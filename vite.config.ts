@@ -27,5 +27,30 @@ export default defineConfig(async () => ({
     target: "es2022",
     minify: "esbuild",
     sourcemap: false,
+    // Monaco editor sits around 3.8 MB by itself; raise the limit so the
+    // bundler warning only fires for genuinely unexpected growth.
+    chunkSizeWarningLimit: 4000,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
+            return "monaco";
+          }
+          if (id.includes("@xterm/")) return "xterm";
+          if (
+            id.includes("react-markdown") ||
+            id.includes("remark-") ||
+            id.includes("rehype-") ||
+            id.includes("highlight.js")
+          ) {
+            return "markdown";
+          }
+          if (id.includes("@iconify") || id.includes("lucide-react")) {
+            return "icons";
+          }
+        },
+      },
+    },
   },
 }));
