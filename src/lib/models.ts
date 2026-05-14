@@ -1,21 +1,23 @@
-import type { AgentMode, ModeModelSettings, ModelRef, ThinkingLevel } from "../types";
+import type {
+  AgentMode,
+  ModeModelSettings,
+  ModelRef,
+  OpenRouterModel,
+  ThinkingLevel,
+} from "../types";
 
-export type ModelId =
-  | "anthropic:claude-opus-4-7"
-  | "anthropic:claude-opus-4-6"
-  | "anthropic:claude-sonnet-4-6"
-  | "anthropic:claude-haiku-4-5"
-  | "openai:gpt-5.5"
-  | "openai:gpt-5.4"
-  | "openai:gpt-5.4-mini"
-  | "openai:gpt-5.3-codex"
-  | "openai:gpt-5.3-codex-spark"
-  | "openai:gpt-5.2"
-  | "google:gemini-3.1-pro-preview"
-  | "kimi:kimi-for-coding";
-export type ProviderId = "anthropic" | "openai" | "google" | "kimi";
+export type ModelId = string;
+export type ProviderId = "anthropic" | "openai" | "google" | "kimi" | "openrouter";
 export type ModeModelSelection = { model: ModelId; thinking: ThinkingLevel };
 export type ModeModelSelections = Record<AgentMode, ModeModelSelection>;
+
+export type ModelEntry = {
+  value: ModelId;
+  provider: ProviderId;
+  label: string;
+  thinking: readonly ThinkingLevel[];
+  defaultThinking: ThinkingLevel;
+};
 
 export const PROVIDERS: {
   value: ProviderId;
@@ -42,6 +44,11 @@ export const PROVIDERS: {
     label: "Kimi",
     icon: "local:kimi",
   },
+  {
+    value: "openrouter",
+    label: "OpenRouter",
+    icon: "simple-icons:openrouter",
+  },
 ];
 
 export const THINKING_LEVELS: { value: ThinkingLevel; label: string }[] = [
@@ -53,13 +60,7 @@ export const THINKING_LEVELS: { value: ThinkingLevel; label: string }[] = [
   { value: "max", label: "Max" },
 ];
 
-export const MODELS: {
-  value: ModelId;
-  provider: ProviderId;
-  label: string;
-  thinking: readonly ThinkingLevel[];
-  defaultThinking: ThinkingLevel;
-}[] = [
+export const MODELS: ModelEntry[] = [
   {
     value: "anthropic:claude-opus-4-7",
     provider: "anthropic",
@@ -146,31 +147,48 @@ export const MODELS: {
   },
 ];
 
-export type ModelEntry = (typeof MODELS)[number];
+const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high"];
+const OPENROUTER_NO_THINKING: readonly ThinkingLevel[] = ["off"];
 
-function isModelId(value: string): value is ModelId {
-  return MODELS.some((model) => model.value === value);
+export function modelsWithOpenRouter(
+  openRouterModels: readonly OpenRouterModel[] = [],
+): ModelEntry[] {
+  return [...MODELS, ...openRouterModelEntries(openRouterModels)];
+}
+
+export function availableModelsForProviders(
+  configuredProviders: readonly string[],
+  openRouterModels: readonly OpenRouterModel[] = [],
+): ModelEntry[] {
+  const configured = new Set(configuredProviders);
+  return [
+    ...MODELS.filter((model) => configured.has(model.provider)),
+    ...(configured.has("openrouter") ? openRouterModelEntries(openRouterModels) : []),
+  ];
+}
+
+function openRouterModelEntries(
+  openRouterModels: readonly OpenRouterModel[],
+): ModelEntry[] {
+  return openRouterModels.map((model) => ({
+    value: modelId("openrouter", model.id),
+    provider: "openrouter",
+    label: model.name || model.id,
+    thinking: model.supportsThinking ? OPENROUTER_THINKING : OPENROUTER_NO_THINKING,
+    defaultThinking: model.supportsThinking ? "medium" : "off",
+  }));
 }
 
 export function modelIdFromRef(model: ModelRef | null | undefined): ModelId {
-  if (model) {
-    const id = `${model.provider}:${model.name}`;
-    if (isModelId(id)) return id;
-  }
-  if (model?.provider === "openai") {
-    return "openai:gpt-5.5";
-  }
-  if (model?.provider === "google") {
-    return "google:gemini-3.1-pro-preview";
-  }
-  if (model?.provider === "kimi") {
-    return "kimi:kimi-for-coding";
-  }
-  return "anthropic:claude-opus-4-7";
+  if (model?.provider && model.name) return modelId(model.provider, model.name);
+  return MODELS[0].value;
 }
 
 export function modelRefFromId(model: ModelId): ModelRef {
-  const [provider, name] = model.split(":");
+  const separator = model.indexOf(":");
+  if (separator < 0) return { provider: "anthropic", name: model };
+  const provider = model.slice(0, separator);
+  const name = model.slice(separator + 1);
   return { provider, name };
 }
 
@@ -190,6 +208,17 @@ export function thinkingFromRef(
   if (model?.provider === "kimi") {
     if (model.effort === "none") return "off";
     return "high";
+  }
+  if (model?.provider === "openrouter") {
+    if (model.effort === "none") return "off";
+    if (
+      model.effort === "low" ||
+      model.effort === "medium" ||
+      model.effort === "high"
+    ) {
+      return model.effort;
+    }
+    return "medium";
   }
   if (
     model?.provider === "openai" &&
@@ -225,6 +254,9 @@ export function modelRefWithThinking(
   }
   if (thinking === "off") return { ...model, effort: "none" };
   if (model.provider === "kimi") return { ...model, effort: "high" };
+  if (model.provider === "openrouter" && (thinking === "xhigh" || thinking === "max")) {
+    return { ...model, effort: "high" };
+  }
   return { ...model, effort: thinking };
 }
 
@@ -235,6 +267,10 @@ export function selectionFromRef(
     model: modelIdFromRef(model),
     thinking: thinkingFromRef(model),
   };
+}
+
+function modelId(provider: string, name: string): ModelId {
+  return `${provider}:${name}`;
 }
 
 export function selectionsFromSettings(

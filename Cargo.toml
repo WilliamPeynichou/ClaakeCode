@@ -6,6 +6,7 @@ members = [
     "crates/sinew-google",
     "crates/sinew-kimi",
     "crates/sinew-openai",
+    "crates/sinew-openrouter",
     "crates/sinew-app",
     "src-tauri",
 ]
@@ -25,6 +26,7 @@ sinew-anthropic = { path = "crates/sinew-anthropic" }
 sinew-google = { path = "crates/sinew-google" }
 sinew-kimi = { path = "crates/sinew-kimi" }
 sinew-openai = { path = "crates/sinew-openai" }
+sinew-openrouter = { path = "crates/sinew-openrouter" }
 sinew-app = { path = "crates/sinew-app" }
 
 tokio = { version = "1.40", features = ["full"] }

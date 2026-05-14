@@ -230,6 +230,28 @@ export type StartKimiLoginOutput = {
   userCode: string;
 };
 
+export type OpenRouterProviderStatus = {
+  connected: boolean;
+  connectionState: ProviderConnectionState;
+  keyPreview?: string | null;
+  lastValidatedMs?: number | null;
+  modelCount: number;
+  error?: string | null;
+};
+
+export type OpenRouterModel = {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  supportsImages: boolean;
+  supportsThinking: boolean;
+  supportsTools: boolean;
+  addedAtMs?: number | null;
+};
+
+export type OpenRouterModelSearchResult = Omit<OpenRouterModel, "addedAtMs">;
+
 export type McpEnvVar = {
   key: string;
   value: string;

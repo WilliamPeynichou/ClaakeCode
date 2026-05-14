@@ -50,10 +50,11 @@ use sinew_app::{
     SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
     ToolSettings, ToolSettingsView, TurnCancel, TurnContext, WebFetchTool, WebSearchTool,
     WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry, WorkspaceFileChangeEvent,
-    WorkspaceSearchResult,
+    WorkspaceSearchResult, OpenRouterModelRecord,
 };
 use sinew_core::{
-    ChatMessage, Effort, ModelRef, Part, Provider, ProviderRequest, Role, ToolDescriptor,
+    ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
+    ToolDescriptor,
 };
 use sinew_google::{
     delete_default_auth as delete_default_google_auth,
@@ -74,6 +75,16 @@ use sinew_openai::{
     delete_default_auth, exchange_oauth_code, generate_pkce, generate_state,
     load_default_auth_status, oauth_authorize_url, OpenAiAuthStatus, OpenAiProvider, PkceCodes,
     MODEL_ID as OPENAI_MODEL_ID,
+};
+use sinew_openrouter::{
+    delete_default_auth as delete_default_openrouter_auth,
+    fetch_model_catalog as fetch_openrouter_model_catalog,
+    load_default_api_key as load_default_openrouter_api_key,
+    load_default_auth_status as load_default_openrouter_auth_status,
+    save_default_api_key as save_default_openrouter_api_key,
+    touch_default_auth_validation as touch_default_openrouter_auth_validation,
+    validate_api_key as validate_openrouter_api_key_remote, OpenRouterAuthStatus,
+    OpenRouterCatalogModel, OpenRouterProvider, PROVIDER_ID as OPENROUTER_PROVIDER_ID,
 };
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tokio::{
@@ -114,6 +125,8 @@ pub fn run() {
         )
         .try_init();
 
+    let store = AppStore::open_default().expect("unable to open app store");
+    let openrouter_models = store.load_openrouter_models().unwrap_or_default();
     let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
     if let Ok(provider) = AnthropicProvider::from_default_sources() {
         providers.insert("anthropic".into(), Arc::new(provider) as Arc<dyn Provider>);
@@ -127,6 +140,14 @@ pub fn run() {
     if let Ok(provider) = KimiProvider::from_default_sources() {
         providers.insert("kimi".into(), Arc::new(provider) as Arc<dyn Provider>);
     }
+    if let Ok(provider) = OpenRouterProvider::from_default_sources(openrouter_capabilities(
+        &openrouter_models,
+    )) {
+        providers.insert(
+            OPENROUTER_PROVIDER_ID.into(),
+            Arc::new(provider) as Arc<dyn Provider>,
+        );
+    }
 
     let default_model = if providers.contains_key("anthropic") {
         ModelRef::new("anthropic", ANTHROPIC_MODEL_ID).with_effort(Effort::Max)
@@ -134,13 +155,18 @@ pub fn run() {
         ModelRef::new("openai", OPENAI_MODEL_ID).with_effort(Effort::Medium)
     } else if providers.contains_key("kimi") {
         ModelRef::new("kimi", KIMI_MODEL_ID).with_effort(Effort::High)
+    } else if providers.contains_key(OPENROUTER_PROVIDER_ID) {
+        openrouter_models
+            .first()
+            .map(default_openrouter_model_ref)
+            .unwrap_or_else(|| ModelRef::new("google", GOOGLE_MODEL_ID).with_effort(Effort::Medium))
     } else {
         ModelRef::new("google", GOOGLE_MODEL_ID).with_effort(Effort::Medium)
     };
 
     let state = DesktopState {
         providers: Arc::new(StdMutex::new(providers)),
-        store: AppStore::open_default().expect("unable to open app store"),
+        store,
         default_model,
         system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
         max_tool_rounds: 200,
@@ -265,6 +291,13 @@ pub fn run() {
             providers::start_kimi_oauth_login,
             providers::cancel_kimi_oauth_login,
             providers::disconnect_kimi_provider,
+            providers::get_openrouter_provider_status,
+            providers::validate_openrouter_api_key,
+            providers::disconnect_openrouter_provider,
+            providers::list_openrouter_models,
+            providers::search_openrouter_models,
+            providers::add_openrouter_model,
+            providers::remove_openrouter_model,
             conversations::probe_mcp_tools,
             conversations::list_installed_skills_command,
             conversations::save_skill_settings,

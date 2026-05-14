@@ -79,6 +79,17 @@ pub(super) struct StartKimiLoginOutput {
     pub(super) user_code: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct OpenRouterProviderStatus {
+    pub(super) connected: bool,
+    pub(super) connection_state: String,
+    pub(super) key_preview: Option<String>,
+    pub(super) last_validated_ms: Option<i64>,
+    pub(super) model_count: usize,
+    pub(super) error: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkspaceInput {
@@ -333,9 +344,52 @@ pub(super) struct SaveSubAgentSettingsInput {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ValidateOpenRouterApiKeyInput {
+    pub(super) api_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct SearchOpenRouterModelsInput {
+    pub(super) query: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AddOpenRouterModelInput {
+    pub(super) model: OpenRouterModelCandidateInput,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct RemoveOpenRouterModelInput {
+    pub(super) id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct OpenRouterModelCandidateInput {
+    pub(super) id: String,
+    pub(super) name: String,
+    pub(super) context_window: u32,
+    pub(super) max_output_tokens: u32,
+    #[serde(default)]
+    pub(super) supports_images: bool,
+    #[serde(default)]
+    pub(super) supports_thinking: bool,
+    #[serde(default = "default_true")]
+    pub(super) supports_tools: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct ModelInput {
     pub(super) provider: String,
     pub(super) name: String,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]

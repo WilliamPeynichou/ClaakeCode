@@ -25,6 +25,7 @@ const MCP_SETTINGS_KEY: &str = "mcp_settings";
 const SUB_AGENT_SETTINGS_KEY: &str = "sub_agent_settings";
 const TOOL_SETTINGS_KEY: &str = "tool_settings";
 const SKILL_SETTINGS_KEY: &str = "skill_settings";
+const OPENROUTER_MODELS_KEY: &str = "openrouter_models";
 const HIDDEN_TOOL_SETTING_NAMES: &[&str] = &["skill"];
 
 pub const DEFAULT_PLAN_MODE_PROMPT: &str = r#"You are in Plan mode.
@@ -250,6 +251,42 @@ pub struct ToolSettingsView {
     pub nano_banana_api_key: String,
     pub web_search_provider: WebSearchProvider,
     pub linkup_api_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenRouterModelRecord {
+    pub id: String,
+    pub name: String,
+    pub context_window: u32,
+    pub max_output_tokens: u32,
+    #[serde(default)]
+    pub supports_images: bool,
+    #[serde(default)]
+    pub supports_thinking: bool,
+    #[serde(default = "default_enabled")]
+    pub supports_tools: bool,
+    #[serde(default)]
+    pub added_at_ms: i64,
+}
+
+impl OpenRouterModelRecord {
+    pub fn normalized(mut self) -> Option<Self> {
+        self.id = self.id.trim().to_string();
+        self.name = self.name.trim().to_string();
+        if self.id.is_empty() {
+            return None;
+        }
+        if self.name.is_empty() {
+            self.name = self.id.clone();
+        }
+        self.context_window = self.context_window.max(1);
+        self.max_output_tokens = self.max_output_tokens.max(1).min(self.context_window);
+        if self.added_at_ms <= 0 {
+            self.added_at_ms = now_ms();
+        }
+        Some(self)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1032,6 +1069,72 @@ impl AppStore {
         Ok(SubAgentSettings::default())
     }
 
+    pub fn load_openrouter_models(&self) -> Result<Vec<OpenRouterModelRecord>> {
+        let conn = self.connection()?;
+        let stored = conn
+            .query_row(
+                "select value_json from app_settings where key = ?1",
+                params![OPENROUTER_MODELS_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .context("unable to read OpenRouter model list")?;
+
+        if let Some(json) = stored {
+            if let Ok(models) = serde_json::from_str::<Vec<OpenRouterModelRecord>>(&json) {
+                return Ok(normalize_openrouter_models(models));
+            }
+        }
+
+        Ok(Vec::new())
+    }
+
+    pub fn save_openrouter_models(
+        &self,
+        models: &[OpenRouterModelRecord],
+    ) -> Result<Vec<OpenRouterModelRecord>> {
+        let normalized = normalize_openrouter_models(models.to_vec());
+        let conn = self.connection()?;
+        conn.execute(
+            "insert into app_settings (key, value_json, updated_at_ms)
+             values (?1, ?2, ?3)
+             on conflict(key) do update set
+                value_json = excluded.value_json,
+                updated_at_ms = excluded.updated_at_ms",
+            params![
+                OPENROUTER_MODELS_KEY,
+                serde_json::to_string(&normalized)?,
+                now_ms(),
+            ],
+        )
+        .context("unable to save OpenRouter model list")?;
+        Ok(normalized)
+    }
+
+    pub fn add_openrouter_model(
+        &self,
+        model: OpenRouterModelRecord,
+    ) -> Result<Vec<OpenRouterModelRecord>> {
+        let Some(model) = model.normalized() else {
+            anyhow::bail!("OpenRouter model id cannot be empty");
+        };
+        let mut models = self.load_openrouter_models()?;
+        if !models.iter().any(|existing| existing.id == model.id) {
+            models.push(model);
+        }
+        self.save_openrouter_models(&models)
+    }
+
+    pub fn remove_openrouter_model(&self, id: &str) -> Result<Vec<OpenRouterModelRecord>> {
+        let id = id.trim();
+        let models = self
+            .load_openrouter_models()?
+            .into_iter()
+            .filter(|model| model.id != id)
+            .collect::<Vec<_>>();
+        self.save_openrouter_models(&models)
+    }
+
     pub fn save_sub_agent_settings(&self, settings: &SubAgentSettings) -> Result<SubAgentSettings> {
         let normalized = settings.clone().normalized();
         let conn = self.connection()?;
@@ -1069,6 +1172,26 @@ impl AppStore {
         )
         .context("unable to delete conversation")?;
         Ok(())
+    }
+
+    pub fn load_conversation_model_by_id(&self, id: &str) -> Result<Option<ModelRef>> {
+        let conn = self.connection()?;
+        conn.query_row(
+            "select model_json from conversations where id = ?1",
+            params![id],
+            |row| {
+                let model_json: String = row.get(0)?;
+                serde_json::from_str::<ModelRef>(&model_json).map_err(|err| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(err),
+                    )
+                })
+            },
+        )
+        .optional()
+        .context("unable to load conversation model")
     }
 
     fn migrate(&self) -> Result<()> {
@@ -1232,6 +1355,15 @@ fn default_enabled() -> bool {
 
 fn default_tool_enabled(name: &str) -> bool {
     !matches!(name, "CreateImage" | "WebSearch")
+}
+
+fn normalize_openrouter_models(models: Vec<OpenRouterModelRecord>) -> Vec<OpenRouterModelRecord> {
+    let mut seen = HashSet::new();
+    models
+        .into_iter()
+        .filter_map(OpenRouterModelRecord::normalized)
+        .filter(|model| seen.insert(model.id.clone()))
+        .collect()
 }
 
 fn load_mode_model_settings_from_conn(

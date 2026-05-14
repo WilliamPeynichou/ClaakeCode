@@ -31,7 +31,9 @@ import {
   MODELS,
   PROVIDERS,
   THINKING_LEVELS,
+  availableModelsForProviders,
   modelRefFromId,
+  modelsWithOpenRouter,
   selectionFromRef,
   selectionsFromSettings,
   thinkingFromRef,
@@ -50,6 +52,7 @@ import type {
   MessageVisibility,
   ModeModelSettings,
   ModelRef,
+  OpenRouterModel,
   Part,
   PlanArtifact,
   PlanControl,
@@ -412,6 +415,7 @@ export function ChatPane({
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+  const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
   const modelRef = useRef<HTMLDivElement | null>(null);
   const thinkingRef = useRef<HTMLDivElement | null>(null);
@@ -475,9 +479,15 @@ export function ChatPane({
 
   const loadConfiguredProviders = useCallback(async () => {
     try {
-      setConfiguredProviders(await api.listConfiguredModelProviders());
+      const [providers, models] = await Promise.all([
+        api.listConfiguredModelProviders(),
+        api.listOpenRouterModels().catch(() => []),
+      ]);
+      setConfiguredProviders(providers);
+      setOpenRouterModels(models);
     } catch {
       setConfiguredProviders([]);
+      setOpenRouterModels([]);
     }
   }, []);
 
@@ -523,9 +533,13 @@ export function ChatPane({
     return () => window.removeEventListener(TOOL_SETTINGS_CHANGED_EVENT, refresh);
   }, [loadAgentTeamsEnabled]);
 
+  const allModels = useMemo(
+    () => modelsWithOpenRouter(openRouterModels),
+    [openRouterModels],
+  );
   const availableModels = useMemo(
-    () => MODELS.filter((entry) => configuredProviders.includes(entry.provider)),
-    [configuredProviders],
+    () => availableModelsForProviders(configuredProviders, openRouterModels),
+    [configuredProviders, openRouterModels],
   );
 
   const baseModeSelections = useMemo(
@@ -556,7 +570,7 @@ export function ChatPane({
   const thinking = currentSelection.thinking;
   const modelEntry = availableModels.find((m) => m.value === model) ?? null;
   const displayModelEntry =
-    modelEntry ?? MODELS.find((m) => m.value === model) ?? null;
+    modelEntry ?? allModels.find((m) => m.value === model) ?? null;
   const availableThinking = modelEntry
     ? THINKING_LEVELS.filter((l) => modelEntry.thinking.includes(l.value))
     : [];
@@ -2643,6 +2657,7 @@ export function ChatPane({
           subAgent={activeSubAgent}
           contextState={subAgentContextEstimate}
           fallbackModel={activeModel}
+          allModels={allModels}
         />
       )}
       {!viewingSubAgent && (
@@ -2708,6 +2723,7 @@ export function ChatPane({
           agents={activeTeamAgentRoster}
           activeId={activeSubAgentId}
           fallbackModel={activeModel}
+          allModels={allModels}
           onOpen={handleOpenSubAgentRecord}
         />
         <div
@@ -3059,11 +3075,13 @@ function TeamAgentRail({
   agents,
   activeId,
   fallbackModel,
+  allModels,
   onOpen,
 }: {
   agents: TeamAgentRosterItem[];
   activeId: string | null;
   fallbackModel: ModelRef;
+  allModels: readonly ModelEntry[];
   onOpen: (record: SubAgentViewRecord) => void;
 }) {
   if (agents.length === 0) return null;
@@ -3071,7 +3089,7 @@ function TeamAgentRail({
     <div className="team-agent-rail" aria-label="Agent Swarm">
       <div className="team-agent-rail__track" role="list">
         {agents.map((agent) => {
-          const label = compactModelLabel(agent.model ?? fallbackModel);
+          const label = compactModelLabel(agent.model ?? fallbackModel, allModels);
           return (
             <button
               key={agent.id}
@@ -3110,13 +3128,15 @@ function SubAgentRuntimeCard({
   subAgent,
   contextState,
   fallbackModel,
+  allModels,
 }: {
   subAgent: SubAgentViewRecord;
   contextState: ContextEstimateState;
   fallbackModel: ModelRef;
+  allModels: readonly ModelEntry[];
 }) {
   const model = subAgent.model ?? fallbackModel;
-  const modelEntry = model ? modelEntryFromRef(model) : null;
+  const modelEntry = model ? modelEntryFromRef(model, allModels) : null;
   const thinkingLabel = model
     ? thinkingLevelLabel(
         THINKING_LEVELS.find((level) => level.value === thinkingFromRef(model)),
@@ -3911,8 +3931,11 @@ function agentStatusLabel(status: TeamAgentRosterItem["status"]): string {
   }
 }
 
-function compactModelLabel(model: ModelRef): string {
-  const entry = modelEntryFromRef(model);
+function compactModelLabel(
+  model: ModelRef,
+  allModels: readonly ModelEntry[] = MODELS,
+): string {
+  const entry = modelEntryFromRef(model, allModels);
   return entry?.label ?? model.name;
 }
 
@@ -3924,9 +3947,12 @@ function subAgentViewId(turnId: string, agentId?: string): string {
   return isTeamAgentId(agentId) ? `agent:${agentId}` : turnId;
 }
 
-function modelEntryFromRef(model: ModelRef) {
+function modelEntryFromRef(
+  model: ModelRef,
+  allModels: readonly ModelEntry[] = MODELS,
+) {
   return (
-    MODELS.find((entry) => {
+    allModels.find((entry) => {
       const ref = modelRefFromId(entry.value);
       return ref.provider === model.provider && ref.name === model.name;
     }) ?? null

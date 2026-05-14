@@ -1990,6 +1990,93 @@ textarea {
   gap: 8px;
 }
 
+.settings-pane__provider-card--openrouter {
+  align-items: stretch;
+}
+
+.settings-pane__provider-card--openrouter .settings-pane__provider-main {
+  flex: 1 1 auto;
+}
+
+.settings-pane__provider-copy--openrouter {
+  flex: 1 1 auto;
+  max-width: 720px;
+}
+
+.settings-pane__openrouter-key {
+  max-width: 520px;
+}
+
+.settings-pane__secret-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-pane__secret-row input {
+  flex: 1 1 auto;
+}
+
+.settings-pane__openrouter-search,
+.settings-pane__openrouter-list {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.settings-pane__openrouter-results,
+.settings-pane__openrouter-list {
+  padding: 8px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-med);
+  background: rgba(255,255,255,0.018);
+}
+
+.settings-pane__openrouter-list-head {
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.settings-pane__openrouter-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-1);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+}
+
+.settings-pane__openrouter-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-pane__openrouter-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-pane__openrouter-added,
+.settings-pane__openrouter-hint,
+.settings-pane__openrouter-empty {
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+}
+
+.settings-pane__openrouter-empty {
+  padding: 2px 0;
+  line-height: 1.45;
+}
+
 /* ----- MCP editor card ----- */
 
 .settings-pane__editor-card {

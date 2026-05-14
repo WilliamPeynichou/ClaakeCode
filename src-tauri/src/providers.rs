@@ -97,6 +97,50 @@ pub(super) fn install_kimi_provider(
     Ok(())
 }
 
+pub(super) fn install_openrouter_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+    models: &[OpenRouterModelRecord],
+) -> std::result::Result<(), String> {
+    let provider = OpenRouterProvider::from_default_sources(openrouter_capabilities(models))
+        .map_err(error_to_string)?;
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .insert(
+            OPENROUTER_PROVIDER_ID.into(),
+            Arc::new(provider) as Arc<dyn Provider>,
+        );
+    Ok(())
+}
+
+pub(super) fn openrouter_capabilities(
+    models: &[OpenRouterModelRecord],
+) -> Vec<ModelCapabilities> {
+    models
+        .iter()
+        .map(|model| {
+            sinew_openrouter::capabilities_from_parts(
+                &model.id,
+                model.context_window,
+                model.max_output_tokens,
+                model.supports_images,
+                model.supports_thinking,
+                model.supports_tools,
+            )
+        })
+        .collect()
+}
+
+pub(super) fn default_openrouter_model_ref(model: &OpenRouterModelRecord) -> ModelRef {
+    let mut model_ref = ModelRef::new(OPENROUTER_PROVIDER_ID, model.id.clone());
+    model_ref.effort = Some(if model.supports_thinking {
+        Effort::Medium
+    } else {
+        Effort::None
+    });
+    model_ref
+}
+
 pub(super) fn remove_openai_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
 ) -> std::result::Result<(), String> {
@@ -134,6 +178,16 @@ pub(super) fn remove_kimi_provider(
         .lock()
         .map_err(|_| "provider registry is unavailable".to_string())?
         .remove("kimi");
+    Ok(())
+}
+
+pub(super) fn remove_openrouter_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+) -> std::result::Result<(), String> {
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .remove(OPENROUTER_PROVIDER_ID);
     Ok(())
 }
 
@@ -203,6 +257,22 @@ pub(super) fn kimi_provider_status_from_auth(
         expires_at_ms: auth.expires_at_ms,
         last_refresh_ms: auth.last_refresh_ms,
         login_id,
+        error,
+    }
+}
+
+pub(super) fn openrouter_provider_status_from_auth(
+    auth: OpenRouterAuthStatus,
+    connection_state: &str,
+    model_count: usize,
+    error: Option<String>,
+) -> OpenRouterProviderStatus {
+    OpenRouterProviderStatus {
+        connected: auth.connected && connection_state == "connected",
+        connection_state: connection_state.to_string(),
+        key_preview: auth.key_preview,
+        last_validated_ms: auth.last_validated_ms,
+        model_count,
         error,
     }
 }
@@ -1283,4 +1353,219 @@ pub(super) async fn disconnect_kimi_provider(
         None,
         None,
     ))
+}
+
+#[tauri::command]
+pub(super) async fn get_openrouter_provider_status(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<OpenRouterProviderStatus, String> {
+    let model_count = state
+        .store
+        .load_openrouter_models()
+        .map_err(error_to_string)?
+        .len();
+    let auth = load_default_openrouter_auth_status().map_err(error_to_string)?;
+    let Some(api_key) = load_default_openrouter_api_key().map_err(error_to_string)? else {
+        remove_openrouter_provider(&state.providers)?;
+        return Ok(openrouter_provider_status_from_auth(
+            auth,
+            "disconnected",
+            model_count,
+            None,
+        ));
+    };
+
+    match validate_openrouter_api_key_remote(&api_key).await {
+        Ok(()) => {
+            let auth = touch_default_openrouter_auth_validation().map_err(error_to_string)?;
+            let models = state
+                .store
+                .load_openrouter_models()
+                .map_err(error_to_string)?;
+            install_openrouter_provider(&state.providers, &models)?;
+            Ok(openrouter_provider_status_from_auth(
+                auth,
+                "connected",
+                models.len(),
+                None,
+            ))
+        }
+        Err(err) => {
+            remove_openrouter_provider(&state.providers)?;
+            Ok(openrouter_provider_status_from_auth(
+                auth,
+                "error",
+                model_count,
+                Some(err.to_string()),
+            ))
+        }
+    }
+}
+
+#[tauri::command]
+pub(super) async fn validate_openrouter_api_key(
+    state: State<'_, DesktopState>,
+    input: ValidateOpenRouterApiKeyInput,
+) -> std::result::Result<OpenRouterProviderStatus, String> {
+    let api_key = input.api_key.trim().to_string();
+    if api_key.is_empty() {
+        return Ok(openrouter_provider_status_from_auth(
+            OpenRouterAuthStatus::disconnected(),
+            "disconnected",
+            state
+                .store
+                .load_openrouter_models()
+                .map_err(error_to_string)?
+                .len(),
+            None,
+        ));
+    }
+
+    validate_openrouter_api_key_remote(&api_key)
+        .await
+        .map_err(error_to_string)?;
+    let auth = save_default_openrouter_api_key(&api_key).map_err(error_to_string)?;
+    let models = state
+        .store
+        .load_openrouter_models()
+        .map_err(error_to_string)?;
+    install_openrouter_provider(&state.providers, &models)?;
+    Ok(openrouter_provider_status_from_auth(
+        auth,
+        "connected",
+        models.len(),
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn disconnect_openrouter_provider(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<OpenRouterProviderStatus, String> {
+    cancel_active_turns_for_provider(&state, OPENROUTER_PROVIDER_ID).await;
+    delete_default_openrouter_auth().map_err(error_to_string)?;
+    remove_openrouter_provider(&state.providers)?;
+    let model_count = state
+        .store
+        .load_openrouter_models()
+        .map_err(error_to_string)?
+        .len();
+    Ok(openrouter_provider_status_from_auth(
+        OpenRouterAuthStatus::disconnected(),
+        "disconnected",
+        model_count,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) fn list_openrouter_models(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<Vec<OpenRouterModelRecord>, String> {
+    state.store.load_openrouter_models().map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn search_openrouter_models(
+    state: State<'_, DesktopState>,
+    input: SearchOpenRouterModelsInput,
+) -> std::result::Result<Vec<OpenRouterCatalogModel>, String> {
+    let query = input.query.trim().to_ascii_lowercase();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let api_key = load_default_openrouter_api_key()
+        .map_err(error_to_string)?
+        .ok_or_else(|| "OpenRouter is not connected".to_string())?;
+    let catalog = match fetch_openrouter_model_catalog(&api_key).await {
+        Ok(catalog) => catalog,
+        Err(err) => {
+            if matches!(err, sinew_core::AppError::Auth(_)) {
+                remove_openrouter_provider(&state.providers)?;
+            }
+            return Err(error_to_string(err));
+        }
+    };
+    let mut matches = catalog
+        .into_iter()
+        .filter(|model| {
+            model.name.to_ascii_lowercase().contains(&query)
+                || model.id.to_ascii_lowercase().contains(&query)
+        })
+        .collect::<Vec<_>>();
+    matches.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    matches.truncate(20);
+    Ok(matches)
+}
+
+#[tauri::command]
+pub(super) fn add_openrouter_model(
+    state: State<'_, DesktopState>,
+    input: AddOpenRouterModelInput,
+) -> std::result::Result<Vec<OpenRouterModelRecord>, String> {
+    let model = OpenRouterModelRecord {
+        id: input.model.id,
+        name: input.model.name,
+        context_window: input.model.context_window,
+        max_output_tokens: input.model.max_output_tokens,
+        supports_images: input.model.supports_images,
+        supports_thinking: input.model.supports_thinking,
+        supports_tools: input.model.supports_tools,
+        added_at_ms: now_ms(),
+    };
+    let models = state
+        .store
+        .add_openrouter_model(model)
+        .map_err(error_to_string)?;
+    refresh_openrouter_provider_if_present(&state, &models)?;
+    Ok(models)
+}
+
+#[tauri::command]
+pub(super) fn remove_openrouter_model(
+    state: State<'_, DesktopState>,
+    input: RemoveOpenRouterModelInput,
+) -> std::result::Result<Vec<OpenRouterModelRecord>, String> {
+    let models = state
+        .store
+        .remove_openrouter_model(&input.id)
+        .map_err(error_to_string)?;
+    refresh_openrouter_provider_if_present(&state, &models)?;
+    Ok(models)
+}
+
+pub(super) fn refresh_openrouter_provider_if_present(
+    state: &DesktopState,
+    models: &[OpenRouterModelRecord],
+) -> std::result::Result<(), String> {
+    let present = state
+        .providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .contains_key(OPENROUTER_PROVIDER_ID);
+    if present {
+        install_openrouter_provider(&state.providers, models)?;
+    }
+    Ok(())
+}
+
+pub(super) async fn cancel_active_turns_for_provider(state: &DesktopState, provider_id: &str) {
+    let active = state
+        .active_turns
+        .lock()
+        .await
+        .iter()
+        .map(|(conversation_id, cancel)| (conversation_id.clone(), cancel.clone()))
+        .collect::<Vec<_>>();
+    for (conversation_id, cancel) in active {
+        match state.store.load_conversation_model_by_id(&conversation_id) {
+            Ok(Some(model)) if model.provider == provider_id => {
+                cancel.cancel_all();
+            }
+            Ok(_) => {}
+            Err(err) => {
+                tracing::warn!(conversation_id, error = %err, "unable to inspect active turn model before provider disconnect");
+            }
+        }
+    }
 }

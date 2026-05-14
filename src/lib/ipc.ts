@@ -17,6 +17,9 @@ import type {
   ModeModelSettings,
   ModelRef,
   OpenAiProviderStatus,
+  OpenRouterModel,
+  OpenRouterModelSearchResult,
+  OpenRouterProviderStatus,
   PlanControl,
   SavedConversation,
   SkillSettings,
@@ -322,6 +325,35 @@ export const api = {
   },
   disconnectKimiProvider() {
     return invoke<KimiProviderStatus>("disconnect_kimi_provider");
+  },
+  getOpenRouterProviderStatus() {
+    return invoke<OpenRouterProviderStatus>("get_openrouter_provider_status");
+  },
+  validateOpenRouterApiKey(apiKey: string) {
+    return invoke<OpenRouterProviderStatus>("validate_openrouter_api_key", {
+      input: { apiKey },
+    });
+  },
+  disconnectOpenRouterProvider() {
+    return invoke<OpenRouterProviderStatus>("disconnect_openrouter_provider");
+  },
+  listOpenRouterModels() {
+    return invoke<OpenRouterModel[]>("list_openrouter_models");
+  },
+  searchOpenRouterModels(query: string) {
+    return invoke<OpenRouterModelSearchResult[]>("search_openrouter_models", {
+      input: { query },
+    });
+  },
+  addOpenRouterModel(model: OpenRouterModelSearchResult) {
+    return invoke<OpenRouterModel[]>("add_openrouter_model", {
+      input: { model },
+    });
+  },
+  removeOpenRouterModel(id: string) {
+    return invoke<OpenRouterModel[]>("remove_openrouter_model", {
+      input: { id },
+    });
   },
   probeMcpTools() {
     return invoke<McpServerProbe[]>("probe_mcp_tools");

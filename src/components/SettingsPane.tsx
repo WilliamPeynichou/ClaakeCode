@@ -9,6 +9,7 @@ import {
   MODELS,
   PROVIDERS,
   THINKING_LEVELS,
+  availableModelsForProviders,
   modelIdFromRef,
   modelRefFromId,
   modelRefWithThinking,
@@ -27,6 +28,9 @@ import type {
   McpServerProbe,
   McpSettings,
   OpenAiProviderStatus,
+  OpenRouterModel,
+  OpenRouterModelSearchResult,
+  OpenRouterProviderStatus,
   SkillSettings,
   SubAgentConfig,
   SubAgentSettings,
@@ -99,6 +103,8 @@ export function SettingsPane({ workspacePath }: Props) {
   const [anthropicStatus, setAnthropicStatus] = useState<AnthropicProviderStatus | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleProviderStatus | null>(null);
   const [kimiStatus, setKimiStatus] = useState<KimiProviderStatus | null>(null);
+  const [openRouterStatus, setOpenRouterStatus] = useState<OpenRouterProviderStatus | null>(null);
+  const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersBusy, setProvidersBusy] = useState(false);
   const [providersMessage, setProvidersMessage] = useState<string | null>(null);
@@ -276,9 +282,15 @@ export function SettingsPane({ workspacePath }: Props) {
 
   const loadConfiguredProviders = useCallback(async () => {
     try {
-      setConfiguredProviders(await api.listConfiguredModelProviders());
+      const [providers, models] = await Promise.all([
+        api.listConfiguredModelProviders(),
+        api.listOpenRouterModels().catch(() => []),
+      ]);
+      setConfiguredProviders(providers);
+      setOpenRouterModels(models);
     } catch {
       setConfiguredProviders([]);
+      setOpenRouterModels([]);
     }
   }, []);
 
@@ -287,8 +299,8 @@ export function SettingsPane({ workspacePath }: Props) {
   }, [loadConfiguredProviders]);
 
   const availableModels = useMemo(
-    () => MODELS.filter((model) => configuredProviders.includes(model.provider)),
-    [configuredProviders],
+    () => availableModelsForProviders(configuredProviders, openRouterModels),
+    [configuredProviders, openRouterModels],
   );
 
   const loadOpenAiStatus = useCallback(async () => {
@@ -359,22 +371,44 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [loadConfiguredProviders]);
 
+  const loadOpenRouterStatus = useCallback(async () => {
+    setProvidersLoading(true);
+    try {
+      const [status, models] = await Promise.all([
+        api.getOpenRouterProviderStatus(),
+        api.listOpenRouterModels(),
+      ]);
+      setOpenRouterStatus(status);
+      setOpenRouterModels(models);
+      setProvidersMessage(status.error ?? null);
+      void loadConfiguredProviders();
+      window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [loadConfiguredProviders]);
+
   useEffect(() => {
     if (section !== "providers") return;
     if (openAiStatus === null) void loadOpenAiStatus();
     if (anthropicStatus === null) void loadAnthropicStatus();
     if (googleStatus === null) void loadGoogleStatus();
     if (kimiStatus === null) void loadKimiStatus();
+    if (openRouterStatus === null) void loadOpenRouterStatus();
   }, [
     section,
     openAiStatus,
     anthropicStatus,
     googleStatus,
     kimiStatus,
+    openRouterStatus,
     loadOpenAiStatus,
     loadAnthropicStatus,
     loadGoogleStatus,
     loadKimiStatus,
+    loadOpenRouterStatus,
   ]);
 
   useEffect(() => {
@@ -591,6 +625,26 @@ export function SettingsPane({ workspacePath }: Props) {
     } finally {
       setProvidersBusy(false);
     }
+  }, [loadConfiguredProviders]);
+
+  const disconnectOpenRouter = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      setOpenRouterStatus(await api.disconnectOpenRouterProvider());
+      setProvidersMessage("Disconnected");
+      void loadConfiguredProviders();
+      window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, [loadConfiguredProviders]);
+
+  const handleOpenRouterChanged = useCallback(() => {
+    void loadConfiguredProviders();
+    window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
   }, [loadConfiguredProviders]);
 
   const saveAndDetect = useCallback(async () => {
@@ -1004,6 +1058,8 @@ export function SettingsPane({ workspacePath }: Props) {
             anthropicStatus={anthropicStatus}
             googleStatus={googleStatus}
             kimiStatus={kimiStatus}
+            openRouterStatus={openRouterStatus}
+            openRouterModels={openRouterModels}
             loading={providersLoading}
             busy={providersBusy}
             message={providersMessage}
@@ -1012,6 +1068,7 @@ export function SettingsPane({ workspacePath }: Props) {
               void loadAnthropicStatus();
               void loadGoogleStatus();
               void loadKimiStatus();
+              void loadOpenRouterStatus();
             }}
             onConnect={() => void connectOpenAi()}
             onCancel={() => void cancelOpenAi()}
@@ -1025,6 +1082,10 @@ export function SettingsPane({ workspacePath }: Props) {
             onConnectKimi={() => void connectKimi()}
             onCancelKimi={() => void cancelKimi()}
             onDisconnectKimi={() => void disconnectKimi()}
+            onDisconnectOpenRouter={() => void disconnectOpenRouter()}
+            onOpenRouterStatusChange={setOpenRouterStatus}
+            onOpenRouterModelsChange={setOpenRouterModels}
+            onOpenRouterChanged={handleOpenRouterChanged}
           />
         ) : section === "tools" ? (
           <ToolsSection
@@ -1158,6 +1219,8 @@ type ProvidersSectionProps = {
   anthropicStatus: AnthropicProviderStatus | null;
   googleStatus: GoogleProviderStatus | null;
   kimiStatus: KimiProviderStatus | null;
+  openRouterStatus: OpenRouterProviderStatus | null;
+  openRouterModels: OpenRouterModel[];
   loading: boolean;
   busy: boolean;
   message: string | null;
@@ -1174,6 +1237,10 @@ type ProvidersSectionProps = {
   onConnectKimi: () => void;
   onCancelKimi: () => void;
   onDisconnectKimi: () => void;
+  onDisconnectOpenRouter: () => void;
+  onOpenRouterStatusChange: (status: OpenRouterProviderStatus) => void;
+  onOpenRouterModelsChange: (models: OpenRouterModel[]) => void;
+  onOpenRouterChanged: () => void;
 };
 
 function ProvidersSection({
@@ -1181,6 +1248,8 @@ function ProvidersSection({
   anthropicStatus,
   googleStatus,
   kimiStatus,
+  openRouterStatus,
+  openRouterModels,
   loading,
   busy,
   message,
@@ -1197,6 +1266,10 @@ function ProvidersSection({
   onConnectKimi,
   onCancelKimi,
   onDisconnectKimi,
+  onDisconnectOpenRouter,
+  onOpenRouterStatusChange,
+  onOpenRouterModelsChange,
+  onOpenRouterChanged,
 }: ProvidersSectionProps) {
   return (
     <>
@@ -1285,6 +1358,16 @@ function ProvidersSection({
           onConnect={onConnectKimi}
           onCancel={onCancelKimi}
           onDisconnect={onDisconnectKimi}
+        />
+        <OpenRouterProviderCard
+          status={openRouterStatus}
+          models={openRouterModels}
+          loading={loading}
+          busy={busy}
+          onDisconnect={onDisconnectOpenRouter}
+          onStatusChange={onOpenRouterStatusChange}
+          onModelsChange={onOpenRouterModelsChange}
+          onChanged={onOpenRouterChanged}
         />
       </div>
     </>
@@ -1404,6 +1487,326 @@ function ProviderCard({
             />
             <span>{busy ? "Opening..." : "Connect"}</span>
           </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type OpenRouterProviderCardProps = {
+  status: OpenRouterProviderStatus | null;
+  models: OpenRouterModel[];
+  loading: boolean;
+  busy: boolean;
+  onDisconnect: () => void;
+  onStatusChange: (status: OpenRouterProviderStatus) => void;
+  onModelsChange: (models: OpenRouterModel[]) => void;
+  onChanged: () => void;
+};
+
+function OpenRouterProviderCard({
+  status,
+  models,
+  loading,
+  busy,
+  onDisconnect,
+  onStatusChange,
+  onModelsChange,
+  onChanged,
+}: OpenRouterProviderCardProps) {
+  const [apiKey, setApiKey] = useState("");
+  const [revealed, setRevealed] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<OpenRouterModelSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [mutatingModelId, setMutatingModelId] = useState<string | null>(null);
+  const validationSeq = useRef(0);
+  const searchSeq = useRef(0);
+
+  const displayStatus: OpenRouterProviderStatus = validating
+    ? {
+        connected: false,
+        connectionState: "connecting",
+        modelCount: models.length,
+      }
+    : status ?? {
+        connected: false,
+        connectionState: "disconnected",
+        modelCount: models.length,
+      };
+  const state = displayStatus.connectionState;
+  const connected = Boolean(displayStatus.connected);
+  const connecting = state === "connecting";
+  const error = validationError ?? (state === "error" ? displayStatus.error : null);
+  const statusLabel = connecting
+    ? "Connecting"
+    : connected
+      ? "Connected"
+      : state === "error"
+        ? "Needs attention"
+        : "Not connected";
+  const statusTone = connecting
+    ? "pending"
+    : connected
+      ? "ok"
+      : state === "error"
+        ? "error"
+        : "off";
+  const modelIds = useMemo(() => new Set(models.map((model) => model.id)), [models]);
+  const searchEnabled = connected && !validating;
+
+  useEffect(() => {
+    const key = apiKey.trim();
+    validationSeq.current += 1;
+    const seq = validationSeq.current;
+    setValidationError(null);
+    if (!key) {
+      setValidating(false);
+      return;
+    }
+    setValidating(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const next = await api.validateOpenRouterApiKey(key);
+          if (validationSeq.current !== seq) return;
+          onStatusChange(next);
+          setApiKey("");
+          setValidationError(null);
+          onChanged();
+        } catch (err) {
+          if (validationSeq.current !== seq) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setValidationError(message);
+          onStatusChange({
+            connected: false,
+            connectionState: "error",
+            modelCount: models.length,
+            error: message,
+          });
+        } finally {
+          if (validationSeq.current === seq) setValidating(false);
+        }
+      })();
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [apiKey, models.length, onChanged, onStatusChange]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    searchSeq.current += 1;
+    const seq = searchSeq.current;
+    setSearchError(null);
+    if (!trimmed || !searchEnabled) {
+      setSearching(false);
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const found = await api.searchOpenRouterModels(trimmed);
+          if (searchSeq.current !== seq) return;
+          setResults(found);
+        } catch (err) {
+          if (searchSeq.current !== seq) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setSearchError(message);
+          setResults([]);
+          onStatusChange({
+            connected: false,
+            connectionState: "error",
+            modelCount: models.length,
+            error: message,
+          });
+        } finally {
+          if (searchSeq.current === seq) setSearching(false);
+        }
+      })();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [models.length, onStatusChange, query, searchEnabled]);
+
+  const addModel = async (model: OpenRouterModelSearchResult) => {
+    setMutatingModelId(model.id);
+    setSearchError(null);
+    try {
+      const next = await api.addOpenRouterModel(model);
+      onModelsChange(next);
+      onStatusChange({
+        ...(status ?? displayStatus),
+        connected: true,
+        connectionState: "connected",
+        modelCount: next.length,
+        error: null,
+      });
+      onChanged();
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutatingModelId(null);
+    }
+  };
+
+  const removeModel = async (id: string) => {
+    setMutatingModelId(id);
+    setSearchError(null);
+    try {
+      const next = await api.removeOpenRouterModel(id);
+      onModelsChange(next);
+      if (status) {
+        onStatusChange({ ...status, modelCount: next.length });
+      }
+      onChanged();
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutatingModelId(null);
+    }
+  };
+
+  return (
+    <section className="settings-pane__provider-card settings-pane__provider-card--openrouter">
+      <div className="settings-pane__provider-main">
+        <div className="settings-pane__provider-mark" aria-hidden>
+          <Icon icon="simple-icons:openrouter" width={24} height={24} />
+        </div>
+        <div className="settings-pane__provider-copy settings-pane__provider-copy--openrouter">
+          <div className="settings-pane__provider-title-row">
+            <h2>OpenRouter</h2>
+            <span className="settings-pane__chip" data-tone={statusTone}>
+              <span className="settings-pane__chip-dot" />
+              {statusLabel}
+            </span>
+          </div>
+          <p>
+            Add an OpenRouter API key, then search and curate the models that appear in Sinew.
+          </p>
+          {connected && (
+            <div className="settings-pane__provider-meta">
+              <span>{displayStatus.keyPreview ?? "API key saved"}</span>
+              <span>
+                {models.length} model{models.length === 1 ? "" : "s"} added
+              </span>
+            </div>
+          )}
+          {error && <div className="settings-pane__provider-error">{error}</div>}
+
+          <label className="settings-pane__field settings-pane__openrouter-key">
+            <span>API key</span>
+            <div className="settings-pane__secret-row">
+              <input
+                type={revealed ? "text" : "password"}
+                value={apiKey}
+                placeholder={connected ? displayStatus.keyPreview ?? "API key saved" : "sk-or-..."}
+                onChange={(event) => setApiKey(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="settings-pane__icon-btn"
+                onClick={() => setRevealed((value) => !value)}
+                title={revealed ? "Hide API key" : "Reveal API key"}
+                aria-label={revealed ? "Hide API key" : "Reveal API key"}
+              >
+                <Icon icon={revealed ? "solar:eye-closed-linear" : "solar:eye-linear"} width={14} height={14} />
+              </button>
+            </div>
+          </label>
+
+          <div className="settings-pane__openrouter-search">
+            <label className="settings-pane__field">
+              <span>Search OpenRouter models</span>
+              <input
+                value={query}
+                disabled={!searchEnabled}
+                placeholder={searchEnabled ? "Type a model name…" : "Save a valid key to enable search"}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <div className="settings-pane__openrouter-results" aria-live="polite">
+              {!searchEnabled ? (
+                <div className="settings-pane__openrouter-empty">Search is available after a valid key is saved.</div>
+              ) : !query.trim() ? (
+                <div className="settings-pane__openrouter-empty">Search the OpenRouter catalog to add models.</div>
+              ) : searching ? (
+                <div className="settings-pane__openrouter-empty">Searching…</div>
+              ) : searchError ? (
+                <div className="settings-pane__provider-error">{searchError}</div>
+              ) : results.length === 0 ? (
+                <div className="settings-pane__openrouter-empty">No matching model.</div>
+              ) : (
+                results.map((model) => {
+                  const added = modelIds.has(model.id);
+                  return (
+                    <div key={model.id} className="settings-pane__openrouter-row">
+                      <span>{model.name}</span>
+                      {added ? (
+                        <span className="settings-pane__openrouter-added">Already added</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="settings-pane__btn"
+                          onClick={() => void addModel(model)}
+                          disabled={mutatingModelId === model.id}
+                        >
+                          <Icon icon="solar:add-circle-linear" width={13} height={13} />
+                          <span>{mutatingModelId === model.id ? "Adding…" : "Add"}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="settings-pane__openrouter-list">
+            <div className="settings-pane__openrouter-list-head">
+              <span>Added OpenRouter models</span>
+            </div>
+            {models.length === 0 ? (
+              <div className="settings-pane__openrouter-empty">No OpenRouter models added yet.</div>
+            ) : (
+              models.map((model) => (
+                <div key={model.id} className="settings-pane__openrouter-row">
+                  <span>{model.name}</span>
+                  <button
+                    type="button"
+                    className="settings-pane__icon-btn"
+                    onClick={() => void removeModel(model.id)}
+                    disabled={mutatingModelId === model.id}
+                    title="Remove model"
+                    aria-label={`Remove ${model.name}`}
+                  >
+                    <Icon icon="solar:trash-bin-trash-linear" width={13} height={13} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="settings-pane__provider-actions">
+        {connected ? (
+          <button
+            type="button"
+            className="settings-pane__btn"
+            onClick={onDisconnect}
+            disabled={busy}
+          >
+            <Icon icon="solar:logout-2-linear" width={13} height={13} />
+            <span>{busy ? "Disconnecting..." : "Disconnect"}</span>
+          </button>
+        ) : (
+          <span className="settings-pane__openrouter-hint">
+            {loading ? "Refreshing…" : validating ? "Validating…" : "Paste a key to connect"}
+          </span>
         )}
       </div>
     </section>
