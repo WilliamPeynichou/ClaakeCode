@@ -214,6 +214,8 @@ pub fn run() {
             workspace::read_external_file_command,
             workspace::delete_skill_command,
             workspace::open_external_url_command,
+            workspace::open_path_with_default_app_command,
+            workspace::copy_file_to_path_command,
             workspace::copy_workspace_entries_command,
             workspace::import_workspace_paths_command,
             workspace::save_clipboard_image_attachment_command,

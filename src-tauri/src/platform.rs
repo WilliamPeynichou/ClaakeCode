@@ -309,6 +309,53 @@ pub(super) fn open_external_url(raw_url: &str) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn open_with_default_app(path: &Path) -> Result<()> {
+    if !path.exists() {
+        anyhow::bail!("path does not exist");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let status = Command::new("open")
+            .arg(path)
+            .status()
+            .context("unable to open file with default application")?;
+        if !status.success() {
+            anyhow::bail!("default application open failed");
+        }
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // `start` is a cmd builtin; the second argument is the window title.
+        let status = Command::new("cmd")
+            .args(["/C", "start", ""])
+            .arg(path)
+            .status()
+            .context("unable to open file with default application")?;
+        if !status.success() {
+            anyhow::bail!("default application open failed");
+        }
+        return Ok(());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let status = Command::new("xdg-open")
+            .arg(path)
+            .status()
+            .context("unable to open file with default application")?;
+        if !status.success() {
+            anyhow::bail!("default application open failed");
+        }
+        return Ok(());
+    }
+
+    #[allow(unreachable_code)]
+    Ok(())
+}
+
 pub(super) fn is_safe_external_url(url: &str) -> bool {
     if url.len() > 4096 || url.chars().any(char::is_control) {
         return false;

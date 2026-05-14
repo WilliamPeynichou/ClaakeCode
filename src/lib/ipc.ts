@@ -147,6 +147,16 @@ export const api = {
       input: { url },
     });
   },
+  openPathWithDefaultApp(path: string) {
+    return invoke<void>("open_path_with_default_app_command", {
+      input: { path },
+    });
+  },
+  copyFileToPath(sourcePath: string, destinationPath: string) {
+    return invoke<void>("copy_file_to_path_command", {
+      input: { sourcePath, destinationPath },
+    });
+  },
   copyEntries(
     workspacePath: string,
     sources: string[],

@@ -375,6 +375,35 @@ pub(super) async fn open_external_url_command(input: OpenExternalUrlInput) -> st
 }
 
 #[tauri::command]
+pub(super) async fn open_path_with_default_app_command(
+    input: AbsolutePathInput,
+) -> std::result::Result<(), String> {
+    let path = std::path::PathBuf::from(&input.path);
+    open_with_default_app(&path).map_err(error_to_string)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CopyFileToPathInput {
+    pub(super) source_path: String,
+    pub(super) destination_path: String,
+}
+
+#[tauri::command]
+pub(super) async fn copy_file_to_path_command(
+    input: CopyFileToPathInput,
+) -> std::result::Result<(), String> {
+    let source = std::path::PathBuf::from(&input.source_path);
+    let destination = std::path::PathBuf::from(&input.destination_path);
+    if !source.exists() {
+        return Err("source file does not exist".to_string());
+    }
+    std::fs::copy(&source, &destination)
+        .map(|_| ())
+        .map_err(|err| format!("unable to copy file: {err}"))
+}
+
+#[tauri::command]
 pub(super) async fn copy_workspace_entries_command(
     app: AppHandle,
     input: CopyWorkspaceEntriesInput,

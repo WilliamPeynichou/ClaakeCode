@@ -13,6 +13,7 @@ import { languageForPath } from "../lib/language";
 import { fileIcon } from "../lib/fileIcon";
 import { Markdown } from "./chat/Markdown";
 import type { EditorRevealTarget, EditorTab } from "../types";
+import { ImageContextMenu } from "./ImageContextMenu";
 
 if (!(globalThis as typeof globalThis & { MonacoEnvironment?: unknown }).MonacoEnvironment) {
   (
@@ -82,7 +83,19 @@ export function EditorPane({
   const [markdownPreview, setMarkdownPreview] = useState<
     Record<string, boolean>
   >({});
+  // Position of the custom right-click menu on the image viewer. `null`
+  // means the menu is closed. We store viewport coordinates because the
+  // menu is rendered with `position: fixed`.
+  const [imageMenu, setImageMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const activeTab: EditorTab | undefined = settingsActive ? undefined : tabs[activeIndex];
+  // Close the image context menu whenever the user switches tabs or
+  // toggles into the settings view, so it never lingers on the wrong file.
+  useEffect(() => {
+    setImageMenu(null);
+  }, [activeIndex, settingsActive]);
+
   const activeIsMarkdown = activeTab
     ? isMarkdownPath(activeTab.relativePath)
     : false;
@@ -396,7 +409,13 @@ export function EditorPane({
               </span>
             </div>
           ) : isPreviewableImagePath(activeTab.relativePath) ? (
-            <div className="editor-image-preview">
+            <div
+              className="editor-image-preview"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setImageMenu({ x: event.clientX, y: event.clientY });
+              }}
+            >
               <img
                 src={imagePreviewSrc(activeTab.doc)}
                 alt={activeTab.doc.name}
@@ -406,6 +425,16 @@ export function EditorPane({
                 <span>{activeTab.doc.name}</span>
                 <span>{formatBytes(activeTab.doc.size)}</span>
               </div>
+              {imageMenu && (
+                <ImageContextMenu
+                  x={imageMenu.x}
+                  y={imageMenu.y}
+                  imageSrc={imagePreviewSrc(activeTab.doc)}
+                  absolutePath={activeTab.doc.absolutePath}
+                  fileName={activeTab.doc.name}
+                  onClose={() => setImageMenu(null)}
+                />
+              )}
             </div>
           ) : showTextEditor ? (
             <div

@@ -1128,7 +1128,7 @@ function AboutSection() {
       <div className="settings-pane__about-links">
         <a
           className="settings-pane__about-link"
-          href="https://discord.gg/"
+          href="https://discord.gg/MADQNHtZW"
           target="_blank"
           rel="noreferrer"
         >
@@ -1137,7 +1137,7 @@ function AboutSection() {
         </a>
         <a
           className="settings-pane__about-link"
-          href="https://github.com/"
+          href="https://github.com/Paseru/sinew"
           target="_blank"
           rel="noreferrer"
         >
