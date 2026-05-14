@@ -155,6 +155,26 @@ jobs:
           #   - the updater plugin is configured (we set this)
           updaterJsonPreferNsis: false
 
+      # Publish a *stable-named* copy of the macOS DMG so the landing page
+      # can hard-link to `releases/latest/download/Sinew_universal.dmg`
+      # without needing to know the version. Tauri names the DMG with the
+      # version embedded (e.g. `Sinew_0.1.2_universal.dmg`), so we make an
+      # additional version-less upload.
+      - name: Upload version-less DMG alias
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG_PATH=$(ls target/universal-apple-darwin/release/bundle/dmg/Sinew_*_universal.dmg | head -1)
+          if [ -z "$DMG_PATH" ]; then
+            echo "No DMG produced — skipping alias upload."
+            exit 0
+          fi
+          cp "$DMG_PATH" "$(dirname "$DMG_PATH")/Sinew_universal.dmg"
+          gh release upload "${{ needs.create-release.outputs.tag_name }}" \
+            "$(dirname "$DMG_PATH")/Sinew_universal.dmg" \
+            --clobber
+
   finalize-release:
     name: Finalize release
     needs: [create-release, build-tauri]
