@@ -11,6 +11,8 @@ type Props = {
   deriveName: (path: string) => string;
 };
 
+const MAX_VISIBLE_RECENTS = 5;
+
 export function Welcome({ onPick, error, deriveName }: Props) {
   const [recents, setRecents] = useState<RecentWorkspace[]>([]);
   const [picking, setPicking] = useState(false);
@@ -76,7 +78,7 @@ export function Welcome({ onPick, error, deriveName }: Props) {
           <section className="welcome__section">
             <h2 className="welcome__section-heading">Recent</h2>
             <div className="welcome__recents">
-              {recents.map((recent) => (
+              {recents.slice(0, MAX_VISIBLE_RECENTS).map((recent) => (
                 <button
                   key={recent.path}
                   className="welcome__recent"

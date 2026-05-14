@@ -13,6 +13,7 @@ import {
   modelIdFromRef,
   modelRefFromId,
   modelRefWithThinking,
+  sanitizeOpenRouterName,
   thinkingFromRef,
   type ModelEntry,
   type ModelId,
@@ -1635,7 +1636,8 @@ function OpenRouterProviderCard({
     setMutatingModelId(model.id);
     setSearchError(null);
     try {
-      const next = await api.addOpenRouterModel(model);
+      const cleanName = sanitizeOpenRouterName(model.name) || model.id;
+      const next = await api.addOpenRouterModel({ ...model, name: cleanName });
       onModelsChange(next);
       onStatusChange({
         ...(status ?? displayStatus),
@@ -1675,7 +1677,7 @@ function OpenRouterProviderCard({
         <div className="settings-pane__provider-mark" aria-hidden>
           <Icon icon="simple-icons:openrouter" width={24} height={24} />
         </div>
-        <div className="settings-pane__provider-copy settings-pane__provider-copy--openrouter">
+        <div className="settings-pane__provider-copy">
           <div className="settings-pane__provider-title-row">
             <h2>OpenRouter</h2>
             <span className="settings-pane__chip" data-tone={statusTone}>
@@ -1683,131 +1685,143 @@ function OpenRouterProviderCard({
               {statusLabel}
             </span>
           </div>
-          <p>
-            Add an OpenRouter API key, then search and curate the models that appear in Sinew.
-          </p>
+          <p>Use any OpenRouter model with your own API key.</p>
           {connected && (
             <div className="settings-pane__provider-meta">
-              <span>{displayStatus.keyPreview ?? "API key saved"}</span>
               <span>
                 {models.length} model{models.length === 1 ? "" : "s"} added
               </span>
             </div>
           )}
           {error && <div className="settings-pane__provider-error">{error}</div>}
+        </div>
+        <div className="settings-pane__provider-actions">
+          {connected ? (
+            <button
+              type="button"
+              className="settings-pane__btn"
+              onClick={onDisconnect}
+              disabled={busy}
+              title="Remove the saved API key"
+            >
+              <Icon icon="solar:trash-bin-trash-linear" width={13} height={13} />
+              <span>{busy ? "Removing..." : "Remove key"}</span>
+            </button>
+          ) : (
+            <span className="settings-pane__openrouter-hint">
+              {loading ? "Refreshing…" : validating ? "Validating…" : "Paste a key to connect"}
+            </span>
+          )}
+        </div>
+      </div>
 
-          <label className="settings-pane__field settings-pane__openrouter-key">
-            <span>API key</span>
-            <div className="settings-pane__secret-row">
-              <input
-                type={revealed ? "text" : "password"}
-                value={apiKey}
-                placeholder={connected ? displayStatus.keyPreview ?? "API key saved" : "sk-or-..."}
-                onChange={(event) => setApiKey(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
+      <div className="settings-pane__provider-detail">
+        <label className="settings-pane__field settings-pane__openrouter-key">
+          <span>API key</span>
+          <div className="settings-pane__secret-row">
+            <input
+              type={revealed ? "text" : "password"}
+              value={apiKey}
+              placeholder={connected ? displayStatus.keyPreview ?? "Key saved" : "sk-or-..."}
+              onChange={(event) => setApiKey(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="settings-pane__icon-btn"
+              onClick={() => setRevealed((value) => !value)}
+              title={revealed ? "Hide API key" : "Reveal API key"}
+              aria-label={revealed ? "Hide API key" : "Reveal API key"}
+            >
+              <Icon
+                icon={revealed ? "solar:eye-closed-linear" : "solar:eye-linear"}
+                width={14}
+                height={14}
               />
-              <button
-                type="button"
-                className="settings-pane__icon-btn"
-                onClick={() => setRevealed((value) => !value)}
-                title={revealed ? "Hide API key" : "Reveal API key"}
-                aria-label={revealed ? "Hide API key" : "Reveal API key"}
-              >
-                <Icon icon={revealed ? "solar:eye-closed-linear" : "solar:eye-linear"} width={14} height={14} />
-              </button>
-            </div>
-          </label>
-
-          <div className="settings-pane__openrouter-search">
-            <label className="settings-pane__field">
-              <span>Search OpenRouter models</span>
-              <input
-                value={query}
-                disabled={!searchEnabled}
-                placeholder={searchEnabled ? "Type a model name…" : "Save a valid key to enable search"}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <div className="settings-pane__openrouter-results" aria-live="polite">
-              {!searchEnabled ? (
-                <div className="settings-pane__openrouter-empty">Search is available after a valid key is saved.</div>
-              ) : !query.trim() ? (
-                <div className="settings-pane__openrouter-empty">Search the OpenRouter catalog to add models.</div>
-              ) : searching ? (
-                <div className="settings-pane__openrouter-empty">Searching…</div>
-              ) : searchError ? (
-                <div className="settings-pane__provider-error">{searchError}</div>
-              ) : results.length === 0 ? (
-                <div className="settings-pane__openrouter-empty">No matching model.</div>
-              ) : (
-                results.map((model) => {
-                  const added = modelIds.has(model.id);
-                  return (
-                    <div key={model.id} className="settings-pane__openrouter-row">
-                      <span>{model.name}</span>
-                      {added ? (
-                        <span className="settings-pane__openrouter-added">Already added</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="settings-pane__btn"
-                          onClick={() => void addModel(model)}
-                          disabled={mutatingModelId === model.id}
-                        >
-                          <Icon icon="solar:add-circle-linear" width={13} height={13} />
-                          <span>{mutatingModelId === model.id ? "Adding…" : "Add"}</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            </button>
           </div>
+        </label>
 
-          <div className="settings-pane__openrouter-list">
-            <div className="settings-pane__openrouter-list-head">
-              <span>Added OpenRouter models</span>
-            </div>
-            {models.length === 0 ? (
-              <div className="settings-pane__openrouter-empty">No OpenRouter models added yet.</div>
+        <div className="settings-pane__openrouter-search">
+          <label className="settings-pane__field">
+            <span>Search models</span>
+            <input
+              value={query}
+              disabled={!searchEnabled}
+              placeholder={searchEnabled ? "Type a model name…" : "Save a valid key to enable search"}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <div className="settings-pane__openrouter-results" aria-live="polite">
+            {!searchEnabled ? (
+              <div className="settings-pane__openrouter-empty">
+                Search is available once a valid key is saved.
+              </div>
+            ) : !query.trim() ? (
+              <div className="settings-pane__openrouter-empty">
+                Search the OpenRouter catalog to add models.
+              </div>
+            ) : searching ? (
+              <div className="settings-pane__openrouter-empty">Searching…</div>
+            ) : searchError ? (
+              <div className="settings-pane__provider-error">{searchError}</div>
+            ) : results.length === 0 ? (
+              <div className="settings-pane__openrouter-empty">No matching model.</div>
             ) : (
-              models.map((model) => (
+              results.map((model) => {
+                const added = modelIds.has(model.id);
+                const label = sanitizeOpenRouterName(model.name) || model.id;
+                return (
+                  <div key={model.id} className="settings-pane__openrouter-row">
+                    <span title={model.id}>{label}</span>
+                    {added ? (
+                      <span className="settings-pane__openrouter-added">Already added</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="settings-pane__btn"
+                        onClick={() => void addModel(model)}
+                        disabled={mutatingModelId === model.id}
+                      >
+                        <Icon icon="solar:add-circle-linear" width={13} height={13} />
+                        <span>{mutatingModelId === model.id ? "Adding…" : "Add"}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="settings-pane__openrouter-list">
+          <div className="settings-pane__openrouter-list-head">
+            <span>Added models</span>
+          </div>
+          {models.length === 0 ? (
+            <div className="settings-pane__openrouter-empty">No models added yet.</div>
+          ) : (
+            models.map((model) => {
+              const label = sanitizeOpenRouterName(model.name) || model.id;
+              return (
                 <div key={model.id} className="settings-pane__openrouter-row">
-                  <span>{model.name}</span>
+                  <span title={model.id}>{label}</span>
                   <button
                     type="button"
                     className="settings-pane__icon-btn"
                     onClick={() => void removeModel(model.id)}
                     disabled={mutatingModelId === model.id}
                     title="Remove model"
-                    aria-label={`Remove ${model.name}`}
+                    aria-label={`Remove ${label}`}
                   >
                     <Icon icon="solar:trash-bin-trash-linear" width={13} height={13} />
                   </button>
                 </div>
-              ))
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
-      </div>
-      <div className="settings-pane__provider-actions">
-        {connected ? (
-          <button
-            type="button"
-            className="settings-pane__btn"
-            onClick={onDisconnect}
-            disabled={busy}
-          >
-            <Icon icon="solar:logout-2-linear" width={13} height={13} />
-            <span>{busy ? "Disconnecting..." : "Disconnect"}</span>
-          </button>
-        ) : (
-          <span className="settings-pane__openrouter-hint">
-            {loading ? "Refreshing…" : validating ? "Validating…" : "Paste a key to connect"}
-          </span>
-        )}
       </div>
     </section>
   );

@@ -73,9 +73,7 @@ where
                             }
                             Err(err) => {
                                 return Some((
-                                    Err(AppError::Decode(format!(
-                                        "bad openrouter event: {err}"
-                                    ))),
+                                    Err(AppError::Decode(format!("bad openrouter event: {err}"))),
                                     (source, parser, pending, true),
                                 ));
                             }
@@ -153,7 +151,9 @@ impl EventParser {
             if let Some(usage) = choice.usage {
                 self.usage = usage_from_body(usage);
             }
-            if let Some(reasoning) = reasoning_delta(&choice.delta).filter(|value| !value.is_empty()) {
+            if let Some(reasoning) =
+                reasoning_delta(&choice.delta).filter(|value| !value.is_empty())
+            {
                 self.ensure_started(&mut out);
                 let index = self.ensure_open(PartKind::Thinking, &mut out);
                 out.push(StreamEvent::ThinkingDelta {

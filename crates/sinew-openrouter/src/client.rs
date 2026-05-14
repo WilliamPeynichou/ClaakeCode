@@ -127,9 +127,9 @@ impl Provider for OpenRouterProvider {
             )));
         }
 
-        let caps = self
-            .capabilities(&request.model)
-            .ok_or_else(|| AppError::Unsupported(format!("model `{}` is not supported", request.model.name)))?;
+        let caps = self.capabilities(&request.model).ok_or_else(|| {
+            AppError::Unsupported(format!("model `{}` is not supported", request.model.name))
+        })?;
         if !caps.supports_images && request_contains_images(&request) {
             return Err(AppError::InvalidRequest(format!(
                 "OpenRouter model `{}` does not support image input",
@@ -530,7 +530,9 @@ pub async fn validate_api_key(api_key: &str) -> Result<()> {
     .await
     .map_err(|err| AppError::Network(format!("OpenRouter key validation failed: {err}")))?;
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        fetch_model_catalog_with_http(&http, api_key).await.map(|_| ())
+        fetch_model_catalog_with_http(&http, api_key)
+            .await
+            .map(|_| ())
     } else if response.status().is_success() {
         Ok(())
     } else {
@@ -576,7 +578,11 @@ async fn fetch_model_catalog_with_http(
 fn catalog_model_from_body(body: ModelBody) -> OpenRouterCatalogModel {
     let context_window = body
         .context_length
-        .or_else(|| body.top_provider.as_ref().and_then(|top| top.context_length))
+        .or_else(|| {
+            body.top_provider
+                .as_ref()
+                .and_then(|top| top.context_length)
+        })
         .unwrap_or(128_000)
         .max(1);
     let max_output_tokens = body

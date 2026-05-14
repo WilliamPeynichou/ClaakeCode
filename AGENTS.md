@@ -106,14 +106,14 @@ Code map:
 │   │       ├── stream.rs
 │   │       └── wire.rs
 │   ├── sinew-openai
-│       ├── Cargo.toml
-│       └── src
-│           ├── auth.rs
-│           ├── client.rs
-│           ├── lib.rs
-│           ├── model_info.rs
-│           ├── stream.rs
-│           └── wire.rs
+│   │   ├── Cargo.toml
+│   │   └── src
+│   │       ├── auth.rs
+│   │       ├── client.rs
+│   │       ├── lib.rs
+│   │       ├── model_info.rs
+│   │       ├── stream.rs
+│   │       └── wire.rs
 │   └── sinew-openrouter
 │       ├── Cargo.toml
 │       └── src

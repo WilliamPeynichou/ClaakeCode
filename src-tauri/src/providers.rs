@@ -113,9 +113,7 @@ pub(super) fn install_openrouter_provider(
     Ok(())
 }
 
-pub(super) fn openrouter_capabilities(
-    models: &[OpenRouterModelRecord],
-) -> Vec<ModelCapabilities> {
+pub(super) fn openrouter_capabilities(models: &[OpenRouterModelRecord]) -> Vec<ModelCapabilities> {
     models
         .iter()
         .map(|model| {
@@ -1462,7 +1460,10 @@ pub(super) async fn disconnect_openrouter_provider(
 pub(super) fn list_openrouter_models(
     state: State<'_, DesktopState>,
 ) -> std::result::Result<Vec<OpenRouterModelRecord>, String> {
-    state.store.load_openrouter_models().map_err(error_to_string)
+    state
+        .store
+        .load_openrouter_models()
+        .map_err(error_to_string)
 }
 
 #[tauri::command]
@@ -1493,7 +1494,11 @@ pub(super) async fn search_openrouter_models(
                 || model.id.to_ascii_lowercase().contains(&query)
         })
         .collect::<Vec<_>>();
-    matches.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    matches.sort_by(|a, b| {
+        a.name
+            .to_ascii_lowercase()
+            .cmp(&b.name.to_ascii_lowercase())
+    });
     matches.truncate(20);
     Ok(matches)
 }

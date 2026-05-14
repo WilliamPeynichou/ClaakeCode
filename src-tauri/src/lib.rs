@@ -45,12 +45,12 @@ use sinew_app::{
     tool_settings_view, trash_workspace_entry, write_workspace_file, AgentEvent, AgentMode,
     AppStore, ApplyPatchTool, BashTool, ConversationEvent, ConversationSummary, CreateImageTool,
     GlobTool, GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpSettings,
-    McpToolRegistry, ModeModelSettings, PlanArtifactState, PlanWorkflowState, QuestionTool,
-    ReadTool, SavedConversation, SkillSettings, SkillTool, SubAgentConfig, SubAgentSettings,
-    SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
-    ToolSettings, ToolSettingsView, TurnCancel, TurnContext, WebFetchTool, WebSearchTool,
-    WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry, WorkspaceFileChangeEvent,
-    WorkspaceSearchResult, OpenRouterModelRecord,
+    McpToolRegistry, ModeModelSettings, OpenRouterModelRecord, PlanArtifactState,
+    PlanWorkflowState, QuestionTool, ReadTool, SavedConversation, SkillSettings, SkillTool,
+    SubAgentConfig, SubAgentSettings, SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution,
+    ToDoListTool, TodoListState, ToolSettings, ToolSettingsView, TurnCancel, TurnContext,
+    WebFetchTool, WebSearchTool, WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry,
+    WorkspaceFileChangeEvent, WorkspaceSearchResult,
 };
 use sinew_core::{
     ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
@@ -140,9 +140,9 @@ pub fn run() {
     if let Ok(provider) = KimiProvider::from_default_sources() {
         providers.insert("kimi".into(), Arc::new(provider) as Arc<dyn Provider>);
     }
-    if let Ok(provider) = OpenRouterProvider::from_default_sources(openrouter_capabilities(
-        &openrouter_models,
-    )) {
+    if let Ok(provider) =
+        OpenRouterProvider::from_default_sources(openrouter_capabilities(&openrouter_models))
+    {
         providers.insert(
             OPENROUTER_PROVIDER_ID.into(),
             Arc::new(provider) as Arc<dyn Provider>,

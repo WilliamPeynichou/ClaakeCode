@@ -150,6 +150,17 @@ export const MODELS: ModelEntry[] = [
 const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high"];
 const OPENROUTER_NO_THINKING: readonly ThinkingLevel[] = ["off"];
 
+export function sanitizeOpenRouterName(name: string | null | undefined): string {
+  const raw = (name ?? "").trim();
+  if (!raw) return "";
+  // OpenRouter prefixes most names with the underlying provider, e.g. "OpenAI: GPT-4o".
+  // The provider icon already conveys that information in Sinew, so drop the prefix.
+  const colon = raw.indexOf(":");
+  if (colon <= 0) return raw;
+  const tail = raw.slice(colon + 1).trim();
+  return tail || raw;
+}
+
 export function modelsWithOpenRouter(
   openRouterModels: readonly OpenRouterModel[] = [],
 ): ModelEntry[] {
@@ -173,7 +184,7 @@ function openRouterModelEntries(
   return openRouterModels.map((model) => ({
     value: modelId("openrouter", model.id),
     provider: "openrouter",
-    label: model.name || model.id,
+    label: sanitizeOpenRouterName(model.name) || model.id,
     thinking: model.supportsThinking ? OPENROUTER_THINKING : OPENROUTER_NO_THINKING,
     defaultThinking: model.supportsThinking ? "medium" : "off",
   }));
