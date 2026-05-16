@@ -171,6 +171,7 @@ pub fn run() {
         system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
         max_tool_rounds: 200,
         active_turns: Arc::new(Mutex::new(HashMap::new())),
+        active_turn_details: Arc::new(StdMutex::new(HashMap::new())),
         team_runtime: Arc::new(RwLock::new(TeamRuntime::default())),
         file_watchers: Arc::new(Mutex::new(HashMap::new())),
         terminal_sessions: Arc::new(Mutex::new(HashMap::new())),
@@ -195,24 +196,29 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            let handle = app.handle();
             #[cfg(target_os = "macos")]
-            install_macos_dock_menu(handle);
+            {
+                install_macos_dock_menu(app.handle());
+            }
 
-            let menu = tauri::menu::Menu::default(handle)?;
-            let new_window_item =
-                tauri::menu::MenuItemBuilder::with_id(NEW_WINDOW_MENU_ID, "New Window")
-                    .accelerator("CmdOrCtrl+Shift+N")
-                    .build(handle)?;
-            let file_menu = tauri::menu::SubmenuBuilder::new(handle, "File")
-                .item(&new_window_item)
-                .build()?;
-            let terminal_menu = tauri::menu::SubmenuBuilder::new(handle, "Terminal")
-                .text(TERMINAL_OPEN_MENU_ID, "Open Terminal")
-                .build()?;
-            menu.append(&file_menu)?;
-            menu.append(&terminal_menu)?;
-            app.set_menu(menu)?;
+            #[cfg(not(target_os = "windows"))]
+            {
+                let handle = app.handle();
+                let menu = tauri::menu::Menu::default(handle)?;
+                let new_window_item =
+                    tauri::menu::MenuItemBuilder::with_id(NEW_WINDOW_MENU_ID, "New Window")
+                        .accelerator("CmdOrCtrl+Shift+N")
+                        .build(handle)?;
+                let file_menu = tauri::menu::SubmenuBuilder::new(handle, "File")
+                    .item(&new_window_item)
+                    .build()?;
+                let terminal_menu = tauri::menu::SubmenuBuilder::new(handle, "Terminal")
+                    .text(TERMINAL_OPEN_MENU_ID, "Open Terminal")
+                    .build()?;
+                menu.append(&file_menu)?;
+                menu.append(&terminal_menu)?;
+                app.set_menu(menu)?;
+            }
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -303,6 +309,8 @@ pub fn run() {
             conversations::save_skill_settings,
             turns::send_message,
             turns::compact_conversation,
+            turns::list_active_turns,
+            turns::replay_active_turn_events,
             context::estimate_context,
             context::estimate_sub_agent_context,
             turns::cancel_turn,

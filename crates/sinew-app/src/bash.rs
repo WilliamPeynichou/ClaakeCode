@@ -248,6 +248,20 @@ impl BashTool {
 
         if !parsed.input.is_empty() {
             if let Err(err) = session.write(parsed.input.as_bytes()) {
+                let output = collect_output(&mut session, Duration::from_millis(500)).await;
+                if output.exited.is_some() {
+                    return self.finish_or_store(session, output).await;
+                }
+                if is_closed_stdin_error(&err) {
+                    let extra = collect_output(&mut session, Duration::from_secs(2)).await;
+                    let output = output.join(extra);
+                    if output.exited.is_some() {
+                        return self.finish_or_store(session, output).await;
+                    }
+                    session.terminate();
+                    let extra = collect_output(&mut session, Duration::from_millis(500)).await;
+                    return self.finish_timed_out(session, output.join(extra)).await;
+                }
                 return ToolRunResult::err(err, Vec::new());
             }
         }
@@ -511,7 +525,6 @@ fn spawn_windows_piped_session(
     let mut cmd = Command::new(windows_powershell_program());
     cmd.arg("-NoLogo")
         .arg("-NoProfile")
-        .arg("-NonInteractive")
         .arg("-ExecutionPolicy")
         .arg("Bypass")
         .arg("-EncodedCommand")
@@ -614,6 +627,13 @@ fn spawn_pipe_reader(
             }
         }
     });
+}
+
+fn is_closed_stdin_error(err: &str) -> bool {
+    err.contains("os error 232")
+        || err.contains("Broken pipe")
+        || err.contains("Le canal de communication")
+        || err.contains("pipe is being closed")
 }
 
 #[derive(Debug, Deserialize)]
