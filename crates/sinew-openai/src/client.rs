@@ -51,8 +51,6 @@ impl OpenAiProvider {
     pub fn new(config: OpenAiConfig) -> Result<Self> {
         let http = reqwest::Client::builder()
             .user_agent(USER_AGENT)
-            .tcp_keepalive(std::time::Duration::from_secs(20))
-            .pool_idle_timeout(std::time::Duration::from_secs(90))
             .build()
             .map_err(|err| AppError::Network(err.to_string()))?;
         Ok(Self { config, http })
@@ -219,11 +217,11 @@ where
     let parser = EventParser::new(default_model);
 
     stream::unfold(
-        (source, parser, Vec::<StreamEvent>::new(), false, false),
-        |(mut source, mut parser, mut pending, mut done, mut saw_any_event)| async move {
+        (source, parser, Vec::<StreamEvent>::new(), false),
+        |(mut source, mut parser, mut pending, mut done)| async move {
             loop {
                 if let Some(next) = pending.pop() {
-                    return Some((Ok(next), (source, parser, pending, done, saw_any_event)));
+                    return Some((Ok(next), (source, parser, pending, done)));
                 }
                 if done {
                     return None;
@@ -231,7 +229,6 @@ where
 
                 match source.next().await {
                     Some(Ok(event)) => {
-                        saw_any_event = true;
                         let data = event.data.trim();
                         if data == "[DONE]" {
                             done = true;
@@ -243,7 +240,7 @@ where
                             Err(err) => {
                                 return Some((
                                     Err(AppError::Decode(format!("bad openai SSE event: {err}"))),
-                                    (source, parser, pending, true, saw_any_event),
+                                    (source, parser, pending, true),
                                 ));
                             }
                         };
@@ -256,41 +253,20 @@ where
                                 produced.reverse();
                                 pending.extend(produced);
                             }
-                            Err(err) => {
-                                return Some((
-                                    Err(err),
-                                    (source, parser, pending, true, saw_any_event),
-                                ));
-                            }
+                            Err(err) => return Some((Err(err), (source, parser, pending, true))),
                         }
                     }
                     Some(Err(err)) => {
                         return Some((
                             Err(AppError::Stream(format!("openai SSE error: {err}"))),
-                            (source, parser, pending, true, saw_any_event),
+                            (source, parser, pending, true),
                         ));
                     }
                     None => {
-                        if !saw_any_event {
-                            return Some((
-                                Err(AppError::Stream(
-                                    "openai SSE closed before any event; \
-                                     the server likely dropped the connection"
-                                        .into(),
-                                )),
-                                (source, parser, pending, true, saw_any_event),
-                            ));
-                        }
                         let mut produced = parser.finish_if_needed();
                         if produced.is_empty() {
-                            // Stream closed cleanly after a terminal event (response.completed
-                            // / response.incomplete / [DONE]). Nothing left to emit.
                             return None;
                         }
-                        // Stream closed *after* some events but *before* a terminal one. The
-                        // parser synthesizes a MessageStop (stop_reason=Other) so partial parts
-                        // are preserved; the agent layer detects the abnormal termination via
-                        // the absence of a normal stop reason and reports it.
                         produced.reverse();
                         pending.extend(produced);
                         done = true;
@@ -604,69 +580,9 @@ async fn read_http_error(response: reqwest::Response) -> AppError {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use bytes::Bytes;
-    use futures::stream::{self, StreamExt};
-    use sinew_core::AppError;
     use sinew_core::{ChatMessage, ModelRef, Part, ProviderRequest, Role, ToolResultImage};
 
-    use super::{build_responses_request, sse_provider_stream, to_input_items};
-
-    fn empty_byte_stream(
-    ) -> impl futures::Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send + 'static
-    {
-        stream::iter(Vec::<std::result::Result<Bytes, std::io::Error>>::new())
-    }
-
-    fn truncated_byte_stream(
-    ) -> impl futures::Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send + 'static
-    {
-        // A valid `response.created` event, then the connection closes (no `[DONE]`,
-        // no `response.completed`).
-        let payload = Bytes::from_static(
-            b"data: {\"type\":\"response.created\",\"response\":{\"model\":\"gpt-5\"}}\n\n",
-        );
-        stream::iter(vec![std::result::Result::<Bytes, std::io::Error>::Ok(
-            payload,
-        )])
-    }
-
-    #[tokio::test]
-    async fn empty_sse_stream_yields_explicit_error() {
-        let mut stream = sse_provider_stream(empty_byte_stream(), "gpt-5".to_string());
-        let first = stream.next().await.expect("expected an event");
-        match first {
-            Err(AppError::Stream(msg)) => {
-                assert!(
-                    msg.contains("closed before any event"),
-                    "unexpected message: {msg}"
-                );
-            }
-            other => panic!("expected AppError::Stream, got: {other:?}"),
-        }
-        assert!(stream.next().await.is_none(), "stream should be terminated");
-    }
-
-    #[tokio::test]
-    async fn truncated_sse_stream_still_emits_synthetic_message_stop() {
-        // Stream cuts off after `response.created`. The parser should synthesize a final
-        // MessageStop so partial parts are preserved — and the agent layer will detect the
-        // missing terminal event separately.
-        let mut stream = sse_provider_stream(truncated_byte_stream(), "gpt-5".to_string());
-        let mut saw_message_start = false;
-        let mut saw_message_stop = false;
-        while let Some(event) = stream.next().await {
-            match event.expect("no provider error expected on a started stream") {
-                sinew_core::StreamEvent::MessageStart { .. } => saw_message_start = true,
-                sinew_core::StreamEvent::MessageStop { .. } => saw_message_stop = true,
-                _ => {}
-            }
-        }
-        assert!(saw_message_start, "MessageStart should have been emitted");
-        assert!(
-            saw_message_stop,
-            "MessageStop should be synthesized when the stream is truncated"
-        );
-    }
+    use super::{build_responses_request, to_input_items};
 
     #[test]
     fn image_tool_result_uses_responses_input_block_types() {

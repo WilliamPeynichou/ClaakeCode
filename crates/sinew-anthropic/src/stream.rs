@@ -17,11 +17,11 @@ where
     let parser = EventParser::default();
 
     futures::stream::unfold(
-        (source, parser, Vec::<StreamEvent>::new(), false, false),
-        |(mut source, mut parser, mut pending, done, mut saw_any_event)| async move {
+        (source, parser, Vec::<StreamEvent>::new(), false),
+        |(mut source, mut parser, mut pending, done)| async move {
             loop {
                 if let Some(next) = pending.pop() {
-                    return Some((Ok(next), (source, parser, pending, done, saw_any_event)));
+                    return Some((Ok(next), (source, parser, pending, done)));
                 }
                 if done {
                     return None;
@@ -29,7 +29,6 @@ where
 
                 match source.next().await {
                     Some(Ok(event)) => {
-                        saw_any_event = true;
                         let parsed: std::result::Result<SseEvent, _> =
                             serde_json::from_str(&event.data);
                         match parsed {
@@ -39,7 +38,7 @@ where
                                         "{}: {}",
                                         error.kind, error.message
                                     ))),
-                                    (source, parser, pending, true, saw_any_event),
+                                    (source, parser, pending, true),
                                 ));
                             }
                             Ok(parsed) => {
@@ -50,7 +49,7 @@ where
                             Err(err) => {
                                 return Some((
                                     Err(AppError::Decode(format!("bad anthropic event: {err}"))),
-                                    (source, parser, pending, true, saw_any_event),
+                                    (source, parser, pending, true),
                                 ));
                             }
                         }
@@ -58,22 +57,10 @@ where
                     Some(Err(err)) => {
                         return Some((
                             Err(AppError::Stream(err.to_string())),
-                            (source, parser, pending, true, saw_any_event),
+                            (source, parser, pending, true),
                         ));
                     }
-                    None => {
-                        if !saw_any_event {
-                            return Some((
-                                Err(AppError::Stream(
-                                    "anthropic SSE closed before any event; \
-                                     the server likely dropped the connection"
-                                        .into(),
-                                )),
-                                (source, parser, pending, true, saw_any_event),
-                            ));
-                        }
-                        return None;
-                    }
+                    None => return None,
                 }
             }
         },

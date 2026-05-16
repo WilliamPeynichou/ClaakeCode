@@ -9,10 +9,18 @@ use std::{
     thread,
     time::Duration,
 };
+#[cfg(windows)]
+use std::{
+    os::windows::process::CommandExt,
+    process::{Command, Stdio},
+};
 
 use anyhow::{bail, Context, Result};
 #[cfg(windows)]
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+#[cfg(windows)]
+use portable_pty::ChildKiller;
+#[cfg(not(windows))]
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -32,6 +40,8 @@ const DEFAULT_YIELD: Duration = Duration::from_millis(1_000);
 const MAX_YIELD: Duration = Duration::from_secs(30);
 const OUTPUT_LIMIT: usize = 64 * 1024;
 const MAX_INTERACTIVE_SESSIONS: usize = 8;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Copy)]
 enum ShellKind {
@@ -287,90 +297,99 @@ impl BashTool {
         max_lifetime: Duration,
         before: WorkspaceSnapshot,
     ) -> Result<BashSession> {
-        let pty_system = native_pty_system();
-        let pair = pty_system
-            .openpty(PtySize {
-                rows: 24,
-                cols: 100,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .context("unable to open pty")?;
+        #[cfg(windows)]
+        {
+            return spawn_windows_piped_session(command, cwd, max_lifetime, before, || {
+                self.next_session_id.fetch_add(1, Ordering::Relaxed)
+            });
+        }
 
-        let mut builder = shell_command_builder(&command);
-        builder.cwd(cwd.as_os_str());
-        builder.env("TERM", "dumb");
-        builder.env("NO_COLOR", "1");
-        builder.env("PAGER", "cat");
-        builder.env("GIT_PAGER", "cat");
-        builder.env("GH_PAGER", "cat");
+        #[cfg(not(windows))]
+        {
+            let pty_system = native_pty_system();
+            let pair = pty_system
+                .openpty(PtySize {
+                    rows: 24,
+                    cols: 100,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .context("unable to open pty")?;
 
-        let mut child = pair
-            .slave
-            .spawn_command(builder)
-            .with_context(|| format!("unable to spawn {}", ShellKind::current().display_name()))?;
-        drop(pair.slave);
+            let mut builder = shell_command_builder(&command);
+            builder.cwd(cwd.as_os_str());
+            builder.env("TERM", "dumb");
+            builder.env("NO_COLOR", "1");
+            builder.env("PAGER", "cat");
+            builder.env("GIT_PAGER", "cat");
+            builder.env("GH_PAGER", "cat");
 
-        let mut reader = pair
-            .master
-            .try_clone_reader()
-            .context("pty reader unavailable")?;
-        let writer = Arc::new(StdMutex::new(
-            pair.master
-                .take_writer()
-                .context("pty writer unavailable")?,
-        ));
-        let killer = Arc::new(StdMutex::new(child.clone_killer()));
-        let (output_tx, output_rx) = mpsc::unbounded_channel();
-        let (exit_tx, exit_rx) = watch::channel(None);
+            let mut child = pair.slave.spawn_command(builder).with_context(|| {
+                format!("unable to spawn {}", ShellKind::current().display_name())
+            })?;
+            drop(pair.slave);
 
-        thread::spawn(move || {
-            let mut buffer = [0u8; 8192];
-            loop {
-                match reader.read(&mut buffer) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        if output_tx.send(buffer[..n].to_vec()).is_err() {
-                            break;
+            let mut reader = pair
+                .master
+                .try_clone_reader()
+                .context("pty reader unavailable")?;
+            let writer = Arc::new(StdMutex::new(
+                pair.master
+                    .take_writer()
+                    .context("pty writer unavailable")?,
+            ));
+            let killer = Arc::new(StdMutex::new(child.clone_killer()));
+            let (output_tx, output_rx) = mpsc::unbounded_channel();
+            let (exit_tx, exit_rx) = watch::channel(None);
+
+            thread::spawn(move || {
+                let mut buffer = [0u8; 8192];
+                loop {
+                    match reader.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            if output_tx.send(buffer[..n].to_vec()).is_err() {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+
+            thread::spawn(move || {
+                let exit = match child.wait() {
+                    Ok(status) => {
+                        let signal = status.signal().map(|value| value.to_string());
+                        let code = status.exit_code();
+                        let display = signal
+                            .as_ref()
+                            .map(|value| format!("signal {value}"))
+                            .unwrap_or_else(|| code.to_string());
+                        SessionExit {
+                            display,
+                            success: signal.is_none() && code == 0,
                         }
                     }
-                    Err(_) => break,
-                }
-            }
-        });
+                    Err(err) => SessionExit {
+                        display: err.to_string(),
+                        success: false,
+                    },
+                };
+                let _ = exit_tx.send(Some(exit));
+            });
 
-        thread::spawn(move || {
-            let exit = match child.wait() {
-                Ok(status) => {
-                    let signal = status.signal().map(|value| value.to_string());
-                    let code = status.exit_code();
-                    let display = signal
-                        .as_ref()
-                        .map(|value| format!("signal {value}"))
-                        .unwrap_or_else(|| code.to_string());
-                    SessionExit {
-                        display,
-                        success: signal.is_none() && code == 0,
-                    }
-                }
-                Err(err) => SessionExit {
-                    display: err.to_string(),
-                    success: false,
-                },
-            };
-            let _ = exit_tx.send(Some(exit));
-        });
-
-        Ok(BashSession {
-            id: self.next_session_id.fetch_add(1, Ordering::Relaxed),
-            writer,
-            killer,
-            output_rx,
-            exit_rx,
-            before,
-            started_at: Instant::now(),
-            max_lifetime,
-        })
+            Ok(BashSession {
+                id: self.next_session_id.fetch_add(1, Ordering::Relaxed),
+                writer,
+                killer,
+                output_rx,
+                exit_rx,
+                before,
+                started_at: Instant::now(),
+                max_lifetime,
+            })
+        }
     }
 
     async fn finish_or_store(
@@ -444,31 +463,11 @@ impl BashTool {
     }
 }
 
+#[cfg(not(windows))]
 fn shell_command_builder(command: &str) -> CommandBuilder {
-    #[cfg(windows)]
-    {
-        powershell_command_builder(command)
-    }
-    #[cfg(not(windows))]
-    {
-        let mut builder = CommandBuilder::new("/bin/bash");
-        builder.arg("-lc");
-        builder.arg(command);
-        builder
-    }
-}
-
-#[cfg(windows)]
-fn powershell_command_builder(command: &str) -> CommandBuilder {
-    let script = powershell_script(command);
-    let mut builder = CommandBuilder::new("powershell.exe");
-    builder.arg("-NoLogo");
-    builder.arg("-NoProfile");
-    builder.arg("-NonInteractive");
-    builder.arg("-ExecutionPolicy");
-    builder.arg("Bypass");
-    builder.arg("-EncodedCommand");
-    builder.arg(&encode_powershell_command(&script));
+    let mut builder = CommandBuilder::new("/bin/bash");
+    builder.arg("-lc");
+    builder.arg(command);
     builder
 }
 
@@ -498,6 +497,123 @@ fn encode_powershell_command(command: &str) -> String {
         bytes.extend_from_slice(&unit.to_le_bytes());
     }
     BASE64_STANDARD.encode(bytes)
+}
+
+#[cfg(windows)]
+fn spawn_windows_piped_session(
+    command: String,
+    cwd: PathBuf,
+    max_lifetime: Duration,
+    before: WorkspaceSnapshot,
+    next_id: impl FnOnce() -> u64,
+) -> Result<BashSession> {
+    let script = powershell_script(&command);
+    let mut cmd = Command::new(windows_powershell_program());
+    cmd.arg("-NoLogo")
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-EncodedCommand")
+        .arg(encode_powershell_command(&script))
+        .current_dir(&cwd)
+        .env("TERM", "dumb")
+        .env("NO_COLOR", "1")
+        .env("PAGER", "cat")
+        .env("GIT_PAGER", "cat")
+        .env("GH_PAGER", "cat")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = cmd
+        .spawn()
+        .with_context(|| format!("unable to spawn {}", ShellKind::current().display_name()))?;
+
+    let stdin = child.stdin.take().context("PowerShell stdin unavailable")?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("PowerShell stdout unavailable")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("PowerShell stderr unavailable")?;
+
+    let writer = Arc::new(StdMutex::new(Box::new(stdin) as Box<dyn Write + Send>));
+    let killer = Arc::new(StdMutex::new(child.clone_killer()));
+    let (output_tx, output_rx) = mpsc::unbounded_channel();
+    let (exit_tx, exit_rx) = watch::channel(None);
+
+    spawn_pipe_reader(stdout, output_tx.clone());
+    spawn_pipe_reader(stderr, output_tx);
+
+    thread::spawn(move || {
+        let exit = match child.wait() {
+            Ok(status) => {
+                let display = status
+                    .code()
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "terminated".to_string());
+                SessionExit {
+                    display,
+                    success: status.success(),
+                }
+            }
+            Err(err) => SessionExit {
+                display: err.to_string(),
+                success: false,
+            },
+        };
+        let _ = exit_tx.send(Some(exit));
+    });
+
+    Ok(BashSession {
+        id: next_id(),
+        writer,
+        killer,
+        output_rx,
+        exit_rx,
+        before,
+        started_at: Instant::now(),
+        max_lifetime,
+    })
+}
+
+#[cfg(windows)]
+fn windows_powershell_program() -> PathBuf {
+    std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .map(|root| {
+            root.join("System32")
+                .join("WindowsPowerShell")
+                .join("v1.0")
+                .join("powershell.exe")
+        })
+        .filter(|path| path.is_file())
+        .unwrap_or_else(|| PathBuf::from("powershell.exe"))
+}
+
+#[cfg(windows)]
+fn spawn_pipe_reader(
+    mut reader: impl Read + Send + 'static,
+    output_tx: mpsc::UnboundedSender<Vec<u8>>,
+) {
+    thread::spawn(move || {
+        let mut buffer = [0u8; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => {
+                    if output_tx.send(buffer[..n].to_vec()).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
 }
 
 #[derive(Debug, Deserialize)]

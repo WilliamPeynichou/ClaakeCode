@@ -195,34 +195,24 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            let handle = app.handle();
             #[cfg(target_os = "macos")]
-            {
-                install_macos_dock_menu(app.handle());
-            }
+            install_macos_dock_menu(handle);
 
-            // Menu natif: utile sur macOS (barre en haut de l'écran) et Linux
-            // (intégrations DE). Sur Windows, le menu serait affiché à
-            // l'intérieur de la fenêtre comme une barre File/Edit/Window/Help
-            // qu'on ne veut pas. Donc on l'installe partout sauf Windows.
-            #[cfg(not(target_os = "windows"))]
-            {
-                let handle = app.handle();
-                let menu = tauri::menu::Menu::default(handle)?;
-                let new_window_item =
-                    tauri::menu::MenuItemBuilder::with_id(NEW_WINDOW_MENU_ID, "New Window")
-                        .accelerator("CmdOrCtrl+Shift+N")
-                        .build(handle)?;
-                let file_menu = tauri::menu::SubmenuBuilder::new(handle, "File")
-                    .item(&new_window_item)
-                    .build()?;
-                let terminal_menu = tauri::menu::SubmenuBuilder::new(handle, "Terminal")
-                    .text(TERMINAL_OPEN_MENU_ID, "Open Terminal")
-                    .build()?;
-                menu.append(&file_menu)?;
-                menu.append(&terminal_menu)?;
-                app.set_menu(menu)?;
-            }
-
+            let menu = tauri::menu::Menu::default(handle)?;
+            let new_window_item =
+                tauri::menu::MenuItemBuilder::with_id(NEW_WINDOW_MENU_ID, "New Window")
+                    .accelerator("CmdOrCtrl+Shift+N")
+                    .build(handle)?;
+            let file_menu = tauri::menu::SubmenuBuilder::new(handle, "File")
+                .item(&new_window_item)
+                .build()?;
+            let terminal_menu = tauri::menu::SubmenuBuilder::new(handle, "Terminal")
+                .text(TERMINAL_OPEN_MENU_ID, "Open Terminal")
+                .build()?;
+            menu.append(&file_menu)?;
+            menu.append(&terminal_menu)?;
+            app.set_menu(menu)?;
             Ok(())
         })
         .on_menu_event(|app, event| {
