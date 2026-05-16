@@ -200,6 +200,10 @@ pub fn run() {
                 install_macos_dock_menu(app.handle());
             }
 
+            // Menu natif: utile sur macOS (barre en haut de l'écran) et Linux
+            // (intégrations DE). Sur Windows, le menu serait affiché à
+            // l'intérieur de la fenêtre comme une barre File/Edit/Window/Help
+            // qu'on ne veut pas. Donc on l'installe partout sauf Windows.
             #[cfg(not(target_os = "windows"))]
             {
                 let handle = app.handle();
@@ -217,16 +221,6 @@ pub fn run() {
                 menu.append(&file_menu)?;
                 menu.append(&terminal_menu)?;
                 app.set_menu(menu)?;
-            }
-
-            #[cfg(target_os = "windows")]
-            {
-                for window in app.webview_windows().into_values() {
-                    let label = window.label().to_string();
-                    if let Err(err) = window.set_decorations(false) {
-                        tracing::warn!(%err, %label, "unable to disable native window decorations");
-                    }
-                }
             }
 
             Ok(())
