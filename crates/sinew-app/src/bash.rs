@@ -11,6 +11,8 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+#[cfg(windows)]
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -31,6 +33,76 @@ const MAX_YIELD: Duration = Duration::from_secs(30);
 const OUTPUT_LIMIT: usize = 64 * 1024;
 const MAX_INTERACTIVE_SESSIONS: usize = 8;
 
+#[derive(Debug, Clone, Copy)]
+enum ShellKind {
+    #[cfg(not(windows))]
+    Bash,
+    #[cfg(windows)]
+    PowerShell,
+}
+
+impl ShellKind {
+    fn current() -> Self {
+        #[cfg(windows)]
+        {
+            Self::PowerShell
+        }
+        #[cfg(not(windows))]
+        {
+            Self::Bash
+        }
+    }
+
+    fn display_name(self) -> &'static str {
+        match self {
+            #[cfg(not(windows))]
+            Self::Bash => "Bash",
+            #[cfg(windows)]
+            Self::PowerShell => "PowerShell",
+        }
+    }
+
+    fn command_description(self) -> &'static str {
+        match self {
+            #[cfg(not(windows))]
+            Self::Bash => "Run a Bash shell command. Commands run in a temporary terminal session, so interactive prompts can stay open and be answered with bash_input. Use POSIX/Bash syntax.",
+            #[cfg(windows)]
+            Self::PowerShell => "Run a Windows PowerShell command. Commands run silently inside Sinew, so do not expect an external PowerShell window. Use PowerShell syntax, not Bash/POSIX syntax.",
+        }
+    }
+
+    fn input_description(self) -> String {
+        format!(
+            "Send text to an interactive {} session, poll its output, or stop it.",
+            self.display_name()
+        )
+    }
+
+    fn session_label(self) -> &'static str {
+        match self {
+            #[cfg(not(windows))]
+            Self::Bash => "bash",
+            #[cfg(windows)]
+            Self::PowerShell => "PowerShell",
+        }
+    }
+}
+
+pub fn active_shell_display_name() -> &'static str {
+    ShellKind::current().display_name()
+}
+
+pub fn shell_system_prompt() -> &'static str {
+    #[cfg(windows)]
+    {
+        "Shell environment: Windows. The `bash` tool is backed by Windows PowerShell, not Bash. Use PowerShell commands and syntax (`Get-ChildItem`, `Select-String`, `Get-Content`, `$env:VAR`, `;`, PowerShell pipelines). Do not use POSIX-only syntax such as `ls -la`, `grep`, `sed`, `awk`, `cat file | head`, or `/bin/bash` unless you explicitly know a compatibility layer is installed."
+    }
+    #[cfg(not(windows))]
+    {
+        "Shell environment: macOS/Linux. The `bash` tool is backed by Bash. Use POSIX/Bash commands and syntax."
+    }
+}
+
 #[derive(Clone)]
 pub struct BashTool {
     workspace_root: PathBuf,
@@ -50,9 +122,10 @@ impl BashTool {
     }
 
     pub fn descriptor(&self) -> ToolDescriptor {
+        let shell = ShellKind::current();
         ToolDescriptor {
             name: "bash".into(),
-            description: "Run a shell command. Commands run in a temporary terminal session, so interactive prompts can stay open and be answered with bash_input.".into(),
+            description: shell.command_description().into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -69,14 +142,18 @@ impl BashTool {
     }
 
     pub fn input_descriptor(&self) -> ToolDescriptor {
+        let shell = ShellKind::current();
+        let session_id_description = format!(
+            "Session id returned by {} while a process is still running.",
+            shell.session_label()
+        );
         ToolDescriptor {
             name: "bash_input".into(),
-            description: "Send text to an interactive bash session, poll its output, or stop it."
-                .into(),
+            description: shell.input_description(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "session_id": { "type": "integer", "minimum": 1, "description": "Session id returned by bash while a process is still running." },
+                    "session_id": { "type": "integer", "minimum": 1, "description": session_id_description },
                     "input": { "type": "string", "description": "Text to send to the process. Include a newline when submitting an answer. Leave empty to only poll output." },
                     "yield_time_ms": { "type": "integer", "minimum": 250, "description": "How long to wait for new output or process exit. Defaults to 1000ms." },
                     "kill": { "type": "boolean", "description": "Stop the session instead of sending input." }
@@ -91,7 +168,7 @@ impl BashTool {
         let parsed: BashInput = match serde_json::from_value(input) {
             Ok(value) => value,
             Err(err) => {
-                return ToolRunResult::err(format!("invalid bash input: {err}"), Vec::new());
+                return ToolRunResult::err(format!("invalid shell input: {err}"), Vec::new());
             }
         };
 
@@ -126,7 +203,7 @@ impl BashTool {
         let parsed: BashInputCommand = match serde_json::from_value(input) {
             Ok(value) => value,
             Err(err) => {
-                return ToolRunResult::err(format!("invalid bash_input input: {err}"), Vec::new());
+                return ToolRunResult::err(format!("invalid shell input: {err}"), Vec::new());
             }
         };
 
@@ -136,7 +213,11 @@ impl BashTool {
                 Some(session) => session,
                 None => {
                     return ToolRunResult::err(
-                        format!("unknown bash session {}", parsed.session_id),
+                        format!(
+                            "unknown {} session {}",
+                            ShellKind::current().session_label(),
+                            parsed.session_id
+                        ),
                         Vec::new(),
                     );
                 }
@@ -216,9 +297,7 @@ impl BashTool {
             })
             .context("unable to open pty")?;
 
-        let mut builder = CommandBuilder::new("/bin/bash");
-        builder.arg("-lc");
-        builder.arg(&command);
+        let mut builder = shell_command_builder(&command);
         builder.cwd(cwd.as_os_str());
         builder.env("TERM", "dumb");
         builder.env("NO_COLOR", "1");
@@ -229,7 +308,7 @@ impl BashTool {
         let mut child = pair
             .slave
             .spawn_command(builder)
-            .context("unable to spawn bash")?;
+            .with_context(|| format!("unable to spawn {}", ShellKind::current().display_name()))?;
         drop(pair.slave);
 
         let mut reader = pair
@@ -357,11 +436,68 @@ impl BashTool {
             transcript.push_str("\n...[output truncated]");
         }
         transcript.push_str(&format!(
-            "\n[bash command timed out after {}s]",
+            "\n[{} command timed out after {}s]",
+            ShellKind::current().display_name(),
             session.max_lifetime.as_secs()
         ));
         ToolRunResult::err(transcript, file_changes)
     }
+}
+
+fn shell_command_builder(command: &str) -> CommandBuilder {
+    #[cfg(windows)]
+    {
+        powershell_command_builder(command)
+    }
+    #[cfg(not(windows))]
+    {
+        let mut builder = CommandBuilder::new("/bin/bash");
+        builder.arg("-lc");
+        builder.arg(command);
+        builder
+    }
+}
+
+#[cfg(windows)]
+fn powershell_command_builder(command: &str) -> CommandBuilder {
+    let script = powershell_script(command);
+    let mut builder = CommandBuilder::new("powershell.exe");
+    builder.arg("-NoLogo");
+    builder.arg("-NoProfile");
+    builder.arg("-NonInteractive");
+    builder.arg("-ExecutionPolicy");
+    builder.arg("Bypass");
+    builder.arg("-EncodedCommand");
+    builder.arg(&encode_powershell_command(&script));
+    builder
+}
+
+#[cfg(windows)]
+fn powershell_script(command: &str) -> String {
+    format!(
+        r#"$__sinewUtf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $__sinewUtf8
+[Console]::OutputEncoding = $__sinewUtf8
+$OutputEncoding = $__sinewUtf8
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
+& {{
+{command}
+}}
+$__sinewSuccess = $?
+$__sinewExitCode = if ($global:LASTEXITCODE -is [int]) {{ $global:LASTEXITCODE }} elseif ($__sinewSuccess) {{ 0 }} else {{ 1 }}
+exit $__sinewExitCode
+"#
+    )
+}
+
+#[cfg(windows)]
+fn encode_powershell_command(command: &str) -> String {
+    let mut bytes = Vec::with_capacity(command.len() * 2);
+    for unit in command.encode_utf16() {
+        bytes.extend_from_slice(&unit.to_le_bytes());
+    }
+    BASE64_STANDARD.encode(bytes)
 }
 
 #[derive(Debug, Deserialize)]
@@ -405,10 +541,12 @@ struct BashSession {
 
 impl BashSession {
     fn write(&self, bytes: &[u8]) -> std::result::Result<(), String> {
-        let mut writer = self
-            .writer
-            .lock()
-            .map_err(|_| "bash session writer unavailable".to_string())?;
+        let mut writer = self.writer.lock().map_err(|_| {
+            format!(
+                "{} session writer unavailable",
+                ShellKind::current().session_label()
+            )
+        })?;
         writer.write_all(bytes).map_err(|err| err.to_string())?;
         writer.flush().map_err(|err| err.to_string())
     }
@@ -521,7 +659,8 @@ fn interactive_transcript(mut text: String, truncated: bool, session_id: u64) ->
         text.push_str("\n...[output truncated]");
     }
     text.push_str(&format!(
-        "\n[process still running: bash session {session_id}]\nUse bash_input with session_id {session_id} to send input or poll output. Include a newline when answering a prompt. Use kill=true to stop it."
+        "\n[process still running: {} session {session_id}]\nUse bash_input with session_id {session_id} to send input or poll output. Include a newline when answering a prompt. Use kill=true to stop it.",
+        ShellKind::current().session_label()
     ));
     text
 }
@@ -579,8 +718,9 @@ mod tests {
     }
 
     fn parse_session_id(content: &str) -> u64 {
+        let needle = format!("{} session ", ShellKind::current().session_label());
         content
-            .split("bash session ")
+            .split(&needle)
             .nth(1)
             .and_then(|tail| tail.split(']').next())
             .and_then(|value| value.parse::<u64>().ok())

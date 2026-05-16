@@ -137,6 +137,7 @@ Code map:
 │   ├── build.rs
 │   ├── tauri.sidecars.conf.json
 │   ├── tauri.conf.json
+│   ├── tauri.windows.conf.json
 │   ├── capabilities
 │   │   └── default.json
 │   ├── gen

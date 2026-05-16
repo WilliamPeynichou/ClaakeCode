@@ -140,6 +140,7 @@ export type SubAgentSettings = {
 
 export type ToolConfig = {
   name: string;
+  displayName?: string;
   description: string;
   defaultDescription: string;
   enabled: boolean;
