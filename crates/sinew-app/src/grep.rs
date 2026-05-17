@@ -51,7 +51,7 @@ impl GrepTool {
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Text or ripgrep-compatible regex pattern to search for."
+                        "description": "Regex pattern to search for."
                     },
                     "path": {
                         "type": "string",
@@ -59,7 +59,7 @@ impl GrepTool {
                     },
                     "include": {
                         "type": "string",
-                        "description": "Optional file glob, e.g. \"*.rs\", \"*.{ts,tsx}\" or \"src/**/*.tsx\"."
+                        "description": "Optional file glob."
                     },
                     "limit": {
                         "type": "integer",

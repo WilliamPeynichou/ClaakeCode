@@ -46,7 +46,13 @@ impl CreateImageTool {
     }
 
     pub fn with_api_key(workspace_root: impl Into<PathBuf>, api_key: Option<String>) -> Self {
-        Self::with_settings(workspace_root, ImageProvider::GptImage2, false, api_key, None)
+        Self::with_settings(
+            workspace_root,
+            ImageProvider::GptImage2,
+            false,
+            api_key,
+            None,
+        )
     }
 
     pub fn with_settings(
@@ -80,7 +86,7 @@ impl CreateImageTool {
         match self.image_provider {
             ImageProvider::GptImage2 => ToolDescriptor {
                 name: "CreateImage".into(),
-                description: "Create images with GPT Image 2. Use this when the user asks to generate or create a new image. Returns the generated image visually.".into(),
+                description: "Use this when the user asks to generate or create a new image. Returns the generated image visually.".into(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {

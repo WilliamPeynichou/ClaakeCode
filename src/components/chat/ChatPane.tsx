@@ -153,7 +153,11 @@ type Props = {
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
   ) => Promise<void>;
-  onCompact: (model: ModelRef, thinking: ThinkingLevel) => Promise<void>;
+  onCompact: (
+    model: ModelRef,
+    thinking: ThinkingLevel,
+    options?: { continueAfter?: boolean },
+  ) => Promise<void>;
   onModeChange: (mode: AgentMode) => Promise<void>;
   onModelPreferenceChange: (
     mode: AgentMode,
@@ -1488,7 +1492,7 @@ export function ChatPane({
     }
     setSendTick((t) => t + 1);
     try {
-      await onCompact(modelRefFromId(model), thinking);
+      await onCompact(modelRefFromId(model), thinking, { continueAfter: false });
     } catch (err) {
       setView((prev) => ({
         ...prev,
@@ -1523,16 +1527,18 @@ export function ChatPane({
     autoCompactAttemptKeysRef.current.add(key);
 
     setSendTick((t) => t + 1);
-    void onCompact(modelRefFromId(model), thinking).catch((err) => {
-      autoCompactAttemptKeysRef.current.delete(key);
-      setView((prev) => ({
-        ...prev,
-        status: "stopped",
-        streamPhase: "idle",
-        lastError: String(err),
-        turnStartedAtMs: null,
-      }));
-    });
+    void onCompact(modelRefFromId(model), thinking, { continueAfter: true }).catch(
+      (err) => {
+        autoCompactAttemptKeysRef.current.delete(key);
+        setView((prev) => ({
+          ...prev,
+          status: "stopped",
+          streamPhase: "idle",
+          lastError: String(err),
+          turnStartedAtMs: null,
+        }));
+      },
+    );
   }, [
     activeSubAgentId,
     composerAttachments.length,
@@ -1557,6 +1563,7 @@ export function ChatPane({
     if (history.length === 0) return;
     if (rewriteState !== null) return;
     if (text.trim() || composerAttachments.length > 0) return;
+    if (!hasContentAfterLatestCompaction(history)) return;
     if (contextEstimate.conversationId !== conversationId) return;
     if (contextEstimate.status !== "ready") return;
     if (contextEstimateSignatureRef.current !== autoCompactHistorySignature(history)) return;
@@ -5557,9 +5564,17 @@ function CompactionSummaryBlock({
   onOpenFile: (path: string) => void;
 }) {
   const [open, setOpen] = useState(streaming ?? false);
+  const wasStreamingRef = useRef(streaming ?? false);
   useEffect(() => {
-    if (streaming) setOpen(true);
-  }, [streaming]);
+    const wasStreaming = wasStreamingRef.current;
+    const isStreamingNow = streaming ?? false;
+    wasStreamingRef.current = isStreamingNow;
+    if (isStreamingNow && !wasStreaming) {
+      setOpen(true);
+      return;
+    }
+    if (wasStreaming && !isStreamingNow && text.trim()) setOpen(false);
+  }, [streaming, text]);
   return (
     <div className="tool-card">
       <div

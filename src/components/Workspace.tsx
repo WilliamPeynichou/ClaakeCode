@@ -1277,11 +1277,13 @@ export function Workspace({
     async (
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
+      options?: { continueAfter?: boolean },
     ) => {
       const conversationId = activeConv.id;
+      const continueAfter = options?.continueAfter ?? true;
       const continuationMode = conversationContinuationMode(activeConv);
       const continuationPrompt =
-        continuationMode === "goal"
+        continueAfter && continuationMode === "goal"
           ? GOAL_COMPACTION_CONTINUATION_PROMPT
           : COMPACTION_CONTINUATION_PROMPT;
       markConversationStreamingModel(conversationId, model, thinking);
@@ -1306,6 +1308,8 @@ export function Workspace({
         if (activeConvIdRef.current === conversationId) {
           setActiveConv(loaded);
         }
+
+        if (!continueAfter) return;
 
         await sleep(0);
 
