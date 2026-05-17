@@ -253,6 +253,8 @@ pub(super) struct SendMessageInput {
     pub(super) message_visibility: Option<MessageVisibilityInput>,
     #[serde(default)]
     pub(super) rewrite_from_history_index: Option<usize>,
+    #[serde(default = "default_true")]
+    pub(super) revert_workspace_changes: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -262,6 +264,8 @@ pub(super) struct CompactConversationInput {
     pub(super) conversation_id: String,
     pub(super) model: Option<ModelInput>,
     pub(super) thinking: Option<ThinkingLevelInput>,
+    #[serde(default)]
+    pub(super) instruction: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

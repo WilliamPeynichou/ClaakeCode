@@ -82,6 +82,7 @@ type RewriteState = {
   historyIndex: number;
   originalText: string;
   originalAttachments: Attachment[];
+  revertWorkspaceChanges: boolean;
 };
 
 type QueuedPrompt = QueuedPromptStripItem & {
@@ -152,11 +153,12 @@ type Props = {
     rewriteFromHistoryIndex?: number,
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
+    revertWorkspaceChanges?: boolean,
   ) => Promise<void>;
   onCompact: (
     model: ModelRef,
     thinking: ThinkingLevel,
-    options?: { continueAfter?: boolean },
+    options?: { continueAfter?: boolean; instruction?: string },
   ) => Promise<void>;
   onModeChange: (mode: AgentMode) => Promise<void>;
   onModelPreferenceChange: (
@@ -170,6 +172,7 @@ type Props = {
   ) => Promise<void>;
   onStop: () => Promise<void>;
   onOpenFile: (path: string) => void;
+  onOpenSettings: (section?: "providers") => void;
   externalDrops: ExternalDropFeed;
   dropZoneRef: RefObject<HTMLDivElement>;
 };
@@ -364,6 +367,7 @@ export function ChatPane({
   onImplementPlanFresh,
   onStop,
   onOpenFile,
+  onOpenSettings,
   externalDrops,
   dropZoneRef,
 }: Props) {
@@ -406,6 +410,8 @@ export function ChatPane({
         : "act",
   );
   const [rewriteState, setRewriteState] = useState<RewriteState | null>(null);
+  const [compactInstructionOpen, setCompactInstructionOpen] = useState(false);
+  const [compactInstruction, setCompactInstruction] = useState("");
   const rewindFileChanges = useMemo(
     () =>
       rewriteState
@@ -426,6 +432,8 @@ export function ChatPane({
   const modeRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const compactInstructionInputRef = useRef<HTMLInputElement | null>(null);
+  const compactPopoverRef = useRef<HTMLDivElement | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const mentionLoadingRef = useRef(false);
   const [mentionFiles, setMentionFiles] = useState<WorkspaceEntry[] | null>(
@@ -578,6 +586,11 @@ export function ChatPane({
   const availableThinking = modelEntry
     ? THINKING_LEVELS.filter((l) => modelEntry.thinking.includes(l.value))
     : [];
+  // Surface a clear "connect a provider" affordance when nothing is wired up
+  // yet. The selectors stay hidden in that case — there's nothing meaningful
+  // to pick from until the user signs into at least one provider.
+  const noProvidersConfigured =
+    !selectorLocked && configuredProviders.length === 0;
   const thinkingLabel =
     thinkingLevelLabel(
       THINKING_LEVELS.find((l) => l.value === thinking),
@@ -689,6 +702,8 @@ export function ChatPane({
     setAttachments(cloneComposerAttachments(composerDraft?.attachments ?? []));
     setInlineMentions(cloneInlineMentions(composerDraft?.inlineMentions ?? []));
     setRewriteState(null);
+    setCompactInstructionOpen(false);
+    setCompactInstruction("");
     setEditingQueuedPrompt(composerDraft?.editingQueuedPrompt ?? null);
     setMention(null);
     setMode(
@@ -954,6 +969,23 @@ export function ChatPane({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [rewriteState]);
+
+  useEffect(() => {
+    if (!compactInstructionOpen) return;
+    window.setTimeout(() => compactInstructionInputRef.current?.focus(), 0);
+  }, [compactInstructionOpen]);
+
+  useEffect(() => {
+    if (!compactInstructionOpen) return;
+    const onDoc = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (compactPopoverRef.current?.contains(target)) return;
+      setCompactInstructionOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [compactInstructionOpen]);
 
   const reduceEventForConversation = useCallback(
     (
@@ -1359,6 +1391,7 @@ export function ChatPane({
       return;
     }
     const rewriteFromHistoryIndex = rewriteState?.historyIndex;
+    const revertWorkspaceChanges = rewriteState?.revertWorkspaceChanges ?? true;
     const nextHistoryIndex = rewriteFromHistoryIndex ?? history.length;
     setView((prev) => {
       const base =
@@ -1387,6 +1420,9 @@ export function ChatPane({
         thinking,
         effectiveMode,
         rewriteFromHistoryIndex,
+        undefined,
+        undefined,
+        revertWorkspaceChanges,
       );
     } catch (err) {
       setView((prev) => ({
@@ -1481,28 +1517,70 @@ export function ChatPane({
     view.status,
   ]);
 
-  const handleCompact = useCallback(async () => {
-    if (
-      view.status === "streaming" ||
-      activeSubAgentId !== null ||
-      history.length === 0 ||
-      !modelEntry
-    ) {
+  const compactDisabled =
+    view.status === "streaming" ||
+    activeSubAgentId !== null ||
+    history.length === 0 ||
+    !modelEntry;
+
+  const runManualCompact = useCallback(
+    async (instruction?: string) => {
+      if (compactDisabled) {
+        return;
+      }
+      setSendTick((t) => t + 1);
+      try {
+        await onCompact(modelRefFromId(model), thinking, {
+          continueAfter: false,
+          instruction,
+        });
+        setCompactInstructionOpen(false);
+        setCompactInstruction("");
+      } catch (err) {
+        setView((prev) => ({
+          ...prev,
+          status: "stopped",
+          streamPhase: "idle",
+          lastError: String(err),
+          turnStartedAtMs: null,
+        }));
+      }
+    },
+    [compactDisabled, model, onCompact, thinking],
+  );
+
+  const handleCompact = useCallback(() => {
+    if (compactDisabled) {
       return;
     }
-    setSendTick((t) => t + 1);
-    try {
-      await onCompact(modelRefFromId(model), thinking, { continueAfter: false });
-    } catch (err) {
-      setView((prev) => ({
-        ...prev,
-        status: "stopped",
-        streamPhase: "idle",
-        lastError: String(err),
-        turnStartedAtMs: null,
-      }));
+    setCompactInstructionOpen((open) => !open);
+  }, [compactDisabled]);
+
+  const handleCompactInstructionSubmit = useCallback(async () => {
+    const instruction = compactInstruction.trim();
+    await runManualCompact(instruction || undefined);
+  }, [compactInstruction, runManualCompact]);
+
+  const handleCompactInstructionKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void handleCompactInstructionSubmit();
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setCompactInstructionOpen(false);
+      }
+    },
+    [handleCompactInstructionSubmit],
+  );
+
+  useEffect(() => {
+    if (compactDisabled && compactInstructionOpen) {
+      setCompactInstructionOpen(false);
     }
-  }, [activeSubAgentId, history.length, model, modelEntry, onCompact, thinking, view.status]);
+  }, [compactDisabled, compactInstructionOpen]);
 
   useEffect(() => {
     if (contextEstimate.conversationId !== conversationId) return;
@@ -1961,10 +2039,12 @@ export function ChatPane({
       setText(block.text);
       setAttachments(chips);
       setInlineMentions(inline);
+      setCompactInstructionOpen(false);
       setRewriteState((prev) => ({
         historyIndex: block.historyIndex,
         originalText: prev?.originalText ?? text,
         originalAttachments: prev?.originalAttachments ?? attachments,
+        revertWorkspaceChanges: prev?.revertWorkspaceChanges ?? true,
       }));
     },
     [attachments, text, view.status, workspacePath],
@@ -2676,6 +2756,12 @@ export function ChatPane({
             {rewriteState && rewindFileChanges.length > 0 && (
               <RewindChangesPreview
                 changes={rewindFileChanges}
+                revertWorkspaceChanges={rewriteState.revertWorkspaceChanges}
+                onRevertWorkspaceChangesChange={(revertWorkspaceChanges) => {
+                  setRewriteState((current) =>
+                    current ? { ...current, revertWorkspaceChanges } : current,
+                  );
+                }}
                 onClose={() => {
                   setText(rewriteState.originalText);
                   setAttachments(rewriteState.originalAttachments);
@@ -2833,7 +2919,62 @@ export function ChatPane({
               }}
             />
           </div>
-          <div className="composer__actions">
+          <div
+            className="composer__actions"
+            data-compacting={compactInstructionOpen ? "true" : "false"}
+          >
+            {compactInstructionOpen ? (
+              <div className="composer__compacting" ref={compactPopoverRef}>
+                <div
+                  className="compact-pill"
+                  role="dialog"
+                  aria-label="Compaction instruction"
+                >
+                  <span className="compact-pill__icon" aria-hidden="true">
+                    <Icon icon="solar:archive-linear" width={14} height={14} />
+                  </span>
+                  <input
+                    ref={compactInstructionInputRef}
+                    className="compact-pill__input"
+                    value={compactInstruction}
+                    onChange={(event) =>
+                      setCompactInstruction(event.target.value)
+                    }
+                    onKeyDown={handleCompactInstructionKeyDown}
+                    placeholder="Optional focus, e.g. keep only X…"
+                    aria-label="Compaction instruction"
+                  />
+                  <button
+                    type="button"
+                    className="compact-pill__submit"
+                    onClick={() => void handleCompactInstructionSubmit()}
+                    aria-label="Compact conversation"
+                  >
+                    <Icon
+                      icon="solar:arrow-right-linear"
+                      width={13}
+                      height={13}
+                    />
+                    <span
+                      className="compact-pill__tip"
+                      role="tooltip"
+                      aria-hidden="true"
+                    >
+                      Compact conversation
+                    </span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="composer__iconbtn composer__compact-cancel"
+                  onClick={() => setCompactInstructionOpen(false)}
+                  aria-label="Cancel compaction"
+                >
+                  <Icon icon="solar:close-circle-linear" width={18} height={18} />
+                </button>
+              </div>
+            ) : (
+              <>
             <div className="composer__actions-left">
               <button
                 type="button"
@@ -2844,6 +2985,17 @@ export function ChatPane({
               >
                 <Icon icon="solar:add-circle-linear" width={18} height={18} />
               </button>
+              {noProvidersConfigured ? (
+                <button
+                  type="button"
+                  className="composer__connect-cta"
+                  onClick={() => onOpenSettings("providers")}
+                >
+                  <Icon icon="solar:plug-circle-linear" width={14} height={14} />
+                  <span>Connect a provider</span>
+                </button>
+              ) : (
+                <>
               <div className="composer__picker" data-kind="mode" ref={modeRef}>
                 <button
                   type="button"
@@ -3030,19 +3182,17 @@ export function ChatPane({
                   </div>
                 )}
               </div>
+                </>
+              )}
             </div>
             <div className="composer__actions-right">
               <button
                 type="button"
                 className="composer__iconbtn composer__compact"
-                onClick={() => void handleCompact()}
-                disabled={
-                  view.status === "streaming" ||
-                  activeSubAgentId !== null ||
-                  history.length === 0 ||
-                  !modelEntry
-                }
+                onClick={handleCompact}
+                disabled={compactDisabled}
                 aria-label="Compact context"
+                aria-expanded={compactInstructionOpen}
               >
                 <Icon icon="solar:archive-linear" width={16} height={16} />
                 <span className="composer__iconbtn-tip" role="tooltip" aria-hidden="true">
@@ -3071,6 +3221,8 @@ export function ChatPane({
                 </button>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -3435,20 +3587,48 @@ const REWIND_DIFF_LINE_LIMIT = 220;
 
 function RewindChangesPreview({
   changes,
+  revertWorkspaceChanges,
+  onRevertWorkspaceChangesChange,
   onClose,
 }: {
   changes: FileChange[];
+  revertWorkspaceChanges: boolean;
+  onRevertWorkspaceChangesChange: (value: boolean) => void;
   onClose: () => void;
 }) {
-  const label =
+  const fileLabel =
     changes.length === 1
       ? "1 file will roll back"
       : `${changes.length} files will roll back`;
+  const detail = revertWorkspaceChanges
+    ? fileLabel
+    : changes.length === 1
+      ? "1 file will stay as-is"
+      : `${changes.length} files will stay as-is`;
   return (
     <div className="rewind-preview">
       <div className="rewind-preview__head">
         <Icon icon="solar:rewind-back-bold-duotone" width={15} height={15} />
-        <span>{label}</span>
+        <span className="rewind-preview__title">Rollback</span>
+        <button
+          type="button"
+          className="rewind-preview__toggle"
+          data-on={revertWorkspaceChanges ? "true" : "false"}
+          role="switch"
+          aria-checked={revertWorkspaceChanges}
+          aria-label="Revert workspace changes on rollback"
+          title={
+            revertWorkspaceChanges
+              ? "File changes will be reverted"
+              : "File changes will be kept"
+          }
+          onClick={() =>
+            onRevertWorkspaceChangesChange(!revertWorkspaceChanges)
+          }
+        >
+          <span className="rewind-preview__toggle-thumb" />
+        </button>
+        <span className="rewind-preview__detail">{detail}</span>
         <button
           type="button"
           className="rewind-preview__close"

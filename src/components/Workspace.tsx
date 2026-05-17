@@ -496,9 +496,20 @@ export function Workspace({
     setSettingsActive(false);
   }, []);
 
-  const openSettings = useCallback(() => {
+  const openSettings = useCallback((section?: "providers") => {
     setSettingsOpen(true);
     setSettingsActive(true);
+    // Pickup hook for SettingsPane: when the caller wants to land on a
+    // specific section (e.g. the composer's "Connect a provider" CTA),
+    // fan it out via a window event so the pane can react regardless of
+    // whether it just mounted or was already open.
+    if (section) {
+      window.dispatchEvent(
+        new CustomEvent("sinew:open-settings-section", {
+          detail: { section },
+        }),
+      );
+    }
   }, []);
 
   const closeSettings = useCallback(() => {
@@ -1219,6 +1230,7 @@ export function Workspace({
       rewriteFromHistoryIndex?: number,
       planControl?: PlanControl,
       messageVisibility?: MessageVisibility,
+      revertWorkspaceChanges?: boolean,
     ) => {
       const conversationId = activeConv.id;
       const workspaceAtRequest = workspacePath;
@@ -1247,6 +1259,7 @@ export function Workspace({
           rewriteFromHistoryIndex,
           planControl,
           messageVisibility,
+          revertWorkspaceChanges,
         );
       } catch (err) {
         markConversationStreaming(conversationId, false);
@@ -1277,7 +1290,7 @@ export function Workspace({
     async (
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
-      options?: { continueAfter?: boolean },
+      options?: { continueAfter?: boolean; instruction?: string },
     ) => {
       const conversationId = activeConv.id;
       const continueAfter = options?.continueAfter ?? true;
@@ -1294,6 +1307,7 @@ export function Workspace({
           conversationId,
           model,
           thinking,
+          options?.instruction,
         );
 
         markConversationStreaming(conversationId, false);
@@ -1615,7 +1629,7 @@ export function Workspace({
           <button
             className="titlebar__btn"
             data-on={settingsActive ? "true" : "false"}
-            onClick={openSettings}
+            onClick={() => openSettings()}
             title="Settings"
           >
             <Icon icon="solar:settings-linear" width={12} height={12} />
@@ -1844,6 +1858,7 @@ export function Workspace({
             onImplementPlanFresh={implementPlanFresh}
             onStop={stopTurn}
             onOpenFile={openChatFile}
+            onOpenSettings={openSettings}
             externalDrops={externalDropFeed}
             dropZoneRef={chatDropZoneRef}
           />

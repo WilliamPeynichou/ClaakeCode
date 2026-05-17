@@ -41,14 +41,16 @@ pub(super) async fn send_message(
                 return Err("rewrite index must point to a user message".into());
             }
         }
-        restore_workspace_for_rewrite(
-            &app,
-            &state.store,
-            &workspace_root,
-            &input.conversation_id,
-            index,
-        )
-        .map_err(error_to_string)?;
+        if input.revert_workspace_changes {
+            restore_workspace_for_rewrite(
+                &app,
+                &state.store,
+                &workspace_root,
+                &input.conversation_id,
+                index,
+            )
+            .map_err(error_to_string)?;
+        }
         conversation.history.truncate(index);
         conversation.todo_list = todo_list_from_history(&conversation.history);
         conversation.plan_workflow = PlanWorkflowState::Idle;
@@ -410,6 +412,12 @@ pub(super) async fn compact_conversation(
 
     let selected_model =
         model_with_optional_selection(&conversation.model, input.model, input.thinking);
+    let compaction_instruction = input
+        .instruction
+        .as_deref()
+        .map(str::trim)
+        .filter(|instruction| !instruction.is_empty())
+        .map(str::to_string);
     let provider = provider_from_registry(&state, &selected_model.provider)?;
     provider
         .capabilities(&selected_model)
@@ -446,6 +454,10 @@ pub(super) async fn compact_conversation(
             name: "context_compaction".to_string(),
         },
     );
+    let args_pretty = compaction_instruction
+        .as_ref()
+        .map(|instruction| json!({ "instruction": instruction }).to_string())
+        .unwrap_or_else(|| "{}".to_string());
     let _ = emit_agent_event(
         &app,
         &workspace_id,
@@ -453,7 +465,7 @@ pub(super) async fn compact_conversation(
         &AgentEvent::ToolReady {
             id: compaction_id.clone(),
             summary: "Compact context".to_string(),
-            args_pretty: "{}".to_string(),
+            args_pretty,
         },
     );
 
@@ -483,6 +495,7 @@ pub(super) async fn compact_conversation(
         source_history.clone(),
         Some(conversation_id.clone()),
         source_history.len(),
+        compaction_instruction,
         &mut cmd_rx,
         Some(summary_delta_tx),
     )

@@ -5583,6 +5583,43 @@ textarea {
   margin-bottom: 7px;
 }
 .rewind-preview__head svg { color: var(--text-3); }
+.rewind-preview__title {
+  color: var(--text-1);
+  font-weight: 550;
+}
+.rewind-preview__detail {
+  color: var(--text-3);
+}
+.rewind-preview__toggle {
+  flex: 0 0 auto;
+  position: relative;
+  width: 22px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--bg-4);
+  transition: background 120ms ease;
+}
+.rewind-preview__toggle[data-on="true"] {
+  background: var(--text-2);
+}
+.rewind-preview__toggle:focus-visible {
+  outline: 1px solid var(--text-3);
+  outline-offset: 2px;
+}
+.rewind-preview__toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 140ms ease, background 140ms ease;
+}
+.rewind-preview__toggle[data-on="true"] .rewind-preview__toggle-thumb {
+  transform: translateX(10px);
+  background: var(--bg-0);
+}
 .rewind-preview__close {
   margin-left: auto;
   flex: 0 0 auto;
@@ -6249,6 +6286,105 @@ textarea {
 .composer__compact {
   margin-right: -2px;
 }
+
+/* Compaction takeover: when the user opens the compaction instruction,
+   the entire toolbar swaps to a single-row pill that spans the full
+   width, with a close (X) at the far right. The selects, the attach
+   button and the Send button are intentionally hidden during this
+   state so the only thing the user can do is submit or cancel. */
+.composer__compacting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.compact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  background: var(--bg-3);
+  border-radius: var(--r-med);
+  color: var(--text-1);
+}
+.compact-pill__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+}
+.compact-pill__icon svg { color: inherit; }
+.compact-pill__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-0);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+.compact-pill__input::placeholder {
+  color: var(--text-3);
+}
+.compact-pill__submit {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-small);
+  background: var(--bg-4);
+  color: var(--text-1);
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.compact-pill__submit:hover {
+  background: var(--text-2);
+  color: var(--bg-0);
+}
+.compact-pill__submit:active { transform: translateY(1px); }
+.compact-pill__submit svg { color: inherit; }
+.compact-pill__tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  transform: translateY(2px);
+  padding: 4px 8px;
+  border-radius: var(--r-med);
+  background: var(--bg-2);
+  color: var(--text-0);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 140ms ease;
+  box-shadow: var(--shadow-ambient);
+  z-index: 45;
+}
+.compact-pill__submit:hover .compact-pill__tip,
+.compact-pill__submit:focus-visible .compact-pill__tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .composer__iconbtn-tip {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -6343,6 +6479,39 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* "Connect a provider" CTA shown in place of the mode/model/thinking
+   pickers when no provider has been configured yet. Sits flush with the
+   composer toolbar height (26px) so the row keeps the same rhythm as the
+   regular pickers, but tinted with the accent palette to read as the
+   primary next step. */
+.composer__connect-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-med);
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease;
+}
+.composer__connect-cta:hover {
+  background: rgba(59, 130, 246, 0.22);
+  color: var(--text-0);
+}
+.composer__connect-cta:active {
+  background: rgba(59, 130, 246, 0.28);
+}
+.composer__connect-cta svg {
+  color: inherit;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 720px) {
