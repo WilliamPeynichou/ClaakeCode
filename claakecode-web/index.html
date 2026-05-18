@@ -50,24 +50,48 @@
     </div>
     <div class="hero-grid hero-grid-spread">
       <div class="hero-title-block">
-        <h1>Every tool.<br/>Every skill.<br/><em>Any</em> <em>provider</em>.</h1>
+        <h1>The open AI IDE<br/><em>you</em> can actually<br/><em>control</em>.</h1>
       </div>
       <div class="hero-copy-block">
         <p class="hero-sub">
-          Claake Code hands the harness back to you. Toggle every tool, rewrite every skill, swap providers mid-conversation — Anthropic, OpenAI, Google, Kimi, OpenRouter. No gatekeepers, no hidden prompts. The agent only ever sees what you decide to ship.
+          Claake Code is a native desktop IDE with an agent, terminal, editor, MCP, skills and multi-provider models — all open source. Toggle every tool, rewrite every skill, swap providers mid-conversation, and keep the harness under your control.
         </p>
         <div class="hero-cta">
           <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg" class="btn btn-primary">Download for macOS ↓</a>
           <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe" class="btn btn-primary btn-windows">Download for Windows ↓</a>
           <a href="https://github.com/WilliamPeynichou/ClaakeCode" class="btn btn-ghost">View on GitHub</a>
         </div>
+        <p class="hero-note mono">No account required · Bring your own API keys · MIT licensed · No telemetry</p>
       </div>
       <div class="hero-chips">
-        <span class="chip"><span class="chip-num">14</span><span class="chip-label">built-in tools · all toggleable</span></span>
-        <span class="chip"><span class="chip-num">∞</span><span class="chip-label">skills · plain markdown, fully yours</span></span>
-        <span class="chip"><span class="chip-num">5</span><span class="chip-label">providers · one click, zero lock-in</span></span>
+        <span class="chip"><span class="chip-num">14</span><span class="chip-label"><strong>editable tools</strong><br/>Turn every capability on/off.</span></span>
+        <span class="chip"><span class="chip-num">∞</span><span class="chip-label"><strong>unlimited skills</strong><br/>Markdown playbooks the agent can load.</span></span>
+        <span class="chip"><span class="chip-num">5</span><span class="chip-label"><strong>model providers</strong><br/>Anthropic, OpenAI, Google, Kimi, OpenRouter.</span></span>
       </div>
     </div>
+  </section>
+
+  <!-- PRODUCT SHOWCASE -->
+  <section class="showcase" id="showcase">
+    <div class="section-tag">
+      <span class="num">Live product</span>
+      <span>See the IDE before you download</span>
+      <span class="rule"></span>
+    </div>
+    <div class="showcase-head">
+      <h2>Not a prompt box.<br/><em class="serif" style="color:var(--forest)">A real IDE</em> with an agent inside.</h2>
+      <p>
+        Open a repo, pick your provider, choose the tools the agent can use, then let it plan, edit, run, inspect and coordinate sub-agents — with everything visible and editable.
+      </p>
+    </div>
+    <figure class="video-stage showcase-video">
+      <div class="video-frame video-frame-wide">
+        <video class="video-el" autoplay loop muted playsinline preload="metadata" poster="assets/claakecode-icon.png">
+          <source src="assets/presentation.mov" type="video/mp4" />
+          <source src="assets/presentation.mov" type="video/quicktime" />
+        </video>
+      </div>
+    </figure>
   </section>
 
   <!-- SUPPORT STRIP -->
@@ -102,35 +126,6 @@
     <p style="color:var(--ink-soft);font-size:17px;line-height:1.55;margin-top:22px;max-width:760px">
       No CLI gymnastics. No hidden system prompt. Open the panel, flip a tool on, rewrite its description, drop in a new skill, swap from Sonnet to GPT to Gemini in a click. The agent runs exactly the harness you assembled.
     </p>
-
-    <div style="margin-top:36px"></div>
-
-    <figure class="video-stage">
-      <div class="video-head">
-        <span class="term-dot r"></span>
-        <span class="term-dot y"></span>
-        <span class="term-dot g"></span>
-        <span class="video-title">claakecode — settings · tools · skills · providers</span>
-        <span class="video-tag">full walkthrough</span>
-      </div>
-      <div class="video-frame video-frame-wide">
-        <video
-          class="video-el"
-          autoplay
-          loop
-          muted
-          playsinline
-          preload="metadata"
-          poster="assets/claakecode-icon.png"
-        >
-          <source src="assets/presentation.mov" type="video/mp4" />
-          <source src="assets/presentation.mov" type="video/quicktime" />
-        </video>
-      </div>
-      <figcaption class="video-stage-cap">
-        <span class="mono">↳ everything you see is editable · everything ships open source</span>
-      </figcaption>
-    </figure>
 
     <div class="pillar-grid">
       <article id="tools-pillar" class="pillar">
@@ -411,7 +406,7 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
       <span>Download</span>
       <span class="rule"></span>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center" class="install-grid">
+    <div class="install-grid">
       <div>
         <h2>One double-click.<br/>
           <em class="serif" style="color:var(--forest)">No terminal</em>, no setup wizard.
@@ -419,27 +414,32 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
         <p style="color:var(--ink-soft);font-size:17px;line-height:1.55;margin-top:20px;max-width:480px">
           Grab the native build for your OS, open the app, and drop in whichever provider keys you want — Anthropic, OpenAI, Google, Kimi, OpenRouter. The tool, skill and provider panels take care of the rest. No package manager, no shell scripts, no setup wizard.
         </p>
+        <div class="download-trust mono">Latest release · Native desktop · Bring your own keys · Open source</div>
       </div>
-      <div style="display:grid;gap:12px">
-        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg" class="install-bar" style="text-decoration:none">
-          <span class="prompt">macOS</span>
-          <span style="flex:1">Download Claake Code .dmg</span>
-          <span class="copy-btn">download ↓</span>
+      <div class="download-cards">
+        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg" class="download-card">
+          <span class="download-os">macOS</span>
+          <strong>Download .dmg</strong>
+          <span>Apple Silicon + Intel universal build.</span>
+          <em>download ↓</em>
         </a>
-        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe" class="install-bar" style="text-decoration:none">
-          <span class="prompt">windows</span>
-          <span style="flex:1">Download Claake Code .exe installer</span>
-          <span class="copy-btn">download ↓</span>
+        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe" class="download-card featured">
+          <span class="download-os">Windows</span>
+          <strong>Download .exe</strong>
+          <span>Windows 10/11 x64 installer.</span>
+          <em>download ↓</em>
         </a>
-        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage" class="install-bar" style="text-decoration:none">
-          <span class="prompt">linux</span>
-          <span style="flex:1">Download Claake Code .AppImage</span>
-          <span class="copy-btn">download ↓</span>
+        <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage" class="download-card">
+          <span class="download-os">Linux</span>
+          <strong>Download AppImage</strong>
+          <span>Portable Linux build; .deb also in releases.</span>
+          <em>download ↓</em>
         </a>
-        <a href="https://github.com/WilliamPeynichou/ClaakeCode" class="install-bar" style="text-decoration:none">
-          <span class="prompt">source</span>
-          <span style="flex:1">Browse the repo on GitHub</span>
-          <span class="copy-btn">open ↗</span>
+        <a href="https://github.com/WilliamPeynichou/ClaakeCode" class="download-card source-card">
+          <span class="download-os">Source</span>
+          <strong>Read the code</strong>
+          <span>MIT licensed Rust + React + Tauri.</span>
+          <em>GitHub ↗</em>
         </a>
       </div>
     </div>

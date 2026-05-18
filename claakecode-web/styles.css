@@ -104,7 +104,7 @@
   h3 { font-size: 22px; line-height: 1.2; font-weight: 500; }
   p { margin: 0; }
 
-  .hero { padding: 56px 0 110px; border-bottom: 1px solid var(--rule); }
+  .hero { padding: 56px 0 84px; border-bottom: 1px solid var(--rule); }
   .hero-meta { display: flex; gap: 12px; margin-bottom: 36px; flex-wrap: wrap; }
   .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: start; }
   .hero-grid-solo { grid-template-columns: minmax(0, 760px); }
@@ -122,6 +122,13 @@
   .hero h1 em { font-family: 'Instrument Serif'; font-style: italic; font-weight: 400; color: var(--forest); letter-spacing: -0.01em; }
   .hero-sub { margin-top: 0; font-size: 18px; line-height: 1.5; color: var(--ink-soft); max-width: 620px; }
   .hero-cta { margin-top: 36px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .hero-note {
+    margin-top: 14px;
+    color: var(--forest);
+    font-size: 12px;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+  }
 
   .install-bar {
     margin-top: 28px;
@@ -173,7 +180,30 @@
     font-family: 'Geist Mono'; font-size: 12px;
     color: var(--ink-soft);
     text-transform: uppercase; letter-spacing: 0.06em;
+    line-height: 1.45;
   }
+  .chip-label strong { color: var(--forest-deep); font-weight: 600; }
+
+  /* ─── product showcase ────────────────────────────────────── */
+  .showcase { padding-top: 54px; }
+  .showcase-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+    gap: 48px;
+    align-items: end;
+    margin-bottom: 34px;
+  }
+  .showcase-head p {
+    color: var(--ink-soft);
+    font-size: 17px;
+    line-height: 1.6;
+    max-width: 520px;
+  }
+  .showcase-video .video-frame {
+    border-radius: 24px;
+    box-shadow: 0 42px 90px -58px rgba(15, 34, 24, 0.75);
+  }
+  .showcase-video .video-el { border-radius: 24px; }
 
   /* ─── video stage ─────────────────────────────────────────── */
   .video-head {
@@ -228,6 +258,78 @@
   .video-stage-cap {
     display: none;
   }
+
+  /* ─── download cards ──────────────────────────────────────── */
+  .install-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .download-trust {
+    margin-top: 22px;
+    color: var(--forest);
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+  }
+  .download-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .download-card {
+    min-height: 188px;
+    padding: 24px;
+    background: var(--cream);
+    border: 1px solid var(--rule);
+    border-radius: 18px;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: transform .14s ease, border-color .14s ease, background .14s ease;
+  }
+  .download-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--forest);
+    background: #f2ead5;
+  }
+  .download-card.featured {
+    background: var(--forest-ink);
+    border-color: var(--forest);
+    color: var(--cream);
+  }
+  .download-card.featured:hover { background: var(--forest-deep); }
+  .download-os {
+    font-family: 'Geist Mono';
+    font-size: 11px;
+    color: var(--forest);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .download-card.featured .download-os { color: #8FB39E; }
+  .download-card strong {
+    font-size: 24px;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+  .download-card span:not(.download-os) {
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .download-card.featured span:not(.download-os) { color: #b7c7bd; }
+  .download-card em {
+    margin-top: auto;
+    font-family: 'Geist Mono';
+    font-style: normal;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--forest);
+  }
+  .download-card.featured em { color: #8FB39E; }
 
   /* ─── tools / skills / providers pillar grid ─────────────── */
   .pillar-grid {
@@ -394,7 +496,7 @@
   @media (max-width: 960px) {
     h1 { font-size: 64px; }
     h2 { font-size: 40px; }
-    .hero-grid, .hero-grid-spread, .loop-wrap { grid-template-columns: 1fr; gap: 36px; }
+    .hero-grid, .hero-grid-spread, .loop-wrap, .showcase-head { grid-template-columns: 1fr; gap: 36px; }
     .hero-copy-block { padding-bottom: 0; }
     .hero-chips { grid-template-columns: 1fr; margin-top: 0; }
     .feat-grid { grid-template-columns: 1fr; }
@@ -419,5 +521,8 @@
     .foot { grid-template-columns: 1fr; }
     .chip { justify-content: flex-start; min-height: auto; padding: 18px 20px; }
     .chip-num { font-size: 36px; }
+    .download-cards { grid-template-columns: 1fr; }
+    .download-card { min-height: auto; }
+    .showcase-video .video-frame, .showcase-video .video-el { border-radius: 16px; }
     .video-frame-wide { aspect-ratio: 4 / 3; }
   }
