@@ -1,83 +1,85 @@
 /* ------------------------------------------------------------------
-   wilide — desktop UI, cool deep-black design system.
-   Reference: designsystem.html at repo root (Geist + Geist Mono,
-   blue #3b82f6 + lavender #c4b5fd accents on near-black surfaces).
-   ZERO italic anywhere. No serif font family.
-   Cursor-minimalist: tight spacing, hairline borders, flat surfaces.
+   Claake Code — desktop UI, "Vert Noisette" dark design system.
+   Palette: warm dark base #1a1916, brand vert noisette #6b7c5c,
+   neutres chauds (stone, hazel green). DM Serif Display for editorial
+   titles, DM Sans for body. Sharp corners, hairline borders, no
+   drop-shadows. Editorial discipline meets IDE density.
    ------------------------------------------------------------------ */
 
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
 :root {
-  /* ---- Surfaces — cool deep black scale ------------------------- */
-  --bg-canvas: #0b0b0d;
-  --bg-0: #0b0b0d;               /* body, main content */
-  --bg-1: #0f1013;               /* sidebars, titlebar, chat column */
-  --bg-2: #141518;               /* cards, panels, user bubble */
-  --bg-3: #181a1f;               /* hover */
-  --bg-4: #1e2025;               /* active / selected */
-  --bg-5: #23252b;               /* pressed */
-  --bg-hi: #141518;              /* subtle highlight == bg-2 */
-  --bg-pure: #000000;
+  /* ---- Surfaces — warm dark noisette scale ---------------------- */
+  --bg-canvas: #1a1916;          /* dark-bg de la DA */
+  --bg-0: #1a1916;               /* body, main content */
+  --bg-1: #1f1d1a;               /* sidebars, titlebar, chat column */
+  --bg-2: #252320;               /* cards, panels, user bubble */
+  --bg-3: #2a2824;               /* hover */
+  --bg-4: #302d28;               /* active / selected */
+  --bg-5: #36332e;               /* pressed */
+  --bg-hi: #252320;              /* subtle highlight == bg-2 */
+  --bg-pure: #0d0c0a;
 
-  /* Editor surface — one shade deeper than shell */
-  --editor-bg: #08090b;
-  --editor-bg-2: #0f1013;
-  --editor-bg-3: #141518;
-  --editor-fg: #e8e9ec;
-  --editor-fg-dim: #9aa0a8;
+  /* Editor surface — slightly deeper than shell */
+  --editor-bg: #151412;
+  --editor-bg-2: #1f1d1a;
+  --editor-bg-3: #252320;
+  --editor-fg: #e8e4d8;
+  --editor-fg-dim: #a09a8a;
 
-  /* ---- Lines / borders — cool cream on dark at low alpha -------- */
-  --line-soft:   rgba(232, 233, 236, 0.04);
-  --line:        rgba(232, 233, 236, 0.08);
-  --line-strong: rgba(232, 233, 236, 0.14);
-  --line-bold:   rgba(232, 233, 236, 0.32);
-  --divider:     rgba(232, 233, 236, 0.08);
+  /* ---- Lines / borders — warm stone on dark at low alpha -------- */
+  --line-soft:   rgba(232, 228, 216, 0.04);
+  --line:        rgba(232, 228, 216, 0.08);
+  --line-strong: rgba(232, 228, 216, 0.14);
+  --line-bold:   rgba(232, 228, 216, 0.30);
+  --divider:     rgba(232, 228, 216, 0.08);
 
-  /* ---- Text — cool gray scale ----------------------------------- */
-  --text-0: #e8e9ec;
-  --text-1: #d2d4d9;
-  --text-2: #9aa0a8;               /* designsystem --text-dim */
-  --text-3: #6b6f78;               /* designsystem --text-mut */
-  --text-muted: #52555c;
-  --text-faint: #3a3d44;
+  /* ---- Text — warm neutral scale -------------------------------- */
+  --text-0: #e8e4d8;               /* dark-text */
+  --text-1: #c8c3b4;
+  --text-2: #a09a8a;               /* stone-400 */
+  --text-3: #8a8578;               /* dark-muted */
+  --text-muted: #6b6558;           /* stone-600 */
+  --text-faint: #4a463e;
 
-  /* ---- Accents — blue primary + lavender secondary -------------- */
-  --accent:      #3b82f6;
-  --accent-hi:   #5b8cff;
-  --accent-dim:  #2f6ee0;
-  --accent-deep: #1e4bb8;
-  --accent-glow: rgba(59, 130, 246, 0.35);
-  --accent-soft: rgba(59, 130, 246, 0.12);
+  /* ---- Accents — Vert Noisette primary -------------------------- */
+  --accent:      #6b7c5c;          /* brand */
+  --accent-hi:   #8a9b78;          /* brand-light */
+  --accent-dim:  #5a6b4d;
+  --accent-deep: #4e5c42;          /* brand-dark */
+  --accent-glow: rgba(107, 124, 92, 0.35);
+  --accent-soft: rgba(107, 124, 92, 0.14);
 
-  /* lavender — used for subtle signal dots, active chat icons */
-  --accent-2:      #c4b5fd;
-  --accent-2-soft: rgba(196, 181, 253, 0.14);
+  /* second accent — pale hazel for signals */
+  --accent-2:      #d0dac4;        /* hazel-green-200 */
+  --accent-2-soft: rgba(208, 218, 196, 0.14);
 
   /* hover — brighten text to pure text-0 (no hue shift) */
   --hover-shift: var(--text-0);
 
   /* semantic */
-  --signal: #c4b5fd;               /* lavender for dirty marker */
-  --danger: #f5737f;               /* warm rose on dark */
-  --ok:     #22c55e;               /* green, matches designsystem --good */
+  --signal: #d0dac4;               /* hazel pale for dirty marker */
+  --danger: #d76b6b;               /* warm rose on dark */
+  --ok:     #8a9b78;               /* brand-light as confirmation */
 
-  /* timeline (tool) colors — cool-shifted */
-  --tone-thinking: #f5a683;        /* peach */
-  --tone-grep:     #86efac;        /* green */
-  --tone-read:     #9fc2ff;        /* blue */
-  --tone-edit:     #c4b5fd;        /* lavender */
+  /* timeline (tool) colors — warm-shifted to match palette */
+  --tone-thinking: #c8a982;        /* warm amber */
+  --tone-grep:     #8a9b78;        /* vert noisette light */
+  --tone-read:     #b0bca0;        /* hazel-green pale */
+  --tone-edit:     #d0dac4;        /* hazel pale */
 
   /* diff */
-  --diff-add-bg: rgba(34, 197, 94, 0.14);
-  --diff-add-fg: #86efac;
-  --diff-rem-bg: rgba(245, 115, 127, 0.14);
-  --diff-rem-fg: #f5a1ab;
+  --diff-add-bg: rgba(138, 155, 120, 0.16);
+  --diff-add-fg: #b0bca0;
+  --diff-rem-bg: rgba(215, 107, 107, 0.16);
+  --diff-rem-fg: #e88a8a;
 
-  /* ---- Typography — Geist only (no serif, no italic) ----------- */
-  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system,
+  /* ---- Typography — Editorial pairing -------------------------- */
+  --font-ui: "DM Sans", ui-sans-serif, system-ui, -apple-system,
              BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
              sans-serif;
-  --font-display: "Geist", ui-sans-serif, system-ui, -apple-system,
-                  BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "DM Serif Display", "Cormorant Garamond",
+                  "Playfair Display", Georgia, serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo,
                Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
@@ -87,13 +89,14 @@
   --fs-mono: 12px;
   --fs-mono-sm: 11.5px;
 
-  /* radius — rounder than before, matches designsystem 10/14/20 */
-  --r-micro: 3px;
-  --r-small: 5px;
-  --r-med: 7px;
-  --r-card: 10px;
-  --r-feature: 14px;
-  --r-large: 20px;
+  /* radius — Vert Noisette is sharp: 0 or 2px on buttons, slightly
+     softer for cards to stay readable in dense IDE chrome. */
+  --r-micro: 0px;
+  --r-small: 2px;
+  --r-med: 2px;
+  --r-card: 4px;
+  --r-feature: 6px;
+  --r-large: 8px;
   --r-pill: 9999px;
 
   /* elevation */
@@ -268,7 +271,7 @@ textarea {
 
 .welcome__title {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 400;
   font-size: 56px;
   letter-spacing: -1.8px;
   line-height: 1;
@@ -276,8 +279,8 @@ textarea {
   color: var(--text-0);
 }
 .welcome__title-dot {
-  color: var(--text-3);
-  font-weight: 500;
+  color: var(--accent);
+  font-weight: 400;
 }
 
 .welcome__tag {
@@ -541,8 +544,8 @@ textarea {
 .titlebar__brand-name {
   font-family: var(--font-display);
   color: var(--text-0);
-  font-weight: 500;
-  font-size: var(--fs-sm);
+  font-weight: 400;
+  font-size: var(--fs-base);
   letter-spacing: -0.011em;
 }
 .titlebar__actions {

@@ -1648,7 +1648,7 @@ export function Workspace({
           <span className="titlebar__brand-mark">
             <WilideMark size={11} />
           </span>
-          <span className="titlebar__brand-name">wilide</span>
+          <span className="titlebar__brand-name">Claake Code</span>
         </div>
         <UpdateBadge />
         <WindowControls />

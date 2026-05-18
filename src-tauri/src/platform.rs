@@ -8,7 +8,7 @@ pub(super) fn create_new_window(app: &AppHandle) -> Result<()> {
     let label = next_window_label(app);
     let mut builder =
         WebviewWindowBuilder::new(app, label, WebviewUrl::App(PathBuf::from(NEW_WINDOW_URL)))
-            .title("wilide")
+            .title("Claake Code")
             .inner_size(1500.0, 940.0)
             .min_inner_size(1100.0, 720.0)
             .resizable(true)
@@ -63,7 +63,7 @@ pub(super) fn focus_existing_window(app: &AppHandle) -> bool {
 /// never shows a blank entry.
 pub(super) fn apply_window_title(window: &tauri::WebviewWindow, folder_name: &str) {
     let trimmed = folder_name.trim();
-    let title = if trimmed.is_empty() { "wilide" } else { trimmed };
+    let title = if trimmed.is_empty() { "Claake Code" } else { trimmed };
     if let Err(err) = window.set_title(title) {
         tracing::warn!(%err, label = %window.label(), "unable to update window title");
     }
@@ -137,7 +137,7 @@ unsafe extern "C-unwind" fn macos_application_dock_menu(
         return std::ptr::null_mut();
     };
 
-    let menu_title = NSString::from_str("wilide");
+    let menu_title = NSString::from_str("Claake Code");
     let item_title = NSString::from_str("Nouvelle fenêtre");
     let empty_key = NSString::new();
     let menu = NSMenu::initWithTitle(mtm.alloc(), &menu_title);

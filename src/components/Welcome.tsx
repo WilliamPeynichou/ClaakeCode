@@ -114,7 +114,7 @@ export function Welcome({ onPick, error, deriveName }: Props) {
             </span>
           </span>
           <h1 className="welcome__title">
-            wilide<span className="welcome__title-dot">.</span>
+            Claake Code<span className="welcome__title-dot">.</span>
           </h1>
           <p className="welcome__tag">Your personal Agentic IDE</p>
         </header>

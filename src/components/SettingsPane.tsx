@@ -1319,12 +1319,12 @@ function AboutSection() {
           <WilideMark size={26} />
         </span>
         <div className="settings-pane__about-title">
-          <h1>wilide</h1>
+          <h1>Claake Code</h1>
         </div>
       </div>
 
       <p className="settings-pane__about-line">
-        wilide is a flexible AI coding harness. You shape it: tweak the description of
+        Claake Code is a flexible AI coding harness. You shape it: tweak the description of
         every tool, turn the ones you don&apos;t need off, and the assistant only sees
         what you keep.
       </p>
@@ -1422,7 +1422,7 @@ function ProvidersSection({
         <div className="settings-pane__header-text">
           <h1 className="settings-pane__title">Providers</h1>
           <p className="settings-pane__subtitle">
-            Connect model providers for wilide.
+            Connect model providers for Claake Code.
           </p>
         </div>
         <div className="settings-pane__actions">
