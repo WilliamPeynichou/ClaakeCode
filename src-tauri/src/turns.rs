@@ -69,6 +69,7 @@ pub(super) async fn send_message(
         mode_model_settings.get(policy.mode),
         input.model,
         input.thinking,
+        input.use_1m_context,
     );
     mode_model_settings.set(policy.mode, selected_model.clone());
     conversation.mode_model_settings = mode_model_settings.clone();
@@ -410,8 +411,12 @@ pub(super) async fn compact_conversation(
         return Err("conversation has no history to compact".into());
     }
 
-    let selected_model =
-        model_with_optional_selection(&conversation.model, input.model, input.thinking);
+    let selected_model = model_with_optional_selection(
+        &conversation.model,
+        input.model,
+        input.thinking,
+        input.use_1m_context,
+    );
     let compaction_instruction = input
         .instruction
         .as_deref()

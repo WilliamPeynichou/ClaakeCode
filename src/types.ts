@@ -119,6 +119,7 @@ export type ModelRef = {
   provider: string;
   name: string;
   effort?: "none" | "low" | "medium" | "high" | "xhigh" | "max" | null;
+  use1mContext?: boolean | null;
 };
 
 export type AgentMode = "act" | "plan" | "goal";

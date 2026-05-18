@@ -4,13 +4,21 @@ pub(super) fn model_with_optional_selection(
     current: &ModelRef,
     model: Option<ModelInput>,
     thinking: Option<ThinkingLevelInput>,
+    use_1m_context: Option<bool>,
 ) -> ModelRef {
     let mut selected = match model {
-        Some(model) => ModelRef::new(model.provider, model.name),
+        Some(model) => {
+            let mut m = ModelRef::new(model.provider, model.name);
+            m.use_1m_context = model.use_1m_context;
+            m
+        }
         None => current.clone(),
     };
     if let Some(thinking) = thinking {
         selected.effort = Some(thinking.into_effort());
+    }
+    if let Some(flag) = use_1m_context {
+        selected.use_1m_context = Some(flag);
     }
     selected
 }

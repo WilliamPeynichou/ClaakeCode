@@ -246,9 +246,17 @@ export const api = {
     mode: AgentMode,
     model: ModelRef,
     thinking: ThinkingLevel,
+    use1mContext?: boolean,
   ) {
     return invoke<ModeModelSettings>("set_conversation_model_preference", {
-      input: { workspacePath, conversationId, mode, model, thinking },
+      input: {
+        workspacePath,
+        conversationId,
+        mode,
+        model,
+        thinking,
+        use1mContext,
+      },
     });
   },
   listMcpSettings() {
@@ -382,6 +390,7 @@ export const api = {
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
     revertWorkspaceChanges?: boolean,
+    use1mContext?: boolean,
   ) {
     return invoke<void>("send_message", {
       input: {
@@ -391,6 +400,7 @@ export const api = {
         attachments,
         model,
         thinking,
+        use1mContext,
         mode,
         rewriteFromHistoryIndex,
         planControl,
@@ -405,9 +415,17 @@ export const api = {
     model: ModelRef,
     thinking: ThinkingLevel,
     instruction?: string,
+    use1mContext?: boolean,
   ) {
     return invoke<void>("compact_conversation", {
-      input: { workspacePath, conversationId, model, thinking, instruction },
+      input: {
+        workspacePath,
+        conversationId,
+        model,
+        thinking,
+        use1mContext,
+        instruction,
+      },
     });
   },
   listActiveTurns() {
@@ -431,6 +449,7 @@ export const api = {
     thinking: ThinkingLevel,
     mode: AgentMode,
     rewriteFromHistoryIndex?: number,
+    use1mContext?: boolean,
   ) {
     return invoke<ContextEstimate>("estimate_context", {
       input: {
@@ -440,6 +459,7 @@ export const api = {
         attachments,
         model,
         thinking,
+        use1mContext,
         mode,
         rewriteFromHistoryIndex,
       },

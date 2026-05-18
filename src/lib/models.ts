@@ -8,8 +8,33 @@ import type {
 
 export type ModelId = string;
 export type ProviderId = "anthropic" | "openai" | "google" | "kimi" | "openrouter";
-export type ModeModelSelection = { model: ModelId; thinking: ThinkingLevel };
+export type ModeModelSelection = {
+  model: ModelId;
+  thinking: ThinkingLevel;
+  use1mContext: boolean;
+};
 export type ModeModelSelections = Record<AgentMode, ModeModelSelection>;
+
+export function modelSupports1mContextBeta(model: ModelId): boolean {
+  return model === "anthropic:claude-sonnet-4-6";
+}
+
+export function use1mContextFromRef(
+  model: ModelRef | null | undefined,
+): boolean {
+  return model?.use1mContext === true;
+}
+
+export function modelRefWithUse1mContext(
+  model: ModelRef,
+  enabled: boolean,
+): ModelRef {
+  if (!enabled) {
+    const { use1mContext: _drop, ...rest } = model;
+    return rest;
+  }
+  return { ...model, use1mContext: true };
+}
 
 export type ModelEntry = {
   value: ModelId;
@@ -277,6 +302,7 @@ export function selectionFromRef(
   return {
     model: modelIdFromRef(model),
     thinking: thinkingFromRef(model),
+    use1mContext: use1mContextFromRef(model),
   };
 }
 

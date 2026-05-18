@@ -170,6 +170,7 @@ pub(super) async fn set_conversation_model_preference(
         conversation.mode_model_settings.get(mode),
         input.model,
         input.thinking,
+        input.use_1m_context,
     );
     let provider = provider_from_registry(&state, &selected.provider)?;
     provider

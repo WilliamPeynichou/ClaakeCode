@@ -33,6 +33,8 @@ import {
   THINKING_LEVELS,
   availableModelsForProviders,
   modelRefFromId,
+  modelRefWithUse1mContext,
+  modelSupports1mContextBeta,
   modelsWithOpenRouter,
   selectionFromRef,
   selectionsFromSettings,
@@ -308,11 +310,13 @@ function selectionForAvailableModels(
     availableModels.find((model) => model.value === selection.model) ??
     availableModels[0];
   if (!entry) return selection;
+  const supports1m = modelSupports1mContextBeta(entry.value);
   return {
     model: entry.value,
     thinking: entry.thinking.includes(selection.thinking)
       ? selection.thinking
       : entry.defaultThinking,
+    use1mContext: supports1m ? selection.use1mContext : false,
   };
 }
 
@@ -332,7 +336,11 @@ function sameModeSelection(
   a: ModeModelSelection | undefined,
   b: ModeModelSelection | undefined,
 ): boolean {
-  return a?.model === b?.model && a?.thinking === b?.thinking;
+  return (
+    a?.model === b?.model &&
+    a?.thinking === b?.thinking &&
+    a?.use1mContext === b?.use1mContext
+  );
 }
 
 function thinkingLevelLabel(
@@ -580,6 +588,8 @@ export function ChatPane({
     : selectionForAvailableModels(rawCurrentSelection, availableModels);
   const model = currentSelection.model;
   const thinking = currentSelection.thinking;
+  const use1mContext = currentSelection.use1mContext;
+  const supports1mContext = modelSupports1mContextBeta(model);
   const modelEntry = availableModels.find((m) => m.value === model) ?? null;
   const displayModelEntry =
     modelEntry ?? allModels.find((m) => m.value === model) ?? null;
@@ -601,6 +611,11 @@ export function ChatPane({
   const composerAttachments = useMemo(
     () => collectComposerAttachments(attachments, inlineMentions),
     [attachments, inlineMentions],
+  );
+  const currentModelRef = useMemo(
+    () =>
+      modelRefWithUse1mContext(modelRefFromId(model), supports1mContext && use1mContext),
+    [model, supports1mContext, use1mContext],
   );
   const queuedPrompts =
     promptQueuesByConversation.get(conversationId) ?? EMPTY_QUEUED_PROMPTS;
@@ -1310,7 +1325,7 @@ export function ChatPane({
           conversationId,
           text,
           composerAttachments,
-          modelRefFromId(model),
+          currentModelRef,
           thinking,
           effectiveMode,
           rewriteState?.historyIndex,
@@ -1371,7 +1386,7 @@ export function ChatPane({
         id: editing?.id,
         text: value,
         attachments: currentAttachments,
-        model: modelRefFromId(model),
+        model: currentModelRef,
         thinking,
         mode: effectiveMode,
         createdAtMs: editing?.createdAtMs,
@@ -1416,7 +1431,7 @@ export function ChatPane({
       await onSend(
         value,
         currentAttachments,
-        modelRefFromId(model),
+        currentModelRef,
         thinking,
         effectiveMode,
         rewriteFromHistoryIndex,
@@ -1530,7 +1545,7 @@ export function ChatPane({
       }
       setSendTick((t) => t + 1);
       try {
-        await onCompact(modelRefFromId(model), thinking, {
+        await onCompact(currentModelRef, thinking, {
           continueAfter: false,
           instruction,
         });
@@ -1605,7 +1620,7 @@ export function ChatPane({
     autoCompactAttemptKeysRef.current.add(key);
 
     setSendTick((t) => t + 1);
-    void onCompact(modelRefFromId(model), thinking, { continueAfter: true }).catch(
+    void onCompact(currentModelRef, thinking, { continueAfter: true }).catch(
       (err) => {
         autoCompactAttemptKeysRef.current.delete(key);
         setView((prev) => ({
@@ -1669,7 +1684,10 @@ export function ChatPane({
     void onSend(
       GOAL_CONTINUATION_PROMPT,
       [],
-      modelRefFromId(goalSelection.model),
+      modelRefWithUse1mContext(
+        modelRefFromId(goalSelection.model),
+        modelSupports1mContextBeta(goalSelection.model) && goalSelection.use1mContext,
+      ),
       goalSelection.thinking,
       "goal",
       undefined,
@@ -1741,7 +1759,7 @@ export function ChatPane({
         await onSend(
           value,
           [],
-          modelRefFromId(model),
+          currentModelRef,
           thinking,
           effectiveMode,
           undefined,
@@ -1789,7 +1807,10 @@ export function ChatPane({
       try {
         await onModelPreferenceChange(
           targetMode,
-          modelRefFromId(next.model),
+          modelRefWithUse1mContext(
+            modelRefFromId(next.model),
+            modelSupports1mContextBeta(next.model) && next.use1mContext,
+          ),
           next.thinking,
         );
       } catch (err) {
@@ -1828,9 +1849,17 @@ export function ChatPane({
       void persistModeSelection(effectiveMode, {
         model: nextModel,
         thinking: nextThinking,
+        use1mContext: modelSupports1mContextBeta(nextModel) ? use1mContext : false,
       });
     },
-    [availableModels, effectiveMode, persistModeSelection, selectorLocked, thinking],
+    [
+      availableModels,
+      effectiveMode,
+      persistModeSelection,
+      selectorLocked,
+      thinking,
+      use1mContext,
+    ],
   );
 
   const handleThinkingSelect = useCallback(
@@ -1840,9 +1869,30 @@ export function ChatPane({
       void persistModeSelection(effectiveMode, {
         model,
         thinking: nextThinking,
+        use1mContext,
       });
     },
-    [effectiveMode, model, persistModeSelection, selectorLocked],
+    [effectiveMode, model, persistModeSelection, selectorLocked, use1mContext],
+  );
+
+  const handle1mContextToggle = useCallback(
+    (enabled: boolean) => {
+      if (selectorLocked) return;
+      if (!supports1mContext) return;
+      void persistModeSelection(effectiveMode, {
+        model,
+        thinking,
+        use1mContext: enabled,
+      });
+    },
+    [
+      effectiveMode,
+      model,
+      persistModeSelection,
+      selectorLocked,
+      supports1mContext,
+      thinking,
+    ],
   );
 
   const handleModeSelect = useCallback(
@@ -1904,7 +1954,11 @@ export function ChatPane({
         await onSend(
           value,
           [planAttachment],
-          modelRefFromId(commandSelection.model),
+          modelRefWithUse1mContext(
+            modelRefFromId(commandSelection.model),
+            modelSupports1mContextBeta(commandSelection.model) &&
+              commandSelection.use1mContext,
+          ),
           commandSelection.thinking,
           nextMode,
           undefined,
@@ -2380,7 +2434,7 @@ export function ChatPane({
               id: editing?.id,
               text: currentValue,
               attachments: currentAttachments,
-              model: modelRefFromId(model),
+              model: currentModelRef,
               thinking,
               mode: effectiveMode,
               createdAtMs: editing?.createdAtMs,
@@ -3182,6 +3236,35 @@ export function ChatPane({
                   </div>
                 )}
               </div>
+              {supports1mContext && (
+                <button
+                  type="button"
+                  className="composer__picker-btn"
+                  data-open={use1mContext ? "true" : "false"}
+                  data-locked={selectorLocked ? "true" : "false"}
+                  disabled={selectorLocked}
+                  onClick={() => {
+                    handle1mContextToggle(!use1mContext);
+                  }}
+                  title={
+                    use1mContext
+                      ? "1M context window (beta) enabled — requires Anthropic tier 4"
+                      : "Enable 1M context window (beta) — requires Anthropic tier 4"
+                  }
+                  aria-pressed={use1mContext}
+                >
+                  <Icon
+                    icon={
+                      use1mContext
+                        ? "solar:checkbox-bold"
+                        : "solar:checkbox-linear"
+                    }
+                    width={12}
+                    height={12}
+                  />
+                  <span className="composer__picker-label">1M</span>
+                </button>
+              )}
                 </>
               )}
             </div>

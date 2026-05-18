@@ -35,8 +35,12 @@ pub(super) async fn estimate_context(
 
     let mode = plan_estimate_mode(&conversation.plan_workflow, requested_mode);
     let mode_model_settings = conversation.mode_model_settings.clone();
-    let selected_model =
-        model_with_optional_selection(mode_model_settings.get(mode), input.model, input.thinking);
+    let selected_model = model_with_optional_selection(
+        mode_model_settings.get(mode),
+        input.model,
+        input.thinking,
+        input.use_1m_context,
+    );
     conversation.mode_model_settings = mode_model_settings;
     conversation.model = selected_model;
     let provider = provider_from_registry(&state, &conversation.model.provider)?;

@@ -248,6 +248,8 @@ pub(super) struct SendMessageInput {
     pub(super) attachments: Vec<AttachmentInput>,
     pub(super) model: Option<ModelInput>,
     pub(super) thinking: Option<ThinkingLevelInput>,
+    #[serde(default)]
+    pub(super) use_1m_context: Option<bool>,
     pub(super) mode: Option<AgentModeInput>,
     pub(super) plan_control: Option<PlanControlInput>,
     pub(super) message_visibility: Option<MessageVisibilityInput>,
@@ -265,6 +267,8 @@ pub(super) struct CompactConversationInput {
     pub(super) model: Option<ModelInput>,
     pub(super) thinking: Option<ThinkingLevelInput>,
     #[serde(default)]
+    pub(super) use_1m_context: Option<bool>,
+    #[serde(default)]
     pub(super) instruction: Option<String>,
 }
 
@@ -279,6 +283,8 @@ pub(super) struct ContextEstimateInput {
     pub(super) attachments: Vec<AttachmentInput>,
     pub(super) model: Option<ModelInput>,
     pub(super) thinking: Option<ThinkingLevelInput>,
+    #[serde(default)]
+    pub(super) use_1m_context: Option<bool>,
     pub(super) mode: Option<AgentModeInput>,
     #[serde(default)]
     pub(super) rewrite_from_history_index: Option<usize>,
@@ -312,6 +318,8 @@ pub(super) struct ConversationModelPreferenceInput {
     pub(super) mode: AgentModeInput,
     pub(super) model: Option<ModelInput>,
     pub(super) thinking: Option<ThinkingLevelInput>,
+    #[serde(default)]
+    pub(super) use_1m_context: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -422,9 +430,12 @@ pub(super) struct OpenRouterModelCandidateInput {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct ModelInput {
     pub(super) provider: String,
     pub(super) name: String,
+    #[serde(default)]
+    pub(super) use_1m_context: Option<bool>,
 }
 
 fn default_true() -> bool {

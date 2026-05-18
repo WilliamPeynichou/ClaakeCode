@@ -6,6 +6,8 @@ pub struct ModelRef {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_1m_context: Option<bool>,
 }
 
 impl ModelRef {
@@ -14,12 +16,22 @@ impl ModelRef {
             provider: provider.into(),
             name: name.into(),
             effort: None,
+            use_1m_context: None,
         }
     }
 
     pub fn with_effort(mut self, effort: Effort) -> Self {
         self.effort = Some(effort);
         self
+    }
+
+    pub fn with_use_1m_context(mut self, value: bool) -> Self {
+        self.use_1m_context = Some(value);
+        self
+    }
+
+    pub fn use_1m_context_enabled(&self) -> bool {
+        self.use_1m_context.unwrap_or(false)
     }
 }
 

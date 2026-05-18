@@ -16,7 +16,8 @@ const BASE_URL: &str = "https://api.anthropic.com";
 const API_VERSION: &str = "2023-06-01";
 const USER_AGENT: &str = "claude-cli/2.1.75";
 const CODE_SYSTEM_PREFIX: &str = "You are Claude Code, Anthropic's official CLI for Claude.";
-const COMMON_BETA: &str = "fine-grained-tool-streaming-2025-05-14,context-1m-2025-08-07";
+const COMMON_BETA: &str = "fine-grained-tool-streaming-2025-05-14";
+const CONTEXT_1M_BETA: &str = "context-1m-2025-08-07";
 const OAUTH_BETA: &str = "claude-code-20250219,oauth-2025-04-20";
 const CACHE_BREAKPOINTS: usize = 4;
 
@@ -67,7 +68,11 @@ impl AnthropicProvider {
         Self::new(AnthropicConfig::from_default_sources()?)
     }
 
-    async fn post(&self, route: &str) -> Result<(reqwest::RequestBuilder, String)> {
+    async fn post(
+        &self,
+        route: &str,
+        use_1m_context: bool,
+    ) -> Result<(reqwest::RequestBuilder, String)> {
         let token = self.config.credential.bearer_or_key(&self.http).await?;
         let is_oauth = self.config.credential.is_oauth();
         let mut request = self
@@ -81,7 +86,7 @@ impl AnthropicProvider {
             .header("content-type", "application/json")
             .header("accept", "application/json")
             .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("anthropic-beta", self.beta_header(is_oauth));
+            .header("anthropic-beta", self.beta_header(is_oauth, use_1m_context));
 
         if is_oauth {
             request = request
@@ -99,8 +104,9 @@ impl AnthropicProvider {
         &self,
         route: &str,
         body: &T,
+        use_1m_context: bool,
     ) -> Result<reqwest::Response> {
-        let (request, token) = self.post(route).await?;
+        let (request, token) = self.post(route, use_1m_context).await?;
         let response = request
             .json(body)
             .send()
@@ -119,7 +125,7 @@ impl AnthropicProvider {
             .await
             .map_err(map_refresh_failure)?;
 
-        let (request, _) = self.post(route).await?;
+        let (request, _) = self.post(route, use_1m_context).await?;
         request
             .json(body)
             .send()
@@ -127,12 +133,15 @@ impl AnthropicProvider {
             .map_err(|err| AppError::Network(err.to_string()))
     }
 
-    fn beta_header(&self, is_oauth: bool) -> String {
+    fn beta_header(&self, is_oauth: bool, use_1m_context: bool) -> String {
         let mut values = Vec::new();
         if is_oauth {
             values.push(OAUTH_BETA.to_string());
         }
         values.push(COMMON_BETA.to_string());
+        if use_1m_context {
+            values.push(CONTEXT_1M_BETA.to_string());
+        }
         if let Some(extra) = &self.config.extra_beta {
             if !extra.is_empty() {
                 values.push(extra.clone());
@@ -179,7 +188,13 @@ impl Provider for AnthropicProvider {
                 .collect(),
         };
 
-        let response = self.send_json("/v1/messages/count_tokens", &body).await?;
+        let response = self
+            .send_json(
+                "/v1/messages/count_tokens",
+                &body,
+                request.model.use_1m_context_enabled(),
+            )
+            .await?;
 
         if !response.status().is_success() {
             return Err(read_http_error(response).await);
@@ -240,7 +255,9 @@ impl Provider for AnthropicProvider {
             stream: true,
         };
 
-        let response = self.send_json("/v1/messages", &body).await?;
+        let response = self
+            .send_json("/v1/messages", &body, request.model.use_1m_context_enabled())
+            .await?;
 
         if !response.status().is_success() {
             return Err(read_http_error(response).await);
