@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <title>Claake Code — agentic IDE</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Claake Code is a local-first, open source desktop AI coding harness. Reshape every tool, run any provider, ship in the open." />
+<meta name="description" content="Claake Code is a desktop AI coding harness you can actually reshape. Rewrite every tool, run any provider (Anthropic, OpenAI, Google, Kimi, OpenRouter), and the assistant only sees what you keep. Open source, MIT." />
 <link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,7 +26,9 @@
     <div class="nav-links">
       <a href="#editor">Editor</a>
       <a href="#agent">Agent</a>
+      <a href="#harness">Harness</a>
       <a href="#features">Features</a>
+      <a href="#compare">Compare</a>
       <a href="#oss">Open source</a>
       <a href="#install">Install</a>
     </div>
@@ -47,9 +49,9 @@
     </div>
     <div class="hero-grid">
       <div>
-        <h1>An <em>agentic</em><br/>code editor<br/>that <em>thinks</em><br/>in repos.</h1>
+        <h1>The coding<br/>harness <em>you</em><br/><em>shape</em>.</h1>
         <p class="hero-sub">
-          Claake Code is a desktop coding harness you can actually reshape. Rewrite every tool description, toggle the ones you don't need, and the assistant only sees what you keep. Multi-provider, MCP-native, no telemetry.
+          Claake Code is a desktop AI coding harness you can actually reshape. Rewrite the description of every tool, turn the ones you don't need off, and the assistant only sees what you keep.
         </p>
         <div class="hero-cta">
           <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest" class="btn btn-primary">Download for macOS ↗</a>
@@ -219,21 +221,21 @@
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:36px;margin-top:48px">
       <div>
-        <div class="mono" style="font-size:11px;color:var(--forest);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Plan mode</div>
+        <div class="mono" style="font-size:11px;color:var(--forest);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">A real IDE</div>
         <p style="color:var(--ink-soft);font-size:15px;line-height:1.55">
-          The agent proposes a structured plan before touching a single byte. Approve, edit, or rewrite the plan in plain English.
+          Monaco editor and xterm terminal. Not a chat box with a file picker — you get a workspace, a file tree, and a real shell next to the agent.
         </p>
       </div>
       <div>
-        <div class="mono" style="font-size:11px;color:var(--forest);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Diffs you can trust</div>
+        <div class="mono" style="font-size:11px;color:var(--forest);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">An agent in the loop</div>
         <p style="color:var(--ink-soft);font-size:15px;line-height:1.55">
-          Every edit lands as a reviewable hunk on a feature branch. Tests run before anything touches your working tree.
+          Plan mode, act mode, goal mode. The assistant can grep, edit, run shell commands, hit the web, generate images, or load any MCP server you've configured.
         </p>
       </div>
       <div>
         <div class="mono" style="font-size:11px;color:var(--forest);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Agent swarm</div>
         <p style="color:var(--ink-soft);font-size:15px;line-height:1.55">
-          Fan a task out to a team of sub-agents with their own context and tool subset. Shared task board, live coordination.
+          Launch a team of sub-agents from a single prompt — each with its own context, role, and tool subset. They coordinate through a shared task board and direct messaging.
         </p>
       </div>
     </div>
@@ -250,10 +252,10 @@
       <div>
         <h2>Plan. Act. Observe.<br/><em class="serif" style="color:var(--forest)">Reflect.</em> Repeat.</h2>
         <p style="color:var(--ink-soft);font-size:17px;line-height:1.55;margin-top:24px;max-width:480px">
-          Claake runs a tight loop with explicit checkpoints. After each tool call the agent re-reads the world, scores its progress against the plan, and decides whether to continue, branch, or ask you a question.
+          Same agent loop across Anthropic, OpenAI, Google, Kimi, and OpenRouter. After each tool call the agent re-reads the world, scores its progress against the plan, and decides whether to continue, branch, or ask you a question.
         </p>
-        <p style="color:var(--ink-soft);font-size:14px;line-height:1.55;margin-top:18px;max-width:480px">
-          No hidden chain-of-thought. Every step lands in your terminal as a structured event you can replay, fork, or pipe into your CI.
+        <p class="mono" style="color:var(--forest);font-size:13px;line-height:1.55;margin-top:18px;max-width:480px;font-weight:500">
+          No magic. No hidden tools. No prompt you can't see.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:24px">
           <span class="pill">read</span>
@@ -300,10 +302,45 @@
     </div>
   </section>
 
+  <!-- SHAPE THE HARNESS -->
+  <section id="harness">
+    <div class="section-tag">
+      <span class="num">§ 03</span>
+      <span>Shape the harness</span>
+      <span class="rule"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:start" class="harness-wrap">
+      <div>
+        <h2>The same agent loop can behave like a <em class="serif" style="color:var(--forest)">barebones pair-programmer</em> or a <em class="serif" style="color:var(--forest)">full autonomous crew</em>.</h2>
+        <p style="color:var(--ink-soft);font-size:17px;line-height:1.55;margin-top:24px;max-width:480px">
+          Tool descriptions live in settings, versioned with your config, and the assistant gets exactly the surface area you decide on.
+        </p>
+      </div>
+      <div style="display:grid;gap:14px;font-family:'Geist Mono';font-size:13px">
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:18px;padding:14px 16px;background:var(--cream);border:1px solid var(--rule);border-radius:10px">
+          <span class="mono" style="color:var(--forest);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;font-weight:500">Minimal</span>
+          <span>read · patch · bash</span>
+        </div>
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:18px;padding:14px 16px;background:var(--cream);border:1px solid var(--rule);border-radius:10px">
+          <span class="mono" style="color:var(--forest);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;font-weight:500">Search</span>
+          <span>+ grep · glob</span>
+        </div>
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:18px;padding:14px 16px;background:var(--cream);border:1px solid var(--rule);border-radius:10px">
+          <span class="mono" style="color:var(--forest);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;font-weight:500">Web</span>
+          <span>+ WebSearch · WebFetch</span>
+        </div>
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:18px;padding:14px 16px;background:var(--forest-ink);color:var(--cream);border:1px solid var(--forest);border-radius:10px">
+          <span class="mono" style="color:#8FB39E;text-transform:uppercase;letter-spacing:0.08em;font-size:11px;font-weight:500">Full</span>
+          <span>+ image · mcp · todo · question · skill · subagent · team</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- FEATURES GRID -->
   <section id="features">
     <div class="section-tag">
-      <span class="num">§ 03</span>
+      <span class="num">§ 04</span>
       <span>Built for people who don't trust black boxes</span>
       <span class="rule"></span>
     </div>
@@ -370,7 +407,7 @@
   <!-- OPEN SOURCE -->
   <section id="oss">
     <div class="section-tag">
-      <span class="num">§ 04</span>
+      <span class="num">§ 05</span>
       <span>Open source</span>
       <span class="rule"></span>
     </div>
@@ -415,10 +452,46 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
     </div>
   </section>
 
+  <!-- HOW IT COMPARES -->
+  <section id="compare">
+    <div class="section-tag">
+      <span class="num">§ 06</span>
+      <span>How it compares</span>
+      <span class="rule"></span>
+    </div>
+    <h2 style="margin-bottom:36px;max-width:980px">Everyone says "agentic". <em class="serif" style="color:var(--forest)">Few</em> let you see and rewrite the prompt.</h2>
+    <div style="overflow-x:auto;border:1px solid var(--rule);border-radius:14px">
+      <table style="width:100%;border-collapse:collapse;font-family:'Geist';font-size:14px;background:var(--paper)">
+        <thead>
+          <tr style="background:var(--cream)">
+            <th style="text-align:left;padding:14px 18px;font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-weight:500">Capability</th>
+            <th style="padding:14px 14px;font-weight:600;color:var(--forest);font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em">Claake Code</th>
+            <th style="padding:14px 14px;font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-weight:500">Cursor</th>
+            <th style="padding:14px 14px;font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-weight:500">Claude Code</th>
+            <th style="padding:14px 14px;font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-weight:500">Aider</th>
+            <th style="padding:14px 14px;font-family:'Geist Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-weight:500">Zed AI</th>
+          </tr>
+        </thead>
+        <tbody style="font-family:'Geist Mono';font-size:12.5px;color:var(--ink)">
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Native desktop app</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">CLI</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">CLI</td><td style="padding:12px 14px;text-align:center">✓</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Open source</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center">✓</td><td style="padding:12px 14px;text-align:center">✓</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Multi-provider</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center">✓</td><td style="padding:12px 14px;text-align:center">✓</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Editable tool descriptions</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Toggle individual tools</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">partial</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">MCP server CRUD UI</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">partial</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">partial</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Skills CRUD UI</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">1M context beta toggle (Sonnet)</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">partial</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Agent swarm + task board</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">—</td></tr>
+          <tr style="border-top:1px solid var(--rule)"><td style="padding:12px 18px">Embedded terminal</td><td style="padding:12px 14px;text-align:center;color:var(--forest)">✓</td><td style="padding:12px 14px;text-align:center">✓</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">n/a</td><td style="padding:12px 14px;text-align:center;color:var(--ink-soft)">n/a</td><td style="padding:12px 14px;text-align:center">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- INSTALL CTA -->
   <section id="install" style="padding-bottom:96px">
     <div class="section-tag">
-      <span class="num">§ 05</span>
+      <span class="num">§ 07</span>
       <span>Install</span>
       <span class="rule"></span>
     </div>
