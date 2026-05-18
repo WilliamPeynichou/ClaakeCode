@@ -120,7 +120,7 @@ pub(super) fn install_macos_dock_menu(app: &AppHandle) {
         );
         let _ = class_addMethod(
             delegate_class,
-            objc2::sel!(wilideNewWindowFromDock:),
+            objc2::sel!(claakecodeNewWindowFromDock:),
             new_window_imp,
             c"v@:@".as_ptr().cast(),
         );
@@ -145,7 +145,7 @@ unsafe extern "C-unwind" fn macos_application_dock_menu(
         NSMenuItem::initWithTitle_action_keyEquivalent(
             mtm.alloc(),
             &item_title,
-            Some(objc2::sel!(wilideNewWindowFromDock:)),
+            Some(objc2::sel!(claakecodeNewWindowFromDock:)),
             &empty_key,
         )
     };
@@ -263,8 +263,8 @@ pub(super) fn delete_installed_skill(workspace_root: &Path, skill_md: &Path) -> 
 /// Create a new SKILL.md under one of the configured skill roots.
 ///
 /// `scope` selects which root family to use:
-/// - "workspace" → `<workspace>/.wilide/skills/<slug>/SKILL.md`
-/// - "global" or anything else → `~/.wilide/skills/<slug>/SKILL.md`
+/// - "workspace" → `<workspace>/.claakecode/skills/<slug>/SKILL.md`
+/// - "global" or anything else → `~/.claakecode/skills/<slug>/SKILL.md`
 ///
 /// Errors if the target folder already exists.
 pub(super) fn create_installed_skill(
@@ -278,10 +278,10 @@ pub(super) fn create_installed_skill(
         anyhow::bail!("skill name must contain at least one letter or digit");
     }
     let root = match scope {
-        "workspace" => workspace_root.join(".wilide/skills"),
+        "workspace" => workspace_root.join(".claakecode/skills"),
         _ => home_dir()
             .ok_or_else(|| anyhow::anyhow!("could not resolve the user home directory"))?
-            .join(".wilide/skills"),
+            .join(".claakecode/skills"),
     };
     fs::create_dir_all(&root)
         .with_context(|| format!("unable to create skill root {}", root.display()))?;
@@ -355,11 +355,11 @@ fn slug_for_skill(name: &str) -> String {
 pub(super) fn skill_roots(workspace_root: &Path) -> Vec<PathBuf> {
     let mut roots = vec![
         workspace_root.join(".agents/skills"),
-        workspace_root.join(".wilide/skills"),
+        workspace_root.join(".claakecode/skills"),
     ];
     if let Some(home) = home_dir() {
         roots.push(home.join(".agents/skills"));
-        roots.push(home.join(".wilide/skills"));
+        roots.push(home.join(".claakecode/skills"));
     }
     roots
 }

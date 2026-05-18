@@ -294,8 +294,8 @@ const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 const AUTO_COMPACT_OUTPUT_TOKEN_MAX = 32_000;
 const GOAL_CONTINUATION_PROMPT =
   "Continue working toward the active goal. Do not repeat completed work. If the goal is now truly complete, audit it and call update_goal with status complete.";
-const PROVIDERS_CHANGED_EVENT = "wilide:providers-changed";
-const TOOL_SETTINGS_CHANGED_EVENT = "wilide:tool-settings-changed";
+const PROVIDERS_CHANGED_EVENT = "claakecode:providers-changed";
+const TOOL_SETTINGS_CHANGED_EVENT = "claakecode:tool-settings-changed";
 const AGENT_TEAMS_TOOL_NAME = "TeamRun";
 const AGENT_TEAMS_DISABLED_TITLE = "Please activate Agent teams in settings.";
 const IMPLEMENT_PLAN_PROMPT =
@@ -2250,7 +2250,7 @@ export function ChatPane({
   const onDragOver = (event: React.DragEvent) => {
     if (activeSubAgentId !== null) return;
     if (
-      event.dataTransfer.types.includes("application/x-wilide-file") ||
+      event.dataTransfer.types.includes("application/x-claakecode-file") ||
       event.dataTransfer.types.includes("Files")
     ) {
       event.preventDefault();
@@ -2262,7 +2262,7 @@ export function ChatPane({
     event.preventDefault();
     setDropActive(false);
     if (activeSubAgentId !== null) return;
-    const payload = event.dataTransfer.getData("application/x-wilide-file");
+    const payload = event.dataTransfer.getData("application/x-claakecode-file");
     if (payload) {
       try {
         const parsed = JSON.parse(payload) as {

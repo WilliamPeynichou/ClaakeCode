@@ -1,17 +1,16 @@
 <p align="center">
-  <img src=".github/assets/hero.png" alt="wilide — the coding harness you shape" width="100%" />
+  <img src=".github/assets/hero.png" alt="Claake Code — the coding harness you shape" width="100%" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/WilliamPeynichou/Wilide/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/WilliamPeynichou/Wilide?style=flat-square&labelColor=0b0b0d&color=3b82f6"></a>
-  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/WilliamPeynichou/Wilide?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
-  <a href="https://github.com/WilliamPeynichou/Wilide/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/WilliamPeynichou/Wilide/release.yml?style=flat-square&labelColor=0b0b0d&color=3b82f6&label=build"></a>
-  <a href="https://github.com/WilliamPeynichou/Wilide/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/WilliamPeynichou/Wilide/total?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
-  <a href="https://discord.gg/MADQNHtZW"><img alt="Discord" src="https://img.shields.io/badge/discord-join-3b82f6?style=flat-square&labelColor=0b0b0d&logo=discord&logoColor=white"></a>
+  <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/WilliamPeynichou/ClaakeCode?style=flat-square&labelColor=1a1916&color=6b7c5c"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/WilliamPeynichou/ClaakeCode?style=flat-square&labelColor=1a1916&color=d0dac4"></a>
+  <a href="https://github.com/WilliamPeynichou/ClaakeCode/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/WilliamPeynichou/ClaakeCode/release.yml?style=flat-square&labelColor=1a1916&color=6b7c5c&label=build"></a>
+  <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/WilliamPeynichou/ClaakeCode/total?style=flat-square&labelColor=1a1916&color=d0dac4"></a>
 </p>
 
 <p align="center">
-  <b>wilide</b> is a desktop AI coding harness you can actually reshape.<br/>
+  <b>Claake Code</b> is a desktop AI coding harness you can actually reshape.<br/>
   Rewrite the description of every tool, turn the ones you don't need off,<br/>
   and the assistant only sees what you keep.
 </p>
@@ -22,12 +21,12 @@
 
 ---
 
-## Why wilide
+## Why Claake Code
 
 Most AI coding tools ship a fixed harness: a hard-coded prompt, a hard-coded set
 of tools, a hard-coded loop. You get whatever the vendor decided is "right".
 
-wilide flips that. The harness is the surface area you control.
+Claake Code flips that. The harness is the surface area you control.
 
 - **Every tool description is editable.** Rephrase it, scope it down, change the contract.
 - **Every tool is toggleable.** Run minimal like Pi, or unlock the full set.
@@ -80,15 +79,18 @@ board update live, stop any teammate, or hand work off.
 ## Multi-provider, one loop
 
 <p align="center">
-  <a href="https://www.anthropic.com"><img alt="Anthropic" src="https://img.shields.io/badge/Anthropic-Claude-c4b5fd?style=for-the-badge&labelColor=0b0b0d&logo=anthropic&logoColor=c4b5fd"></a>
-  <a href="https://openai.com"><img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-GPT-e8e9ec?style=for-the-badge&labelColor=0b0b0d&logo=openai&logoColor=e8e9ec"></a>
-  <a href="https://ai.google.dev"><img alt="Google" src="https://img.shields.io/badge/Google-Gemini-3b82f6?style=for-the-badge&labelColor=0b0b0d&logo=google&logoColor=3b82f6"></a>
-  <a href="https://www.moonshot.cn"><img alt="Kimi" src="https://img.shields.io/badge/Moonshot-Kimi-c4b5fd?style=for-the-badge&labelColor=0b0b0d"></a>
-  <a href="https://openrouter.ai"><img alt="OpenRouter" src="https://img.shields.io/badge/OpenRouter-Any%20model-9aa0a8?style=for-the-badge&labelColor=0b0b0d"></a>
+  <a href="https://www.anthropic.com"><img alt="Anthropic" src="https://img.shields.io/badge/Anthropic-Claude-d0dac4?style=for-the-badge&labelColor=1a1916&logo=anthropic&logoColor=d0dac4"></a>
+  <a href="https://openai.com"><img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-GPT-e8e4d8?style=for-the-badge&labelColor=1a1916&logo=openai&logoColor=e8e4d8"></a>
+  <a href="https://ai.google.dev"><img alt="Google" src="https://img.shields.io/badge/Google-Gemini-6b7c5c?style=for-the-badge&labelColor=1a1916&logo=google&logoColor=6b7c5c"></a>
+  <a href="https://www.moonshot.cn"><img alt="Kimi" src="https://img.shields.io/badge/Moonshot-Kimi-d0dac4?style=for-the-badge&labelColor=1a1916"></a>
+  <a href="https://openrouter.ai"><img alt="OpenRouter" src="https://img.shields.io/badge/OpenRouter-Any%20model-a09a8a?style=for-the-badge&labelColor=1a1916"></a>
 </p>
 
 OAuth where possible, API keys where it makes sense. Switch provider mid-project
 without changing your tools, your prompt, or your workflow.
+
+For Anthropic, a per-session toggle enables Sonnet 4.6's **1M context (beta)**
+window — without burning the beta header on accounts that don't have access.
 
 ---
 
@@ -105,9 +107,9 @@ without changing your tools, your prompt, or your workflow.
 | `CreateImage` | Generate images (OpenAI Image, Nano Banana) |
 | `ToDoList` | Maintain a structured task list across turns |
 | `Question` | Ask the user single / multiple-choice questions |
-| `mcp` | Bind any Model Context Protocol server as tools |
+| `mcp` | Bind any Model Context Protocol server as tools — full CRUD UI |
 | `LoadMcpTool` | Lazy-load MCP tools on demand |
-| `Skill` | Long-form, on-disk skills the agent can invoke |
+| `Skill` | Long-form, on-disk skills — full CRUD UI (create, edit, delete) |
 | `subagent_*` | Delegate to a configured sub-agent |
 | `TeamRun` / `TeamStatus` / `TeamStop` | Drive the agent swarm |
 
@@ -119,7 +121,7 @@ row has an on/off toggle.
 ## Screenshot
 
 <p align="center">
-  <img src=".github/assets/screenshot.png" alt="wilide IDE" width="100%" />
+  <img src=".github/assets/screenshot.png" alt="Claake Code IDE" width="100%" />
 </p>
 
 ---
@@ -127,26 +129,29 @@ row has an on/off toggle.
 ## Architecture
 
 <p align="center">
-  <img src=".github/assets/architecture.png" alt="wilide architecture" width="100%" />
+  <img src=".github/assets/architecture.png" alt="Claake Code architecture" width="100%" />
 </p>
 
 - **`src/`** — React UI (Monaco, xterm, chat, settings, file tree).
 - **`src-tauri/`** — Tauri 2 shell, IPC commands, workspace I/O, conversation store.
-- **`crates/wilide-core`** — Provider-agnostic types: messages, tools, streams.
-- **`crates/wilide-app`** — Agent loop, tool implementations, swarm, MCP, compaction.
-- **`crates/wilide-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
+- **`crates/claakecode-core`** — Provider-agnostic types: messages, tools, streams.
+- **`crates/claakecode-app`** — Agent loop, tool implementations, swarm, MCP, compaction.
+- **`crates/claakecode-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
 
 ---
 
 ## How it compares
 
-| | **wilide** | Cursor | Claude Code | Aider | Zed AI |
+| | **Claake Code** | Cursor | Claude Code | Aider | Zed AI |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Native desktop app | ✓ | ✓ | — (CLI) | — (CLI) | ✓ |
 | Open source | ✓ | — | — | ✓ | ✓ |
 | Multi-provider | ✓ | ✓ | — | ✓ | ✓ |
 | Editable tool descriptions | ✓ | — | — | — | — |
 | Toggle individual tools | ✓ | partial | — | — | — |
+| MCP server CRUD UI | ✓ | partial | partial | — | — |
+| Skills CRUD UI | ✓ | — | — | — | — |
+| 1M context beta toggle (Sonnet) | ✓ | — | partial | — | — |
 | Agent swarm + task board | ✓ | — | — | — | — |
 | MCP servers | ✓ | ✓ | ✓ | — | partial |
 | Embedded terminal | ✓ | ✓ | n/a | n/a | ✓ |
@@ -156,7 +161,7 @@ row has an on/off toggle.
 ## Install
 
 Grab the latest build for your OS from the
-[releases page](https://github.com/WilliamPeynichou/Wilide/releases/latest).
+[releases page](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest).
 
 - **macOS** — `.dmg`
 - **Windows** — `.msi` / `.exe`
@@ -193,9 +198,8 @@ as secret in this context.
 
 ## Community
 
-- [Discord](https://discord.gg/MADQNHtZW) — chat, support, share your harness configs
-- [Issues](https://github.com/WilliamPeynichou/Wilide/issues) — bugs and feature requests
-- [Discussions](https://github.com/WilliamPeynichou/Wilide/discussions) — design, providers, MCP
+- [Issues](https://github.com/WilliamPeynichou/ClaakeCode/issues) — bugs and feature requests
+- [Discussions](https://github.com/WilliamPeynichou/ClaakeCode/discussions) — design, providers, MCP
 
 ---
 
@@ -204,5 +208,5 @@ as secret in this context.
 [MIT](./LICENSE)
 
 <p align="center">
-  <sub>Forked from [Paseru/sinew](https://github.com/Paseru/sinew). Built with Tauri, Rust, and a stubborn refusal to ship a black-box harness.</sub>
+  <sub>Forked from <a href="https://github.com/Paseru/sinew">Paseru/sinew</a>. Built with Tauri, Rust, and a stubborn refusal to ship a black-box harness.</sub>
 </p>

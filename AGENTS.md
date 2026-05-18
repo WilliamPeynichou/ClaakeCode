@@ -26,7 +26,7 @@ Code map:
 │   └── workflows
 │       └── release.yml
 ├── crates
-│   ├── wilide-anthropic
+│   ├── claakecode-anthropic
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -35,7 +35,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── wilide-app
+│   ├── claakecode-app
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── agent.rs
@@ -84,7 +84,7 @@ Code map:
 │   │       ├── tool_run.rs
 │   │       ├── web.rs
 │   │       └── workspace.rs
-│   ├── wilide-core
+│   ├── claakecode-core
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── error.rs
@@ -94,7 +94,7 @@ Code map:
 │   │       ├── provider.rs
 │   │       ├── stream.rs
 │   │       └── tool.rs
-│   ├── wilide-google
+│   ├── claakecode-google
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -103,7 +103,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── wilide-kimi
+│   ├── claakecode-kimi
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -112,7 +112,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── wilide-openai
+│   ├── claakecode-openai
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -121,7 +121,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   └── wilide-openrouter
+│   └── claakecode-openrouter
 │       ├── Cargo.toml
 │       └── src
 │           ├── auth.rs
@@ -238,7 +238,7 @@ Code map:
     │   ├── FileTree.tsx
     │   ├── SearchPane.tsx
     │   ├── SettingsPane.tsx
-    │   ├── WilideMark.tsx
+    │   ├── ClaakeCodeMark.tsx
     │   ├── Splitter.tsx
     │   ├── TerminalPanel.tsx
     │   ├── UpdateBadge.tsx

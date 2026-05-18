@@ -125,7 +125,7 @@ pub(super) fn openrouter_capabilities(models: &[OpenRouterModelRecord]) -> Vec<M
     models
         .iter()
         .map(|model| {
-            wilide_openrouter::capabilities_from_parts(
+            claakecode_openrouter::capabilities_from_parts(
                 &model.id,
                 model.context_window,
                 model.max_output_tokens,
@@ -309,7 +309,7 @@ pub(super) async fn run_openai_oauth_server(
     cancel: Arc<Notify>,
 ) -> Result<()> {
     let http = reqwest::Client::builder()
-        .user_agent("wilide/0.1")
+        .user_agent("ClaakeCode/0.1")
         .build()
         .context("unable to build OAuth client")?;
 
@@ -431,7 +431,7 @@ pub(super) async fn run_anthropic_oauth_server(
     cancel: Arc<Notify>,
 ) -> Result<()> {
     let http = reqwest::Client::builder()
-        .user_agent("wilide/0.1")
+        .user_agent("ClaakeCode/0.1")
         .build()
         .context("unable to build OAuth client")?;
 
@@ -553,7 +553,7 @@ pub(super) async fn run_google_oauth_server(
     cancel: Arc<Notify>,
 ) -> Result<()> {
     let http = reqwest::Client::builder()
-        .user_agent("wilide/0.1")
+        .user_agent("ClaakeCode/0.1")
         .build()
         .context("unable to build OAuth client")?;
 
@@ -1269,7 +1269,7 @@ pub(super) async fn start_kimi_oauth_login(
     }
 
     let http = reqwest::Client::builder()
-        .user_agent("wilide/0.1")
+        .user_agent("ClaakeCode/0.1")
         .build()
         .map_err(error_to_string)?;
     let auth = request_kimi_device_authorization(&http)
@@ -1497,7 +1497,7 @@ pub(super) async fn search_openrouter_models(
     let catalog = match fetch_openrouter_model_catalog(&api_key).await {
         Ok(catalog) => catalog,
         Err(err) => {
-            if matches!(err, wilide_core::AppError::Auth(_)) {
+            if matches!(err, claakecode_core::AppError::Auth(_)) {
                 remove_openrouter_provider(&state.providers)?;
             }
             return Err(error_to_string(err));

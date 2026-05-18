@@ -1,13 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/wilide-core",
-    "crates/wilide-anthropic",
-    "crates/wilide-google",
-    "crates/wilide-kimi",
-    "crates/wilide-openai",
-    "crates/wilide-openrouter",
-    "crates/wilide-app",
+    "crates/claakecode-core",
+    "crates/claakecode-anthropic",
+    "crates/claakecode-google",
+    "crates/claakecode-kimi",
+    "crates/claakecode-openai",
+    "crates/claakecode-openrouter",
+    "crates/claakecode-app",
     "src-tauri",
 ]
 
@@ -21,13 +21,13 @@ license = "MIT"
 too_many_arguments = "allow"
 
 [workspace.dependencies]
-wilide-core = { path = "crates/wilide-core" }
-wilide-anthropic = { path = "crates/wilide-anthropic" }
-wilide-google = { path = "crates/wilide-google" }
-wilide-kimi = { path = "crates/wilide-kimi" }
-wilide-openai = { path = "crates/wilide-openai" }
-wilide-openrouter = { path = "crates/wilide-openrouter" }
-wilide-app = { path = "crates/wilide-app" }
+claakecode-core = { path = "crates/claakecode-core" }
+claakecode-anthropic = { path = "crates/claakecode-anthropic" }
+claakecode-google = { path = "crates/claakecode-google" }
+claakecode-kimi = { path = "crates/claakecode-kimi" }
+claakecode-openai = { path = "crates/claakecode-openai" }
+claakecode-openrouter = { path = "crates/claakecode-openrouter" }
+claakecode-app = { path = "crates/claakecode-app" }
 
 tokio = { version = "1.40", features = ["full"] }
 futures = "0.3"

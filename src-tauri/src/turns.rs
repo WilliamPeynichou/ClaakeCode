@@ -1002,7 +1002,7 @@ pub(super) fn attachment_looks_like_plan(attachment: &AttachmentInput) -> bool {
         .unwrap_or_default()
         .to_ascii_lowercase();
     path.ends_with(".md")
-        || path.contains(".wilide/plans/")
+        || path.contains(".claakecode/plans/")
         || name.ends_with(".md")
         || name.contains("plan")
 }
@@ -1147,7 +1147,7 @@ pub(super) fn latest_plan_artifact_path(history: &[ChatMessage]) -> Option<Strin
 }
 
 pub(super) fn is_safe_plan_path(path: &str) -> bool {
-    if !path.starts_with(".wilide/plans/") || !path.ends_with(".md") {
+    if !path.starts_with(".claakecode/plans/") || !path.ends_with(".md") {
         return false;
     }
     Path::new(path)
@@ -1159,7 +1159,7 @@ pub(super) fn new_plan_relative_path(conversation_id: &str, plan_text: &str) -> 
     let title = plan_title(plan_text).unwrap_or_else(|| "plan".to_string());
     let slug = slugify(&title);
     let short_id = conversation_id.chars().take(8).collect::<String>();
-    format!(".wilide/plans/{}-{}-{}.md", now_ms(), short_id, slug)
+    format!(".claakecode/plans/{}-{}-{}.md", now_ms(), short_id, slug)
 }
 
 pub(super) fn plan_title(plan_text: &str) -> Option<String> {

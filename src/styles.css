@@ -650,7 +650,7 @@ textarea {
 .titlebar__update {
   position: absolute;
   top: 50%;
-  right: 90px; /* leaves room for `[mark] wilide` at right:12px */
+  right: 90px; /* leaves room for `[mark] Claake Code` at right:12px */
   transform: translateY(-50%);
   -webkit-app-region: no-drag;
   z-index: 5;

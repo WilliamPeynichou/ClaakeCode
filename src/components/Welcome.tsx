@@ -9,7 +9,7 @@ import type {
   ActiveTurnsChangedPayload,
   RecentWorkspace,
 } from "../types";
-import { WilideMark } from "./WilideMark";
+import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
 
 type Props = {
@@ -23,7 +23,7 @@ const IS_WINDOWS = isWindowsPlatform();
 
 /// Collapse a list of `ActiveTurnSummary` items down to the set of workspace
 /// paths that currently have an in-flight agent turn. The backend reports
-/// these globally (across every wilide window), so a recent workspace can be
+/// these globally (across every Claake Code window), so a recent workspace can be
 /// "live" even when it's owned by a sibling window.
 function activeWorkspaceSet(turns: ActiveTurnSummary[]): Set<string> {
   return new Set(turns.map((turn) => turn.workspaceId));
@@ -110,7 +110,7 @@ export function Welcome({ onPick, error, deriveName }: Props) {
         <header className="welcome__head">
           <span className="welcome__mark-dot" aria-hidden="true">
             <span className="welcome__mark-inner">
-              <WilideMark size={22} className="welcome__mark-glyph" />
+              <ClaakeCodeMark size={22} className="welcome__mark-glyph" />
             </span>
           </span>
           <h1 className="welcome__title">

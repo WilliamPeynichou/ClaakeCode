@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { Wrench } from "lucide-react";
 import { api } from "../lib/ipc";
 import { Markdown } from "./chat/Markdown";
-import { WilideMark } from "./WilideMark";
+import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import {
   MODELS,
   PROVIDERS,
@@ -53,8 +53,8 @@ const FALLBACK_TOOL_SETTINGS: ToolSettings = {
   webSearchProvider: "classic",
   linkupApiKey: "",
 };
-const PROVIDERS_CHANGED_EVENT = "wilide:providers-changed";
-const TOOL_SETTINGS_CHANGED_EVENT = "wilide:tool-settings-changed";
+const PROVIDERS_CHANGED_EVENT = "claakecode:providers-changed";
+const TOOL_SETTINGS_CHANGED_EVENT = "claakecode:tool-settings-changed";
 
 type Props = {
   workspacePath: string;
@@ -132,9 +132,9 @@ export function SettingsPane({ workspacePath }: Props) {
       const detail = (event as CustomEvent<{ section?: Section }>).detail;
       if (detail?.section) setSection(detail.section);
     };
-    window.addEventListener("wilide:open-settings-section", handler);
+    window.addEventListener("claakecode:open-settings-section", handler);
     return () =>
-      window.removeEventListener("wilide:open-settings-section", handler);
+      window.removeEventListener("claakecode:open-settings-section", handler);
   }, []);
 
   // ---- MCP load ---------------------------------------------------------
@@ -1035,7 +1035,7 @@ export function SettingsPane({ workspacePath }: Props) {
   }, []);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
-    monaco.editor.defineTheme("wilide-cool", {
+    monaco.editor.defineTheme("claakecode-cool", {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -1077,7 +1077,7 @@ export function SettingsPane({ workspacePath }: Props) {
         "scrollbarSlider.activeBackground": "#3a3d44cc",
       },
     });
-    monaco.editor.setTheme("wilide-cool");
+    monaco.editor.setTheme("claakecode-cool");
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       void saveAndDetectRef.current();
     });
@@ -1316,7 +1316,7 @@ function AboutSection() {
     <div className="settings-pane__body settings-pane__body--about">
       <div className="settings-pane__about-hero">
         <span className="settings-pane__about-mark" aria-hidden>
-          <WilideMark size={26} />
+          <ClaakeCodeMark size={26} />
         </span>
         <div className="settings-pane__about-title">
           <h1>Claake Code</h1>
@@ -1345,7 +1345,7 @@ function AboutSection() {
         </a>
         <a
           className="settings-pane__about-link"
-          href="https://github.com/WilliamPeynichou/Wilide"
+          href="https://github.com/WilliamPeynichou/ClaakeCode"
           target="_blank"
           rel="noreferrer"
         >
@@ -2553,7 +2553,7 @@ function McpSection({
                 <Editor
                   value={jsonText}
                   language="json"
-                  theme="wilide-cool"
+                  theme="claakecode-cool"
                   onChange={(value) => onJsonChange(value ?? "")}
                   onMount={onMount}
                   options={{
@@ -3698,7 +3698,7 @@ function SkillEditor({
         <Editor
           value={draft}
           language="markdown"
-          theme="wilide-cool"
+          theme="claakecode-cool"
           onChange={(value) => setDraft(value ?? "")}
           options={{
             fontFamily:

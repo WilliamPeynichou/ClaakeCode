@@ -123,7 +123,7 @@ pub(super) async fn unwatch_workspace_command(
 #[tauri::command]
 pub(super) async fn list_workspace_entries_command(
     input: WorkspaceEntriesInput,
-) -> std::result::Result<Vec<wilide_app::WorkspaceEntry>, String> {
+) -> std::result::Result<Vec<claakecode_app::WorkspaceEntry>, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     list_workspace_entries(&workspace_root, input.relative_path.as_deref()).map_err(error_to_string)
@@ -132,7 +132,7 @@ pub(super) async fn list_workspace_entries_command(
 #[tauri::command]
 pub(super) async fn list_workspace_files_command(
     input: WorkspaceInput,
-) -> std::result::Result<Vec<wilide_app::WorkspaceEntry>, String> {
+) -> std::result::Result<Vec<claakecode_app::WorkspaceEntry>, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     list_workspace_files(&workspace_root).map_err(error_to_string)
@@ -177,7 +177,7 @@ pub(super) async fn import_workspace_paths_command(
 #[tauri::command]
 pub(super) async fn read_workspace_file_command(
     input: WorkspaceFileInput,
-) -> std::result::Result<wilide_app::FileDocument, String> {
+) -> std::result::Result<claakecode_app::FileDocument, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     read_workspace_file(&workspace_root, &input.relative_path).map_err(error_to_string)
@@ -187,7 +187,7 @@ pub(super) async fn read_workspace_file_command(
 pub(super) async fn write_workspace_file_command(
     app: AppHandle,
     input: WriteWorkspaceFileInput,
-) -> std::result::Result<wilide_app::FileDocument, String> {
+) -> std::result::Result<claakecode_app::FileDocument, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let doc = write_workspace_file(&workspace_root, &input.relative_path, &input.content)
@@ -200,7 +200,7 @@ pub(super) async fn write_workspace_file_command(
 pub(super) async fn create_workspace_file_command(
     app: AppHandle,
     input: CreateWorkspaceEntryInput,
-) -> std::result::Result<wilide_app::WorkspaceEntry, String> {
+) -> std::result::Result<claakecode_app::WorkspaceEntry, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let entry = create_workspace_file(
@@ -217,7 +217,7 @@ pub(super) async fn create_workspace_file_command(
 pub(super) async fn create_workspace_directory_command(
     app: AppHandle,
     input: CreateWorkspaceEntryInput,
-) -> std::result::Result<wilide_app::WorkspaceEntry, String> {
+) -> std::result::Result<claakecode_app::WorkspaceEntry, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let entry = create_workspace_directory(
@@ -262,7 +262,7 @@ pub(super) async fn save_clipboard_image_attachment_command(
         .unwrap_or_default()
         .as_millis();
     let file_name = format!("{safe_stem}-{}-{now_ms}.{extension}", std::process::id());
-    let dir = std::env::temp_dir().join("wilide-clipboard-attachments");
+    let dir = std::env::temp_dir().join("claakecode-clipboard-attachments");
     fs::create_dir_all(&dir).map_err(error_to_string)?;
     let path = dir.join(file_name);
     fs::write(&path, bytes).map_err(error_to_string)?;
@@ -277,7 +277,7 @@ pub(super) async fn save_clipboard_image_attachment_command(
 pub(super) async fn rename_workspace_entry_command(
     app: AppHandle,
     input: RenameWorkspaceEntryInput,
-) -> std::result::Result<wilide_app::WorkspaceEntry, String> {
+) -> std::result::Result<claakecode_app::WorkspaceEntry, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let entry = rename_workspace_entry(&workspace_root, &input.relative_path, &input.new_name)
@@ -316,7 +316,7 @@ pub(super) async fn trash_workspace_entry_command(
 pub(super) async fn restore_workspace_deleted_entries_command(
     app: AppHandle,
     input: RestoreWorkspaceDeletedEntriesInput,
-) -> std::result::Result<Vec<wilide_app::WorkspaceEntry>, String> {
+) -> std::result::Result<Vec<claakecode_app::WorkspaceEntry>, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let entries = restore_workspace_deleted_entries(&workspace_root, &input.entries)
@@ -333,7 +333,7 @@ pub(super) async fn reveal_workspace_entry_command(
 ) -> std::result::Result<(), String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
-    let path = wilide_app::workspace::resolve_workspace_path(&workspace_root, &input.relative_path)
+    let path = claakecode_app::workspace::resolve_workspace_path(&workspace_root, &input.relative_path)
         .map_err(error_to_string)?;
     reveal_path(&path).map_err(error_to_string)
 }
@@ -378,7 +378,7 @@ pub(super) async fn resolve_terminal_path_command(
 #[tauri::command]
 pub(super) async fn read_external_file_command(
     input: AbsolutePathInput,
-) -> std::result::Result<wilide_app::FileDocument, String> {
+) -> std::result::Result<claakecode_app::FileDocument, String> {
     let path = std::path::PathBuf::from(&input.path);
     read_external_file(&path).map_err(error_to_string)
 }
@@ -513,7 +513,7 @@ pub(super) async fn copy_file_to_path_command(
 pub(super) async fn copy_workspace_entries_command(
     app: AppHandle,
     input: CopyWorkspaceEntriesInput,
-) -> std::result::Result<Vec<wilide_app::WorkspaceEntry>, String> {
+) -> std::result::Result<Vec<claakecode_app::WorkspaceEntry>, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let operation = if input.cut {
