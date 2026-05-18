@@ -6,8 +6,6 @@
 /src-tauri/binaries/rg-*
 /.history
 /.claakecode/
-/ClaakeCodeWeb/
-/claakecode-web/
 .DS_Store
 *.log
 .env
