@@ -20,6 +20,7 @@ import { TerminalPanel } from "./TerminalPanel";
 import { SearchPane } from "./SearchPane";
 import { ChatPane, type ExternalDropFeed } from "./chat/ChatPane";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
+import { useTheme } from "../lib/theme";
 import { UpdateBadge } from "./UpdateBadge";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
 import type {
@@ -70,6 +71,7 @@ export function Workspace({
   onBootstrapReplace,
 }: Props) {
   const workspacePath = bootstrap.workspace.path;
+  const { theme, toggleTheme } = useTheme();
 
   const [conversations, setConversations] = useState<ConversationSummary[]>(
     bootstrap.conversations,
@@ -1642,6 +1644,18 @@ export function Workspace({
           >
             <Icon icon="solar:folder-with-files-linear" width={12} height={12} />
             Switch
+          </button>
+          <button
+            className="titlebar__btn"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label="Toggle theme"
+          >
+            <Icon
+              icon={theme === "dark" ? "solar:sun-linear" : "solar:moon-linear"}
+              width={12}
+              height={12}
+            />
           </button>
         </div>
         <div className="titlebar__brand" data-tauri-drag-region>

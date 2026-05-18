@@ -109,6 +109,80 @@
   --shadow-focus: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
+/* ----------------------------------------------------------------
+   Light theme — "Vert Noisette" warm light variant.
+   Activated via `<html data-theme="light">`.
+   ---------------------------------------------------------------- */
+html[data-theme="light"] {
+  /* Surfaces — warm cream scale */
+  --bg-canvas: #faf9f5;          /* warm-white */
+  --bg-0: #faf9f5;
+  --bg-1: #f3f0e8;               /* cream — sidebars, titlebar */
+  --bg-2: #ede9de;               /* cards, panels */
+  --bg-3: #e8e4d8;               /* stone-100 — hover */
+  --bg-4: #dbd6c6;               /* active / selected */
+  --bg-5: #cfcab8;               /* pressed */
+  --bg-hi: #ede9de;
+  --bg-pure: #ffffff;
+
+  /* Editor surface — almost white */
+  --editor-bg: #fdfcf8;
+  --editor-bg-2: #f7f5ec;
+  --editor-bg-3: #f0ecdf;
+  --editor-fg: #1e1c18;
+  --editor-fg-dim: #6b6558;
+
+  /* Lines / borders — stone-900 on light at low alpha */
+  --line-soft:   rgba(30, 28, 24, 0.05);
+  --line:        rgba(30, 28, 24, 0.10);
+  --line-strong: rgba(30, 28, 24, 0.18);
+  --line-bold:   rgba(30, 28, 24, 0.32);
+  --divider:     rgba(30, 28, 24, 0.10);
+
+  /* Text — warm stone scale (dark on light) */
+  --text-0: #1e1c18;             /* stone-900 — body */
+  --text-1: #3a3730;             /* stone-800 */
+  --text-2: #6b6558;             /* stone-600 */
+  --text-3: #a09a8a;             /* stone-400 */
+  --text-muted: #b3ad9c;
+  --text-faint: #cfcab8;
+
+  /* Accent — same vert noisette, more saturated on light */
+  --accent:      #6b7c5c;
+  --accent-hi:   #4e5c42;        /* brand-dark for hover on light */
+  --accent-dim:  #8a9b78;
+  --accent-deep: #3d4933;
+  --accent-glow: rgba(107, 124, 92, 0.30);
+  --accent-soft: rgba(107, 124, 92, 0.12);
+
+  --accent-2:      #4e5c42;
+  --accent-2-soft: rgba(78, 92, 66, 0.10);
+
+  --hover-shift: var(--text-0);
+
+  --signal: #4e5c42;
+  --danger: #b14a4a;
+  --ok:     #4e5c42;
+
+  --tone-thinking: #a07246;
+  --tone-grep:     #4e5c42;
+  --tone-read:     #5a6b4d;
+  --tone-edit:     #6b7c5c;
+
+  --diff-add-bg: rgba(78, 92, 66, 0.14);
+  --diff-add-fg: #3d4933;
+  --diff-rem-bg: rgba(177, 74, 74, 0.14);
+  --diff-rem-fg: #8c3a3a;
+
+  /* Light-mode shadows: very subtle, no harsh blacks */
+  --shadow-ambient: 0 0 14px rgba(30, 28, 24, 0.06),
+                    0 0 6px rgba(30, 28, 24, 0.03);
+  --shadow-elevated: 0 24px 56px rgba(30, 28, 24, 0.10),
+                     0 10px 24px rgba(30, 28, 24, 0.06),
+                     0 0 0 1px var(--line);
+  --shadow-focus: 0 3px 12px rgba(30, 28, 24, 0.10);
+}
+
 * {
   box-sizing: border-box;
 }
