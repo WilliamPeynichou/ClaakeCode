@@ -69,6 +69,8 @@
   }
   .btn-primary { background: var(--forest); color: var(--cream); }
   .btn-primary:hover { background: var(--forest-deep); }
+  .btn-windows { background: var(--forest-ink); }
+  .btn-windows:hover { background: var(--ink); }
   .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
   .btn-ghost:hover { border-color: var(--forest); color: var(--forest); }
 
