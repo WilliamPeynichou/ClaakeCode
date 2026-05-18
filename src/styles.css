@@ -7411,3 +7411,20 @@ textarea {
   color: #e88080;
   border-color: rgba(215, 107, 107, 0.6);
 }
+
+/* Skill editor (Phase 4) — Monaco fills the doc body */
+.settings-pane__skill-doc-body--editor {
+  flex: 1 1 0;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: var(--r-med);
+  overflow: hidden;
+  background: var(--bg-1);
+}
+
+.settings-pane__skill-doc-body--editor > div {
+  flex: 1 1 0;
+  min-height: 0;
+}

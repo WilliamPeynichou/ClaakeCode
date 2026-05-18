@@ -923,6 +923,57 @@ export function SettingsPane({ workspacePath }: Props) {
     [skills, skillsDirty, workspacePath],
   );
 
+  const createSkill = useCallback(async () => {
+    if (!skills) return;
+    const namesTaken = new Set(skills.map((skill) => skill.name));
+    let counter = skills.length + 1;
+    let baseName = `New skill ${counter}`;
+    while (namesTaken.has(baseName)) {
+      counter += 1;
+      baseName = `New skill ${counter}`;
+    }
+    const template = `---\nname: ${baseName}\ndescription: One-line trigger description.\n---\n\nDescribe the skill body in markdown.\n`;
+    setSkillsSaving(true);
+    setSkillsError(null);
+    setSkillsStatus(null);
+    try {
+      await api.createSkill(workspacePath, baseName, template, "global");
+      const refreshed = await api.listInstalledSkills(workspacePath);
+      setSkills(refreshed);
+      setSavedSkillsJson(skillsFingerprint(refreshed));
+      setSelectedSkillName(baseName);
+      setSkillsStatus("Created");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSkillsError(message);
+      setSkillsStatus(message);
+    } finally {
+      setSkillsSaving(false);
+    }
+  }, [skills, workspacePath]);
+
+  const updateSkillContent = useCallback(
+    async (skill: InstalledSkill, content: string) => {
+      setSkillsSaving(true);
+      setSkillsError(null);
+      setSkillsStatus(null);
+      try {
+        await api.updateSkill(workspacePath, skill.absolutePath, content);
+        const refreshed = await api.listInstalledSkills(workspacePath);
+        setSkills(refreshed);
+        setSavedSkillsJson(skillsFingerprint(refreshed));
+        setSkillsStatus("Saved");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setSkillsError(message);
+        setSkillsStatus(message);
+      } finally {
+        setSkillsSaving(false);
+      }
+    },
+    [workspacePath],
+  );
+
   const selectedSubAgent =
     subAgentSettings.agents.find((agent) => agent.id === selectedSubAgentId) ??
     null;
@@ -1232,6 +1283,10 @@ export function SettingsPane({ workspacePath }: Props) {
             onToggleSkill={toggleSkillEnabled}
             onRevealSkill={(skill) => void revealSkill(skill)}
             onDeleteSkill={(skill) => void deleteSkill(skill)}
+            onCreateSkill={() => void createSkill()}
+            onUpdateSkillContent={(skill, content) =>
+              void updateSkillContent(skill, content)
+            }
           />
         ) : (
           <SubAgentsSection
@@ -3314,6 +3369,8 @@ type SkillsSectionProps = {
   onToggleSkill: (name: string) => void;
   onRevealSkill: (skill: InstalledSkill) => void;
   onDeleteSkill: (skill: InstalledSkill) => void;
+  onCreateSkill: () => void;
+  onUpdateSkillContent: (skill: InstalledSkill, content: string) => void;
 };
 
 function SkillsSection({
@@ -3334,6 +3391,8 @@ function SkillsSection({
   onToggleSkill,
   onRevealSkill,
   onDeleteSkill,
+  onCreateSkill,
+  onUpdateSkillContent,
 }: SkillsSectionProps) {
   const total = allSkills?.length ?? 0;
   const visible = skills.length;
@@ -3356,11 +3415,24 @@ function SkillsSection({
           {status && (
             <span
               className="settings-pane__status"
-              data-tone={status === "Saved" ? "ok" : "error"}
+              data-tone={
+                status === "Saved" || status === "Created" || status === "Deleted"
+                  ? "ok"
+                  : "error"
+              }
             >
               {status}
             </span>
           )}
+          <button
+            type="button"
+            className="settings-pane__btn"
+            onClick={onCreateSkill}
+            disabled={loading || saving || deleting}
+          >
+            <Icon icon="solar:add-circle-linear" width={13} height={13} />
+            <span>New skill</span>
+          </button>
           <button
             type="button"
             className="settings-pane__btn"
@@ -3482,11 +3554,15 @@ function SkillsSection({
 
         <div className="settings-pane__skill-preview">
           {selectedSkill ? (
-            <SkillPreview
+            <SkillEditor
               skill={selectedSkill}
               deleting={deleting}
+              saving={saving}
               onReveal={() => onRevealSkill(selectedSkill)}
               onDelete={() => onDeleteSkill(selectedSkill)}
+              onSaveContent={(content) =>
+                onUpdateSkillContent(selectedSkill, content)
+              }
             />
           ) : (
             <div className="settings-pane__empty settings-pane__empty--main">
@@ -3502,19 +3578,24 @@ function SkillsSection({
   );
 }
 
-function SkillPreview({
+function SkillEditor({
   skill,
   deleting,
+  saving,
   onReveal,
   onDelete,
+  onSaveContent,
 }: {
   skill: InstalledSkill;
   deleting: boolean;
+  saving: boolean;
   onReveal: () => void;
   onDelete: () => void;
+  onSaveContent: (content: string) => void;
 }) {
-  const body = stripFrontmatter(skill.content);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [draft, setDraft] = useState(skill.content);
+  const dirty = draft !== skill.content;
 
   useEffect(() => {
     if (!confirmDelete) return;
@@ -3524,7 +3605,8 @@ function SkillPreview({
 
   useEffect(() => {
     setConfirmDelete(false);
-  }, [skill.absolutePath]);
+    setDraft(skill.content);
+  }, [skill.absolutePath, skill.content]);
 
   return (
     <article className="settings-pane__skill-doc">
@@ -3538,8 +3620,29 @@ function SkillPreview({
             >
               {skill.source === "workspace" ? "workspace" : "global"}
             </span>
+            {dirty && (
+              <span className="settings-pane__pill" data-tone="dirty">
+                <span className="settings-pane__pill-dot" />
+                Unsaved
+              </span>
+            )}
           </div>
           <div className="settings-pane__skill-doc-actions">
+            <button
+              type="button"
+              className="settings-pane__skill-doc-action"
+              onClick={() => onSaveContent(draft)}
+              disabled={!dirty || saving || deleting}
+              title="Save SKILL.md"
+              aria-label="Save SKILL.md"
+            >
+              <Icon
+                icon={saving ? "solar:refresh-linear" : "solar:diskette-linear"}
+                width={13}
+                height={13}
+              />
+              <span>{saving ? "Saving…" : "Save"}</span>
+            </button>
             <button
               type="button"
               className="settings-pane__skill-doc-action"
@@ -3549,7 +3652,7 @@ function SkillPreview({
               aria-label={`Reveal ${skill.name} in Finder`}
             >
               <Icon icon="solar:folder-open-linear" width={13} height={13} />
-              <span>Reveal in Finder</span>
+              <span>Reveal</span>
             </button>
             <button
               type="button"
@@ -3591,8 +3694,33 @@ function SkillPreview({
           <p className="settings-pane__skill-doc-desc">{skill.description}</p>
         )}
       </header>
-      <div className="settings-pane__skill-doc-body">
-        <Markdown text={body || "_(empty SKILL.md)_"} onOpenFile={noop} />
+      <div className="settings-pane__skill-doc-body settings-pane__skill-doc-body--editor">
+        <Editor
+          value={draft}
+          language="markdown"
+          theme="wilide-cool"
+          onChange={(value) => setDraft(value ?? "")}
+          options={{
+            fontFamily:
+              '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace',
+            fontSize: 12,
+            lineHeight: 18,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            smoothScrolling: true,
+            renderLineHighlight: "line",
+            padding: { top: 12, bottom: 12 },
+            tabSize: 2,
+            wordWrap: "on",
+            automaticLayout: true,
+            lineNumbers: "off",
+            folding: false,
+            scrollbar: {
+              verticalScrollbarSize: 9,
+              horizontalScrollbarSize: 9,
+            },
+          }}
+        />
       </div>
     </article>
   );

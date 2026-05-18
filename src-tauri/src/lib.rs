@@ -263,6 +263,8 @@ pub fn run() {
             workspace::resolve_terminal_path_command,
             workspace::read_external_file_command,
             workspace::delete_skill_command,
+            workspace::create_skill_command,
+            workspace::update_skill_command,
             workspace::open_external_url_command,
             workspace::open_path_with_default_app_command,
             workspace::copy_file_to_path_command,

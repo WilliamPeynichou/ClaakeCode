@@ -399,6 +399,80 @@ pub(super) async fn delete_skill_command(
     Ok(())
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CreateSkillInput {
+    pub(super) workspace_path: String,
+    pub(super) name: String,
+    pub(super) content: String,
+    #[serde(default = "default_skill_scope")]
+    pub(super) scope: String,
+}
+
+fn default_skill_scope() -> String {
+    "global".into()
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CreatedSkillOutput {
+    pub(super) absolute_path: String,
+}
+
+#[tauri::command]
+pub(super) async fn create_skill_command(
+    app: AppHandle,
+    input: CreateSkillInput,
+) -> std::result::Result<CreatedSkillOutput, String> {
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let skill_md =
+        create_installed_skill(&workspace_root, &input.name, &input.content, &input.scope)
+            .map_err(error_to_string)?;
+    if let Some(folder) = skill_md.parent() {
+        if let Ok(relative) = folder.strip_prefix(&workspace_root) {
+            emit_workspace_file_change(
+                &app,
+                &workspace_root,
+                &relative.to_string_lossy().to_string(),
+            );
+        }
+    }
+    Ok(CreatedSkillOutput {
+        absolute_path: skill_md.display().to_string(),
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct UpdateSkillInput {
+    pub(super) workspace_path: String,
+    pub(super) path: String,
+    pub(super) content: String,
+}
+
+#[tauri::command]
+pub(super) async fn update_skill_command(
+    app: AppHandle,
+    input: UpdateSkillInput,
+) -> std::result::Result<(), String> {
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let skill_md = PathBuf::from(&input.path);
+    write_installed_skill_content(&workspace_root, &skill_md, &input.content)
+        .map_err(error_to_string)?;
+    if let Some(folder) = skill_md.parent() {
+        if let Ok(relative) = folder.strip_prefix(&workspace_root) {
+            emit_workspace_file_change(
+                &app,
+                &workspace_root,
+                &relative.to_string_lossy().to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub(super) async fn open_external_url_command(
     input: OpenExternalUrlInput,
