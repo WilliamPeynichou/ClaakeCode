@@ -494,6 +494,7 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
   // ─── make sure embedded videos autoplay on every browser ─────
   document.querySelectorAll('video.video-el').forEach((v) => {
     v.muted = true;
+    if (v.closest('.showcase-video')) v.playbackRate = 2;
     v.setAttribute('muted', '');
     v.setAttribute('playsinline', '');
     const tryPlay = () => v.play().catch(() => { /* ignore — user gesture will trigger */ });
