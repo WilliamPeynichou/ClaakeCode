@@ -1,5 +1,5 @@
 // Domain types shared with the Rust backend. Kept in sync manually with
-// src-tauri/src/lib.rs and crates/sinew-app.
+// src-tauri/src/lib.rs and crates/wilide-app.
 
 export type Role = "user" | "assistant";
 

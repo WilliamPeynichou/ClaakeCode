@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sinew",
+  "productName": "wilide",
   "version": "0.1.12",
-  "identifier": "dev.hyrak.sinew",
+  "identifier": "dev.williampeynichou.wilide",
   "build": {
     "beforeBuildCommand": "npm run prepare-sidecars && npm run build",
     "beforeDevCommand": "npm run dev",
@@ -22,7 +22,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Sinew",
+        "title": "wilide",
         "width": 1500,
         "height": 940,
         "minWidth": 1100,
@@ -57,7 +57,7 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyRTkxMjI2NDY1QjJFRjcKUldUM0xsdEdKaExwWXFyRHdtb1MxdlhidnNsQU0zOEEvVU5yNjJGOGVzN1pIbTNwZWlkSW1OTDUK",
       "endpoints": [
-        "https://github.com/Paseru/sinew/releases/latest/download/latest.json"
+        "https://github.com/WilliamPeynichou/Wilide/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

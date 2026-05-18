@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { Wrench } from "lucide-react";
 import { api } from "../lib/ipc";
 import { Markdown } from "./chat/Markdown";
-import { SinewMark } from "./SinewMark";
+import { WilideMark } from "./WilideMark";
 import {
   MODELS,
   PROVIDERS,
@@ -53,8 +53,8 @@ const FALLBACK_TOOL_SETTINGS: ToolSettings = {
   webSearchProvider: "classic",
   linkupApiKey: "",
 };
-const PROVIDERS_CHANGED_EVENT = "sinew:providers-changed";
-const TOOL_SETTINGS_CHANGED_EVENT = "sinew:tool-settings-changed";
+const PROVIDERS_CHANGED_EVENT = "wilide:providers-changed";
+const TOOL_SETTINGS_CHANGED_EVENT = "wilide:tool-settings-changed";
 
 type Props = {
   workspacePath: string;
@@ -132,9 +132,9 @@ export function SettingsPane({ workspacePath }: Props) {
       const detail = (event as CustomEvent<{ section?: Section }>).detail;
       if (detail?.section) setSection(detail.section);
     };
-    window.addEventListener("sinew:open-settings-section", handler);
+    window.addEventListener("wilide:open-settings-section", handler);
     return () =>
-      window.removeEventListener("sinew:open-settings-section", handler);
+      window.removeEventListener("wilide:open-settings-section", handler);
   }, []);
 
   // ---- MCP load ---------------------------------------------------------
@@ -930,7 +930,7 @@ export function SettingsPane({ workspacePath }: Props) {
   }, []);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
-    monaco.editor.defineTheme("sinew-cool", {
+    monaco.editor.defineTheme("wilide-cool", {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -972,7 +972,7 @@ export function SettingsPane({ workspacePath }: Props) {
         "scrollbarSlider.activeBackground": "#3a3d44cc",
       },
     });
-    monaco.editor.setTheme("sinew-cool");
+    monaco.editor.setTheme("wilide-cool");
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       void saveAndDetectRef.current();
     });
@@ -1204,15 +1204,15 @@ function AboutSection() {
     <div className="settings-pane__body settings-pane__body--about">
       <div className="settings-pane__about-hero">
         <span className="settings-pane__about-mark" aria-hidden>
-          <SinewMark size={26} />
+          <WilideMark size={26} />
         </span>
         <div className="settings-pane__about-title">
-          <h1>Sinew</h1>
+          <h1>wilide</h1>
         </div>
       </div>
 
       <p className="settings-pane__about-line">
-        Sinew is a flexible AI coding harness. You shape it: tweak the description of
+        wilide is a flexible AI coding harness. You shape it: tweak the description of
         every tool, turn the ones you don&apos;t need off, and the assistant only sees
         what you keep.
       </p>
@@ -1233,7 +1233,7 @@ function AboutSection() {
         </a>
         <a
           className="settings-pane__about-link"
-          href="https://github.com/Paseru/sinew"
+          href="https://github.com/WilliamPeynichou/Wilide"
           target="_blank"
           rel="noreferrer"
         >
@@ -1310,7 +1310,7 @@ function ProvidersSection({
         <div className="settings-pane__header-text">
           <h1 className="settings-pane__title">Providers</h1>
           <p className="settings-pane__subtitle">
-            Connect model providers for Sinew.
+            Connect model providers for wilide.
           </p>
         </div>
         <div className="settings-pane__actions">
@@ -2412,7 +2412,7 @@ function McpSection({
                 <Editor
                   value={jsonText}
                   language="json"
-                  theme="sinew-cool"
+                  theme="wilide-cool"
                   onChange={(value) => onJsonChange(value ?? "")}
                   onMount={onMount}
                   options={{

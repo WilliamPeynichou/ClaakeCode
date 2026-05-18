@@ -154,7 +154,7 @@ export function sanitizeOpenRouterName(name: string | null | undefined): string 
   const raw = (name ?? "").trim();
   if (!raw) return "";
   // OpenRouter prefixes most names with the underlying provider, e.g. "OpenAI: GPT-4o".
-  // The provider icon already conveys that information in Sinew, so drop the prefix.
+  // The provider icon already conveys that information in wilide, so drop the prefix.
   const colon = raw.indexOf(":");
   if (colon <= 0) return raw;
   const tail = raw.slice(colon + 1).trim();

@@ -25,7 +25,7 @@ use objc2_foundation::NSString;
 use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sinew_anthropic::{
+use wilide_anthropic::{
     delete_default_auth as delete_default_anthropic_auth,
     exchange_oauth_code as exchange_anthropic_oauth_code, generate_pkce as generate_anthropic_pkce,
     generate_state as generate_anthropic_state,
@@ -33,7 +33,7 @@ use sinew_anthropic::{
     oauth_authorize_url as anthropic_oauth_authorize_url, AnthropicAuthStatus, AnthropicProvider,
     PkceCodes as AnthropicPkceCodes, MODEL_ID as ANTHROPIC_MODEL_ID,
 };
-use sinew_app::{
+use wilide_app::{
     checkpoint_from_snapshots, clean_context_descriptor, compact_conversation_history,
     copy_workspace_entries, create_workspace_directory, create_workspace_file,
     delete_workspace_entry, import_workspace_paths, list_installed_skills, list_workspace_entries,
@@ -52,18 +52,18 @@ use sinew_app::{
     WebFetchTool, WebSearchTool, WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry,
     WorkspaceFileChangeEvent, WorkspaceSearchResult,
 };
-use sinew_core::{
+use wilide_core::{
     ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
     ToolDescriptor,
 };
-use sinew_google::{
+use wilide_google::{
     delete_default_auth as delete_default_google_auth,
     exchange_oauth_code as exchange_google_oauth_code, generate_state as generate_google_state,
     load_default_auth_status as load_default_google_auth_status,
     oauth_authorize_url as google_oauth_authorize_url, GoogleAuthStatus, GoogleProvider,
     MODEL_ID as GOOGLE_MODEL_ID,
 };
-use sinew_kimi::{
+use wilide_kimi::{
     delete_default_auth as delete_default_kimi_auth, generate_state as generate_kimi_state,
     load_default_auth_status as load_default_kimi_auth_status,
     request_device_authorization as request_kimi_device_authorization,
@@ -71,12 +71,12 @@ use sinew_kimi::{
     DeviceAuthorization as KimiDeviceAuthorization, KimiAuthStatus, KimiProvider,
     MODEL_ID as KIMI_MODEL_ID,
 };
-use sinew_openai::{
+use wilide_openai::{
     delete_default_auth, exchange_oauth_code, generate_pkce, generate_state,
     load_default_auth_status, oauth_authorize_url, OpenAiAuthStatus, OpenAiProvider, PkceCodes,
     MODEL_ID as OPENAI_MODEL_ID,
 };
-use sinew_openrouter::{
+use wilide_openrouter::{
     delete_default_auth as delete_default_openrouter_auth,
     fetch_model_catalog as fetch_openrouter_model_catalog,
     load_default_api_key as load_default_openrouter_api_key,
@@ -329,7 +329,7 @@ pub fn run() {
             updater::updater_current_version,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building sinew desktop")
+        .expect("error while building wilide desktop")
         .run(|app, event| {
             #[cfg(not(target_os = "macos"))]
             let _ = (&app, &event);

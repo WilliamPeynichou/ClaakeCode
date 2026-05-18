@@ -3,37 +3,6 @@
 version = 3
 
 [[package]]
-name = "Sinew"
-version = "0.1.12"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "notify",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "portable-pty",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sinew-anthropic",
- "sinew-app",
- "sinew-core",
- "sinew-google",
- "sinew-kimi",
- "sinew-openai",
- "sinew-openrouter",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-updater",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3888,141 +3857,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
-name = "sinew-anthropic"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "directories",
- "eventsource-stream",
- "futures",
- "futures-util",
- "rand 0.9.4",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "sinew-core",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "sinew-app"
-version = "0.1.12"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "directories",
- "futures-util",
- "kuchikiki",
- "portable-pty",
- "regex",
- "reqwest 0.12.28",
- "rusqlite",
- "serde",
- "serde_json",
- "similar",
- "sinew-core",
- "sinew-openai",
- "tokio",
- "tracing",
- "uuid",
- "walkdir",
-]
-
-[[package]]
-name = "sinew-core"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "futures",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "sinew-google"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "directories",
- "eventsource-stream",
- "futures",
- "futures-util",
- "rand 0.9.4",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sinew-core",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "sinew-kimi"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "directories",
- "eventsource-stream",
- "futures",
- "rand 0.9.4",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sinew-core",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "sinew-openai"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "directories",
- "eventsource-stream",
- "futures",
- "rand 0.9.4",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "sinew-core",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "sinew-openrouter"
-version = "0.1.12"
-dependencies = [
- "async-trait",
- "bytes",
- "directories",
- "eventsource-stream",
- "futures",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sinew-core",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5502,6 +5336,172 @@ dependencies = [
  "thiserror 2.0.18",
  "windows",
  "windows-core 0.61.2",
+]
+
+[[package]]
+name = "wilide"
+version = "0.1.12"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "notify",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "portable-pty",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-updater",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "wilide-anthropic",
+ "wilide-app",
+ "wilide-core",
+ "wilide-google",
+ "wilide-kimi",
+ "wilide-openai",
+ "wilide-openrouter",
+]
+
+[[package]]
+name = "wilide-anthropic"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "futures-util",
+ "rand 0.9.4",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "url",
+ "wilide-core",
+]
+
+[[package]]
+name = "wilide-app"
+version = "0.1.12"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "directories",
+ "futures-util",
+ "kuchikiki",
+ "portable-pty",
+ "regex",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "similar",
+ "tokio",
+ "tracing",
+ "uuid",
+ "walkdir",
+ "wilide-core",
+ "wilide-openai",
+]
+
+[[package]]
+name = "wilide-core"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "wilide-google"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "futures-util",
+ "rand 0.9.4",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "url",
+ "wilide-core",
+]
+
+[[package]]
+name = "wilide-kimi"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "rand 0.9.4",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "wilide-core",
+]
+
+[[package]]
+name = "wilide-openai"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "rand 0.9.4",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "url",
+ "wilide-core",
+]
+
+[[package]]
+name = "wilide-openrouter"
+version = "0.1.12"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "wilide-core",
 ]
 
 [[package]]

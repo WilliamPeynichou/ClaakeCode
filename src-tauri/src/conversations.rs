@@ -272,7 +272,7 @@ pub(super) async fn save_sub_agent_settings(
 #[tauri::command]
 pub(super) async fn probe_mcp_tools(
     state: State<'_, DesktopState>,
-) -> std::result::Result<Vec<sinew_app::McpServerProbe>, String> {
+) -> std::result::Result<Vec<wilide_app::McpServerProbe>, String> {
     let settings = state.store.load_mcp_settings().map_err(error_to_string)?;
     Ok(probe_mcp_servers(&settings).await)
 }

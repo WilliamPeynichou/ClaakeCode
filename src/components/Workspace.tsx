@@ -19,7 +19,7 @@ import { SettingsPane } from "./SettingsPane";
 import { TerminalPanel } from "./TerminalPanel";
 import { SearchPane } from "./SearchPane";
 import { ChatPane, type ExternalDropFeed } from "./chat/ChatPane";
-import { SinewMark } from "./SinewMark";
+import { WilideMark } from "./WilideMark";
 import { UpdateBadge } from "./UpdateBadge";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
 import type {
@@ -505,7 +505,7 @@ export function Workspace({
     // whether it just mounted or was already open.
     if (section) {
       window.dispatchEvent(
-        new CustomEvent("sinew:open-settings-section", {
+        new CustomEvent("wilide:open-settings-section", {
           detail: { section },
         }),
       );
@@ -1577,7 +1577,7 @@ export function Workspace({
         absolutePath: entry.absolutePath,
         name: entry.name,
       });
-      event.dataTransfer.setData("application/x-sinew-file", payload);
+      event.dataTransfer.setData("application/x-wilide-file", payload);
       event.dataTransfer.setData("text/plain", entry.relativePath);
       event.dataTransfer.effectAllowed = "copy";
     },
@@ -1646,9 +1646,9 @@ export function Workspace({
         </div>
         <div className="titlebar__brand" data-tauri-drag-region>
           <span className="titlebar__brand-mark">
-            <SinewMark size={11} />
+            <WilideMark size={11} />
           </span>
-          <span className="titlebar__brand-name">Sinew</span>
+          <span className="titlebar__brand-name">wilide</span>
         </div>
         <UpdateBadge />
         <WindowControls />

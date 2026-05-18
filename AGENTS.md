@@ -26,7 +26,7 @@ Code map:
 │   └── workflows
 │       └── release.yml
 ├── crates
-│   ├── sinew-anthropic
+│   ├── wilide-anthropic
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -35,7 +35,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── sinew-app
+│   ├── wilide-app
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── agent.rs
@@ -84,7 +84,7 @@ Code map:
 │   │       ├── tool_run.rs
 │   │       ├── web.rs
 │   │       └── workspace.rs
-│   ├── sinew-core
+│   ├── wilide-core
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── error.rs
@@ -94,7 +94,7 @@ Code map:
 │   │       ├── provider.rs
 │   │       ├── stream.rs
 │   │       └── tool.rs
-│   ├── sinew-google
+│   ├── wilide-google
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -103,7 +103,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── sinew-kimi
+│   ├── wilide-kimi
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -112,7 +112,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   ├── sinew-openai
+│   ├── wilide-openai
 │   │   ├── Cargo.toml
 │   │   └── src
 │   │       ├── auth.rs
@@ -121,7 +121,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── stream.rs
 │   │       └── wire.rs
-│   └── sinew-openrouter
+│   └── wilide-openrouter
 │       ├── Cargo.toml
 │       └── src
 │           ├── auth.rs
@@ -238,7 +238,7 @@ Code map:
     │   ├── FileTree.tsx
     │   ├── SearchPane.tsx
     │   ├── SettingsPane.tsx
-    │   ├── SinewMark.tsx
+    │   ├── WilideMark.tsx
     │   ├── Splitter.tsx
     │   ├── TerminalPanel.tsx
     │   ├── UpdateBadge.tsx

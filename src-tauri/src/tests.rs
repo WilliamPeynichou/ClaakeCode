@@ -3,8 +3,8 @@ use super::*;
 fn sample_plan_ready() -> PlanWorkflowState {
     PlanWorkflowState::PlanReady {
         artifact: PlanArtifactState {
-            path: ".sinew/plans/test.md".into(),
-            absolute_path: Some("/workspace/.sinew/plans/test.md".into()),
+            path: ".wilide/plans/test.md".into(),
+            absolute_path: Some("/workspace/.wilide/plans/test.md".into()),
             title: Some("Test plan".into()),
             updated_at_ms: Some(1),
         },
@@ -138,7 +138,7 @@ fn plan_implementation_reminder_uses_ready_plan_artifact() {
     .unwrap()
     .unwrap();
 
-    assert!(reminder.contains("Plan path: .sinew/plans/test.md"));
+    assert!(reminder.contains("Plan path: .wilide/plans/test.md"));
     assert!(reminder.contains("Plan title: Test plan"));
     assert!(reminder.contains("current turn"));
     assert!(reminder.contains("Use the ToDoList tool"));
@@ -147,7 +147,7 @@ fn plan_implementation_reminder_uses_ready_plan_artifact() {
 #[test]
 fn plan_implementation_reminder_uses_attached_plan_after_context_clear() {
     let attachments = vec![AttachmentInput {
-        path: "/workspace/.sinew/plans/fresh.md".into(),
+        path: "/workspace/.wilide/plans/fresh.md".into(),
         name: Some("fresh.md".into()),
     }];
     let reminder = plan_implementation_turn_reminder(
@@ -159,7 +159,7 @@ fn plan_implementation_reminder_uses_attached_plan_after_context_clear() {
     .unwrap()
     .unwrap();
 
-    assert!(reminder.contains("Plan path: .sinew/plans/fresh.md"));
+    assert!(reminder.contains("Plan path: .wilide/plans/fresh.md"));
 }
 
 #[test]

@@ -134,7 +134,7 @@ export function EditorPane({
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     setEditorReadySeq((value) => value + 1);
-    monaco.editor.defineTheme("sinew-cool", {
+    monaco.editor.defineTheme("wilide-cool", {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -177,7 +177,7 @@ export function EditorPane({
         "scrollbarSlider.activeBackground": "#3a3d44cc",
       },
     });
-    monaco.editor.setTheme("sinew-cool");
+    monaco.editor.setTheme("wilide-cool");
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       const path = currentPathRef.current;
@@ -445,7 +445,7 @@ export function EditorPane({
                 <Editor
                   key={activeTab.relativePath}
                   height="100%"
-                  theme="sinew-cool"
+                  theme="wilide-cool"
                   path={activeTab.relativePath}
                   value={activeTab.buffer}
                   language={languageForPath(activeTab.relativePath)}
@@ -627,5 +627,5 @@ function isMarkdownPath(relativePath: string): boolean {
 }
 
 function isPlanMarkdownPath(relativePath: string): boolean {
-  return /^\.sinew\/plans\/.+\.md$/i.test(relativePath);
+  return /^\.wilide\/plans\/.+\.md$/i.test(relativePath);
 }

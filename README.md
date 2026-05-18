@@ -1,17 +1,17 @@
 <p align="center">
-  <img src=".github/assets/hero.png" alt="Sinew — the coding harness you shape" width="100%" />
+  <img src=".github/assets/hero.png" alt="wilide — the coding harness you shape" width="100%" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/Paseru/sinew/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Paseru/sinew?style=flat-square&labelColor=0b0b0d&color=3b82f6"></a>
-  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/Paseru/sinew?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
-  <a href="https://github.com/Paseru/sinew/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/Paseru/sinew/release.yml?style=flat-square&labelColor=0b0b0d&color=3b82f6&label=build"></a>
-  <a href="https://github.com/Paseru/sinew/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Paseru/sinew/total?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
+  <a href="https://github.com/WilliamPeynichou/Wilide/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/WilliamPeynichou/Wilide?style=flat-square&labelColor=0b0b0d&color=3b82f6"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/WilliamPeynichou/Wilide?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
+  <a href="https://github.com/WilliamPeynichou/Wilide/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/WilliamPeynichou/Wilide/release.yml?style=flat-square&labelColor=0b0b0d&color=3b82f6&label=build"></a>
+  <a href="https://github.com/WilliamPeynichou/Wilide/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/WilliamPeynichou/Wilide/total?style=flat-square&labelColor=0b0b0d&color=c4b5fd"></a>
   <a href="https://discord.gg/MADQNHtZW"><img alt="Discord" src="https://img.shields.io/badge/discord-join-3b82f6?style=flat-square&labelColor=0b0b0d&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
-  <b>Sinew</b> is a desktop AI coding harness you can actually reshape.<br/>
+  <b>wilide</b> is a desktop AI coding harness you can actually reshape.<br/>
   Rewrite the description of every tool, turn the ones you don't need off,<br/>
   and the assistant only sees what you keep.
 </p>
@@ -22,12 +22,12 @@
 
 ---
 
-## Why Sinew
+## Why wilide
 
 Most AI coding tools ship a fixed harness: a hard-coded prompt, a hard-coded set
 of tools, a hard-coded loop. You get whatever the vendor decided is "right".
 
-Sinew flips that. The harness is the surface area you control.
+wilide flips that. The harness is the surface area you control.
 
 - **Every tool description is editable.** Rephrase it, scope it down, change the contract.
 - **Every tool is toggleable.** Run minimal like Pi, or unlock the full set.
@@ -119,7 +119,7 @@ row has an on/off toggle.
 ## Screenshot
 
 <p align="center">
-  <img src=".github/assets/screenshot.png" alt="Sinew IDE" width="100%" />
+  <img src=".github/assets/screenshot.png" alt="wilide IDE" width="100%" />
 </p>
 
 ---
@@ -127,20 +127,20 @@ row has an on/off toggle.
 ## Architecture
 
 <p align="center">
-  <img src=".github/assets/architecture.png" alt="Sinew architecture" width="100%" />
+  <img src=".github/assets/architecture.png" alt="wilide architecture" width="100%" />
 </p>
 
 - **`src/`** — React UI (Monaco, xterm, chat, settings, file tree).
 - **`src-tauri/`** — Tauri 2 shell, IPC commands, workspace I/O, conversation store.
-- **`crates/sinew-core`** — Provider-agnostic types: messages, tools, streams.
-- **`crates/sinew-app`** — Agent loop, tool implementations, swarm, MCP, compaction.
-- **`crates/sinew-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
+- **`crates/wilide-core`** — Provider-agnostic types: messages, tools, streams.
+- **`crates/wilide-app`** — Agent loop, tool implementations, swarm, MCP, compaction.
+- **`crates/wilide-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
 
 ---
 
 ## How it compares
 
-| | **Sinew** | Cursor | Claude Code | Aider | Zed AI |
+| | **wilide** | Cursor | Claude Code | Aider | Zed AI |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Native desktop app | ✓ | ✓ | — (CLI) | — (CLI) | ✓ |
 | Open source | ✓ | — | — | ✓ | ✓ |
@@ -156,7 +156,7 @@ row has an on/off toggle.
 ## Install
 
 Grab the latest build for your OS from the
-[releases page](https://github.com/Paseru/sinew/releases/latest).
+[releases page](https://github.com/WilliamPeynichou/Wilide/releases/latest).
 
 - **macOS** — `.dmg`
 - **Windows** — `.msi` / `.exe`
@@ -194,8 +194,8 @@ as secret in this context.
 ## Community
 
 - [Discord](https://discord.gg/MADQNHtZW) — chat, support, share your harness configs
-- [Issues](https://github.com/Paseru/sinew/issues) — bugs and feature requests
-- [Discussions](https://github.com/Paseru/sinew/discussions) — design, providers, MCP
+- [Issues](https://github.com/WilliamPeynichou/Wilide/issues) — bugs and feature requests
+- [Discussions](https://github.com/WilliamPeynichou/Wilide/discussions) — design, providers, MCP
 
 ---
 
@@ -204,5 +204,5 @@ as secret in this context.
 [MIT](./LICENSE)
 
 <p align="center">
-  <sub>Built with Tauri, Rust, and a stubborn refusal to ship a black-box harness.</sub>
+  <sub>Forked from [Paseru/sinew](https://github.com/Paseru/sinew). Built with Tauri, Rust, and a stubborn refusal to ship a black-box harness.</sub>
 </p>

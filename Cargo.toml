@@ -1,13 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/sinew-core",
-    "crates/sinew-anthropic",
-    "crates/sinew-google",
-    "crates/sinew-kimi",
-    "crates/sinew-openai",
-    "crates/sinew-openrouter",
-    "crates/sinew-app",
+    "crates/wilide-core",
+    "crates/wilide-anthropic",
+    "crates/wilide-google",
+    "crates/wilide-kimi",
+    "crates/wilide-openai",
+    "crates/wilide-openrouter",
+    "crates/wilide-app",
     "src-tauri",
 ]
 
@@ -21,13 +21,13 @@ license = "MIT"
 too_many_arguments = "allow"
 
 [workspace.dependencies]
-sinew-core = { path = "crates/sinew-core" }
-sinew-anthropic = { path = "crates/sinew-anthropic" }
-sinew-google = { path = "crates/sinew-google" }
-sinew-kimi = { path = "crates/sinew-kimi" }
-sinew-openai = { path = "crates/sinew-openai" }
-sinew-openrouter = { path = "crates/sinew-openrouter" }
-sinew-app = { path = "crates/sinew-app" }
+wilide-core = { path = "crates/wilide-core" }
+wilide-anthropic = { path = "crates/wilide-anthropic" }
+wilide-google = { path = "crates/wilide-google" }
+wilide-kimi = { path = "crates/wilide-kimi" }
+wilide-openai = { path = "crates/wilide-openai" }
+wilide-openrouter = { path = "crates/wilide-openrouter" }
+wilide-app = { path = "crates/wilide-app" }
 
 tokio = { version = "1.40", features = ["full"] }
 futures = "0.3"

@@ -5,7 +5,7 @@
 /idea.md
 /src-tauri/binaries/rg-*
 /.history
-/.sinew/
+/.wilide/
 .DS_Store
 *.log
 .env
