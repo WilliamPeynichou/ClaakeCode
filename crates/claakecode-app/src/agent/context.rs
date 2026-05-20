@@ -63,4 +63,5 @@ pub struct TurnOutput {
     pub todo_list: TodoListState,
     pub goal_workflow: GoalWorkflowState,
     pub interrupted: bool,
+    pub compacted: bool,
 }

@@ -21,6 +21,7 @@ Code map:
 │   │   ├── architecture.png
 │   │   ├── harness.png
 │   │   ├── hero.png
+│   │   ├── modes.png
 │   │   ├── screenshot.png
 │   │   └── swarm.png
 │   └── workflows
@@ -254,6 +255,7 @@ Code map:
     │       ├── DotmSquare5.tsx
     │       ├── FileChangeBlock.tsx
     │       ├── Markdown.tsx
+    │       ├── MermaidDiagram.tsx
     │       ├── PlanningNextMoveBlock.tsx
     │       ├── Questionnaire.tsx
     │       ├── TodoStrip.tsx
