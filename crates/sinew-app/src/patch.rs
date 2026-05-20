@@ -59,7 +59,7 @@ A single patch can combine several operations atomically:
 
 Rules:
 - Always start with `*** Begin Patch` and end with `*** End Patch`.
-- The `@@` header takes a code-level anchor (function/class declaration line), not a unified-diff line range like `-N,M +N,M`.
+- The `@@` header takes a code-level anchor (function/class declaration line as it appears in the file). The anchor must match a whole line; unified-diff line ranges (`-N,M +N,M`) are ignored if you include them.
 - For Update File hunks, include ~3 lines of unchanged context above and below your -/+ changes so the patch can be anchored unambiguously.
 - New file content lines must start with `+`.
 - Update hunk lines start with ' ' (context), '-' (removal), or '+' (addition).
@@ -535,7 +535,16 @@ fn parse_chunk(lines: &[String], index: &mut usize, end_index: usize) -> Result<
     let change_context = if header == "@@" {
         None
     } else if let Some(context) = header.strip_prefix("@@ ") {
-        Some(context.to_string())
+        // Silent-fix: if the model emitted a unified-diff line range
+        // (`-N,M +N,M @@` with or without leading dash), drop it and fall
+        // back to a bare `@@`. We don't use line numbers — the hunk's own
+        // -/+/context lines are enough for disambiguation, so the line
+        // range is noise we can safely ignore.
+        if looks_like_unified_diff_range(context) {
+            None
+        } else {
+            Some(context.to_string())
+        }
     } else {
         bail!("invalid update hunk: expected '@@'");
     };
@@ -554,6 +563,30 @@ fn parse_chunk(lines: &[String], index: &mut usize, end_index: usize) -> Result<
             is_end_of_file = true;
             *index += 1;
             break;
+        }
+
+        // Lenient blank-line handling: peek ahead. If the run of blank
+        // lines is followed by another hunk header or a new file operation
+        // (or by the end-of-patch marker), the blank lines were meant as
+        // visual separators between hunks — consume them and exit. If they
+        // are followed by more hunk content, push a single empty context
+        // line and keep going.
+        if line.is_empty() {
+            let mut peek = *index + 1;
+            while peek < end_index && lines[peek].is_empty() {
+                peek += 1;
+            }
+            let is_separator = peek >= end_index
+                || is_file_operation_header(&lines[peek])
+                || is_chunk_header(&lines[peek]);
+            if is_separator {
+                *index = peek;
+                break;
+            }
+            old_lines.push(String::new());
+            new_lines.push(String::new());
+            *index += 1;
+            continue;
         }
 
         let Some((prefix, content)) = line.split_at_checked(1) else {
@@ -867,10 +900,11 @@ fn normalize_for_match(s: &str) -> String {
 /// `-1 +1`. Used to detect when the model wrote a git-style `@@ -N,M +N,M @@`
 /// header instead of our source-anchor `@@ <code line>`.
 fn looks_like_unified_diff_range(context: &str) -> bool {
-    let mut chars = context.trim().chars().peekable();
-    if chars.next() != Some('-') {
-        return false;
-    }
+    // Accept both Codex-doc form `@@ -N,M +N,M @@` and the variant models
+    // also emit without the leading dash, like `@@ N,M +N,M @@`.
+    let s = context.trim();
+    let s = s.strip_prefix('-').unwrap_or(s);
+    let mut chars = s.chars().peekable();
     if !chars.peek().is_some_and(|c| c.is_ascii_digit()) {
         return false;
     }
@@ -1259,7 +1293,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn error_when_at_at_uses_unified_diff_range_gives_hint() {
+    async fn unified_diff_range_in_at_at_header_is_silently_dropped() {
+        // Regression: in the original conv-n°2 the model used
+        // `@@ -1,3 +1,3 @@`; we previously errored with a hint, now we
+        // silently drop the range and rely on the hunk's own context.
         let root = unique_temp_dir();
         fs::create_dir_all(&root).expect("create temp workspace");
         fs::write(root.join("a.txt"), "line one\nline two\nline three\n").expect("write file");
@@ -1271,19 +1308,62 @@ mod tests {
             }))
             .await;
 
-        assert!(result.is_error);
         assert!(
-            result
-                .content
-                .contains("failed to find context '-1,3 +1,3 @@'"),
-            "error should echo the bogus context, got: {}",
+            !result.is_error,
+            "unified-diff range should be silently dropped, got: {}",
             result.content
         );
-        assert!(
-            result.content.contains("unified-diff line range"),
-            "error should hint at the unified-diff confusion, got: {}",
-            result.content
-        );
+        let updated = fs::read_to_string(root.join("a.txt")).expect("read");
+        assert!(updated.contains("LINE TWO"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[tokio::test]
+    async fn silently_strips_unified_diff_range_from_at_at_header() {
+        // The model emits a git-style `@@ -N,M +N,M @@` header. We don't use
+        // line numbers, so the range is noise we silently drop and treat
+        // the hunk as bare `@@`. Same for the form without leading dash.
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("create temp workspace");
+        fs::write(root.join("a.txt"), "alpha\nbeta\ngamma\ndelta\n").expect("write file");
+
+        let tool = ApplyPatchTool::new(&root);
+        let patch = "*** Begin Patch\n*** Update File: a.txt\n@@ -2,2 +2,2 @@\n-beta\n+BETA\n*** End Patch\n";
+        let result = tool.run(json!({ "patch": patch })).await;
+        assert!(!result.is_error, "with leading dash, got: {}", result.content);
+        let updated = fs::read_to_string(root.join("a.txt")).expect("read");
+        assert!(updated.contains("BETA"));
+
+        fs::write(root.join("a.txt"), "alpha\nbeta\ngamma\ndelta\n").expect("rewrite");
+        let patch_no_dash = "*** Begin Patch\n*** Update File: a.txt\n@@ 2,2 +2,2 @@\n-beta\n+B2\n*** End Patch\n";
+        let result = tool.run(json!({ "patch": patch_no_dash })).await;
+        assert!(!result.is_error, "without leading dash, got: {}", result.content);
+        let updated = fs::read_to_string(root.join("a.txt")).expect("read");
+        assert!(updated.contains("B2"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[tokio::test]
+    async fn silently_skips_blank_lines_between_update_hunks() {
+        // Reproduces conv-n°3 bug: the model puts a visual blank line
+        // between two hunks inside an Update File. We must consume it as
+        // a separator instead of failing with `invalid update hunk line`.
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("create temp workspace");
+        fs::write(
+            root.join("a.txt"),
+            "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\n",
+        )
+        .expect("write file");
+
+        let tool = ApplyPatchTool::new(&root);
+        let patch = "*** Begin Patch\n*** Update File: a.txt\n@@\n-alpha\n+ALPHA\n\n@@\n-zeta\n+ZETA\n*** End Patch\n";
+        let result = tool.run(json!({ "patch": patch })).await;
+        assert!(!result.is_error, "should silently skip blank, got: {}", result.content);
+        let updated = fs::read_to_string(root.join("a.txt")).expect("read");
+        assert!(updated.contains("ALPHA"));
+        assert!(updated.contains("ZETA"));
         fs::remove_dir_all(root).ok();
     }
 
