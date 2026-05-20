@@ -76,7 +76,6 @@ button { font: inherit; cursor: pointer; background: none; border: 0; color: inh
   overflow: hidden;
   display: grid; place-items: center;
   background: transparent;
-  border: 1px solid var(--green-ink);
 }
 .nav-brand .mark img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .nav-brand .name {
@@ -804,7 +803,6 @@ footer {
   gap: 36px;
   align-items: start;
 }
-footer .nav-brand .mark { border-color: var(--green-mist); }
 footer .nav-brand .name { color: var(--cream); }
 footer .nav-brand .name em { color: var(--green-bright); }
 footer p.serif {
