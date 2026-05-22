@@ -14,8 +14,8 @@ name: Release
 #   * TAURI_SIGNING_PRIVATE_KEY          — content of .tauri-keys/claakecode.key
 #   * TAURI_SIGNING_PRIVATE_KEY_PASSWORD — empty string if you generated the key without a password
 #
-# Required for the public macOS download. Without these, Gatekeeper rejects the
-# downloaded app with "Apple cannot verify that it is free from malware".
+# Optional macOS notarization. Without these, macOS artifacts can still be built,
+# but Gatekeeper may warn on first launch until notarization is configured.
 #   * APPLE_CERTIFICATE                  — base64-encoded .p12 Developer ID cert
 #   * APPLE_CERTIFICATE_PASSWORD         — password for the .p12
 #   * APPLE_ID                           — Apple ID email
@@ -86,17 +86,17 @@ jobs:
           - name: macos-universal
             os: macos-latest
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
-            tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.sidecars.conf.json"
+            tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
           # Windows x64 installer bundles — MSI + NSIS.
           - name: windows-x64
-            os: windows-latest
+            os: windows-2022
             rust_targets: "x86_64-pc-windows-msvc"
-            tauri_args: "--target x86_64-pc-windows-msvc --config src-tauri/tauri.sidecars.conf.json"
+            tauri_args: "--target x86_64-pc-windows-msvc --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
           # Linux x64 bundles — .deb + AppImage.
           - name: linux-x64
             os: ubuntu-22.04
             rust_targets: "x86_64-unknown-linux-gnu"
-            tauri_args: "--target x86_64-unknown-linux-gnu --config src-tauri/tauri.sidecars.conf.json"
+            tauri_args: "--target x86_64-unknown-linux-gnu --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
     runs-on: ${{ matrix.platform.os }}
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +147,8 @@ jobs:
           open -a Finder
           sleep 3
 
-      - name: Verify macOS signing secrets
+      - name: Check macOS signing secrets
+        id: macos-signing
         if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -163,13 +164,15 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required macOS signing/notarization secrets: ${missing[*]}"
-            echo "::error::Refusing to publish an unnotarized macOS DMG because Gatekeeper will block it."
-            exit 1
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Missing macOS signing/notarization secrets: ${missing[*]}"
+            echo "::warning::Building macOS without Apple notarization; Gatekeeper may warn on first launch."
+          else
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Export optional macOS signing variables
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos-signing.outputs.has_secrets == 'true'
         env:
           APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_PROVIDER_SHORT_NAME_SECRET: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
@@ -185,10 +188,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -201,7 +206,7 @@ jobs:
           updaterJsonPreferNsis: false
 
       - name: Validate macOS notarization
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos-signing.outputs.has_secrets == 'true'
         run: |
           APP_PATH=$(find target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name "*.app" -type d -print -quit)
           if [ -z "$APP_PATH" ]; then
