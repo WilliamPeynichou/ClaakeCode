@@ -30,7 +30,7 @@
     <div class="nav-brand">
       <div class="mark"><img src="assets/claakecode-icon.png" alt="Claake Code"/></div>
       <div class="name">claake <em>code</em></div>
-      <span class="mono" style="font-size:11px;color:var(--ink-soft);margin-left:6px">v0.1.16</span>
+      <span class="mono" style="font-size:11px;color:var(--ink-soft);margin-left:6px">v0.1.17</span>
     </div>
     <div class="nav-links">
       <a href="#tools">Tools</a>
@@ -44,6 +44,10 @@
       <a href="#install">Download</a>
     </div>
     <div class="nav-cta">
+      <div class="lang-toggle" role="group" aria-label="Language switcher">
+        <button type="button" class="lang-btn is-active" data-lang-option="en" aria-pressed="true">EN</button>
+        <button type="button" class="lang-btn" data-lang-option="fr" aria-pressed="false">FR</button>
+      </div>
       <a href="https://github.com/WilliamPeynichou/ClaakeCode" class="pill" style="text-decoration:none">
         <span class="dot"></span>Star on GitHub
       </a>
@@ -55,7 +59,7 @@
   <section class="hero">
     <div class="hero-meta">
       <span class="pill"><span class="dot"></span>Open source · MIT</span>
-      <span class="pill">v0.1.16</span>
+      <span class="pill">v0.1.17</span>
       <span class="pill">Database settings</span>
       <span class="pill">macOS · linux · windows</span>
     </div>
@@ -73,7 +77,7 @@
           <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage" class="btn btn-primary btn-linux">Download for Linux ↓</a>
           <a href="https://github.com/WilliamPeynichou/ClaakeCode" class="btn btn-ghost">View on GitHub</a>
         </div>
-        <p class="hero-note mono">No account required · Bring your own API keys · MIT licensed · No telemetry</p>
+        <p class="hero-note mono">No account required · Signed macOS build · Bring your own API keys · No telemetry</p>
       </div>
       <div class="hero-chips">
         <span class="chip"><span class="chip-num">17</span><span class="chip-label"><strong>editable tools</strong><br/>Including database list, schema and query.</span></span>
@@ -91,16 +95,16 @@
       <span class="rule"></span>
     </div>
     <div class="release-card">
-      <div class="release-kicker mono">Latest release · v0.1.16</div>
+      <div class="release-kicker mono">Latest release · v0.1.17</div>
       <div class="release-grid">
         <div>
           <h2>Database settings land in <em class="serif">Claake Code</em>.</h2>
           <p class="release-intro">
-            Version 0.1.16 adds a dedicated Settings database section and updates the downloadable files so new installs pull the latest desktop build.
+            Version 0.1.17 updates Claake Code with the latest upstream agent improvements while keeping the Settings database section and stable downloads intact.
           </p>
           <div class="release-actions">
-            <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/tag/v0.1.16">Read release notes ↗</a>
-            <a class="btn btn-ghost" href="#install">Download v0.1.16</a>
+            <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/tag/v0.1.17">Read release notes ↗</a>
+            <a class="btn btn-ghost" href="#install">Download v0.1.17</a>
           </div>
         </div>
         <div class="release-notes">
@@ -117,7 +121,7 @@
           <article>
             <span class="release-num">III</span>
             <h3>Downloads refreshed</h3>
-            <p>The macOS, Windows and Linux download buttons now target the latest 0.1.16 assets from GitHub releases.</p>
+            <p>The macOS, Windows and Linux download buttons target stable latest-release assets, with the macOS DMG built through Apple signing and notarization.</p>
           </article>
         </div>
       </div>
@@ -492,13 +496,13 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
         <p style="color:var(--ink-soft);font-size:17px;line-height:1.55;margin-top:20px;max-width:480px">
           Grab the native build for your OS, open the app, and drop in whichever provider keys and database sources you want — Anthropic, OpenAI, Google, Kimi, OpenRouter, plus Postgres, MySQL, SQLite, MSSQL or Supabase. The tool, skill, provider and database panels take care of the rest. No package manager, no shell scripts, no setup wizard.
         </p>
-        <div class="download-trust mono">Latest release v0.1.16 · Native desktop · Bring your own keys · Open source</div>
+        <div class="download-trust mono">Latest release v0.1.17 · Notarized macOS DMG · Bring your own keys · Open source</div>
       </div>
       <div class="download-cards">
         <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg" class="download-card">
           <span class="download-os">macOS</span>
           <strong>Download .dmg</strong>
-          <span>Apple Silicon + Intel universal build.</span>
+          <span>Signed and notarized universal build for Apple Silicon + Intel.</span>
           <em>download ↓</em>
         </a>
         <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe" class="download-card featured">
@@ -568,6 +572,252 @@ skill : long-form on-disk in ~/.claakecode/skills</pre>
 </div>
 
 <script>
+  // ─── lightweight EN/FR i18n for the static landing ──────────
+  const I18N_META = {
+    en: {
+      title: "Claake Code — agentic IDE",
+      description: "Claake Code is a desktop AI coding harness with free, in-app management of every tool, every skill, every provider and now database sources. Anthropic, OpenAI, Google, Kimi, OpenRouter — toggle, rewrite, swap. Open source, MIT.",
+      aria: "Language switcher",
+    },
+    fr: {
+      title: "Claake Code — IDE agentique",
+      description: "Claake Code est un IDE IA desktop open source avec gestion intégrée des outils, skills, fournisseurs de modèles et sources de base de données. Anthropic, OpenAI, Google, Kimi, OpenRouter — activez, réécrivez, changez. Open source, MIT.",
+      aria: "Sélecteur de langue",
+    },
+  };
+
+  const I18N_FR = {
+    "Claake Code — agentic IDE": "Claake Code — IDE agentique",
+    "Tools": "Outils",
+    "Skills": "Compétences",
+    "Providers": "Fournisseurs",
+    "Features": "Fonctionnalités",
+    "Compare": "Comparer",
+    "Patch notes": "Notes de version",
+    "Download": "Télécharger",
+    "Star on GitHub": "Star sur GitHub",
+    "Database settings": "Paramètres bases de données",
+    "The open AI IDE": "L’IDE IA ouvert",
+    "you": "que vous",
+    "can actually": "pouvez vraiment",
+    "control": "contrôler",
+    "Claake Code is a native desktop IDE with an agent, terminal, editor, MCP, skills, database sources and multi-provider models — all open source. Toggle every tool, rewrite every skill, connect the data sources you approve, swap providers mid-conversation, and keep the harness under your control.": "Claake Code est un IDE desktop natif avec agent, terminal, éditeur, MCP, skills, sources de base de données et modèles multi-fournisseurs — entièrement open source. Activez chaque outil, réécrivez chaque skill, connectez les sources de données que vous approuvez, changez de fournisseur en pleine conversation et gardez l’environnement sous votre contrôle.",
+    "Download for macOS ↓": "Télécharger pour macOS ↓",
+    "Download for Windows ↓": "Télécharger pour Windows ↓",
+    "Download for Linux ↓": "Télécharger pour Linux ↓",
+    "View on GitHub": "Voir sur GitHub",
+    "No account required · Signed macOS build · Bring your own API keys · No telemetry": "Aucun compte requis · Build macOS signé · Apportez vos clés API · Aucune télémétrie",
+    "editable tools": "outils éditables",
+    "Including database list, schema and query.": "Inclut la liste, le schéma et les requêtes de base de données.",
+    "unlimited skills": "skills illimitées",
+    "Markdown playbooks the agent can load.": "Playbooks Markdown que l’agent peut charger.",
+    "database settings": "paramètres bases de données",
+    "Connect sources the agent can inspect and query.": "Connectez les sources que l’agent peut inspecter et interroger.",
+    "Live product": "Produit en direct",
+    "See the IDE before you download": "Voyez l’IDE avant de le télécharger",
+    "Not a prompt box.": "Pas une simple boîte de prompt.",
+    "A real IDE": "Un vrai IDE",
+    "with an agent inside.": "avec un agent intégré.",
+    "Open a repo, pick your provider, choose the tools the agent can use, then let it plan, edit, run, inspect and coordinate sub-agents — with everything visible and editable.": "Ouvrez un repo, choisissez votre fournisseur, sélectionnez les outils accessibles à l’agent, puis laissez-le planifier, éditer, exécuter, inspecter et coordonner des sous-agents — tout reste visible et éditable.",
+    "RUNS ON →": "FONCTIONNE AVEC →",
+    "MODELS →": "MODÈLES →",
+    "DATA →": "DONNÉES →",
+    "Free management of tools · skills · providers · databases": "Gestion libre des outils · skills · fournisseurs · bases de données",
+    "One workspace.": "Un seul workspace.",
+    "Every tool, every skill, every provider, every database source": "Chaque outil, chaque skill, chaque fournisseur, chaque source de base de données",
+    "under your control — from a UI, not a config file.": "sous votre contrôle — depuis une UI, pas un fichier de config.",
+    "No CLI gymnastics. No hidden system prompt. Open the panel, flip a tool on, rewrite its description, drop in a new skill, connect a database source, swap from Sonnet to GPT to Gemini in a click. The agent runs exactly the harness you assembled.": "Pas de gymnastique CLI. Pas de prompt système caché. Ouvrez le panneau, activez un outil, réécrivez sa description, ajoutez une skill, connectez une source de base de données, passez de Sonnet à GPT ou Gemini en un clic. L’agent exécute exactement l’environnement que vous avez assemblé.",
+    "↳ tools": "↳ outils",
+    "↳ skills": "↳ skills",
+    "↳ providers": "↳ fournisseurs",
+    "↳ database": "↳ base de données",
+    "Toggle, rewrite, ship.": "Activez, réécrivez, livrez.",
+    "Every built-in tool — read, edit, grep, bash, web, image, MCP, database — has an on/off switch and an editable description. Run a minimal pair-programmer or unlock the full agentic surface. Your call, per workspace.": "Chaque outil intégré — lecture, édition, grep, bash, web, image, MCP, base de données — possède un interrupteur et une description éditable. Lancez un pair-programmer minimal ou débloquez toute la surface agentique. À vous de décider, workspace par workspace.",
+    "Plain markdown, fully yours.": "Du Markdown simple, entièrement à vous.",
+    "Long-form skills live on disk in": "Les skills longues vivent sur disque dans",
+    ". Create, edit, delete from the UI. The agent loads them on demand — no SDK, no plugin store, no review queue.": ". Créez, modifiez et supprimez-les depuis l’UI. L’agent les charge à la demande — pas de SDK, pas de boutique de plugins, pas de file d’attente de validation.",
+    "Swap models without leaving the chat.": "Changez de modèle sans quitter le chat.",
+    "Anthropic, OpenAI, Google, Kimi, OpenRouter — wired into the same agent loop. OAuth where it makes sense, API keys where it doesn't. Switch provider, model, or context window mid-conversation. Zero lock-in.": "Anthropic, OpenAI, Google, Kimi, OpenRouter — tous branchés sur la même boucle agent. OAuth quand c’est pertinent, clés API quand ça ne l’est pas. Changez de fournisseur, de modèle ou de fenêtre de contexte en pleine conversation. Zéro verrouillage.",
+    "Database sources, gated by settings.": "Sources de base de données, contrôlées par les paramètres.",
+    "Add Postgres, MySQL, SQLite, MSSQL or Supabase REST sources from Settings. The agent can list sources, describe schemas and query only the databases you enable — with row limits, read-only mode and destructive-action confirmation.": "Ajoutez des sources Postgres, MySQL, SQLite, MSSQL ou Supabase REST depuis les paramètres. L’agent peut lister les sources, décrire les schémas et interroger uniquement les bases que vous activez — avec limites de lignes, mode lecture seule et confirmation des actions destructrices.",
+    "How the agent works": "Comment fonctionne l’agent",
+    "Plan. Act. Observe.": "Planifier. Agir. Observer.",
+    "Reflect.": "Réfléchir.",
+    "Repeat.": "Recommencer.",
+    "Same agent loop across Anthropic, OpenAI, Google, Kimi, and OpenRouter. After each tool call the agent re-reads the world, scores its progress against the plan, and decides whether to continue, branch, or ask you a question.": "La même boucle agent pour Anthropic, OpenAI, Google, Kimi et OpenRouter. Après chaque appel d’outil, l’agent relit l’état du monde, évalue sa progression par rapport au plan et décide de continuer, bifurquer ou vous poser une question.",
+    "No magic. No hidden tools. No prompt you can't see.": "Pas de magie. Pas d’outils cachés. Pas de prompt invisible.",
+    "plan": "plan",
+    "act": "agir",
+    "observe": "observer",
+    "reflect": "réfléchir",
+    "loop": "boucle",
+    "until done": "jusqu’à la fin",
+    "Shape the harness": "Façonnez l’environnement",
+    "The same agent loop can behave like a": "La même boucle agent peut se comporter comme un",
+    "barebones pair-programmer": "pair-programmer minimal",
+    "or a": "ou comme une",
+    "full autonomous crew": "équipe autonome complète",
+    "Tool descriptions live in settings, versioned with your config, and the assistant gets exactly the surface area you decide on.": "Les descriptions d’outils vivent dans les paramètres, versionnées avec votre config, et l’assistant reçoit exactement la surface que vous choisissez.",
+    "Minimal": "Minimal",
+    "Search": "Recherche",
+    "Full": "Complet",
+    "Built for people who don't trust black boxes": "Conçu pour celles et ceux qui ne font pas confiance aux boîtes noires",
+    "Seven things we will": "Sept choses sur lesquelles nous ne ferons",
+    "never": "jamais",
+    "compromise on.": "de compromis.",
+    "Reshape every tool": "Remodelez chaque outil",
+    "Every tool description is editable, every tool is toggleable. Run minimal like Pi, or unlock the full set with MCP, skills, and a sub-agent swarm.": "Chaque description d’outil est éditable, chaque outil peut être activé ou désactivé. Lancez un mode minimal façon Pi, ou débloquez l’ensemble complet avec MCP, skills et essaim de sous-agents.",
+    "Bring your own model": "Apportez votre propre modèle",
+    "Same agent loop across Anthropic, OpenAI, Google, Kimi, and OpenRouter. OAuth where it makes sense, API keys where it doesn't. Switch mid-project.": "La même boucle agent pour Anthropic, OpenAI, Google, Kimi et OpenRouter. OAuth quand c’est pertinent, clés API quand ça ne l’est pas. Changez en plein projet.",
+    "Add database sources from Settings, test connections, import candidates from .env files, and decide which sources the agent can list, inspect or query.": "Ajoutez des sources de base de données depuis les paramètres, testez les connexions, importez des candidates depuis les fichiers .env et décidez quelles sources l’agent peut lister, inspecter ou interroger.",
+    "Native MCP support": "Support MCP natif",
+    "The Model Context Protocol is wired into the core. Add a server from a UI form — the agent picks it up on the next turn. No restart, no JSON spelunking.": "Le Model Context Protocol est câblé dans le cœur. Ajoutez un serveur depuis un formulaire UI — l’agent le récupère au tour suivant. Pas de redémarrage, pas de fouille JSON.",
+    "1M context, only when you want it": "Contexte 1M, seulement quand vous le voulez",
+    "Sonnet 4.6's 1M beta window is one toggle away — without forcing the beta header on accounts that don't have access.": "La fenêtre bêta 1M de Sonnet 4.6 est à un toggle — sans forcer l’en-tête bêta sur les comptes qui n’y ont pas accès.",
+    "Skills, in the open": "Skills, au grand jour",
+    "Long-form, on-disk skills the agent can invoke. Create, edit, and delete them from the UI — they live as plain markdown in": "Des skills longues, sur disque, que l’agent peut invoquer. Créez, modifiez et supprimez-les depuis l’UI — elles vivent en Markdown simple dans",
+    "Forkable, hackable core": "Un cœur forkable et hackable",
+    "MIT licensed, written in Rust + React on Tauri 2. Read the source, send a PR, or fork it for your team's house style — that's literally how this project started.": "Sous licence MIT, écrit en Rust + React sur Tauri 2. Lisez le source, envoyez une PR, ou forkez-le pour le style maison de votre équipe — c’est littéralement comme ça que ce projet a commencé.",
+    "The contract is simple:": "Le contrat est simple :",
+    "you own the tools you build with.": "vous possédez les outils avec lesquels vous construisez.",
+    "Claake Code is MIT licensed. The agent runtime, the editor, the prompt library, the providers — everything is in a single Cargo workspace with a React UI on top. If you can read Rust and TypeScript, you can read everything we ship.": "Claake Code est sous licence MIT. Le runtime agent, l’éditeur, la bibliothèque de prompts, les fournisseurs — tout est dans un seul workspace Cargo avec une UI React par-dessus. Si vous savez lire Rust et TypeScript, vous pouvez lire tout ce que nous livrons.",
+    "No telemetry. No training on your transcripts. No enterprise tier hiding the good features. The same binary the maintainers use is the binary you download.": "Aucune télémétrie. Aucun entraînement sur vos transcriptions. Aucun plan enterprise qui cache les bonnes fonctionnalités. Le binaire que les mainteneurs utilisent est celui que vous téléchargez.",
+    "Read the source ↗": "Lire le code source ↗",
+    "# House rules - Run `cargo check --workspace` before committing. - Prefer the dedicated tool over `bash`. - Keep the surface editable: every tool description lives in settings, every tool has an on/off toggle. ## tools mcp.* : configured per-workspace, hot-reloaded skill : long-form on-disk in ~/.claakecode/skills": "# Règles maison\n\n- Lancez `cargo check --workspace` avant de committer.\n- Préférez l’outil dédié à `bash`.\n- Gardez la surface éditable : chaque description\n  d’outil vit dans les paramètres, chaque outil a un toggle.\n\n## outils\nmcp.* : configuré par workspace, rechargé à chaud\nskill : long-form sur disque dans ~/.claakecode/skills",
+    "Providers wired": "Fournisseurs câblés",
+    "Built-in tools": "Outils intégrés",
+    "MCP servers supported": "Serveurs MCP supportés",
+    "Forever and ever": "Pour toujours",
+    "How it compares": "Comment il se compare",
+    "Everyone says \"agentic\".": "Tout le monde dit « agentique ».",
+    "Few": "Peu",
+    "let you see and rewrite the prompt.": "vous laissent voir et réécrire le prompt.",
+    "Capability": "Capacité",
+    "Native desktop app": "App desktop native",
+    "Multi-provider": "Multi-fournisseurs",
+    "Editable tool descriptions": "Descriptions d’outils éditables",
+    "Toggle individual tools": "Activation outil par outil",
+    "Database sources in Settings": "Sources de base de données dans les paramètres",
+    "MCP server CRUD UI": "UI CRUD pour serveurs MCP",
+    "Skills CRUD UI": "UI CRUD pour skills",
+    "1M context beta toggle (Sonnet)": "Toggle contexte 1M bêta (Sonnet)",
+    "Agent swarm + task board": "Essaim d’agents + tableau de tâches",
+    "Embedded terminal": "Terminal intégré",
+    "partial": "partiel",
+    "Latest release · v0.1.17": "Dernière version · v0.1.17",
+    "Database settings land in Claake Code.": "Les paramètres bases de données arrivent dans Claake Code.",
+    "Version 0.1.17 updates Claake Code with the latest upstream agent improvements while keeping the Settings database section and stable downloads intact.": "La version 0.1.17 met Claake Code à jour avec les dernières améliorations agent upstream tout en conservant la section bases de données des paramètres et les téléchargements stables.",
+    "Read release notes ↗": "Lire les notes de version ↗",
+    "Download v0.1.17": "Télécharger v0.1.17",
+    "Settings database": "Base de données dans les paramètres",
+    "Configure database sources directly in the app: Postgres, MySQL, SQLite, MSSQL and Supabase REST. Sources can be enabled, tested and kept under your control from Settings.": "Configurez les sources de base de données directement dans l’app : Postgres, MySQL, SQLite, MSSQL et Supabase REST. Les sources peuvent être activées, testées et gardées sous votre contrôle depuis les paramètres.",
+    "Agent-safe data access": "Accès données sécurisé pour l’agent",
+    "The agent gets database tools only through configured sources, with schema inspection, query execution, row limits, read-only options, activity history and destructive-action confirmation.": "L’agent reçoit les outils base de données uniquement via les sources configurées, avec inspection de schéma, exécution de requêtes, limites de lignes, options lecture seule, historique d’activité et confirmation des actions destructrices.",
+    "Downloads refreshed": "Téléchargements actualisés",
+    "The macOS, Windows and Linux download buttons target stable latest-release assets, with the macOS DMG built through Apple signing and notarization.": "Les boutons de téléchargement macOS, Windows et Linux ciblent les assets stables de la dernière release, avec un DMG macOS signé et notarized par Apple.",
+    "One double-click.": "Un double-clic.",
+    "No terminal": "Pas de terminal",
+    ", no setup wizard.": ", pas d’assistant d’installation.",
+    "Grab the native build for your OS, open the app, and drop in whichever provider keys and database sources you want — Anthropic, OpenAI, Google, Kimi, OpenRouter, plus Postgres, MySQL, SQLite, MSSQL or Supabase. The tool, skill, provider and database panels take care of the rest. No package manager, no shell scripts, no setup wizard.": "Récupérez le build natif pour votre OS, ouvrez l’app et ajoutez les clés fournisseurs et sources de base de données que vous voulez — Anthropic, OpenAI, Google, Kimi, OpenRouter, plus Postgres, MySQL, SQLite, MSSQL ou Supabase. Les panneaux outils, skills, fournisseurs et bases de données s’occupent du reste. Pas de gestionnaire de paquets, pas de scripts shell, pas d’assistant d’installation.",
+    "Latest release v0.1.17 · Notarized macOS DMG · Bring your own keys · Open source": "Dernière version v0.1.17 · DMG macOS notarized · Apportez vos clés · Open source",
+    "Download .dmg": "Télécharger .dmg",
+    "Signed and notarized universal build for Apple Silicon + Intel.": "Build universel signé et notarized pour Apple Silicon + Intel.",
+    "download ↓": "télécharger ↓",
+    "Download .exe": "Télécharger .exe",
+    "Windows 10/11 x64 installer.": "Installeur Windows 10/11 x64.",
+    "Download AppImage": "Télécharger AppImage",
+    "Portable Linux build; .deb also in releases.": "Build Linux portable ; .deb aussi disponible dans les releases.",
+    "Read the code": "Lire le code",
+    "MIT licensed Rust + React + Tauri.": "Rust + React + Tauri sous licence MIT.",
+    "An agentic editor, in the open.": "Un éditeur agentique, ouvert.",
+    "\"The best tools are the ones you can read all the way down to the metal.\"": "« Les meilleurs outils sont ceux que l’on peut lire jusqu’au métal. »",
+    "Product": "Produit",
+    "Releases": "Versions",
+    "Resources": "Ressources",
+    "Community": "Communauté",
+    "Forked from Sinew": "Fork de Sinew",
+    "© 2026 · MIT licensed": "© 2026 · Licence MIT",
+    "fork it, ship it": "forkez, livrez",
+  };
+
+  const normalizeText = (value) => value.replace(/\s+/g, ' ').trim();
+  const translatableTextNodes = [];
+
+  const collectTextNodes = () => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const key = normalizeText(node.nodeValue || '');
+        if (!key || !I18N_FR[key]) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent || parent.closest('script, style')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    let node;
+    while ((node = walker.nextNode())) {
+      translatableTextNodes.push({
+        node,
+        key: normalizeText(node.nodeValue || ''),
+        original: node.nodeValue,
+      });
+    }
+  };
+
+  const withOriginalSpacing = (original, translated) => {
+    const leading = original.match(/^\s*/)?.[0] || '';
+    const trailing = original.match(/\s*$/)?.[0] || '';
+    return `${leading}${translated}${trailing}`;
+  };
+
+  const savedLanguage = () => {
+    try { return localStorage.getItem('claakecode-web-lang'); }
+    catch { return null; }
+  };
+
+  const persistLanguage = (lang) => {
+    try { localStorage.setItem('claakecode-web-lang', lang); }
+    catch { /* ignore private-mode storage errors */ }
+  };
+
+  const preferredLanguage = () => {
+    const saved = savedLanguage();
+    if (saved === 'en' || saved === 'fr') return saved;
+    return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  };
+
+  const applyLanguage = (lang) => {
+    const nextLang = lang === 'fr' ? 'fr' : 'en';
+    const meta = I18N_META[nextLang];
+    const metaDescription = document.querySelector('meta[name="description"]');
+    const toggle = document.querySelector('.lang-toggle');
+
+    document.documentElement.lang = nextLang;
+    document.documentElement.dataset.lang = nextLang;
+    document.title = meta.title;
+    if (metaDescription) metaDescription.setAttribute('content', meta.description);
+    if (toggle) toggle.setAttribute('aria-label', meta.aria);
+
+    translatableTextNodes.forEach(({ node, key, original }) => {
+      const translated = nextLang === 'fr' ? I18N_FR[key] : original;
+      node.nodeValue = nextLang === 'fr' ? withOriginalSpacing(original, translated) : original;
+    });
+
+    document.querySelectorAll('[data-lang-option]').forEach((button) => {
+      const active = button.getAttribute('data-lang-option') === nextLang;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+
+    persistLanguage(nextLang);
+  };
+
+  collectTextNodes();
+  document.querySelectorAll('[data-lang-option]').forEach((button) => {
+    button.addEventListener('click', () => applyLanguage(button.getAttribute('data-lang-option')));
+  });
+  applyLanguage(preferredLanguage());
+
   // ─── make sure embedded videos autoplay on every browser ─────
   document.querySelectorAll('video.video-el').forEach((v) => {
     v.muted = true;

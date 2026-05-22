@@ -14,13 +14,16 @@ name: Release
 #   * TAURI_SIGNING_PRIVATE_KEY          — content of .tauri-keys/claakecode.key
 #   * TAURI_SIGNING_PRIVATE_KEY_PASSWORD — empty string if you generated the key without a password
 #
-# Optional (macOS notarization — recommended for distribution outside the App Store):
+# Required for the public macOS download. Without these, Gatekeeper rejects the
+# downloaded app with "Apple cannot verify that it is free from malware".
 #   * APPLE_CERTIFICATE                  — base64-encoded .p12 Developer ID cert
 #   * APPLE_CERTIFICATE_PASSWORD         — password for the .p12
-#   * APPLE_SIGNING_IDENTITY             — e.g. "Developer ID Application: Your Name (TEAMID)"
 #   * APPLE_ID                           — Apple ID email
 #   * APPLE_PASSWORD                     — app-specific password
 #   * APPLE_TEAM_ID                      — Apple Developer team identifier
+# Optional:
+#   * APPLE_SIGNING_IDENTITY             — e.g. "Developer ID Application: Your Name (TEAMID)"
+#   * APPLE_PROVIDER_SHORT_NAME          — provider short name when the Apple ID has multiple teams
 
 on:
   push:
@@ -144,12 +147,51 @@ jobs:
           open -a Finder
           sleep 3
 
+      - name: Verify macOS signing secrets
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required macOS signing/notarization secrets: ${missing[*]}"
+            echo "::error::Refusing to publish an unnotarized macOS DMG because Gatekeeper will block it."
+            exit 1
+          fi
+
+      - name: Export optional macOS signing variables
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_PROVIDER_SHORT_NAME_SECRET: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+        run: |
+          if [ -n "$APPLE_SIGNING_IDENTITY_SECRET" ]; then
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_SECRET" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$APPLE_PROVIDER_SHORT_NAME_SECRET" ]; then
+            echo "APPLE_PROVIDER_SHORT_NAME=$APPLE_PROVIDER_SHORT_NAME_SECRET" >> "$GITHUB_ENV"
+          fi
+
       - name: Build & publish via tauri-action
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.platform.tauri_args }}
@@ -157,6 +199,17 @@ jobs:
           #   - `bundle.createUpdaterArtifacts` is true (we set this)
           #   - the updater plugin is configured (we set this)
           updaterJsonPreferNsis: false
+
+      - name: Validate macOS notarization
+        if: runner.os == 'macOS'
+        run: |
+          APP_PATH=$(find target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name "*.app" -type d -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No macOS .app bundle found to validate."
+            exit 1
+          fi
+          xcrun stapler validate "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
 
       # Publish a *stable-named* copy of the macOS DMG so the landing page
       # can hard-link to `releases/latest/download/Claake_Code_universal.dmg`

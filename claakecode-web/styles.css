@@ -102,6 +102,32 @@ button { font: inherit; cursor: pointer; background: none; border: 0; color: inh
 .nav-links a:hover { color: var(--green); }
 .nav-cta { display: flex; gap: 10px; align-items: center; }
 
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: transparent;
+  border: 1px solid var(--rule);
+}
+.lang-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 7px 9px;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  transition: background .15s ease, color .15s ease;
+}
+.lang-btn:hover { color: var(--green); }
+.lang-btn.is-active {
+  background: var(--green);
+  color: var(--cream);
+}
+
 /* ── BUTTONS / PILLS ─────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -869,6 +895,7 @@ footer p.serif {
   .stat:nth-child(2) { border-right: 0; }
   .foot { grid-template-columns: 1fr 1fr; }
   .nav-links { display: none; }
+  .nav-cta { margin-left: auto; }
   .install-grid { grid-template-columns: 1fr !important; }
   .harness-wrap, .oss-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
   .section-tag .num { font-size: 48px; }
