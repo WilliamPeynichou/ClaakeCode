@@ -64,6 +64,16 @@ jobs:
           script: |
             const tag = "${{ steps.resolve-tag.outputs.tag }}";
             const version = tag.replace(/^v/, "");
+            const existing = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const release = existing.find((candidate) => candidate.tag_name === tag);
+            if (release) {
+              core.info(`Reusing existing release ${release.id} for ${tag}`);
+              return release.id;
+            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
