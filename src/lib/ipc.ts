@@ -156,20 +156,17 @@ export const api = {
       input: { workspacePath, path },
     });
   },
-  createSkill(
-    workspacePath: string,
-    name: string,
-    content: string,
-    scope: "global" | "workspace" = "global",
-  ) {
-    return invoke<{ absolutePath: string }>("create_skill_command", {
-      input: { workspacePath, name, content, scope },
-    });
+  createSkill(workspacePath: string) {
+    return invoke<{ name: string; skills: InstalledSkill[] }>(
+      "create_skill_command",
+      { input: { workspacePath } },
+    );
   },
-  updateSkill(workspacePath: string, path: string, content: string) {
-    return invoke<void>("update_skill_command", {
-      input: { workspacePath, path, content },
-    });
+  updateSkillContent(workspacePath: string, path: string, content: string) {
+    return invoke<{ name: string; skills: InstalledSkill[] }>(
+      "update_skill_content_command",
+      { input: { workspacePath, path, content } },
+    );
   },
   openExternalUrl(url: string) {
     return invoke<void>("open_external_url_command", {

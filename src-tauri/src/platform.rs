@@ -260,62 +260,17 @@ pub(super) fn delete_installed_skill(workspace_root: &Path, skill_md: &Path) -> 
     Ok(folder)
 }
 
-/// Create a new SKILL.md under one of the configured skill roots.
-///
-/// `scope` selects which root family to use:
-/// - "workspace" → `<workspace>/.claakecode/skills/<slug>/SKILL.md`
-/// - "global" or anything else → `~/.claakecode/skills/<slug>/SKILL.md`
-///
-/// Errors if the target folder already exists.
-pub(super) fn create_installed_skill(
-    workspace_root: &Path,
-    name: &str,
-    content: &str,
-    scope: &str,
-) -> Result<PathBuf> {
-    let slug = slug_for_skill(name);
-    if slug.is_empty() {
-        anyhow::bail!("skill name must contain at least one letter or digit");
-    }
-    let root = match scope {
-        "workspace" => workspace_root.join(".claakecode/skills"),
-        _ => home_dir()
-            .ok_or_else(|| anyhow::anyhow!("could not resolve the user home directory"))?
-            .join(".claakecode/skills"),
-    };
-    fs::create_dir_all(&root)
-        .with_context(|| format!("unable to create skill root {}", root.display()))?;
-    let folder = root.join(&slug);
-    if folder.exists() {
-        anyhow::bail!(
-            "a skill folder named `{}` already exists at {}",
-            slug,
-            folder.display()
-        );
-    }
-    fs::create_dir(&folder)
-        .with_context(|| format!("unable to create skill folder {}", folder.display()))?;
-    let skill_md = folder.join("SKILL.md");
-    fs::write(&skill_md, content)
-        .with_context(|| format!("unable to write {}", skill_md.display()))?;
-    Ok(skill_md)
-}
-
-/// Rewrite the contents of an existing SKILL.md.
-///
-/// Validates that the file lives under one of the configured skill roots
-/// before writing, to prevent the command from being abused to write
-/// arbitrary files on disk.
-pub(super) fn write_installed_skill_content(
+pub(super) fn write_installed_skill(
     workspace_root: &Path,
     skill_md: &Path,
     content: &str,
-) -> Result<()> {
-    let canonical = fs::canonicalize(skill_md).context("skill file does not exist")?;
-    if canonical.file_name().and_then(|name| name.to_str()) != Some("SKILL.md") {
-        anyhow::bail!("can only update a SKILL.md file");
+) -> Result<PathBuf> {
+    let skill_md = fs::canonicalize(skill_md).context("skill file does not exist")?;
+    if skill_md.file_name().and_then(|name| name.to_str()) != Some("SKILL.md") {
+        anyhow::bail!("can only edit a SKILL.md file");
     }
-    let folder = canonical
+
+    let folder = skill_md
         .parent()
         .ok_or_else(|| anyhow::anyhow!("skill has no parent folder"))?
         .to_path_buf();
@@ -329,27 +284,10 @@ pub(super) fn write_installed_skill_content(
     if !allowed {
         anyhow::bail!("skill is outside the configured skill folders");
     }
-    fs::write(&canonical, content)
-        .with_context(|| format!("unable to write {}", canonical.display()))?;
-    Ok(())
-}
 
-fn slug_for_skill(name: &str) -> String {
-    let mut slug = String::with_capacity(name.len());
-    let mut last_dash = true;
-    for ch in name.trim().chars() {
-        if ch.is_ascii_alphanumeric() {
-            slug.push(ch.to_ascii_lowercase());
-            last_dash = false;
-        } else if !last_dash {
-            slug.push('-');
-            last_dash = true;
-        }
-    }
-    while slug.ends_with('-') {
-        slug.pop();
-    }
-    slug
+    fs::write(&skill_md, content)
+        .with_context(|| format!("unable to write {}", skill_md.display()))?;
+    Ok(skill_md)
 }
 
 pub(super) fn skill_roots(workspace_root: &Path) -> Vec<PathBuf> {

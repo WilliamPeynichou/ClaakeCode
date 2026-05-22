@@ -36,7 +36,7 @@ pub const DEFAULT_PLAN_MODE_PROMPT: &str = r#"You are in Plan mode.
 
 Rules:
 - Build understanding by reading/searching/running diagnostic shell commands as needed.
-- Do not edit workspace files and do not use apply_patch.
+- Do not edit workspace files.
 - You must keep the user in a Question loop until the user explicitly clicks "Send and stop questions".
 - If the user message does not contain <plan_mode_control action="stop_questions">, your turn must end by calling the Question tool. Do not write the final plan yet.
 - After each normal answer to a Question, inspect/explore more if needed, then ask the next Question.
@@ -490,7 +490,8 @@ fn tool_display_name(name: &str) -> String {
 fn default_tool_display_name(name: &str) -> String {
     match name {
         "read" => "Read".to_string(),
-        "apply_patch" => "Patch".to_string(),
+        "edit_file" => "Edit file".to_string(),
+        "write_file" => "Write file".to_string(),
         "Glob" => "Glob".to_string(),
         "Grep" => "Grep".to_string(),
         "WebSearch" => "Web search".to_string(),
@@ -1788,7 +1789,7 @@ mod tests {
     fn tool_settings_ignore_legacy_saved_descriptions_without_user_override() {
         let settings = ToolSettings {
             tools: vec![ToolConfig {
-                name: "apply_patch".to_string(),
+                name: "edit_file".to_string(),
                 description: "old default from database".to_string(),
                 enabled: true,
                 description_override: false,
@@ -1799,7 +1800,7 @@ mod tests {
         .normalized();
 
         let tools =
-            settings.apply_to_descriptors(vec![descriptor("apply_patch", "new code default")]);
+            settings.apply_to_descriptors(vec![descriptor("edit_file", "new code default")]);
 
         assert_eq!(tools[0].description, "new code default");
     }
@@ -1816,23 +1817,23 @@ mod tests {
                     default_description: "read default".to_string(),
                 },
                 ToolConfig {
-                    name: "apply_patch".to_string(),
-                    description: "custom patch instructions".to_string(),
+                    name: "edit_file".to_string(),
+                    description: "custom edit instructions".to_string(),
                     enabled: true,
                     description_override: false,
-                    default_description: "patch default".to_string(),
+                    default_description: "edit default".to_string(),
                 },
             ],
             ..ToolSettings::default()
         }
         .normalized_for_catalog(&[
             descriptor("read", "read default"),
-            descriptor("apply_patch", "patch default"),
+            descriptor("edit_file", "edit default"),
         ]);
 
         assert_eq!(settings.tools[0].description, "");
         assert!(!settings.tools[0].description_override);
-        assert_eq!(settings.tools[1].description, "custom patch instructions");
+        assert_eq!(settings.tools[1].description, "custom edit instructions");
         assert!(settings.tools[1].description_override);
     }
 
@@ -1840,8 +1841,8 @@ mod tests {
     fn tool_settings_apply_user_description_override() {
         let settings = ToolSettings {
             tools: vec![ToolConfig {
-                name: "apply_patch".to_string(),
-                description: "custom patch instructions".to_string(),
+                name: "edit_file".to_string(),
+                description: "custom edit instructions".to_string(),
                 enabled: true,
                 description_override: true,
                 default_description: String::new(),
@@ -1851,9 +1852,9 @@ mod tests {
         .normalized();
 
         let tools =
-            settings.apply_to_descriptors(vec![descriptor("apply_patch", "new code default")]);
+            settings.apply_to_descriptors(vec![descriptor("edit_file", "new code default")]);
 
-        assert_eq!(tools[0].description, "custom patch instructions");
+        assert_eq!(tools[0].description, "custom edit instructions");
     }
 
     #[test]

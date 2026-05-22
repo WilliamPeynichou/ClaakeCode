@@ -623,7 +623,7 @@ fn is_context_length_message(message: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use sinew_core::{ChatMessage, Part, Role, ToolResultImage};
+    use claakecode_core::{ChatMessage, Part, Role, ToolResultImage};
 
     use super::*;
 
