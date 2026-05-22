@@ -157,29 +157,13 @@ jobs:
           open -a Finder
           sleep 3
 
-      - name: Check macOS signing secrets
+      - name: Bypass macOS signing secrets
         id: macos-signing
         if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          missing=()
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
-            if [ -z "${!name}" ]; then
-              missing+=("$name")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Missing macOS signing/notarization secrets: ${missing[*]}"
-            echo "::warning::Building macOS without Apple notarization; Gatekeeper may warn on first launch."
-          else
-            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
-          fi
+          echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Bypassing macOS signing/notarization in CI."
+          echo "::warning::No APPLE_* variables are exported to tauri-action, so Tauri will build unsigned macOS artifacts."
 
       - name: Export optional macOS signing variables
         if: runner.os == 'macOS' && steps.macos-signing.outputs.has_secrets == 'true'
@@ -201,12 +185,6 @@ jobs:
           CI: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.platform.tauri_args }}
