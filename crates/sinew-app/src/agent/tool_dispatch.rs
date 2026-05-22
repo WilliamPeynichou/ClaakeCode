@@ -5,8 +5,8 @@ use tokio::sync::mpsc;
 
 use crate::{
     BashTool, CreateImageTool, EditFileTool, GlobTool, GrepTool, McpToolRegistry, QuestionTool,
-    ReadFingerprint, ReadTool, SkillTool, SubAgentTool, TeamTool, ToDoListTool,
-    TodoListState, ToolRunResult, ToolSettings, WebFetchTool, WebSearchTool, WriteFileTool,
+    ReadFingerprint, ReadTool, SkillTool, SubAgentTool, TeamTool, ToDoListTool, TodoListState,
+    ToolRunResult, ToolSettings, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 
 use super::{cancel::TurnCancel, context::AgentMode, events::AgentEvent};

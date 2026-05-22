@@ -17,8 +17,8 @@ mod text;
 pub mod todo;
 pub mod tool_run;
 pub mod web;
-pub mod write;
 pub mod workspace;
+pub mod write;
 
 pub use agent::{
     clean_context_descriptor, run_turn, system_prompt_for_mode,
@@ -57,7 +57,6 @@ pub use tool_run::{
     DiffLine, DiffLineKind, FileChange, FileChangeKind, ToolRunResult, TurnCheckpoint,
 };
 pub use web::{WebFetchTool, WebSearchTool};
-pub use write::WriteFileTool;
 pub use workspace::{
     copy_workspace_entries, create_workspace_directory, create_workspace_file,
     delete_workspace_entry, import_workspace_paths, list_workspace_entries, list_workspace_files,
@@ -68,3 +67,4 @@ pub use workspace::{
     WorkspaceEntryKind, WorkspaceFileChangeEvent, WorkspaceInfo, WorkspaceSearchFile,
     WorkspaceSearchMatch, WorkspaceSearchResult,
 };
+pub use write::WriteFileTool;
