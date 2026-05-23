@@ -6,9 +6,6 @@ Code map:
 ├── AGENTS.md
 ├── Cargo.lock
 ├── Cargo.toml
-├── EDIT_FILE_HARNESS_COMPARISON.md
-├── GLOB_HARNESS_COMPARISON.md
-├── GREP_HARNESS_COMPARISON.md
 ├── editharness.md
 ├── FEATURES.md
 ├── index.html
