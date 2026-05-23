@@ -20,6 +20,7 @@ export type ToolCardProps = {
   isError?: boolean;
   cleaned?: boolean;
   fileChanges?: FileChange[];
+  liveFileChange?: FileChange;
   images?: ToolResultImage[];
   meta?: Record<string, unknown> | null;
   onOpenFile: (path: string) => void;
@@ -887,6 +888,7 @@ export function ToolCard({
   isError,
   cleaned,
   fileChanges,
+  liveFileChange,
   images,
   meta,
   onOpenFile,
@@ -1050,7 +1052,8 @@ export function ToolCard({
     );
   }
 
-  const renderedFileChanges = fileChanges;
+  const renderedFileChanges = fileChanges ?? (liveFileChange ? [liveFileChange] : undefined);
+  const isLiveFileChange = !fileChanges && !!liveFileChange;
 
   if (
     (isEditFile || isWriteFile) &&
@@ -1061,7 +1064,7 @@ export function ToolCard({
     return (
       <div className="tool-card__changes" data-bare="true">
         {renderedFileChanges.map((change, idx) => (
-          <FileChangeBlock key={idx} change={change} />
+          <FileChangeBlock key={idx} change={change} live={isLiveFileChange} />
         ))}
       </div>
     );
@@ -1279,7 +1282,7 @@ export function ToolCard({
           {hasChanges && (
             <div className="tool-card__changes">
               {renderedFileChanges!.map((change, idx) => (
-                <FileChangeBlock key={idx} change={change} />
+                <FileChangeBlock key={idx} change={change} live={isLiveFileChange} />
               ))}
             </div>
           )}

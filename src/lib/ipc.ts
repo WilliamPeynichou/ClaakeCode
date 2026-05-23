@@ -25,6 +25,7 @@ import type {
   PlanControl,
   QuestionAnswer,
   SavedConversation,
+  ServiceTier,
   SkillSettings,
   StartAnthropicLoginOutput,
   StartGoogleLoginOutput,
@@ -391,6 +392,7 @@ export const api = {
     model: ModelRef,
     thinking: ThinkingLevel,
     mode: AgentMode,
+    serviceTier?: ServiceTier | null,
     rewriteFromHistoryIndex?: number,
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
@@ -405,6 +407,7 @@ export const api = {
         model,
         thinking,
         mode,
+        serviceTier,
         rewriteFromHistoryIndex,
         planControl,
         messageVisibility,
@@ -417,10 +420,11 @@ export const api = {
     conversationId: string,
     model: ModelRef,
     thinking: ThinkingLevel,
+    serviceTier?: ServiceTier | null,
     instruction?: string,
   ) {
     return invoke<void>("compact_conversation", {
-      input: { workspacePath, conversationId, model, thinking, instruction },
+      input: { workspacePath, conversationId, model, thinking, serviceTier, instruction },
     });
   },
   listActiveTurns() {

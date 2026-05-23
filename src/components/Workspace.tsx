@@ -36,6 +36,7 @@ import type {
   PlanArtifact,
   PlanControl,
   SavedConversation,
+  ServiceTier,
   ThinkingLevel,
   WorkspaceBootstrap,
   WorkspaceEntry,
@@ -1227,6 +1228,7 @@ export function Workspace({
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
       mode: AgentMode,
+      serviceTier?: ServiceTier | null,
       rewriteFromHistoryIndex?: number,
       planControl?: PlanControl,
       messageVisibility?: MessageVisibility,
@@ -1256,6 +1258,7 @@ export function Workspace({
           model,
           thinking,
           mode,
+          serviceTier,
           rewriteFromHistoryIndex,
           planControl,
           messageVisibility,
@@ -1290,6 +1293,7 @@ export function Workspace({
     async (
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
+      serviceTier?: ServiceTier | null,
       options?: { continueAfter?: boolean; instruction?: string },
     ) => {
       const conversationId = activeConv.id;
@@ -1307,6 +1311,7 @@ export function Workspace({
           conversationId,
           model,
           thinking,
+          serviceTier,
           options?.instruction,
         );
 
@@ -1337,6 +1342,7 @@ export function Workspace({
           model,
           thinking,
           continuationMode,
+          serviceTier,
           undefined,
           undefined,
           "systemReminder",
@@ -1461,6 +1467,7 @@ export function Workspace({
           seedModel,
           seedThinking,
           "act",
+          null,
           undefined,
           "implementPlan",
           "systemReminder",

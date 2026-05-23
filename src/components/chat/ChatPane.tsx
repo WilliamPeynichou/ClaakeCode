@@ -58,6 +58,7 @@ import type {
   PlanControl,
   PlanWorkflowState,
   QuestionAnswer,
+  ServiceTier,
   StreamTokenUsage,
   ThinkingLevel,
   WorkspaceEntry,
@@ -90,6 +91,7 @@ type QueuedPrompt = QueuedPromptStripItem & {
   model: ModelRef;
   thinking: ThinkingLevel;
   mode: AgentMode;
+  serviceTier: ServiceTier | null;
   createdAtMs: number;
 };
 
@@ -116,6 +118,8 @@ const MODES: {
   { value: "plan", label: "Plan", icon: "solar:clipboard-list-linear" },
   { value: "goal", label: "Goal", icon: "solar:flag-2-linear" },
 ];
+
+const FAST_SERVICE_TIER_STORAGE_KEY = "sinew.fastServiceTier";
 
 const CONTEXT_BREAKDOWN_COLORS: Record<string, string> = {
   system: "#85888f",
@@ -151,6 +155,7 @@ type Props = {
     model: ModelRef,
     thinking: ThinkingLevel,
     mode: AgentMode,
+    serviceTier?: ServiceTier | null,
     rewriteFromHistoryIndex?: number,
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
@@ -159,6 +164,7 @@ type Props = {
   onCompact: (
     model: ModelRef,
     thinking: ThinkingLevel,
+    serviceTier?: ServiceTier | null,
     options?: { continueAfter?: boolean; instruction?: string },
   ) => Promise<void>;
   onModeChange: (mode: AgentMode) => Promise<void>;
@@ -317,6 +323,15 @@ function selectionForAvailableModels(
   };
 }
 
+function serviceTierForSelection(
+  selection: ModeModelSelection,
+  availableModels: readonly ModelEntry[],
+  fastEnabled: boolean,
+): ServiceTier | null {
+  const entry = availableModels.find((model) => model.value === selection.model);
+  return fastEnabled && entry?.supportsFast ? "fast" : null;
+}
+
 function mergeModeSelections(
   base: ModeModelSelections,
   override: PartialModeModelSelections | undefined,
@@ -343,6 +358,26 @@ function thinkingLevelLabel(
   if (!level) return undefined;
   if (model?.provider === "kimi" && level.value !== "off") return "Thinking";
   return level.label;
+}
+
+function loadFastServiceTierPreference(): boolean {
+  try {
+    return window.localStorage.getItem(FAST_SERVICE_TIER_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveFastServiceTierPreference(enabled: boolean) {
+  try {
+    if (enabled) {
+      window.localStorage.setItem(FAST_SERVICE_TIER_STORAGE_KEY, "1");
+    } else {
+      window.localStorage.removeItem(FAST_SERVICE_TIER_STORAGE_KEY);
+    }
+  } catch {
+    // Preference persistence is best-effort.
+  }
 }
 
 export type ExternalDropFeed = {
@@ -425,6 +460,9 @@ export function ChatPane({
   const [modelOpen, setModelOpen] = useState(false);
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
+  const [fastServiceTierEnabled, setFastServiceTierEnabled] = useState(
+    loadFastServiceTierPreference,
+  );
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
@@ -587,6 +625,12 @@ export function ChatPane({
   const availableThinking = modelEntry
     ? THINKING_LEVELS.filter((l) => modelEntry.thinking.includes(l.value))
     : [];
+  const fastSupported = Boolean(modelEntry?.supportsFast);
+  const serviceTier = serviceTierForSelection(
+    currentSelection,
+    availableModels,
+    fastServiceTierEnabled,
+  );
   // Surface a clear "connect a provider" affordance when nothing is wired up
   // yet. The selectors stay hidden in that case — there's nothing meaningful
   // to pick from until the user signs into at least one provider.
@@ -1375,6 +1419,7 @@ export function ChatPane({
         model: modelRefFromId(model),
         thinking,
         mode: effectiveMode,
+        serviceTier,
         createdAtMs: editing?.createdAtMs,
       });
       blockedQueueItemIdsRef.current.delete(queuedPrompt.id);
@@ -1420,6 +1465,7 @@ export function ChatPane({
         modelRefFromId(model),
         thinking,
         effectiveMode,
+        serviceTier,
         rewriteFromHistoryIndex,
         undefined,
         undefined,
@@ -1449,6 +1495,7 @@ export function ChatPane({
     modelEntry,
     thinking,
     effectiveMode,
+    serviceTier,
   ]);
 
   useEffect(() => {
@@ -1484,6 +1531,7 @@ export function ChatPane({
       nextPrompt.model,
       nextPrompt.thinking,
       nextPrompt.mode,
+      nextPrompt.serviceTier,
     )
       .catch((err) => {
         blockedQueueItemIdsRef.current.add(nextPrompt.id);
@@ -1531,7 +1579,7 @@ export function ChatPane({
       }
       setSendTick((t) => t + 1);
       try {
-        await onCompact(modelRefFromId(model), thinking, {
+        await onCompact(modelRefFromId(model), thinking, serviceTier, {
           continueAfter: false,
           instruction,
         });
@@ -1547,7 +1595,7 @@ export function ChatPane({
         }));
       }
     },
-    [compactDisabled, model, onCompact, thinking],
+    [compactDisabled, model, onCompact, serviceTier, thinking],
   );
 
   const handleCompact = useCallback(() => {
@@ -1606,7 +1654,9 @@ export function ChatPane({
     autoCompactAttemptKeysRef.current.add(key);
 
     setSendTick((t) => t + 1);
-    void onCompact(modelRefFromId(model), thinking, { continueAfter: true }).catch(
+    void onCompact(modelRefFromId(model), thinking, serviceTier, {
+      continueAfter: true,
+    }).catch(
       (err) => {
         autoCompactAttemptKeysRef.current.delete(key);
         setView((prev) => ({
@@ -1629,6 +1679,7 @@ export function ChatPane({
     modelEntry,
     onCompact,
     rewriteState,
+    serviceTier,
     text,
     thinking,
     view.status,
@@ -1665,6 +1716,11 @@ export function ChatPane({
       modeSelections.goal ?? modeSelections.act ?? selectionFromRef(activeModel),
       availableModels,
     );
+    const goalServiceTier = serviceTierForSelection(
+      goalSelection,
+      availableModels,
+      fastServiceTierEnabled,
+    );
     setView((prev) => beginTurn(prev));
     setSendTick((t) => t + 1);
     void onSend(
@@ -1673,6 +1729,7 @@ export function ChatPane({
       modelRefFromId(goalSelection.model),
       goalSelection.thinking,
       "goal",
+      goalServiceTier,
       undefined,
       undefined,
       "systemReminder",
@@ -1693,6 +1750,7 @@ export function ChatPane({
     composerAttachments.length,
     contextEstimate,
     conversationId,
+    fastServiceTierEnabled,
     goalWorkflow,
     history,
     isStreaming,
@@ -1850,6 +1908,15 @@ export function ChatPane({
     [effectiveMode, model, persistModeSelection, selectorLocked],
   );
 
+  const handleFastServiceTierToggle = useCallback(() => {
+    if (selectorLocked || !fastSupported) return;
+    setFastServiceTierEnabled((enabled) => {
+      const next = !enabled;
+      saveFastServiceTierPreference(next);
+      return next;
+    });
+  }, [fastSupported, selectorLocked]);
+
   const handleModeSelect = useCallback(
     async (nextMode: AgentMode) => {
       if (selectorLocked) return;
@@ -1899,6 +1966,11 @@ export function ChatPane({
         name: basename(plan.path),
       };
       const commandSelection = commandSelectionForMode(nextMode);
+      const commandServiceTier = serviceTierForSelection(
+        commandSelection,
+        availableModels,
+        fastServiceTierEnabled,
+      );
       setView((prev) => {
         const next = beginTurn(prev);
         if (messageVisibility === "systemReminder") return next;
@@ -1912,6 +1984,7 @@ export function ChatPane({
           modelRefFromId(commandSelection.model),
           commandSelection.thinking,
           nextMode,
+          commandServiceTier,
           undefined,
           planControl,
           messageVisibility,
@@ -1926,7 +1999,15 @@ export function ChatPane({
         }));
       }
     },
-    [commandSelectionForMode, history.length, modelEntry, onSend, view.status],
+    [
+      availableModels,
+      commandSelectionForMode,
+      fastServiceTierEnabled,
+      history.length,
+      modelEntry,
+      onSend,
+      view.status,
+    ],
   );
 
   const handlePlanKeepUpdating = useCallback(
@@ -2388,6 +2469,7 @@ export function ChatPane({
               model: modelRefFromId(model),
               thinking,
               mode: effectiveMode,
+              serviceTier,
               createdAtMs: editing?.createdAtMs,
             })
           : null;
@@ -2428,6 +2510,7 @@ export function ChatPane({
       effectiveMode,
       model,
       queuedPrompts,
+      serviceTier,
       text,
       thinking,
     ],
@@ -3187,6 +3270,35 @@ export function ChatPane({
                   </div>
                 )}
               </div>
+              {fastSupported && (
+                <button
+                  type="button"
+                  className="composer__iconbtn composer__fast-btn"
+                  data-active={serviceTier === "fast" ? "true" : "false"}
+                  disabled={selectorLocked}
+                  onClick={handleFastServiceTierToggle}
+                  aria-label={
+                    serviceTier === "fast" ? "Disable Fast" : "Enable Fast"
+                  }
+                  aria-pressed={serviceTier === "fast"}
+                  title={
+                    selectorLocked
+                      ? "Fast locked while streaming"
+                      : serviceTier === "fast"
+                        ? "Fast on"
+                        : "Fast"
+                  }
+                >
+                  <Icon icon="solar:bolt-bold-duotone" width={15} height={15} />
+                  <span
+                    className="composer__iconbtn-tip"
+                    role="tooltip"
+                    aria-hidden="true"
+                  >
+                    {serviceTier === "fast" ? "Fast on" : "Fast"}
+                  </span>
+                </button>
+              )}
                 </>
               )}
             </div>
@@ -5002,6 +5114,7 @@ function buildQueuedPrompt({
   model,
   thinking,
   mode,
+  serviceTier,
   createdAtMs,
 }: {
   id?: string;
@@ -5010,6 +5123,7 @@ function buildQueuedPrompt({
   model: ModelRef;
   thinking: ThinkingLevel;
   mode: AgentMode;
+  serviceTier: ServiceTier | null;
   createdAtMs?: number;
 }): QueuedPrompt {
   return {
@@ -5019,6 +5133,7 @@ function buildQueuedPrompt({
     model: cloneModelRef(model),
     thinking,
     mode,
+    serviceTier,
     createdAtMs: createdAtMs ?? Date.now(),
   };
 }
@@ -5518,6 +5633,7 @@ function BlockView({
             isError={block.isError}
             cleaned={block.cleaned}
             fileChanges={block.fileChanges}
+            liveFileChange={block.liveFileChange}
             images={block.images}
             meta={block.meta}
             onOpenFile={onOpenFile}
