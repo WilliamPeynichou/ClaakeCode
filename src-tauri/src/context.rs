@@ -79,6 +79,7 @@ pub(super) async fn estimate_context(
         skill_settings,
         DatabaseTool::new(state.store.clone()),
         state.max_tool_rounds,
+        None,
         TurnCancel::empty(),
     )
     .descriptors();

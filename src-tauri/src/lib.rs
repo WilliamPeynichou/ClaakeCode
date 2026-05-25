@@ -35,36 +35,38 @@ use claakecode_anthropic::{
 };
 use claakecode_app::{
     checkpoint_from_snapshots, clean_context_descriptor, compact_conversation_history,
-    copy_workspace_entries, create_workspace_directory, create_workspace_file,
-    delete_workspace_entry, import_workspace_paths, list_installed_skills, list_workspace_entries,
-    list_workspace_files, normalize_workspace_root, probe_mcp_servers, read_external_file,
-    read_workspace_file, rename_workspace_entry, resolve_terminal_path, restore_turn_checkpoints,
-    restore_workspace_deleted_entries, run_turn, search_workspace_files, shell_system_prompt,
-    snapshot_workspace_for_checkpoint, subagent_system_prompt,
+    copy_workspace_entries, create_workspace_directory,
+    create_workspace_file, delete_workspace_entry, import_workspace_paths, list_installed_skills,
+    list_workspace_entries, list_workspace_files, normalize_workspace_root, probe_mcp_servers,
+    read_external_file, read_workspace_file, rename_workspace_entry, resolve_terminal_path,
+    restore_turn_checkpoints, restore_workspace_deleted_entries, run_turn, search_workspace_files,
+    shell_system_prompt, snapshot_workspace_for_checkpoint, subagent_system_prompt,
     system_prompt_for_mode_with_plan_prompt, system_prompt_with_todo, todo_list_from_history,
     tool_settings_view, trash_workspace_entry, write_workspace_file, AgentEvent, AgentMode,
-    AppStore, ApplyPatchTool, BashTool, ConversationEvent, ConversationSummary, CreateImageTool,
+    AppStore, BashTool, ConversationEvent, ConversationSummary, CreateImageTool,
     DatabaseActivityEntry, DatabaseConnectionStatus, DatabaseConnectionTestResult,
-    DatabaseSettings, DatabaseSourceConfig, DatabaseTool, GlobTool, GoalWorkflowState, GrepTool,
-    ImportedEntry, InstalledSkill, McpSettings,
+    DatabaseSettings, DatabaseSourceConfig, DatabaseTool, EditFileTool, GlobTool,
+    GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpSettings,
     McpToolRegistry, ModeModelSettings, OpenRouterModelRecord, PlanArtifactState,
     PlanWorkflowState, QuestionTool, ReadTool, SavedConversation, SkillSettings, SkillTool,
     SubAgentConfig, SubAgentSettings, SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution,
     ToDoListTool, TodoListState, ToolSettings, ToolSettingsView, TurnCancel, TurnContext,
     WebFetchTool, WebSearchTool, WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry,
-    WorkspaceFileChangeEvent, WorkspaceSearchResult,
+    WorkspaceFileChangeEvent, WorkspaceSearchResult, WriteFileTool,
     test_database_source_connection,
 };
 use claakecode_core::{
     ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
-    ToolDescriptor,
+    ServiceTier, ToolDescriptor,
 };
 use claakecode_google::{
     delete_default_auth as delete_default_google_auth,
-    exchange_oauth_code as exchange_google_oauth_code, generate_state as generate_google_state,
+    exchange_oauth_code as exchange_google_oauth_code, generate_pkce as generate_google_pkce,
+    generate_state as generate_google_state,
     load_default_auth_status as load_default_google_auth_status,
-    oauth_authorize_url as google_oauth_authorize_url, GoogleAuthStatus, GoogleProvider,
-    MODEL_ID as GOOGLE_MODEL_ID,
+    oauth_authorize_url as google_oauth_authorize_url,
+    purge_legacy_oauth_if_needed as purge_legacy_google_oauth, GoogleAuthStatus, GoogleProvider,
+    PkceCodes as GooglePkceCodes, MODEL_ID as GOOGLE_MODEL_ID,
 };
 use claakecode_kimi::{
     delete_default_auth as delete_default_kimi_auth, generate_state as generate_kimi_state,
@@ -97,6 +99,7 @@ use tokio::{
 
 mod context;
 mod conversations;
+mod git;
 mod models;
 mod platform;
 mod providers;
@@ -201,6 +204,18 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "windows")]
             let _ = app;
+
+            // One-shot purge of legacy Google OAuth tokens so users coming from
+            // pre-0.1.14 builds reconnect against the fixed Antigravity flow.
+            match purge_legacy_google_oauth() {
+                Ok(true) => {
+                    tracing::info!("purged legacy Google OAuth state (forced re-login)");
+                }
+                Ok(false) => {}
+                Err(err) => {
+                    tracing::warn!(error = %err, "google auth migration check failed");
+                }
+            }
 
             #[cfg(target_os = "macos")]
             {
@@ -335,6 +350,15 @@ pub fn run() {
             terminal::write_terminal,
             terminal::resize_terminal,
             terminal::kill_terminal,
+            git::git_repository_snapshot_command,
+            git::git_init_command,
+            git::git_create_worktree_command,
+            git::git_remove_worktree_command,
+            git::git_create_branch_command,
+            git::git_commit_command,
+            git::git_push_command,
+            git::git_pull_command,
+            git::git_create_pull_request_command,
             updater::updater_check,
             updater::updater_download_and_install,
             updater::updater_restart,

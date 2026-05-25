@@ -333,6 +333,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
         cache_stable_message_count: turn_user_history_index,
+        service_tier: None,
         auto_compact: true,
         mode: AgentMode::Act,
         stop_questions: false,
@@ -344,7 +345,8 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
         glob: Arc::new(GlobTool::new(workspace_root.clone())),
         grep: Arc::new(GrepTool::new(workspace_root.clone())),
         read: Arc::new(ReadTool::new(workspace_root.clone())),
-        apply_patch: Arc::new(ApplyPatchTool::new(workspace_root.clone())),
+        edit_file: Arc::new(EditFileTool::new(workspace_root.clone())),
+        write_file: Arc::new(WriteFileTool::new(workspace_root.clone())),
         create_image: Arc::new(CreateImageTool::with_settings(
             workspace_root.clone(),
             tool_settings.image_provider,
@@ -375,6 +377,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
             skill_settings.clone(),
             DatabaseTool::new(state.store.clone()),
             state.max_tool_rounds,
+            None,
             cancel.clone(),
         ))),
         teams: Some(Arc::new(TeamTool::new(
@@ -389,6 +392,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
             DatabaseTool::new(state.store.clone()),
             conversation.model.clone(),
             state.max_tool_rounds,
+            None,
             state.team_runtime.clone(),
             cancel.clone(),
         ))),
@@ -666,6 +670,7 @@ pub(super) async fn stop_agent_swarm_command(
         DatabaseTool::new(state.store.clone()),
         conversation.model.clone(),
         state.max_tool_rounds,
+        None,
         state.team_runtime.clone(),
         TurnCancel::empty(),
     );

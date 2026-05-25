@@ -536,6 +536,7 @@ fn test_team_tool() -> TeamTool {
         crate::DatabaseTool::new(crate::store::AppStore::in_memory().expect("in-memory store")),
         ModelRef::new("test", "model"),
         1,
+        None,
         Arc::new(RwLock::new(TeamRuntime::default())),
         TurnCancel::empty(),
     )

@@ -219,6 +219,11 @@ button {
   background: transparent;
   padding: 0;
   color: inherit;
+  outline: none;
+}
+button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
 }
 
 input,
@@ -570,6 +575,279 @@ textarea {
   color: var(--text-2);
   line-height: 1.5;
   letter-spacing: -0.005em;
+}
+
+/* ------------------------------------------------------------------
+   Updater lock screen
+   ------------------------------------------------------------------
+   Boot-time blocking gate shown when an update is available. Mounted
+   by <App /> in place of Welcome/Workspace — no "Later", no "Skip".
+   Visually mirrors .welcome so the boot moment stays cohesive.
+   ------------------------------------------------------------------ */
+
+/* Black canvas shown for the brief moment between window paint and the
+   completion of the boot update check. Keeps the splash visually quiet
+   so we don't flash Welcome before the gate has had a chance to fire. */
+.app-boot {
+  height: 100%;
+  background: var(--bg-canvas);
+}
+
+.updater-lock {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: var(--bg-0);
+  padding: 48px 32px;
+}
+
+/* Windows-only drag region — mirrors .welcome__titlebar so the user can
+   still move/minimize/close the window. We keep close available even on
+   the lock screen: the policy is "update or quit", not a trap. */
+.updater-lock__titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: transparent;
+  -webkit-app-region: drag;
+  user-select: none;
+  z-index: 50;
+}
+.updater-lock__titlebar button {
+  -webkit-app-region: no-drag;
+}
+
+.updater-lock__stage {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---- header --------------------------------------------------- */
+.updater-lock__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.updater-lock__mark-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+.updater-lock__mark-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 200ms ease;
+}
+.updater-lock__mark-inner--pulse {
+  animation: updaterMarkPulse 1.8s ease-in-out infinite;
+}
+.updater-lock__mark-inner--ok {
+  color: var(--ok);
+}
+.updater-lock__mark-inner--err {
+  color: var(--danger);
+}
+.updater-lock__mark-glyph rect {
+  fill: currentColor;
+}
+@keyframes updaterMarkPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+.updater-lock__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 32px;
+  letter-spacing: -1px;
+  line-height: 1.05;
+  margin: 0;
+  color: var(--text-0);
+}
+.updater-lock__sub {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-3);
+  letter-spacing: -0.005em;
+}
+
+/* ---- release notes (prompt phase only) ----------------------- */
+.updater-lock__notes {
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border-radius: var(--r-card);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.updater-lock__notes p {
+  margin: 0 0 6px;
+}
+.updater-lock__notes p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- progress card (downloading + installing) --------------- */
+.updater-lock__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border-radius: var(--r-card);
+}
+.updater-lock__card--error {
+  background: rgba(245, 115, 127, 0.08);
+}
+
+.updater-lock__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-4);
+  overflow: hidden;
+  position: relative;
+}
+.updater-lock__bar-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+/* Reuse the indeterminate keyframes defined for the titlebar badge so we
+   don't ship two near-identical animations. */
+.updater-lock__bar--indeterminate .updater-lock__bar-fill {
+  width: 25%;
+  animation: updateBarIndeterminate 1.4s ease-in-out infinite;
+}
+.updater-lock__bar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.updater-lock__bar-bytes {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.updater-lock__error {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--danger);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* ---- actions ------------------------------------------------- */
+.updater-lock__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Full-width primary CTA — same tactile vibe as .welcome__cta but a
+   touch more compact (this screen has less hierarchy to support). */
+.updater-lock__cta {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-3);
+  border: none;
+  border-radius: var(--r-card);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text-0);
+  cursor: pointer;
+  transition: background 140ms ease, transform 90ms ease;
+}
+.updater-lock__cta:hover {
+  background: var(--bg-4);
+}
+.updater-lock__cta:active {
+  background: var(--bg-5);
+  transform: translateY(1px);
+}
+.updater-lock__cta-label {
+  letter-spacing: -0.01em;
+}
+.updater-lock__cta-chev {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  flex: 0 0 auto;
+  transition: color 140ms ease, transform 140ms ease;
+}
+.updater-lock__cta:hover .updater-lock__cta-chev {
+  color: var(--text-0);
+  transform: translateX(2px);
+}
+
+/* Error-mode secondary buttons (Retry / Quit Sinew). Mirrors the
+   popover button system to stay in family with the badge. */
+.updater-lock__btn {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--r-med);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.updater-lock__btn--ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+.updater-lock__btn--ghost:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.updater-lock__btn--primary {
+  background: var(--bg-4);
+  color: var(--text-0);
+}
+.updater-lock__btn--primary:hover {
+  background: var(--bg-5);
 }
 
 /* ------------------------------------------------------------------
@@ -1538,6 +1816,1062 @@ textarea {
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
   letter-spacing: -0.005em;
+}
+
+/* ------------------------------------------------------------------
+   Bottom sidebar tabs (Conversations / Git)
+   ------------------------------------------------------------------ */
+
+.sidebar__section--bottom {
+  position: relative;
+}
+
+.sidebar__head--tabs {
+  padding-left: 6px;
+  padding-right: 6px;
+  gap: 6px;
+}
+
+.sidebar-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sidebar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-med);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-3);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+  white-space: nowrap;
+  min-width: 0;
+}
+.sidebar-tab > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-tab svg {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.sidebar-tab:hover {
+  color: var(--text-1);
+}
+.sidebar-tab[data-active="true"] {
+  color: var(--text-0);
+  background: transparent;
+}
+.sidebar-tab[data-active="true"] svg {
+  opacity: 1;
+}
+
+.sidebar-tab-pane {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------
+   Git panel
+   Mirrors the existing sidebar surfaces (ConversationList, FileTree,
+   SearchPane): flat rows separated by background steps, no visible
+   borders, no accent-tinted surfaces. Icon-only actions reuse the
+   sidebar__head-btn rhythm so the panel feels native to the rest of
+   the sidebar rather than a separate product.
+   ------------------------------------------------------------------ */
+
+.git-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  letter-spacing: -0.005em;
+}
+
+/* Shared spinner, used both as the loading state and inline inside
+   busy buttons. Matches conv-row__spinner's visual weight. */
+.git-panel__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  border-top-color: currentColor;
+  animation: spin 0.7s linear infinite;
+  flex: 0 0 12px;
+}
+.git-panel__spinner--inline {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+}
+
+/* (No coloured dot indicators — counts are shown as a small mono
+   number in --text-2, the same way the count chip works in Settings.) */
+
+/* --------------------------------------------------------------------
+   Empty / unavailable states
+   -------------------------------------------------------------------- */
+
+.git-panel--state {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px 22px;
+  gap: 8px;
+  color: var(--text-3);
+}
+.git-panel--state svg {
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+.git-panel__state-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-0);
+  letter-spacing: -0.005em;
+}
+.git-panel__state-text {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.5;
+  max-width: 32ch;
+}
+.git-panel__state-text code {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.git-panel__state-error {
+  margin-top: 4px;
+  color: var(--danger);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  word-break: break-word;
+  max-width: 32ch;
+}
+.git-panel__state-btn {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: var(--r-med);
+  background: var(--bg-3);
+  color: var(--text-0);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.git-panel__state-btn:hover:not(:disabled) {
+  background: var(--bg-4);
+}
+.git-panel__state-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------
+   Pinned head — same 32px row as sidebar__head: bg-1 strip, mono
+   branch label, ghost icon buttons that match sidebar__head-btn.
+   -------------------------------------------------------------------- */
+
+.git-panel__head {
+  flex: 0 0 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--bg-1);
+}
+
+.git-panel__head-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-0);
+}
+.git-panel__head-branch > svg {
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+.git-panel__head-branch-name {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.git-panel__head-dirty {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.git-panel__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* Labelled action button (Pull / Push). Ghost by default — no
+   background — so it doesn't read as a framed card. Picks up a
+   bg-3 only on hover, matching the sidebar__head-btn rhythm. */
+.git-panel__head-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-med);
+  color: var(--text-2);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, opacity 150ms ease;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.git-panel__head-action:hover:not(:disabled) {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
+.git-panel__head-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.git-panel__head-action > svg {
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+.git-panel__head-action:hover:not(:disabled) > svg {
+  color: var(--text-1);
+}
+
+.git-panel__head-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-med);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  flex: 0 0 auto;
+}
+.git-panel__head-btn:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.git-panel__head-btn[data-active="true"] {
+  background: var(--bg-4);
+  color: var(--text-0);
+}
+.git-panel__head-btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+.git-panel__head-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------
+   Inline notice strip — same weight as sidebar__import-error: one
+   thin row, no tinted card, no border.
+   -------------------------------------------------------------------- */
+
+.git-panel__notice {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+.git-panel__notice[data-kind="error"] {
+  color: var(--danger);
+}
+.git-panel__notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+.git-panel__notice-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-small);
+  color: inherit;
+  opacity: 0.65;
+  transition: opacity 140ms ease, background 140ms ease;
+  cursor: pointer;
+  flex: 0 0 18px;
+}
+.git-panel__notice-close:hover {
+  opacity: 1;
+  background: rgba(232, 233, 236, 0.08);
+}
+
+/* --------------------------------------------------------------------
+   Scrollable body — padding + scrollbar treatment match sidebar__body.
+   -------------------------------------------------------------------- */
+
+.git-panel__body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 5px 12px;
+}
+.git-panel__body::-webkit-scrollbar {
+  width: 8px;
+}
+.git-panel__body::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------
+   Section. No border-bottom, no tinted background — separation comes
+   from vertical spacing alone, the same way the sidebar separates the
+   file tree from the conversations.
+   -------------------------------------------------------------------- */
+
+.git-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0 4px;
+}
+.git-panel__section:first-child {
+  padding-top: 4px;
+}
+
+.git-panel__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 22px;
+  padding: 0 5px 0 10px;
+}
+.git-panel__section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: -0.005em;
+  min-width: 0;
+}
+.git-panel__section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.git-panel__section-link {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--r-small);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-3);
+  background: transparent;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+.git-panel__section-link:hover {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
+
+/* Count chip — same neutral mono pill weight as search-result__count. */
+.git-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+
+.git-panel__empty {
+  padding: 6px 10px 4px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+.git-panel__empty code {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+
+.git-panel__link {
+  display: inline;
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+  font: inherit;
+  padding: 0;
+  transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+.git-panel__link:hover {
+  color: var(--text-0);
+  text-decoration-color: var(--text-0);
+}
+
+/* Hint row — same neutral whisper as git-panel__empty so it doesn't
+   compete for emphasis with the rows below. */
+.git-panel__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+.git-panel__hint > svg {
+  flex: 0 0 auto;
+  color: var(--text-3);
+}
+
+/* --------------------------------------------------------------------
+   Sub-tabs (Local / Remote). Reuses the ghost-tab pattern from
+   .sidebar-tab so it feels like the same component as the
+   Conversations/Git tabs sitting above the panel.
+   -------------------------------------------------------------------- */
+
+.git-panel__sub-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 7px;
+  margin-top: 2px;
+}
+.git-panel__sub-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--r-med);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-3);
+  background: transparent;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.git-panel__sub-tab:hover {
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+.git-panel__sub-tab[data-active="true"] {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
+
+/* --------------------------------------------------------------------
+   Unified row primitive. Same rhythm and hover behaviour as conv-row
+   / search-result__file / tree-row. Variants only change the grid
+   template-columns; nothing else.
+   -------------------------------------------------------------------- */
+
+.git-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.git-panel__row {
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  min-height: 24px;
+  border-radius: var(--r-med);
+  color: var(--text-1);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms ease, color 140ms ease;
+  width: 100%;
+  min-width: 0;
+}
+.git-panel__row:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+.git-panel__row[data-selected="true"] {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.git-panel__row[data-current="true"] {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+/* File row variant: [status letter] [path] */
+.git-panel__row--file {
+  grid-template-columns: 14px 1fr;
+}
+.git-panel__row-status {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-3);
+}
+.git-panel__row-status[data-kind="modified"]   { color: var(--tone-read); }
+.git-panel__row-status[data-kind="added"]      { color: var(--ok); }
+.git-panel__row-status[data-kind="deleted"]    { color: var(--danger); }
+.git-panel__row-status[data-kind="untracked"]  { color: var(--accent-2); }
+.git-panel__row-status[data-kind="renamed"]    { color: var(--tone-thinking); }
+.git-panel__row-status[data-kind="conflicted"] { color: var(--danger); }
+
+.git-panel__row-path {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.git-panel__row-old {
+  color: var(--text-3);
+}
+.git-panel__row-arrow {
+  color: var(--text-3);
+  padding: 0 2px;
+}
+
+/* Worktree row variant: [mark] [stacked title/sub] [actions] */
+.git-panel__row--wt {
+  grid-template-columns: 16px 1fr auto;
+  min-height: 36px;
+  padding: 5px 6px 5px 8px;
+  cursor: default;
+}
+.git-panel__row--wt:hover {
+  background: var(--bg-2);
+}
+.git-panel__row-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+  flex: 0 0 16px;
+}
+.git-panel__row[data-current="true"] .git-panel__row-mark {
+  color: var(--text-1);
+}
+.git-panel__row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.git-panel__row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.git-panel__row-name {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  letter-spacing: -0.005em;
+}
+.git-panel__row[data-current="true"] .git-panel__row-name {
+  color: var(--text-0);
+}
+.git-panel__row-dirty {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  flex: 0 0 auto;
+}
+.git-panel__row-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  overflow: hidden;
+}
+.git-panel__row-branch {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  white-space: nowrap;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-panel__row-sep {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+.git-panel__row-path-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.git-panel__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.git-panel__row--wt:hover .git-panel__row-actions,
+.git-panel__row--wt:focus-within .git-panel__row-actions {
+  opacity: 1;
+}
+
+/* Branch row variant: [mark] [name] [upstream] */
+.git-panel__row--branch {
+  grid-template-columns: 14px 1fr auto;
+  cursor: default;
+}
+.git-panel__row-branch-name {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.git-panel__row[data-current="true"] .git-panel__row-branch-name {
+  color: var(--text-0);
+  font-weight: 500;
+}
+.git-panel__row-upstream {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18ch;
+  flex: 0 0 auto;
+}
+
+/* --------------------------------------------------------------------
+   Commit composer. Input borrows the search-pane__field ghost shape;
+   action button matches state-btn weight.
+   -------------------------------------------------------------------- */
+
+.git-panel__commit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 5px 0;
+}
+
+.git-panel__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-med);
+  background: var(--bg-2);
+  color: var(--text-2);
+  transition: background 150ms ease;
+}
+.git-panel__field:focus-within {
+  background: var(--bg-3);
+}
+.git-panel__field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  color: var(--text-0);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  letter-spacing: -0.005em;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.git-panel__field input::placeholder {
+  color: var(--text-3);
+}
+.git-panel__field input:disabled {
+  cursor: default;
+}
+
+.git-panel__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: var(--r-med);
+  background: var(--bg-3);
+  color: var(--text-0);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+  white-space: nowrap;
+}
+.git-panel__action:hover:not(:disabled) {
+  background: var(--bg-4);
+}
+.git-panel__action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.git-panel__action--inline {
+  align-self: flex-start;
+  height: 24px;
+  padding: 0 10px;
+  font-size: var(--fs-xs);
+}
+
+/* --------------------------------------------------------------------
+   PR result — stacked row, not a coloured card.
+   -------------------------------------------------------------------- */
+
+.git-panel__pr {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 5px;
+  padding: 6px 8px 8px;
+  border-radius: var(--r-med);
+  background: var(--bg-2);
+}
+.git-panel__pr-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-1);
+}
+.git-panel__pr-label {
+  flex: 1 1 auto;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-0);
+  letter-spacing: -0.005em;
+}
+.git-panel__pr-url {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+/* --------------------------------------------------------------------
+   Dialog primitive (portaled to <body>). Visuals stripped to match
+   Sinew's flat surface language: no border, soft elevation only.
+   -------------------------------------------------------------------- */
+
+.git-panel__dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 9, 11, 0.65);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: git-panel-fade-in 120ms ease-out;
+}
+
+@keyframes git-panel-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes git-panel-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.git-panel__dialog {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 14px;
+  background: var(--bg-2);
+  border-radius: var(--r-feature);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  animation: git-panel-pop-in 140ms ease-out;
+}
+
+.git-panel__dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.git-panel__dialog-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--text-0);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.git-panel__dialog-desc {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.git-panel__dialog-desc code,
+.git-panel__dialog-code {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  word-break: break-all;
+}
+.git-panel__dialog-strong {
+  color: var(--text-0);
+  font-weight: 500;
+}
+
+.git-panel__dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+  margin-right: -2px;
+}
+.git-panel__dialog-body::-webkit-scrollbar {
+  width: 6px;
+}
+.git-panel__dialog-body::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+.git-panel__dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.git-panel__dialog-label {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: -0.005em;
+}
+
+.git-panel__dialog-input,
+.git-panel__dialog-select,
+.git-panel__dialog-textarea {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r-med);
+  background: var(--bg-1);
+  color: var(--text-0);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  letter-spacing: -0.005em;
+  border: 0;
+  outline: none;
+  transition: background 140ms ease;
+}
+.git-panel__dialog-input::placeholder,
+.git-panel__dialog-textarea::placeholder {
+  color: var(--text-3);
+}
+.git-panel__dialog-input:focus,
+.git-panel__dialog-select:focus,
+.git-panel__dialog-textarea:focus {
+  background: var(--bg-0);
+}
+.git-panel__dialog-input,
+.git-panel__dialog-select {
+  height: 30px;
+  padding: 0 10px;
+}
+.git-panel__dialog-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+    linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) 13px,
+    calc(100% - 8px) 13px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+}
+.git-panel__dialog-textarea {
+  min-height: 76px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.git-panel__dialog-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.4;
+}
+.git-panel__dialog-check input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--text-1);
+  cursor: pointer;
+}
+.git-panel__dialog-check:hover {
+  color: var(--text-0);
+}
+
+.git-panel__dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+.git-panel__dialog-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-med);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+  white-space: nowrap;
+}
+.git-panel__dialog-btn:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.git-panel__dialog-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.git-panel__dialog-btn--primary {
+  background: var(--bg-4);
+  color: var(--text-0);
+}
+.git-panel__dialog-btn--primary:hover:not(:disabled) {
+  background: var(--bg-5);
+}
+.git-panel__dialog-btn--primary[data-danger="true"] {
+  color: var(--danger);
+}
+.git-panel__dialog-btn--primary[data-danger="true"]:hover:not(:disabled) {
+  background: var(--bg-5);
+  color: var(--danger);
 }
 
 /* ------------------------------------------------------------------
@@ -3540,6 +4874,16 @@ textarea {
   color: var(--danger);
 }
 
+.settings-pane__skill-doc-action[data-primary="true"] {
+  background: var(--bg-4);
+  color: var(--text-0);
+}
+
+.settings-pane__skill-doc-action[data-primary="true"]:hover:not(:disabled) {
+  background: var(--bg-5);
+  color: var(--text-0);
+}
+
 .settings-pane__skill-doc-action[data-danger="true"]:hover:not(:disabled),
 .settings-pane__skill-doc-action[data-confirm="true"] {
   background: rgba(245, 115, 127, 0.14);
@@ -3588,6 +4932,70 @@ textarea {
 
 .settings-pane__skill-doc-body :first-child {
   margin-top: 0;
+}
+
+/* ---- Skill in-place edit ---- */
+
+.settings-pane__skill-doc-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--r-small);
+  background: var(--bg-2);
+  color: var(--text-0);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  outline: none;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+
+.settings-pane__skill-doc-title-input:hover,
+.settings-pane__skill-doc-title-input:focus {
+  background: var(--bg-3);
+}
+
+.settings-pane__skill-doc-title-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1px rgba(245, 115, 127, 0.55);
+}
+
+.settings-pane__skill-doc-desc-input {
+  margin: 2px 0 0;
+  padding: 4px 6px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--r-small);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  outline: none;
+  transition: background 140ms ease;
+}
+
+.settings-pane__skill-doc-desc-input:hover,
+.settings-pane__skill-doc-desc-input:focus {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.settings-pane__skill-doc-editor {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+}
+
+.settings-pane__skill-doc-editor-host {
+  flex: 1 1 0;
+  min-height: 240px;
+  background: var(--bg-0);
 }
 
 .settings-pane__subagent-editor {
@@ -4796,10 +6204,15 @@ textarea {
   font-size: var(--fs-sm);
   letter-spacing: -0.005em;
 }
-.md table {
-  display: block;
+.md-table-wrap {
   max-width: 100%;
   overflow-x: auto;
+  margin: 8px 0;
+}
+.md-table-wrap > table {
+  margin: 0;
+}
+.md table {
   border-collapse: collapse;
   margin: 8px 0;
   width: 100%;
@@ -4810,6 +6223,11 @@ textarea {
   padding: 5px 9px;
   border-bottom: 1px solid rgba(232, 233, 236, 0.06);
   text-align: left;
+  /* Use break-word (not anywhere) so the cell min-content stays at the
+     longest word width — otherwise the inherited overflow-wrap: anywhere
+     from .md collapses each column to ~1 character of min-width. */
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .md th {
   background: transparent;
@@ -5157,6 +6575,26 @@ textarea {
   border-radius: 50%;
   background: var(--danger);
   flex: 0 0 6px;
+}
+.tool-card__file-stack {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  position: relative;
+}
+.tool-card__file-stack-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--bg-2);
+  box-shadow: 0 0 0 1.5px var(--bg-2);
+  position: relative;
+}
+.tool-card__file-stack-item + .tool-card__file-stack-item {
+  margin-left: -6px;
 }
 .tool-card__caret {
   color: var(--text-3);
@@ -6228,6 +7666,37 @@ textarea {
   min-height: 0;
 }
 
+.composer__resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  margin: 0;
+  cursor: ns-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 2;
+}
+.composer__resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-3);
+  opacity: 0;
+  transition: opacity 120ms ease, width 120ms ease;
+}
+.composer__resize-handle:hover::before,
+.composer__resize-handle:active::before {
+  opacity: 0.6;
+  width: 40px;
+}
+
 .composer__overlay {
   position: absolute;
   inset: 0;
@@ -6289,7 +7758,7 @@ textarea {
   display: block;
   width: 100%;
   margin: 0;
-  min-height: 48px;
+  min-height: 60px;
   max-height: 200px;
   padding: 9px 11px 2px;
   background: transparent;
@@ -6711,6 +8180,33 @@ textarea {
 }
 .composer__compact {
   margin-right: -2px;
+}
+.composer__fast-btn {
+  margin-left: -1px;
+  color: var(--text-3);
+}
+.composer__fast-btn[data-active="true"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-0);
+}
+.composer__fast-btn[data-active="true"]:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-0);
+}
+/* Keep full opacity while the composer is locked (e.g. during streaming),
+   so the Fast indicator does not visually fade out while the agent walks. */
+.composer__fast-btn:disabled {
+  opacity: 1;
+}
+/* Preserve the active background/color even when disabled + hovered,
+   otherwise the generic .composer__iconbtn:disabled:hover would clear it. */
+.composer__fast-btn[data-active="true"]:disabled,
+.composer__fast-btn[data-active="true"]:disabled:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-0);
+}
+.composer__fast-btn svg {
+  color: inherit;
 }
 
 /* Compaction takeover: when the user opens the compaction instruction,

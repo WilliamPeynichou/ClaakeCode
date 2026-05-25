@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use claakecode_core::{ChatMessage, Provider};
+use claakecode_core::{ChatMessage, Provider, ServiceTier};
 
 use crate::{
-    ApplyPatchTool, BashTool, CreateImageTool, DatabaseTool, GlobTool, GoalWorkflowState,
-    GrepTool, McpToolRegistry, QuestionTool, ReadTool, SkillTool, SubAgentTool, TeamTool,
-    ToDoListTool, TodoListState, ToolSettings, WebFetchTool, WebSearchTool,
+    BashTool, CreateImageTool, DatabaseTool, EditFileTool, GlobTool, GoalWorkflowState, GrepTool,
+    McpToolRegistry, QuestionTool, ReadTool, SkillTool, SubAgentTool, TeamTool, ToDoListTool,
+    TodoListState, ToolSettings, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 
 use super::{
@@ -28,6 +28,7 @@ pub struct TurnContext {
     pub model: claakecode_core::ModelRef,
     pub cache_key: Option<String>,
     pub cache_stable_message_count: usize,
+    pub service_tier: Option<ServiceTier>,
     pub auto_compact: bool,
     pub mode: AgentMode,
     pub stop_questions: bool,
@@ -39,7 +40,8 @@ pub struct TurnContext {
     pub glob: Arc<GlobTool>,
     pub grep: Arc<GrepTool>,
     pub read: Arc<ReadTool>,
-    pub apply_patch: Arc<ApplyPatchTool>,
+    pub edit_file: Arc<EditFileTool>,
+    pub write_file: Arc<WriteFileTool>,
     pub create_image: Arc<CreateImageTool>,
     pub todo_list_tool: Option<Arc<ToDoListTool>>,
     pub question: Option<Arc<QuestionTool>>,

@@ -15,6 +15,7 @@ pub(super) async fn send_message(
     let message_visibility = input
         .message_visibility
         .unwrap_or(MessageVisibilityInput::Normal);
+    let service_tier = input.service_tier.map(ServiceTier::from);
 
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
@@ -149,6 +150,7 @@ pub(super) async fn send_message(
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
         cache_stable_message_count: turn_user_history_index,
+        service_tier,
         auto_compact: true,
         mode: policy.mode,
         stop_questions: policy.stop_questions,
@@ -160,7 +162,8 @@ pub(super) async fn send_message(
         glob: Arc::new(GlobTool::new(workspace_root.clone())),
         grep: Arc::new(GrepTool::new(workspace_root.clone())),
         read: Arc::new(ReadTool::new(workspace_root.clone())),
-        apply_patch: Arc::new(ApplyPatchTool::new(workspace_root.clone())),
+        edit_file: Arc::new(EditFileTool::new(workspace_root.clone())),
+        write_file: Arc::new(WriteFileTool::new(workspace_root.clone())),
         create_image: Arc::new(CreateImageTool::with_settings(
             workspace_root.clone(),
             tool_settings.image_provider,
@@ -191,6 +194,7 @@ pub(super) async fn send_message(
             skill_settings.clone(),
             DatabaseTool::new(state.store.clone()),
             state.max_tool_rounds,
+            service_tier,
             cancel.clone(),
         ))),
         teams: Some(Arc::new(TeamTool::new(
@@ -205,6 +209,7 @@ pub(super) async fn send_message(
             DatabaseTool::new(state.store.clone()),
             conversation.model.clone(),
             state.max_tool_rounds,
+            service_tier,
             state.team_runtime.clone(),
             cancel.clone(),
         ))),
@@ -452,6 +457,7 @@ pub(super) async fn compact_conversation(
         input.thinking,
         input.use_1m_context,
     );
+    let service_tier = input.service_tier.map(ServiceTier::from);
     let compaction_instruction = input
         .instruction
         .as_deref()
@@ -535,6 +541,7 @@ pub(super) async fn compact_conversation(
         source_history.clone(),
         Some(conversation_id.clone()),
         source_history.len(),
+        service_tier,
         compaction_instruction,
         &mut cmd_rx,
         Some(summary_delta_tx),
@@ -1415,7 +1422,8 @@ pub(super) fn tool_descriptors_for_workspace(
         tools.push(descriptor);
     }
     if mode != AgentMode::Plan {
-        tools.insert(4, ApplyPatchTool::new(workspace_root).descriptor());
+        tools.insert(4, EditFileTool::new(workspace_root).descriptor());
+        tools.insert(5, WriteFileTool::new(workspace_root).descriptor());
         tools.push(CreateImageTool::new(workspace_root).descriptor());
     }
     tools

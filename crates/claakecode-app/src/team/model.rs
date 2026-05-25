@@ -129,6 +129,7 @@ pub struct TeamTool {
     pub(super) database: DatabaseTool,
     pub(super) default_model: ModelRef,
     pub(super) max_tool_rounds: usize,
+    pub(super) service_tier: Option<ServiceTier>,
     pub(super) runtime: Arc<RwLock<TeamRuntime>>,
     pub(super) cancel: TurnCancel,
     pub(super) current_agent: Option<TeamIdentity>,
