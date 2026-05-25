@@ -242,7 +242,7 @@ pub(super) async fn send_message(
                 event = event_rx.recv(), if !events_done => {
                     match event {
                         Some(event) => {
-                            if matches!(event, AgentEvent::TurnFinished) {
+                            if matches!(event, AgentEvent::TurnFinished { .. }) {
                                 continue;
                             }
                             schedule_main_wake_for_swarm_event(
@@ -307,6 +307,7 @@ pub(super) async fn send_message(
                                     }
                                 }
                             }
+                            let turn_duration_ms = goal_workflow_duration_ms(&goal_workflow);
                             let saved = SavedConversation {
                                 id: conversation_id.clone(),
                                 workspace_id: workspace_id.clone(),
@@ -373,11 +374,14 @@ pub(super) async fn send_message(
                                     }
                                 }
                             }
+                            let turn_finished_event = AgentEvent::TurnFinished {
+                                duration_ms: turn_duration_ms,
+                            };
                             let _ = emit_agent_event(
                                 &app,
                                 &workspace_id,
                                 &conversation_id,
-                                &AgentEvent::TurnFinished,
+                                &turn_finished_event,
                             );
                             active_turns.lock().await.remove(&conversation_id);
                             active_turn_details
@@ -399,7 +403,7 @@ pub(super) async fn send_message(
                                 &app,
                                 &workspace_id,
                                 &conversation_id,
-                                &AgentEvent::TurnFinished,
+                                &AgentEvent::TurnFinished { duration_ms: None },
                             );
                             active_turns.lock().await.remove(&conversation_id);
                             active_turn_details
@@ -662,7 +666,9 @@ pub(super) async fn compact_conversation(
         &app,
         &workspace_id,
         &conversation_id,
-        &AgentEvent::TurnFinished,
+        &AgentEvent::TurnFinished {
+            duration_ms: goal_workflow_duration_ms(&conversation.goal_workflow),
+        },
     );
     state.active_turns.lock().await.remove(&conversation_id);
     state
