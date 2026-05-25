@@ -13,6 +13,7 @@ impl TeamTool {
         database: DatabaseTool,
         default_model: ModelRef,
         max_tool_rounds: usize,
+        service_tier: Option<ServiceTier>,
         runtime: Arc<RwLock<TeamRuntime>>,
         cancel: TurnCancel,
     ) -> Self {
@@ -28,6 +29,7 @@ impl TeamTool {
             database,
             default_model,
             max_tool_rounds,
+            service_tier,
             runtime,
             cancel,
             current_agent: None,

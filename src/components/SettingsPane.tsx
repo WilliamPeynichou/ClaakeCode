@@ -1182,15 +1182,24 @@ export function SettingsPane({ workspacePath }: Props) {
   );
 
   const createSkill = useCallback(async () => {
+    if (!skills) return;
+    const namesTaken = new Set(skills.map((skill) => skill.name));
+    let counter = skills.length + 1;
+    let baseName = `New skill ${counter}`;
+    while (namesTaken.has(baseName)) {
+      counter += 1;
+      baseName = `New skill ${counter}`;
+    }
+    const template = `---\nname: ${baseName}\ndescription: One-line trigger description.\n---\n\nDescribe the skill body in markdown.\n`;
     setSkillsSaving(true);
     setSkillsError(null);
     setSkillsStatus(null);
     try {
-      const { name, skills: refreshed } = await api.createSkill(workspacePath);
+      await api.createSkill(workspacePath, baseName, template, "global");
+      const refreshed = await api.listInstalledSkills(workspacePath);
       setSkills(refreshed);
       setSavedSkillsJson(skillsFingerprint(refreshed));
-      setSelectedSkillName(name);
-      setSkillFilter("");
+      setSelectedSkillName(baseName);
       setSkillsStatus("Created");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1199,48 +1208,28 @@ export function SettingsPane({ workspacePath }: Props) {
     } finally {
       setSkillsSaving(false);
     }
-  }, [workspacePath]);
+  }, [skills, workspacePath]);
 
-  const saveSkillContent = useCallback(
+  const updateSkillContent = useCallback(
     async (skill: InstalledSkill, content: string) => {
       setSkillsSaving(true);
       setSkillsError(null);
       setSkillsStatus(null);
       try {
-        const { name, skills: refreshed } = await api.updateSkillContent(
-          workspacePath,
-          skill.absolutePath,
-          content,
-        );
-        const enabledByPath = new Map(
-          (skills ?? []).map((item) => [item.absolutePath, item.enabled]),
-        );
-        const merged = refreshed.map((item) => {
-          const enabled = enabledByPath.get(item.absolutePath);
-          return enabled === undefined ? item : { ...item, enabled };
-        });
-        const saved = await api.saveSkillSettings(
-          workspacePath,
-          settingsFromSkills(merged),
-        );
-        setSkills(saved);
-        setSavedSkillsJson(skillsFingerprint(saved));
-        setSelectedSkillName(
-          name || saved.find((item) => item.absolutePath === skill.absolutePath)?.name || skill.name,
-        );
-        setSkillFilter("");
+        await api.updateSkill(workspacePath, skill.absolutePath, content);
+        const refreshed = await api.listInstalledSkills(workspacePath);
+        setSkills(refreshed);
+        setSavedSkillsJson(skillsFingerprint(refreshed));
         setSkillsStatus("Saved");
-        return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setSkillsError(message);
         setSkillsStatus(message);
-        return false;
       } finally {
         setSkillsSaving(false);
       }
     },
-    [skills, workspacePath],
+    [workspacePath],
   );
 
   const selectedSubAgent =
@@ -1547,11 +1536,13 @@ export function SettingsPane({ workspacePath }: Props) {
             onSelectSkill={(name) => setSelectedSkillName(name)}
             onRefresh={() => void loadSkills()}
             onSave={() => void saveSkills()}
-            onCreate={() => void createSkill()}
             onToggleSkill={toggleSkillEnabled}
             onRevealSkill={(skill) => void revealSkill(skill)}
             onDeleteSkill={(skill) => void deleteSkill(skill)}
-            onSaveSkillContent={saveSkillContent}
+            onCreateSkill={() => void createSkill()}
+            onUpdateSkillContent={(skill, content) =>
+              void updateSkillContent(skill, content)
+            }
           />
         ) : (
           <SubAgentsSection
@@ -3289,11 +3280,7 @@ function SubAgentsSection({
           {status && (
             <span
               className="settings-pane__status"
-              data-tone={
-                status === "Saved" || status === "Created" || status === "Deleted"
-                  ? "ok"
-                  : "error"
-              }
+              data-tone={status === "Saved" ? "ok" : "error"}
             >
               {status}
             </span>
@@ -3634,11 +3621,11 @@ type SkillsSectionProps = {
   onSelectSkill: (name: string) => void;
   onRefresh: () => void;
   onSave: () => void;
-  onCreate: () => void;
   onToggleSkill: (name: string) => void;
   onRevealSkill: (skill: InstalledSkill) => void;
   onDeleteSkill: (skill: InstalledSkill) => void;
-  onSaveSkillContent: (skill: InstalledSkill, content: string) => Promise<boolean>;
+  onCreateSkill: () => void;
+  onUpdateSkillContent: (skill: InstalledSkill, content: string) => void;
 };
 
 function SkillsSection({
@@ -3656,11 +3643,11 @@ function SkillsSection({
   onSelectSkill,
   onRefresh,
   onSave,
-  onCreate,
   onToggleSkill,
   onRevealSkill,
   onDeleteSkill,
-  onSaveSkillContent,
+  onCreateSkill,
+  onUpdateSkillContent,
 }: SkillsSectionProps) {
   const total = allSkills?.length ?? 0;
   const visible = skills.length;
@@ -3695,11 +3682,11 @@ function SkillsSection({
           <button
             type="button"
             className="settings-pane__btn"
-            onClick={onCreate}
+            onClick={onCreateSkill}
             disabled={loading || saving || deleting}
           >
             <Icon icon="solar:add-circle-linear" width={13} height={13} />
-            <span>Add</span>
+            <span>New skill</span>
           </button>
           <button
             type="button"
@@ -3822,13 +3809,15 @@ function SkillsSection({
 
         <div className="settings-pane__skill-preview">
           {selectedSkill ? (
-            <SkillPreview
+            <SkillEditor
               skill={selectedSkill}
-              saving={saving}
               deleting={deleting}
+              saving={saving}
               onReveal={() => onRevealSkill(selectedSkill)}
               onDelete={() => onDeleteSkill(selectedSkill)}
-              onSaveContent={(content) => onSaveSkillContent(selectedSkill, content)}
+              onSaveContent={(content) =>
+                onUpdateSkillContent(selectedSkill, content)
+              }
             />
           ) : (
             <div className="settings-pane__empty settings-pane__empty--main">
@@ -3844,34 +3833,24 @@ function SkillsSection({
   );
 }
 
-function SkillPreview({
+function SkillEditor({
   skill,
-  saving,
   deleting,
+  saving,
   onReveal,
   onDelete,
   onSaveContent,
 }: {
   skill: InstalledSkill;
-  saving: boolean;
   deleting: boolean;
+  saving: boolean;
   onReveal: () => void;
   onDelete: () => void;
-  onSaveContent: (content: string) => Promise<boolean>;
+  onSaveContent: (content: string) => void;
 }) {
-  const body = stripFrontmatter(skill.content);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState(skill.name);
-  const [draftDescription, setDraftDescription] = useState(skill.description ?? "");
-  const [draftBody, setDraftBody] = useState(body);
-  const nameValid = draftName.trim().length > 0;
-
-  const resetDraft = useCallback(() => {
-    setDraftName(skill.name);
-    setDraftDescription(skill.description ?? "");
-    setDraftBody(stripFrontmatter(skill.content));
-  }, [skill.content, skill.description, skill.name]);
+  const [draft, setDraft] = useState(skill.content);
+  const dirty = draft !== skill.content;
 
   useEffect(() => {
     if (!confirmDelete) return;
@@ -3881,194 +3860,124 @@ function SkillPreview({
 
   useEffect(() => {
     setConfirmDelete(false);
-    setEditing(false);
-    resetDraft();
-  }, [resetDraft, skill.absolutePath]);
-
-  const saveDraft = useCallback(async () => {
-    if (!nameValid || saving || deleting) return;
-    const ok = await onSaveContent(
-      buildSkillContent(draftName, draftDescription, draftBody),
-    );
-    if (ok) setEditing(false);
-  }, [deleting, draftBody, draftDescription, draftName, nameValid, onSaveContent, saving]);
+    setDraft(skill.content);
+  }, [skill.absolutePath, skill.content]);
 
   return (
     <article className="settings-pane__skill-doc">
       <header className="settings-pane__skill-doc-head">
         <div className="settings-pane__skill-doc-top">
           <div className="settings-pane__skill-doc-title">
-            {editing ? (
-              <input
-                className="settings-pane__skill-doc-title-input"
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                placeholder="skill-name"
-                aria-invalid={!nameValid}
-                spellCheck={false}
-                autoFocus
-              />
-            ) : (
-              <h2>{skill.name}</h2>
-            )}
+            <h2>{skill.name}</h2>
             <span
               className="settings-pane__skill-source"
               data-source={skill.source}
             >
               {skill.source === "workspace" ? "workspace" : "global"}
             </span>
+            {dirty && (
+              <span className="settings-pane__pill" data-tone="dirty">
+                <span className="settings-pane__pill-dot" />
+                Unsaved
+              </span>
+            )}
           </div>
           <div className="settings-pane__skill-doc-actions">
-            {editing ? (
-              <>
-                <button
-                  type="button"
-                  className="settings-pane__skill-doc-action"
-                  onClick={() => {
-                    resetDraft();
-                    setEditing(false);
-                  }}
-                  disabled={saving || deleting}
-                >
-                  <Icon icon="solar:close-circle-linear" width={13} height={13} />
-                  <span>Cancel</span>
-                </button>
-                <button
-                  type="button"
-                  className="settings-pane__skill-doc-action"
-                  data-primary="true"
-                  onClick={() => void saveDraft()}
-                  disabled={saving || deleting || !nameValid}
-                >
-                  <Icon
-                    icon={saving ? "solar:refresh-linear" : "solar:diskette-linear"}
-                    width={13}
-                    height={13}
-                  />
-                  <span>{saving ? "Saving…" : "Save"}</span>
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="settings-pane__skill-doc-action"
-                onClick={() => setEditing(true)}
-                disabled={saving || deleting}
-                title="Edit skill content"
-              >
-                <Icon icon="solar:code-square-linear" width={13} height={13} />
-                <span>Raw</span>
-              </button>
-            )}
-            {!editing && (
-              <>
-                <button
-                  type="button"
-                  className="settings-pane__skill-doc-action"
-                  onClick={onReveal}
-                  disabled={saving || deleting}
-                  title="Reveal in Finder"
-                  aria-label={`Reveal ${skill.name} in Finder`}
-                >
-                  <Icon icon="solar:folder-open-linear" width={13} height={13} />
-                  <span>Reveal in Finder</span>
-                </button>
-                <button
-                  type="button"
-                  className="settings-pane__skill-doc-action"
-                  data-danger="true"
-                  data-confirm={confirmDelete ? "true" : "false"}
-                  disabled={saving || deleting}
-                  title={confirmDelete ? "Click again to confirm" : "Delete skill"}
-                  aria-label={confirmDelete ? "Confirm skill delete" : `Delete ${skill.name}`}
-                  onClick={() => {
-                    if (confirmDelete) {
-                      onDelete();
-                    } else {
-                      setConfirmDelete(true);
-                    }
-                  }}
-                >
-                  <Icon
-                    icon={
-                      deleting
-                        ? "solar:refresh-linear"
-                        : "solar:trash-bin-trash-linear"
-                    }
-                    width={13}
-                    height={13}
-                  />
-                  <span>
-                    {deleting
-                      ? "Deleting..."
-                      : confirmDelete
-                        ? "Confirm delete"
-                        : "Delete"}
-                  </span>
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              className="settings-pane__skill-doc-action"
+              onClick={() => onSaveContent(draft)}
+              disabled={!dirty || saving || deleting}
+              title="Save SKILL.md"
+              aria-label="Save SKILL.md"
+            >
+              <Icon
+                icon={saving ? "solar:refresh-linear" : "solar:diskette-linear"}
+                width={13}
+                height={13}
+              />
+              <span>{saving ? "Saving…" : "Save"}</span>
+            </button>
+            <button
+              type="button"
+              className="settings-pane__skill-doc-action"
+              onClick={onReveal}
+              disabled={deleting}
+              title="Reveal in Finder"
+              aria-label={`Reveal ${skill.name} in Finder`}
+            >
+              <Icon icon="solar:folder-open-linear" width={13} height={13} />
+              <span>Reveal</span>
+            </button>
+            <button
+              type="button"
+              className="settings-pane__skill-doc-action"
+              data-danger="true"
+              data-confirm={confirmDelete ? "true" : "false"}
+              disabled={deleting}
+              title={confirmDelete ? "Click again to confirm" : "Delete skill"}
+              aria-label={confirmDelete ? "Confirm skill delete" : `Delete ${skill.name}`}
+              onClick={() => {
+                if (confirmDelete) {
+                  onDelete();
+                } else {
+                  setConfirmDelete(true);
+                }
+              }}
+            >
+              <Icon
+                icon={
+                  deleting
+                    ? "solar:refresh-linear"
+                    : "solar:trash-bin-trash-linear"
+                }
+                width={13}
+                height={13}
+              />
+              <span>
+                {deleting
+                  ? "Deleting..."
+                  : confirmDelete
+                    ? "Confirm delete"
+                    : "Delete"}
+              </span>
+            </button>
           </div>
         </div>
         <code className="settings-pane__skill-path">{skill.absolutePath}</code>
-        {editing ? (
-          <input
-            className="settings-pane__skill-doc-desc-input"
-            value={draftDescription}
-            onChange={(event) => setDraftDescription(event.target.value)}
-            placeholder="When should the agent reach for this skill?"
-            spellCheck={false}
-          />
-        ) : (
-          skill.description && (
-            <p className="settings-pane__skill-doc-desc">{skill.description}</p>
-          )
+        {skill.description && (
+          <p className="settings-pane__skill-doc-desc">{skill.description}</p>
         )}
       </header>
-      {editing ? (
-        <div className="settings-pane__skill-doc-editor">
-          {!nameValid && (
-            <div className="settings-pane__editor-error">
-              <Icon icon="solar:danger-triangle-linear" width={13} height={13} />
-              <span>Name is required.</span>
-            </div>
-          )}
-          <div className="settings-pane__skill-doc-editor-host">
-            <Editor
-              value={draftBody}
-              language="markdown"
-              theme={monacoThemeForDocument()}
-              onChange={(value) => setDraftBody(value ?? "")}
-              onMount={(_editor, monaco) => attachMonacoTheme(monaco)}
-              options={{
-                fontFamily:
-                  '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace',
-                fontSize: 12,
-                lineHeight: 18,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                smoothScrolling: true,
-                renderLineHighlight: "line",
-                padding: { top: 12, bottom: 12 },
-                tabSize: 2,
-                wordWrap: "on",
-                automaticLayout: true,
-                lineNumbers: "on",
-                lineNumbersMinChars: 3,
-                folding: true,
-                scrollbar: {
-                  verticalScrollbarSize: 9,
-                  horizontalScrollbarSize: 9,
-                },
-              }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="settings-pane__skill-doc-body">
-          <Markdown text={body || "_(empty SKILL.md)_"} onOpenFile={noop} />
-        </div>
-      )}
+      <div className="settings-pane__skill-doc-body settings-pane__skill-doc-body--editor">
+        <Editor
+          value={draft}
+          language="markdown"
+          theme={monacoThemeForDocument()}
+          onChange={(value) => setDraft(value ?? "")}
+          onMount={(_editor, monaco) => attachMonacoTheme(monaco)}
+          options={{
+            fontFamily:
+              '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace',
+            fontSize: 12,
+            lineHeight: 18,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            smoothScrolling: true,
+            renderLineHighlight: "line",
+            padding: { top: 12, bottom: 12 },
+            tabSize: 2,
+            wordWrap: "on",
+            automaticLayout: true,
+            lineNumbers: "off",
+            folding: false,
+            scrollbar: {
+              verticalScrollbarSize: 9,
+              horizontalScrollbarSize: 9,
+            },
+          }}
+        />
+      </div>
     </article>
   );
 }
@@ -4097,22 +4006,6 @@ function stripFrontmatter(content: string): string {
   const end = content.indexOf("\n---", 3);
   if (end === -1) return content.trim();
   return content.slice(end + 4).trim();
-}
-
-function buildSkillContent(name: string, description: string, body: string): string {
-  const normalizedBody = body.replace(/\r\n/g, "\n").trimEnd();
-  return [
-    "---",
-    `name: ${cleanFrontmatterValue(name)}`,
-    `description: ${cleanFrontmatterValue(description)}`,
-    "---",
-    "",
-    normalizedBody,
-  ].join("\n");
-}
-
-function cleanFrontmatterValue(value: string): string {
-  return value.replace(/\r?\n/g, " ").trim();
 }
 
 function createSubAgent(
@@ -4615,8 +4508,7 @@ const TOOL_LABEL: Record<string, string> = {
   bash: "Shell",
   bash_input: "Shell input",
   read: "Read",
-  edit_file: "Edit file",
-  write_file: "Write file",
+  apply_patch: "Patch",
   Glob: "Glob",
   Grep: "Grep",
   WebSearch: "Web search",
@@ -4640,8 +4532,7 @@ const TOOL_LABEL: Record<string, string> = {
 
 const TOOL_ICON: Record<string, string> = {
   read: "solar:document-text-linear",
-  edit_file: "solar:pen-2-linear",
-  write_file: "solar:file-text-linear",
+  apply_patch: "solar:pen-new-square-linear",
   WebSearch: "solar:magnifer-linear",
   WebFetch: "solar:link-round-linear",
   CreateImage: "solar:gallery-wide-linear",

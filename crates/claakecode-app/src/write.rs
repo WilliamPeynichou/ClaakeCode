@@ -19,17 +19,7 @@ use crate::{
 
 const MAX_WRITE_FILE_BYTES: usize = 2 * 1024 * 1024;
 
-const WRITE_FILE_DESCRIPTION: &str = r#"Write a complete text file in the workspace.
-
-Input:
-- path: file path to write. Relative paths are resolved from the workspace root; absolute paths must be inside the workspace.
-- content: full file content to write.
-
-Rules:
-- If the file does not exist, write_file creates it, including parent directories.
-- If the file already exists, you must read it successfully before using write_file. write_file refuses to overwrite an existing file if it changed since that read.
-- write_file replaces the entire file content. For targeted edits, prefer edit_file.
-"#;
+const WRITE_FILE_DESCRIPTION: &str = r#"Use this tool to write files. Put the path before the content"#;
 
 #[derive(Debug, Clone)]
 pub struct WriteFileTool {
@@ -511,6 +501,6 @@ mod tests {
     }
 
     fn unique_temp_dir() -> PathBuf {
-        std::env::temp_dir().join(format!("sinew-write-test-{}", Uuid::new_v4()))
+        std::env::temp_dir().join(format!("claakecode-write-test-{}", Uuid::new_v4()))
     }
 }

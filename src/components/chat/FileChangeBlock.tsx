@@ -21,12 +21,12 @@ function normalizeDiffLineKind(kind: string): RenderedDiffLineKind {
 
 export function FileChangeBlock({
   change,
-  streaming = false,
+  live = false,
 }: {
   change: FileChange;
-  streaming?: boolean;
+  live?: boolean;
 }) {
-  const [open, setOpen] = useState(streaming);
+  const [open, setOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const name = basename(change.relativePath);
   const visibleLineKinds = change.lines.map((line) =>
@@ -56,11 +56,7 @@ export function FileChangeBlock({
     : null;
 
   useEffect(() => {
-    if (streaming) setOpen(true);
-  }, [streaming]);
-
-  useEffect(() => {
-    if (!open || firstChangedLineIndex < 0 || streaming) return undefined;
+    if (!open || firstChangedLineIndex < 0 || live) return undefined;
     const body = bodyRef.current;
     if (!body) return undefined;
     const frame = window.requestAnimationFrame(() => {
@@ -71,20 +67,20 @@ export function FileChangeBlock({
       body.scrollTop = Math.max(0, firstChange.offsetTop - body.offsetTop);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [firstChangedLineIndex, open]);
+  }, [firstChangedLineIndex, open, live]);
 
   useEffect(() => {
-    if (!streaming || !open) return undefined;
+    if (!live || !open) return undefined;
     const body = bodyRef.current;
     if (!body) return undefined;
     const frame = window.requestAnimationFrame(() => {
       body.scrollTop = body.scrollHeight;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [change.lines.length, open, streaming]);
+  }, [change.lines.length, open, live]);
 
   return (
-    <div className="filechange" data-streaming={streaming ? "true" : "false"}>
+    <div className="filechange">
       <div className="filechange__head" onClick={() => setOpen((v) => !v)}>
         <span
           className="tab__icon"
@@ -109,7 +105,6 @@ export function FileChangeBlock({
             )}
           </span>
         )}
-        {streaming && <span className="filechange__badge">streaming</span>}
         {quietLabel && <span className="filechange__badge">{quietLabel}</span>}
         <span className="filechange__caret">
           <Icon

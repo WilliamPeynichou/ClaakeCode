@@ -64,6 +64,9 @@ jobs:
           script: |
             const tag = "${{ steps.resolve-tag.outputs.tag }}";
             const version = tag.replace(/^v/, "");
+            const displayVersion = version.startsWith("0.")
+              ? version.slice(2)
+              : version.replace(/\.0$/, "");
             const existing = await github.paginate(github.rest.repos.listReleases, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -78,8 +81,8 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
-              name: `Claake Code ${version}`,
-              body: `Claake Code ${version}\n\nDownloads below. The desktop app will auto-update existing installs.`,
+              name: `Claake Code ${displayVersion}`,
+              body: `Claake Code ${displayVersion}\n\nDownloads below. The desktop app will auto-update existing installs.`,
               draft: true,
               prerelease: false,
             });

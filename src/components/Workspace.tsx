@@ -11,9 +11,11 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Icon } from "@iconify/react";
 import { api } from "../lib/ipc";
 import { modelRefWithThinking, thinkingFromRef } from "../lib/models";
+import { recordRecent } from "../lib/recents";
 import { Splitter } from "./Splitter";
 import { FileTree, type FileTreeHandle } from "./FileTree";
 import { ConversationList } from "./ConversationList";
+import { GitPanel, GitMark } from "./GitPanel";
 import { EditorPane } from "./EditorPane";
 import { SettingsPane } from "./SettingsPane";
 import { TerminalPanel } from "./TerminalPanel";
@@ -37,6 +39,7 @@ import type {
   PlanArtifact,
   PlanControl,
   SavedConversation,
+  ServiceTier,
   ThinkingLevel,
   WorkspaceBootstrap,
   WorkspaceEntry,
@@ -96,6 +99,12 @@ export function Workspace({
   const activeConvIdRef = useRef(bootstrap.activeConversation.id);
   const workspacePathRef = useRef(workspacePath);
   const navigationSeqRef = useRef(0);
+  // Bottom-sidebar tab — "conversations" preserves the existing default.
+  // Both panels stay mounted (display:none on the inactive one) so users
+  // can flip between them without losing in-progress form input.
+  const [bottomTab, setBottomTab] = useState<"conversations" | "git">(
+    "conversations",
+  );
 
   useEffect(() => {
     activeConvIdRef.current = activeConv.id;
@@ -1229,6 +1238,7 @@ export function Workspace({
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
       mode: AgentMode,
+      serviceTier?: ServiceTier | null,
       rewriteFromHistoryIndex?: number,
       planControl?: PlanControl,
       messageVisibility?: MessageVisibility,
@@ -1258,6 +1268,7 @@ export function Workspace({
           model,
           thinking,
           mode,
+          serviceTier,
           rewriteFromHistoryIndex,
           planControl,
           messageVisibility,
@@ -1292,6 +1303,7 @@ export function Workspace({
     async (
       model: SavedConversation["model"],
       thinking: ThinkingLevel,
+      serviceTier?: ServiceTier | null,
       options?: { continueAfter?: boolean; instruction?: string },
     ) => {
       const conversationId = activeConv.id;
@@ -1309,6 +1321,7 @@ export function Workspace({
           conversationId,
           model,
           thinking,
+          serviceTier,
           options?.instruction,
         );
 
@@ -1339,6 +1352,7 @@ export function Workspace({
           model,
           thinking,
           continuationMode,
+          serviceTier,
           undefined,
           undefined,
           "systemReminder",
@@ -1463,6 +1477,7 @@ export function Workspace({
           seedModel,
           seedThinking,
           "act",
+          null,
           undefined,
           "implementPlan",
           "systemReminder",
@@ -1488,6 +1503,46 @@ export function Workspace({
       console.error(err);
     }
   }, [workspacePath, activeConv.id]);
+
+  // Switch this window to another workspace path. Used by the Git
+  // panel when the user clicks a worktree row or creates a new one.
+  // We refuse the switch while any conversation in the current window
+  // is still streaming so the in-flight turn isn't orphaned mid-tool.
+  // Throwing here lets the caller surface a contextual error notice
+  // instead of swallowing the failure silently.
+  const switchWorkspace = useCallback(
+    async (targetPath: string): Promise<void> => {
+      if (streamingConversationIds.size > 0) {
+        throw new Error(
+          "A conversation is still streaming. Stop active turns before switching workspace.",
+        );
+      }
+      const nextBootstrap = await api.openWorkspace(targetPath);
+      recordRecent(
+        nextBootstrap.workspace.path,
+        nextBootstrap.workspace.name,
+      );
+      // Drop editor / settings / search state that belongs to the
+      // outgoing workspace so the incoming one boots cleanly. The
+      // bootstrap-replace effect refreshes conversations, file tree,
+      // etc. on its own.
+      setTabs([]);
+      setActiveTabIndex(-1);
+      setSettingsOpen(false);
+      setSettingsActive(false);
+      setFileSearchOpen(false);
+      setPendingRootCreate(null);
+      setEditorRevealTarget(null);
+      setImportError(null);
+      onBootstrapReplace(nextBootstrap);
+      refreshFileTree();
+    },
+    [
+      onBootstrapReplace,
+      refreshFileTree,
+      streamingConversationIds,
+    ],
+  );
 
   // ---------------- Layout state ----------------
   const [leftWidth, setLeftWidth] = useState(INITIAL_LEFT);
@@ -1757,15 +1812,95 @@ export function Workspace({
             )}
           </div>
           <Splitter orientation="horizontal" onDelta={applyTopDelta} />
-          <ConversationList
-            conversations={conversations}
-            activeId={activeConv.id}
-            streamingIds={streamingConversationIds}
-            onSelect={selectConversation}
-            onCreate={createConversation}
-            onRename={renameConversation}
-            onDelete={deleteConversation}
-          />
+          <div
+            className="sidebar__section sidebar__section--bottom"
+            style={{ flex: "1 1 0" }}
+          >
+            <div className="sidebar__head sidebar__head--tabs">
+              <div className="sidebar-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  className="sidebar-tab"
+                  data-active={bottomTab === "conversations" ? "true" : "false"}
+                  aria-selected={bottomTab === "conversations"}
+                  onClick={() => setBottomTab("conversations")}
+                >
+                  <Icon
+                    icon="solar:chat-round-dots-linear"
+                    width={13}
+                    height={13}
+                  />
+                  <span>Conversations</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className="sidebar-tab"
+                  data-active={bottomTab === "git" ? "true" : "false"}
+                  aria-selected={bottomTab === "git"}
+                  onClick={() => setBottomTab("git")}
+                >
+                  <GitMark size={13} />
+                  <span>Git</span>
+                </button>
+              </div>
+              {bottomTab === "conversations" && (
+                <div className="sidebar__head-actions">
+                  <button
+                    type="button"
+                    className="sidebar__head-btn"
+                    onClick={createConversation}
+                    title="New conversation"
+                  >
+                    <Icon
+                      icon="solar:add-square-linear"
+                      width={15}
+                      height={15}
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+            {/*
+              Both panels stay mounted so swapping tabs preserves any
+              transient state (a half-typed commit message, an open
+              "New worktree" form, etc). We toggle visibility with
+              display:none to avoid double-mounting their effects.
+            */}
+            <div
+              className="sidebar-tab-pane"
+              role="tabpanel"
+              aria-hidden={bottomTab !== "conversations"}
+              style={{
+                display: bottomTab === "conversations" ? "flex" : "none",
+              }}
+            >
+              <ConversationList
+                conversations={conversations}
+                activeId={activeConv.id}
+                streamingIds={streamingConversationIds}
+                onSelect={selectConversation}
+                onRename={renameConversation}
+                onDelete={deleteConversation}
+              />
+            </div>
+            <div
+              className="sidebar-tab-pane"
+              role="tabpanel"
+              aria-hidden={bottomTab !== "git"}
+              style={{
+                display: bottomTab === "git" ? "flex" : "none",
+              }}
+            >
+              <GitPanel
+                workspacePath={workspacePath}
+                active={bottomTab === "git"}
+                hasStreamingConversation={hasStreamingConversation}
+                onSwitchWorkspace={switchWorkspace}
+              />
+            </div>
+          </div>
         </div>
         <Splitter
           orientation="vertical"
@@ -1819,6 +1954,7 @@ export function Workspace({
           >
             {terminalAvailable && (
               <TerminalPanel
+                key={workspacePath}
                 active={terminalVisible}
                 fullHeight={terminalFullHeight}
                 workspacePath={workspacePath}

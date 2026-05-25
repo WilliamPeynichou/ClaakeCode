@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use claakecode_core::{ChatMessage, Provider};
+use claakecode_core::{ChatMessage, Provider, ServiceTier};
 
 use crate::{
     BashTool, CreateImageTool, DatabaseTool, EditFileTool, GlobTool, GoalWorkflowState, GrepTool,
@@ -28,6 +28,7 @@ pub struct TurnContext {
     pub model: claakecode_core::ModelRef,
     pub cache_key: Option<String>,
     pub cache_stable_message_count: usize,
+    pub service_tier: Option<ServiceTier>,
     pub auto_compact: bool,
     pub mode: AgentMode,
     pub stop_questions: bool,

@@ -6,13 +6,16 @@ Code map:
 ├── AGENTS.md
 ├── Cargo.lock
 ├── Cargo.toml
+├── EDIT_FILE_HARNESS_COMPARISON.md
 ├── FEATURES.md
+├── GLOB_HARNESS_COMPARISON.md
+├── GREP_HARNESS_COMPARISON.md
 ├── index.html
 ├── LICENSE
 ├── package-lock.json
 ├── package.json
 ├── README.md
-├── test.md
+├── test-stop.md
 ├── scripts
 │   └── prepare-sidecars.mjs
 ├── tsconfig.json
@@ -58,6 +61,7 @@ Code map:
 │   │       ├── bash.rs
 │   │       ├── compact.rs
 │   │       ├── database.rs
+│   │       ├── database_tool.rs
 │   │       ├── edit.rs
 │   │       ├── glob.rs
 │   │       ├── grep.rs
@@ -218,6 +222,7 @@ Code map:
 │   └── src
 │       ├── context.rs
 │       ├── conversations.rs
+│       ├── git.rs
 │       ├── lib.rs
 │       ├── main.rs
 │       ├── models.rs
@@ -241,6 +246,7 @@ Code map:
     │   ├── ConversationList.tsx
     │   ├── EditorPane.tsx
     │   ├── FileTree.tsx
+    │   ├── GitPanel.tsx
     │   ├── SearchPane.tsx
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx
@@ -248,6 +254,7 @@ Code map:
     │   ├── Splitter.tsx
     │   ├── TerminalPanel.tsx
     │   ├── UpdateBadge.tsx
+    │   ├── UpdaterLockScreen.tsx
     │   ├── Welcome.tsx
     │   ├── WindowControls.tsx
     │   ├── Workspace.tsx
