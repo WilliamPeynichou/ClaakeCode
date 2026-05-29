@@ -93,21 +93,28 @@ export default function App() {
   }, []);
 
   // Mid-session escalation: when the <UpdateBadge /> in Workspace fires
-  // "sinew:install-update" (user clicked "Install & restart" in the
+  // "claakecode:install-update" (user clicked "Install & restart" in the
   // popover), we swap the whole window to the lock screen with
   // `autoInstall` enabled. From there the screen runs the same download
   // → install → auto-restart flow as the boot gate. This means the
   // policy is identical regardless of entry point: once the user
-  // commits to installing, Sinew becomes uninteractive until the update
+  // commits to installing, Claake Code becomes uninteractive until the update
   // is applied or they quit.
   useEffect(() => {
-    const handler = (event: WindowEventMap["sinew:install-update"]) => {
+    const handler = (event: CustomEvent<{ info: UpdateInfo }>) => {
       const info = event.detail?.info;
       if (!info || !info.available || !info.version) return;
       setState({ kind: "update_required", info, autoInstall: true });
     };
-    window.addEventListener("sinew:install-update", handler);
-    return () => window.removeEventListener("sinew:install-update", handler);
+    window.addEventListener(
+      "claakecode:install-update",
+      handler as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "claakecode:install-update",
+        handler as EventListener,
+      );
   }, []);
 
   const backToWelcome = useCallback(() => {

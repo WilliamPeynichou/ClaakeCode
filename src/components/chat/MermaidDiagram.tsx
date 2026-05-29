@@ -109,7 +109,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ source }: Props) {
 
   if (!instanceIdRef.current) {
     mermaidIdCounter += 1;
-    instanceIdRef.current = `sinew-mermaid-${mermaidIdCounter}`;
+    instanceIdRef.current = `claakecode-mermaid-${mermaidIdCounter}`;
   }
 
   useEffect(() => {

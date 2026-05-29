@@ -391,7 +391,7 @@ struct AuthMigrations {
 }
 
 fn default_migration_path() -> Result<PathBuf> {
-    let dirs = ProjectDirs::from("dev", "hyrak", "sinew")
+    let dirs = ProjectDirs::from("dev", "williampeynichou", "claakecode")
         .ok_or_else(|| AppError::Auth("unable to resolve local data directory".into()))?;
     Ok(dirs.data_local_dir().join(AUTH_MIGRATION_FILE))
 }

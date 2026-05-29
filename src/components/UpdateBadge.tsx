@@ -142,7 +142,7 @@ export function UpdateBadge() {
     // `downloading` state — by the next frame this <UpdateBadge /> is
     // unmounted along with the Workspace.
     window.dispatchEvent(
-      new CustomEvent<{ info: UpdateInfo }>("sinew:install-update", {
+      new CustomEvent<{ info: UpdateInfo }>("claakecode:install-update", {
         detail: { info },
       }),
     );

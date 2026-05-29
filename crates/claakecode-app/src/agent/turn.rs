@@ -34,7 +34,7 @@ use super::{
     tool_summary::{display_mcp_server_name, pretty_json, should_stream_tool_args, summarize_tool},
 };
 
-use crate::{system_prompt_with_todo, ReadFingerprint, ToolRunResult};
+use crate::{system_prompt_with_todo, tool_names, ReadFingerprint, ToolRunResult};
 
 const SAFE_STREAM_MAX_RETRIES: usize = 5;
 
@@ -140,7 +140,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             tool_descriptors.extend(teams.descriptors());
         }
         let tool_descriptors = tool_settings.apply_to_descriptors(tool_descriptors);
-        let question_enabled = question.is_some() && tool_settings.is_enabled("Question");
+        let question_enabled = question.is_some() && tool_settings.is_enabled(tool_names::QUESTION);
 
         let mut current_system_prompt = system_prompt_with_todo(&system_prompt, &todo_list);
         if let Some(teams) = &teams {
@@ -642,7 +642,10 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         ) => result,
                     }
                 };
-                if (name == "read" || name == "edit_file" || name == "write_file")
+                let canonical_name = tool_names::canonical_tool_name(name);
+                if (canonical_name == tool_names::READ
+                    || canonical_name == tool_names::EDIT_FILE
+                    || canonical_name == tool_names::WRITE_FILE)
                     && !result.is_error
                 {
                     update_read_fingerprint_cache(&mut read_fingerprints, result.meta.as_ref());
@@ -658,7 +661,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 if !result.file_changes.is_empty() {
                     meta.insert("file_changes".into(), json!(result.file_changes.clone()));
                 }
-                if name == "ToDoList" && !result.is_error {
+                if canonical_name == tool_names::TODO_LIST && !result.is_error {
                     meta.insert("todo_list".into(), json!(&todo_list));
                 }
                 if let Some(Value::Object(result_meta)) = result.meta.clone() {
@@ -666,7 +669,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         meta.insert(key, value);
                     }
                 }
-                let stop_after_question = name == "Question"
+                let stop_after_question = canonical_name == tool_names::QUESTION
                     && meta
                         .get("question_stop_requested")
                         .and_then(Value::as_bool)
@@ -685,7 +688,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         meta: result_meta.clone(),
                     },
                 );
-                if name != "clean_context" {
+                if canonical_name != tool_names::CLEAN_CONTEXT {
                     current_turn_tool_result_ids.insert(id.clone());
                 }
                 tool_results.push(Part::ToolResult {
@@ -695,7 +698,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         .into_iter()
                         .map(|image| ToolResultImage {
                             media_type: image.media_type,
-                            data: if name == "CreateImage" {
+                            data: if canonical_name == tool_names::CREATE_IMAGE {
                                 String::new()
                             } else {
                                 image.data
@@ -754,7 +757,11 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
     if cancelled {
         send_event(&event_tx, event_scope.as_ref(), AgentEvent::Interrupted);
     }
-    send_event(&event_tx, event_scope.as_ref(), AgentEvent::TurnFinished);
+    send_event(
+        &event_tx,
+        event_scope.as_ref(),
+        AgentEvent::TurnFinished { duration_ms: None },
+    );
     todo_list.normalize();
     TurnOutput {
         history,
@@ -845,7 +852,7 @@ fn append_plan_fallback_question(
     event_scope: Option<&AgentEventScope>,
 ) {
     let id = format!("plan-question-{}", Uuid::new_v4());
-    let name = "Question".to_string();
+    let name = tool_names::QUESTION.to_string();
     let input = json!({
         "question": "Je peux continuer a preparer le plan. Tu veux ajouter une contrainte avant que je le cree ?",
         "type": "single_choice",
@@ -891,7 +898,7 @@ fn assistant_has_question_tool(message: &ChatMessage) -> bool {
     message.parts.iter().any(|part| {
         matches!(
             part,
-            Part::ToolCall { name, .. } if name == "Question"
+            Part::ToolCall { name, .. } if tool_names::is_tool_name(name, tool_names::QUESTION)
         )
     })
 }

@@ -18,6 +18,7 @@ import {
   validateDatabaseSettings,
 } from "../lib/databaseSettings";
 import { attachMonacoTheme, monacoThemeForDocument } from "../lib/monacoThemes";
+import { canonicalToolName } from "../lib/tools";
 import { Markdown } from "./chat/Markdown";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { DatabaseSection } from "./DatabaseSettingsSection";
@@ -99,11 +100,15 @@ export function SettingsPane({ workspacePath }: Props) {
   const [savedJson, setSavedJson] = useState("");
   const [jsonText, setJsonText] = useState("");
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [probes, setProbes] = useState<McpServerProbe[]>([]);
+  // Last known successful tool count per server id. We keep it across toggles
+  // so that disabling a server doesn't make us forget how many tools it had.
+  const [knownToolCounts, setKnownToolCounts] = useState<Record<string, number>>({});
 
   const [probing, setProbing] = useState(false);
 
@@ -245,6 +250,27 @@ export function SettingsPane({ workspacePath }: Props) {
       disposed = true;
     };
   }, []);
+
+  // Remember the latest successful tool count per server so we can keep
+  // displaying a count (in a disabled tone) even after the server is toggled
+  // off and the probe stops reflecting it.
+  useEffect(() => {
+    if (probes.length === 0) return;
+    setKnownToolCounts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const probe of probes) {
+        if (probe.enabled && probe.ok) {
+          const count = probe.tools.length;
+          if (next[probe.serverId] !== count) {
+            next[probe.serverId] = count;
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [probes]);
 
   // Re-parse on every JSON edit so cards reflect the latest text.
   useEffect(() => {
@@ -965,17 +991,43 @@ export function SettingsPane({ workspacePath }: Props) {
   }, [jsonText]);
 
   const toggleEnabled = useCallback(
-    (id: string) => {
-      if (parseError) return;
-      const next: McpSettings = {
+    async (id: string) => {
+      if (parseError || saving) return;
+      const next = normalizeSettings({
         servers: settings.servers.map((server) =>
           server.id === id ? { ...server, enabled: !server.enabled } : server,
         ),
-      };
+      });
+      const optimisticJson = settingsToJson(next);
       setSettings(next);
-      setJsonText(settingsToJson(next));
+      setJsonText(optimisticJson);
+      setSaving(true);
+      setStatus(null);
+      try {
+        const saved = normalizeSettings(await api.saveMcpSettings(next));
+        const nextJson = settingsToJson(saved);
+        setSettings(saved);
+        setSavedJson(nextJson);
+        setJsonText(nextJson);
+        setParseError(null);
+
+        const nextProbes = await api.probeMcpTools();
+        setProbes(nextProbes);
+        const failures = nextProbes.filter((probe) => probe.enabled && !probe.ok).length;
+        setStatus(
+          failures
+            ? `${failures} server${failures === 1 ? "" : "s"} failed`
+            : "Saved",
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setParseError(message);
+        setStatus(message);
+      } finally {
+        setSaving(false);
+      }
     },
-    [parseError, settings],
+    [parseError, saving, settings],
   );
 
   const addNewServer = useCallback(() => {
@@ -1510,10 +1562,15 @@ export function SettingsPane({ workspacePath }: Props) {
             onSave={() => void saveAndDetect()}
             servers={settings.servers}
             probes={probes}
-            onSelectServer={setSelectedServerId}
-            onClearSelection={() => setSelectedServerId(null)}
+            onSelectServer={(id) => {
+              setSelectedServerId(id);
+              setMcpAdvancedOpen(false);
+            }}
             selectedServer={selectedServer}
+            advancedOpen={mcpAdvancedOpen}
+            onAdvancedOpenChange={setMcpAdvancedOpen}
             selectedProbe={selectedProbe}
+            knownToolCounts={knownToolCounts}
             onToggleEnabled={toggleEnabled}
             onAddServer={addNewServer}
             onUpdateServer={updateServer}
@@ -2237,8 +2294,8 @@ const TOOL_GROUPS = [
 type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"];
 
 const SWARM_TOOL_NAMES = new Set([
-  "SendMessage",
-  "TaskList",
+  "send_message",
+  "task_list",
 ]);
 
 function ToolsSection({
@@ -2274,8 +2331,8 @@ function ToolsSection({
     imageProvider === "nanoBanana2" || !subscriptionActive;
   const activeImageKey =
     imageProvider === "nanoBanana2" ? nanoBananaApiKey : openaiImageApiKey;
-  const hasImageTool = tools.some((tool) => tool.name === "CreateImage");
-  const hasWebSearchTool = tools.some((tool) => tool.name === "WebSearch");
+  const hasImageTool = tools.some((tool) => canonicalToolName(tool.name) === "create_image");
+  const hasWebSearchTool = tools.some((tool) => canonicalToolName(tool.name) === "web_search");
   const enabledCount = tools.filter((tool) => tool.enabled).length;
   const groups = TOOL_GROUPS.map((group) => {
     const groupTools = tools.filter((tool) => toolGroupId(tool) === group.id);
@@ -2481,7 +2538,7 @@ function ToolsSection({
 }
 
 function toolGroupId(tool: ToolConfig): ToolGroupId {
-  return SWARM_TOOL_NAMES.has(tool.name) ? "swarm" : "main";
+  return SWARM_TOOL_NAMES.has(canonicalToolName(tool.name)) ? "swarm" : "main";
 }
 
 function PlanModePromptSettingsItem({
@@ -2613,9 +2670,11 @@ type McpSectionProps = {
   servers: McpServerConfig[];
   probes: McpServerProbe[];
   onSelectServer: (id: string) => void;
-  onClearSelection: () => void;
   selectedServer: McpServerConfig | null;
+  advancedOpen: boolean;
+  onAdvancedOpenChange: (open: boolean) => void;
   selectedProbe: McpServerProbe | null;
+  knownToolCounts: Record<string, number>;
   onToggleEnabled: (id: string) => void;
   onAddServer: () => void;
   onUpdateServer: (id: string, patch: Partial<McpServerConfig>) => void;
@@ -2636,27 +2695,32 @@ function McpSection({
   servers,
   probes,
   onSelectServer,
-  onClearSelection,
   selectedServer,
+  advancedOpen,
+  onAdvancedOpenChange,
   selectedProbe,
+  knownToolCounts,
   onToggleEnabled,
   onAddServer,
   onUpdateServer,
   onDeleteServer,
   onMount,
 }: McpSectionProps) {
-  const detailOpen = Boolean(selectedServer);
+  const enabledCount = servers.filter((server) => server.enabled).length;
+  const failedCount = probes.filter((probe) => probe.enabled && !probe.ok).length;
 
   return (
     <>
       <header className="settings-pane__header">
         <div className="settings-pane__header-text">
           <h1 className="settings-pane__title">MCP servers</h1>
-          {servers.length === 0 && (
-            <p className="settings-pane__subtitle">
-              Add a server in the JSON config to extend the agent.
-            </p>
-          )}
+          <p className="settings-pane__subtitle">
+            {loading
+              ? "Loading servers…"
+              : servers.length === 0
+                ? "Add servers in advanced config, then turn them on here."
+                : `${enabledCount}/${servers.length} enabled${failedCount ? ` · ${failedCount} need attention` : ""}`}
+          </p>
         </div>
         <div className="settings-pane__actions">
           {status && (
@@ -2664,6 +2728,15 @@ function McpSection({
               {status}
             </span>
           )}
+          <button
+            type="button"
+            className="settings-pane__btn"
+            onClick={() => onAdvancedOpenChange(!advancedOpen)}
+            disabled={loading}
+          >
+            <Icon icon="solar:code-square-linear" width={13} height={13} />
+            <span>{advancedOpen ? "Hide config" : "Advanced config"}</span>
+          </button>
           <button
             type="button"
             className="settings-pane__btn"
@@ -2676,7 +2749,7 @@ function McpSection({
               width={13}
               height={13}
             />
-            <span>{saving ? "Checking…" : "Save & probe"}</span>
+            <span>{saving ? "Checking…" : dirty ? "Save changes" : "Saved"}</span>
           </button>
         </div>
       </header>
@@ -2709,32 +2782,6 @@ function McpSection({
               </span>
             </button>
             <div className="settings-pane__nav-list-divider" />
-            <button
-              type="button"
-              className="settings-pane__nav-list-item"
-              data-active={!detailOpen ? "true" : "false"}
-              onClick={onClearSelection}
-            >
-              <Icon
-                icon="solar:code-square-linear"
-                width={12}
-                height={12}
-                className="settings-pane__nav-list-item-glyph"
-              />
-              <span className="settings-pane__nav-list-item-name">
-                Raw config
-              </span>
-              {dirty && (
-                <span
-                  className="settings-pane__nav-list-item-dot"
-                  data-tone="dirty"
-                  aria-label="Unsaved"
-                />
-              )}
-            </button>
-            {servers.length > 0 && (
-              <div className="settings-pane__nav-list-divider" />
-            )}
             {servers.map((server) => {
               const probe = probes.find((item) => item.serverId === server.id);
               const tone = !server.enabled
@@ -2744,26 +2791,61 @@ function McpSection({
                   : probe.ok
                     ? "ok"
                     : "error";
-              const isActive =
-                detailOpen && selectedServer?.id === server.id;
+              const isActive = selectedServer?.id === server.id;
+              const knownCount = knownToolCounts[server.id];
+              const toolCount = probe?.ok
+                ? probe.tools.length
+                : knownCount ?? null;
+              const toggleDisabled =
+                loading || saving || Boolean(parseError);
+              const displayName = server.name || "Untitled";
               return (
-                <button
-                  type="button"
+                <div
                   key={server.id}
                   className="settings-pane__nav-list-item"
                   data-active={isActive ? "true" : "false"}
                   data-on={server.enabled ? "true" : "false"}
-                  onClick={() => onSelectServer(server.id)}
                 >
-                  <span
-                    className="settings-pane__nav-list-item-dot"
-                    data-tone={tone}
-                    aria-hidden
-                  />
-                  <span className="settings-pane__nav-list-item-name">
-                    {server.name || "Untitled"}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="settings-pane__nav-list-item-main"
+                    onClick={() => onSelectServer(server.id)}
+                  >
+                    <span
+                      className="settings-pane__nav-list-item-dot"
+                      data-tone={tone}
+                      aria-hidden
+                    />
+                    <span className="settings-pane__nav-list-item-name">
+                      {displayName}
+                    </span>
+                    {toolCount !== null && (
+                      <span
+                        className="settings-pane__nav-list-item-count"
+                        data-on={server.enabled ? "true" : "false"}
+                        title={`${toolCount} tool${toolCount === 1 ? "" : "s"}`}
+                        aria-label={`${toolCount} tool${toolCount === 1 ? "" : "s"}`}
+                      >
+                        {toolCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-pane__switch"
+                    role="switch"
+                    aria-checked={server.enabled}
+                    aria-label={`${server.enabled ? "Disable" : "Enable"} ${displayName}`}
+                    data-on={server.enabled ? "true" : "false"}
+                    disabled={toggleDisabled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleEnabled(server.id);
+                    }}
+                  >
+                    <span className="settings-pane__switch-thumb" />
+                  </button>
+                </div>
               );
             })}
             {servers.length === 0 && (
@@ -2775,17 +2857,7 @@ function McpSection({
         </aside>
 
         <main className="settings-pane__detail-pane">
-          {detailOpen && selectedServer ? (
-            <ServerEditor
-              server={selectedServer}
-              probe={selectedProbe}
-              probing={probing}
-              disabled={Boolean(parseError) || loading || saving}
-              onChange={(patch) => onUpdateServer(selectedServer.id, patch)}
-              onDelete={() => onDeleteServer(selectedServer.id)}
-              onToggleEnabled={() => onToggleEnabled(selectedServer.id)}
-            />
-          ) : (
+          {advancedOpen ? (
             <div className="settings-pane__editor-card">
               <div className="settings-pane__editor-bar">
                 <div className="settings-pane__editor-bar-left">
@@ -2842,6 +2914,25 @@ function McpSection({
                 </div>
               )}
             </div>
+          ) : selectedServer ? (
+            <ServerDetail
+              server={selectedServer}
+              probe={selectedProbe}
+              probing={probing}
+              knownToolCount={knownToolCounts[selectedServer.id]}
+              disabled={Boolean(parseError) || loading || saving}
+              onChange={(patch) => onUpdateServer(selectedServer.id, patch)}
+              onDelete={() => onDeleteServer(selectedServer.id)}
+              onToggleEnabled={() => onToggleEnabled(selectedServer.id)}
+            />
+          ) : (
+            <div className="settings-pane__empty-state">
+              <Icon icon="solar:server-square-cloud-linear" width={18} height={18} />
+              <div>
+                <strong>No MCP servers configured yet.</strong>
+                <span>Use Advanced config to paste an MCP server block.</span>
+              </div>
+            </div>
           )}
         </main>
       </div>
@@ -2849,101 +2940,27 @@ function McpSection({
   );
 }
 
-type ServerCardProps = {
-  server: McpServerConfig;
-  probe: McpServerProbe | undefined;
-  probing: boolean;
-  disabled: boolean;
-  onOpen: () => void;
-  onToggle: () => void;
-};
-
-function ServerCard({
-  server,
-  probe,
-  probing,
-  disabled,
-  onOpen,
-  onToggle,
-}: ServerCardProps) {
-  const tone = !server.enabled
-    ? "off"
-    : !probe
-      ? "pending"
-      : probe.ok
-        ? "ok"
-        : "error";
-
-  const label = !server.enabled
-    ? "disabled"
-    : !probe
-      ? probing
-        ? "probing…"
-        : "pending"
-      : probe.ok
-        ? `${probe.tools.length} tool${probe.tools.length === 1 ? "" : "s"}`
-        : "error";
-
-  const command = [server.command, ...server.args].join(" ").trim();
-
-  return (
-    <div
-      className="settings-pane__server-card"
-      data-on={server.enabled ? "true" : "false"}
-      onClick={onOpen}
-    >
-      <div className="settings-pane__server-row">
-        <span className="settings-pane__server-name">{server.name || "Untitled"}</span>
-        <button
-          type="button"
-          className="settings-pane__switch"
-          role="switch"
-          aria-checked={server.enabled}
-          aria-label={`${server.enabled ? "Disable" : "Enable"} ${server.name}`}
-          data-on={server.enabled ? "true" : "false"}
-          disabled={disabled}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggle();
-          }}
-        >
-          <span className="settings-pane__switch-thumb" />
-        </button>
-      </div>
-      <div className="settings-pane__server-meta">
-        <span className="settings-pane__chip" data-tone={tone}>
-          <span className="settings-pane__chip-dot" />
-          {label}
-        </span>
-        {command && (
-          <code className="settings-pane__server-cmd" title={command}>
-            {command}
-          </code>
-        )}
-      </div>
-    </div>
-  );
-}
-
-type ServerEditorProps = {
+type ServerDetailProps = {
   server: McpServerConfig;
   probe: McpServerProbe | null;
   probing: boolean;
+  knownToolCount: number | undefined;
   disabled: boolean;
   onChange: (patch: Partial<McpServerConfig>) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
 };
 
-function ServerEditor({
+function ServerDetail({
   server,
   probe,
   probing,
+  knownToolCount,
   disabled,
   onChange,
   onDelete,
   onToggleEnabled,
-}: ServerEditorProps) {
+}: ServerDetailProps) {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(
     () => new Set<string>(),
   );
@@ -2973,7 +2990,9 @@ function ServerEditor({
         ? "ok"
         : "error";
   const statusLabel = !server.enabled
-    ? "disabled"
+    ? knownToolCount != null
+      ? `${knownToolCount} tool${knownToolCount === 1 ? "" : "s"}`
+      : "disabled"
     : !probe
       ? probing
         ? "probing…"
@@ -4076,7 +4095,7 @@ function normalizeToolSettings(settings: ToolSettings): ToolSettings {
       settings.webSearchProvider === "linkup" ? "linkup" : "classic",
     linkupApiKey: settings.linkupApiKey ?? "",
     tools: (settings.tools ?? []).flatMap((tool) => {
-      const name = tool.name?.trim();
+      const name = canonicalToolName(tool.name?.trim() ?? "");
       if (!name || seen.has(name)) return [];
       seen.add(name);
       const defaultDescription = tool.defaultDescription ?? tool.description ?? "";
@@ -4471,32 +4490,33 @@ function BroomGlyph() {
 }
 
 function ToolGlyph({ name }: { name: string }) {
-  if (name === "bash" || name === "bash_input") {
+  const canonicalName = canonicalToolName(name);
+  if (canonicalName === "bash" || canonicalName === "bash_input") {
     return <TerminalGlyph />;
   }
-  if (name === "Glob" || name === "Grep") {
+  if (canonicalName === "glob" || canonicalName === "grep") {
     return <AsteriskGlyph />;
   }
-  if (name === "TeamRun" || name === "TeamStatus" || name === "TeamStop") {
+  if (canonicalName === "team_run" || canonicalName === "team_status" || canonicalName === "team_stop") {
     return <SwarmGlyph />;
   }
-  if (name === "LoadMcpTool") {
+  if (canonicalName === "load_mcp_tool") {
     return <McpGlyph />;
   }
-  if (name === "LoadSkill") {
+  if (canonicalName === "skill") {
     return <SkillGlyph />;
   }
-  if (name === "clean_context") {
+  if (canonicalName === "clean_context") {
     return <BroomGlyph />;
   }
   if (
-    name === "database_list_sources" ||
-    name === "database_describe_schema" ||
-    name === "database_execute_query"
+    canonicalName === "database_list_sources" ||
+    canonicalName === "database_describe_schema" ||
+    canonicalName === "database_execute_query"
   ) {
     return <DatabaseGlyph />;
   }
-  const icon = TOOL_ICON[name] ?? "solar:tuning-2-linear";
+  const icon = TOOL_ICON[canonicalName] ?? "solar:tuning-2-linear";
   return <Icon icon={icon} width={13} height={13} />;
 }
 
@@ -4508,20 +4528,21 @@ const TOOL_LABEL: Record<string, string> = {
   bash: "Shell",
   bash_input: "Shell input",
   read: "Read",
-  apply_patch: "Patch",
-  Glob: "Glob",
-  Grep: "Grep",
-  WebSearch: "Web search",
-  WebFetch: "Web fetch",
-  CreateImage: "Create image",
-  Question: "Question",
-  ToDoList: "To-do list",
-  LoadMcpTool: "Load MCP tool",
-  LoadSkill: "Load skill",
-  TeamRun: "Team run",
-  TeamStatus: "Team status",
-  TeamStop: "Team stop",
-  SendMessage: "Send message",
+  edit_file: "Edit file",
+  write_file: "Write file",
+  glob: "Glob",
+  grep: "Grep",
+  web_search: "Web search",
+  web_fetch: "Web fetch",
+  create_image: "Create image",
+  question: "Question",
+  todo_list: "To-do list",
+  load_mcp_tool: "Load MCP tool",
+  skill: "Load skill",
+  team_run: "Team run",
+  team_status: "Team status",
+  team_stop: "Team stop",
+  send_message: "Send message",
   clean_context: "Clean context",
   update_goal: "Update goal",
   context_compaction: "Compact context",
@@ -4532,13 +4553,14 @@ const TOOL_LABEL: Record<string, string> = {
 
 const TOOL_ICON: Record<string, string> = {
   read: "solar:document-text-linear",
-  apply_patch: "solar:pen-new-square-linear",
-  WebSearch: "solar:magnifer-linear",
-  WebFetch: "solar:link-round-linear",
-  CreateImage: "solar:gallery-wide-linear",
-  Question: "solar:question-circle-linear",
-  ToDoList: "solar:checklist-linear",
-  SendMessage: "solar:chat-round-dots-linear",
+  edit_file: "solar:pen-2-linear",
+  write_file: "solar:file-text-linear",
+  web_search: "solar:magnifer-linear",
+  web_fetch: "solar:link-round-linear",
+  create_image: "solar:gallery-wide-linear",
+  question: "solar:question-circle-linear",
+  todo_list: "solar:checklist-linear",
+  send_message: "solar:chat-round-dots-linear",
   update_goal: "solar:flag-2-linear",
   context_compaction: "solar:archive-linear",
   database_list_sources: "solar:database-linear",
@@ -4550,10 +4572,10 @@ function labelForTool(tool: ToolConfig | string): string {
   if (typeof tool !== "string") {
     const displayName = tool.displayName?.trim();
     if (displayName) return displayName;
-    return TOOL_LABEL[tool.name] ?? humanizeToolName(tool.name);
+    return TOOL_LABEL[canonicalToolName(tool.name)] ?? humanizeToolName(tool.name);
   }
   const name = tool;
-  return TOOL_LABEL[name] ?? humanizeToolName(name);
+  return TOOL_LABEL[canonicalToolName(name)] ?? humanizeToolName(name);
 }
 
 function humanizeToolName(name: string): string {

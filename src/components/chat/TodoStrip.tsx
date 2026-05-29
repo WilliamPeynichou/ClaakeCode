@@ -10,6 +10,7 @@ import {
 import { Icon } from "@iconify/react";
 import type { ChatBlock } from "./stream";
 import { Markdown } from "./Markdown";
+import { canonicalToolName, isToolName } from "../../lib/tools";
 import type { AttachmentInput, TodoStatus } from "../../types";
 
 type ParsedTask = {
@@ -225,7 +226,7 @@ function latestActiveTodo(blocks: ChatBlock[]): {
   for (let i = blocks.length - 1; i >= 0; i--) {
     const b = blocks[i];
     if (b.kind !== "tool") continue;
-    if (b.name !== "ToDoList") continue;
+    if (!isToolName(b.name, "todo_list")) continue;
     if (b.status === "error") continue;
     const parsed = parseTodoOutput(b.output);
     if (!parsed) continue;
@@ -300,12 +301,8 @@ function shouldReplaceTeamTask(
 }
 
 function isTeamTaskTool(name: string): boolean {
-  return (
-    name === "TeamRun" ||
-    name === "TeamStatus" ||
-    name === "TaskCreate" ||
-    name === "TaskList" ||
-    name === "TaskUpdate"
+  return ["team_run", "team_status", "task_create", "task_list", "task_update"].includes(
+    canonicalToolName(name),
   );
 }
 
@@ -459,6 +456,7 @@ export function TodoStrip({
   teamAgentColors = {},
   teamMessageRecipient,
   onOpenFile,
+  onQueuedPromptSend,
   onQueuedPromptEdit,
   onQueuedPromptDelete,
   onQueuedPromptMove,
@@ -470,6 +468,7 @@ export function TodoStrip({
   teamAgentColors?: Record<string, string>;
   teamMessageRecipient?: string;
   onOpenFile: (path: string) => void;
+  onQueuedPromptSend?: (id: string) => void;
   onQueuedPromptEdit?: (id: string) => void;
   onQueuedPromptDelete?: (id: string) => void;
   onQueuedPromptMove?: (draggedId: string, targetId: string) => void;
@@ -743,6 +742,7 @@ export function TodoStrip({
                       )
                   : undefined
               }
+              onSend={onQueuedPromptSend}
               onEdit={onQueuedPromptEdit}
               onDelete={onQueuedPromptDelete}
             />
@@ -811,6 +811,7 @@ function QueuedPromptRow({
   index,
   canMoveUp,
   canMoveDown,
+  onSend,
   onMoveUp,
   onMoveDown,
   onEdit,
@@ -820,6 +821,7 @@ function QueuedPromptRow({
   index: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  onSend?: (id: string) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onEdit?: (id: string) => void;
@@ -876,6 +878,19 @@ function QueuedPromptRow({
           title="Move down"
         >
           <Icon icon="solar:alt-arrow-down-linear" width={13} height={13} />
+        </button>
+        <button
+          type="button"
+          className="todo-strip__queue-action"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSend?.(prompt.id);
+          }}
+          disabled={!onSend}
+          aria-label="Send queued prompt now"
+          title="Send now"
+        >
+          <Icon icon="solar:arrow-right-linear" width={14} height={14} />
         </button>
         <button
           type="button"

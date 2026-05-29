@@ -27,6 +27,7 @@ import {
 import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
 import { api } from "../../lib/ipc";
+import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
   PROVIDERS,
@@ -121,7 +122,7 @@ const MODES: {
   { value: "goal", label: "Goal", icon: "solar:flag-2-linear" },
 ];
 
-const FAST_SERVICE_TIER_STORAGE_KEY = "sinew.fastServiceTier";
+const FAST_SERVICE_TIER_STORAGE_KEY = "claakecode.fastServiceTier";
 
 const CONTEXT_BREAKDOWN_COLORS: Record<string, string> = {
   system: "#85888f",
@@ -303,7 +304,7 @@ const GOAL_CONTINUATION_PROMPT =
   "Continue working toward the active goal. Do not repeat completed work. If the goal is now truly complete, audit it and call update_goal with status complete.";
 const PROVIDERS_CHANGED_EVENT = "claakecode:providers-changed";
 const TOOL_SETTINGS_CHANGED_EVENT = "claakecode:tool-settings-changed";
-const AGENT_TEAMS_TOOL_NAME = "TeamRun";
+const AGENT_TEAMS_TOOL_NAME = "team_run";
 const AGENT_TEAMS_DISABLED_TITLE = "Please activate Agent teams in settings.";
 const IMPLEMENT_PLAN_PROMPT =
   "Implement completely this plan. Use the attached plan as the source of truth.";
@@ -616,7 +617,7 @@ export function ChatPane({
       const settings = await api.listToolSettings(workspacePath);
       setAgentTeamsEnabled(
         settings.tools.some(
-          (tool) => tool.name === AGENT_TEAMS_TOOL_NAME && tool.enabled,
+          (tool) => canonicalToolName(tool.name) === AGENT_TEAMS_TOOL_NAME && tool.enabled,
         ),
       );
     } catch {
@@ -1555,6 +1556,59 @@ export function ChatPane({
     serviceTier,
   ]);
 
+  const sendQueuedPrompt = useCallback(
+    (nextPrompt: QueuedPrompt, restoreIndex = 0) => {
+      if (dequeueInFlightRef.current !== null) return;
+      blockedQueueItemIdsRef.current.delete(nextPrompt.id);
+      dequeueInFlightRef.current = nextPrompt.id;
+      setPromptQueuesByConversation((current) =>
+        updatePromptQueue(current, conversationId, (queue) =>
+          queue.filter((prompt) => prompt.id !== nextPrompt.id),
+        ),
+      );
+      setView((prev) =>
+        beginTurn(
+          appendUserMessage(
+            prev,
+            nextPrompt.text,
+            optimisticNextUserHistoryIndex(history, prev),
+            userAttachmentsFromQueue(nextPrompt.attachments),
+          ),
+        ),
+      );
+      setSendTick((t) => t + 1);
+      void onSend(
+        nextPrompt.text,
+        nextPrompt.attachments,
+        nextPrompt.model,
+        nextPrompt.thinking,
+        nextPrompt.mode,
+        nextPrompt.serviceTier,
+      )
+        .catch((err) => {
+          blockedQueueItemIdsRef.current.add(nextPrompt.id);
+          setPromptQueuesByConversation((current) =>
+            updatePromptQueue(current, conversationId, (queue) =>
+              insertQueuedPrompt(queue, nextPrompt, restoreIndex),
+            ),
+          );
+          setView((prev) => ({
+            ...prev,
+            status: "stopped",
+            streamPhase: "idle",
+            lastError: String(err),
+            turnStartedAtMs: null,
+          }));
+        })
+        .finally(() => {
+          if (dequeueInFlightRef.current === nextPrompt.id) {
+            dequeueInFlightRef.current = null;
+          }
+        });
+    },
+    [conversationId, history, onSend],
+  );
+
   useEffect(() => {
     if (view.status === "streaming" || isStreaming) return;
     if (activeSubAgentId !== null) return;
@@ -1563,63 +1617,16 @@ export function ChatPane({
     const nextPrompt = queuedPrompts[0];
     if (!nextPrompt) return;
     if (blockedQueueItemIdsRef.current.has(nextPrompt.id)) return;
-    if (dequeueInFlightRef.current === nextPrompt.id) return;
+    if (dequeueInFlightRef.current !== null) return;
 
-    dequeueInFlightRef.current = nextPrompt.id;
-    setPromptQueuesByConversation((current) =>
-      updatePromptQueue(current, conversationId, (queue) =>
-        queue.filter((prompt) => prompt.id !== nextPrompt.id),
-      ),
-    );
-    setView((prev) =>
-      beginTurn(
-        appendUserMessage(
-          prev,
-          nextPrompt.text,
-          optimisticNextUserHistoryIndex(history, prev),
-          userAttachmentsFromQueue(nextPrompt.attachments),
-        ),
-      ),
-    );
-    setSendTick((t) => t + 1);
-    void onSend(
-      nextPrompt.text,
-      nextPrompt.attachments,
-      nextPrompt.model,
-      nextPrompt.thinking,
-      nextPrompt.mode,
-      nextPrompt.serviceTier,
-    )
-      .catch((err) => {
-        blockedQueueItemIdsRef.current.add(nextPrompt.id);
-        setPromptQueuesByConversation((current) =>
-          updatePromptQueue(current, conversationId, (queue) =>
-            queue.some((prompt) => prompt.id === nextPrompt.id)
-              ? queue
-              : [nextPrompt, ...queue],
-          ),
-        );
-        setView((prev) => ({
-          ...prev,
-          status: "stopped",
-          streamPhase: "idle",
-          lastError: String(err),
-          turnStartedAtMs: null,
-        }));
-      })
-      .finally(() => {
-        if (dequeueInFlightRef.current === nextPrompt.id) {
-          dequeueInFlightRef.current = null;
-        }
-      });
+    sendQueuedPrompt(nextPrompt, 0);
   }, [
     activeSubAgentId,
     conversationId,
     editingQueuedPrompt,
-    history.length,
     isStreaming,
-    onSend,
     queuedPrompts,
+    sendQueuedPrompt,
     view.status,
   ]);
 
@@ -2545,6 +2552,49 @@ export function ChatPane({
     [conversationId, setSubAgentViewsForConversation, workspacePath],
   );
 
+  const handleQueuedPromptSend = useCallback(
+    (id: string) => {
+      const itemIndex = queuedPrompts.findIndex((prompt) => prompt.id === id);
+      if (itemIndex < 0) return;
+      const item = queuedPrompts[itemIndex];
+      blockedQueueItemIdsRef.current.delete(id);
+      const streaming =
+        view.status === "streaming" ||
+        isStreaming ||
+        activeSubAgentId !== null ||
+        dequeueInFlightRef.current !== null;
+      if (streaming) {
+        // Bring this prompt to the front of the queue so the auto-dequeue
+        // effect picks it up right after the current turn stops, then ask
+        // the active turn to stop.
+        setPromptQueuesByConversation((current) =>
+          updatePromptQueue(current, conversationId, (queue) => {
+            const first = queue[0];
+            if (!first || first.id === id) return queue;
+            return moveQueuedPrompt(queue, id, first.id);
+          }),
+        );
+        void onStop().catch((err) => {
+          setView((prev) => ({
+            ...prev,
+            lastError: String(err),
+          }));
+        });
+        return;
+      }
+      sendQueuedPrompt(item, itemIndex);
+    },
+    [
+      activeSubAgentId,
+      conversationId,
+      isStreaming,
+      onStop,
+      queuedPrompts,
+      sendQueuedPrompt,
+      view.status,
+    ],
+  );
+
   const handleQueuedPromptEdit = useCallback(
     (id: string) => {
       const item = queuedPrompts.find((prompt) => prompt.id === id);
@@ -2919,6 +2969,7 @@ export function ChatPane({
         teamAgentColors={teamAgentColors}
         teamMessageRecipient={viewingSubAgent ? activeSubAgent?.name : undefined}
         onOpenFile={onOpenFile}
+        onQueuedPromptSend={viewingSubAgent ? undefined : handleQueuedPromptSend}
         onQueuedPromptEdit={viewingSubAgent ? undefined : handleQueuedPromptEdit}
         onQueuedPromptDelete={viewingSubAgent ? undefined : handleQueuedPromptDelete}
         onQueuedPromptMove={viewingSubAgent ? undefined : handleQueuedPromptMove}
@@ -3831,7 +3882,7 @@ function shouldShowPlanningNextMove(view: ChatViewState): boolean {
     !view.blocks.some(
       (block) =>
         block.kind === "tool" &&
-        block.name === "Question" &&
+        isToolName(block.name, "question") &&
         block.status === "running",
     ) &&
     !view.blocks.some((block) => block.kind === "plan-writing")
@@ -4236,7 +4287,7 @@ function subAgentNameFromToolBlock(
   block: Extract<ChatBlock, { kind: "tool" }>,
 ): string | null {
   const input = parseJsonRecord(block.argsPretty) ?? parseJsonRecord(block.argsRaw);
-  if (block.name === "Agent") {
+  if (isToolName(block.name, "agent")) {
     const fromArgs = typeof input?.name === "string" ? input.name.trim() : "";
     if (fromArgs) return fromArgs;
   }
@@ -4298,7 +4349,7 @@ function mergeAgentStatus(
 }
 
 function isSubAgentToolName(name: string): boolean {
-  return name.startsWith("subagent_") || name === "Agent";
+  return name.startsWith("subagent_") || isToolName(name, "agent");
 }
 
 function isGenericSubAgentName(value: string): boolean {
@@ -4527,7 +4578,7 @@ function subAgentInitialMessageFromToolBlock(
   block: Extract<ChatBlock, { kind: "tool" }>,
 ): string | undefined {
   const input = parseJsonRecord(block.argsPretty) ?? parseJsonRecord(block.argsRaw);
-  if (block.name === "Agent") {
+  if (isToolName(block.name, "agent")) {
     const prompt = typeof input?.prompt === "string" ? input.prompt.trim() : "";
     const description =
       typeof input?.description === "string" ? input.description.trim() : "";
@@ -4575,9 +4626,9 @@ function activeTeamNameChange(
       candidate.kind === "tool" && candidate.id === event.id,
   );
   const teamRunStatus = teamRunStatusFromMeta(event.meta);
-  const isTeamStop = block?.name === "TeamStop";
+  const isTeamStop = block ? isToolName(block.name, "team_stop") : false;
   const isTeamRunSpawn =
-    block?.name === "TeamRun" && !teamRunAgentFromArgs(block.argsPretty ?? block.argsRaw);
+    !!block && isToolName(block.name, "team_run") && !teamRunAgentFromArgs(block.argsPretty ?? block.argsRaw);
   const teamName =
     teamNameFromMeta(event.meta) ??
     (isTeamRunSpawn || isTeamStop
@@ -4986,7 +5037,7 @@ function teamMessageFromSendMessageTool(
   block: Extract<ChatBlock, { kind: "tool" }>,
   activeAgentName?: string,
 ): TeamMessageItem | null {
-  if (block.name !== "SendMessage" || !activeAgentName?.trim()) return null;
+  if (!isToolName(block.name, "send_message") || !activeAgentName?.trim()) return null;
   const input = parseJsonRecord(block.argsPretty) ?? parseJsonRecord(block.argsRaw);
   const message =
     typeof input?.message === "string" ? input.message.trim() : "";
@@ -5412,7 +5463,7 @@ function renderItemsFromBlocks(blocks: ChatBlock[]): RenderItem[] {
     if (block.kind === "tool" && block.hidden) return [];
     if (
       block.kind === "tool" &&
-      block.name === "Question" &&
+      isToolName(block.name, "question") &&
       (block.status === "running" || block.status === "done")
     ) {
       return [{
@@ -5735,15 +5786,14 @@ function BlockView({
     case "tool":
       if (
         !block.isError &&
-        (block.name === "ToDoList" ||
-          block.name === "TaskCreate" ||
-          block.name === "TaskList" ||
-          block.name === "TaskUpdate")
+        ["todo_list", "task_create", "task_list", "task_update"].includes(
+          canonicalToolName(block.name),
+        )
       ) {
         return null;
       }
       const preparingQuestion =
-        block.name === "Question" && block.status === "running";
+        isToolName(block.name, "question") && block.status === "running";
       const sentTeamMessage = teamMessageFromSendMessageTool(
         block,
         activeAgentName,
@@ -5776,13 +5826,13 @@ function BlockView({
             meta={block.meta}
             onOpenFile={onOpenFile}
             onStopTeam={
-              block.name === "TeamRun" ? onStopAgentSwarm : undefined
+              isToolName(block.name, "team_run") ? onStopAgentSwarm : undefined
             }
             teamAgents={teamAgents}
             teamCompletionByTeam={teamCompletionByTeam}
             activeTeamNames={activeTeamNames}
             onOpenSubAgent={
-              block.name.startsWith("subagent_") || block.name === "Agent"
+              isSubAgentToolName(block.name)
                 ? () => onOpenSubAgent(block)
                 : undefined
             }

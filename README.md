@@ -21,6 +21,21 @@
 
 ---
 
+> [!NOTE]
+> **OAuth providers — a quick heads-up, then chill ✌️**
+>
+> Claake Code can sign you in to **Codex**, **Claude Code** and **Antigravity** through their native OAuth flow, so you can plug Claake Code into the subscription you already pay for instead of double-paying through an API key.
+>
+> - **Codex (OpenAI)** — fully in-bounds. The Codex CLI is open-source (Apache 2.0) and its OAuth flow is part of the publicly supported tooling, so third-party clients using it sit on solid ground.
+> - **Claude Code (Anthropic)** and **Antigravity (Google)** — the same OAuth flow is technically reserved for their own first-party clients. So in theory, those providers *could* flag accounts using it through a third-party harness.
+>
+> In practice: **no ban has ever been reported to us**, and this is the exact same approach every other open-source coding agent out there uses (opencode, crush, and friends). We track the upstream clients closely and ship updates fast whenever the flow shifts — so what Claake Code sends keeps looking like a normal first-party session and stays clear of any flagging heuristics.
+>
+> Want to stay 100% sanctioned? Every provider also works with a plain **API key** or through **OpenRouter** — both fully in-bounds usages. Pick the path that feels right. Use at your own risk, but honestly: stay chill.
+
+
+---
+
 ## Why Claake Code
 
 Most AI coding tools ship a fixed harness: a hard-coded prompt, a hard-coded set
@@ -44,11 +59,11 @@ Claake Code flips that. The harness is the surface area you control.
 - [Tools](#tools) — the agent's toolset
   - [`clean_context`](#clean_context) — the model cleans its own context
   - [`bash` / `bash_input`](#bash--bash_input) — PTY-backed shell sessions
-  - [Why dedicated `read`, `Glob`, `Grep`](#why-dedicated-tools-for-read-glob-and-grep)
-  - [`read`](#read) · [`Glob`](#glob) · [`Grep`](#grep) · [`edit_file`](#edit_file) · [`write_file`](#write_file)
-  - [`WebSearch`](#websearch) · [`WebFetch`](#webfetch) · [`CreateImage`](#createimage)
-  - [`Question`](#question) · [`ToDoList`](#todolist)
-  - [`LoadMcpTool`](#loadmcptool) · [`skill`](#skill)
+  - [Why dedicated `read`, `glob`, `grep`](#why-dedicated-tools-for-read-glob-and-grep)
+  - [`read`](#read) · [`glob`](#glob) · [`grep`](#grep) · [`edit_file`](#edit_file) · [`write_file`](#write_file)
+  - [`web_search`](#web_search) · [`web_fetch`](#web_fetch) · [`create_image`](#create_image)
+  - [`question`](#question) · [`todo_list`](#todo_list)
+  - [`load_mcp_tool`](#load_mcp_tool) · [`skill`](#skill)
 - [Sub-agents](#sub-agents) — configurable specialised agents
 - [Agent swarm](#agent-swarm) — peer-to-peer team of 2–8 agents
 - [Compaction](#compaction) — auto and manual
@@ -87,7 +102,7 @@ It's only constrained technically if the user wants to impose a specific stack.
 
 ## `AGENTS.md` & `DESIGN.md`
 
-Sinew supports two reference files at the root of the workspace, and **injects them automatically into the model's system prompt**.
+Claake Code supports two reference files at the root of the workspace, and **injects them automatically into the model's system prompt**.
 
 **`AGENTS.md`** — general instructions for the agent: project conventions, constraints, things to avoid, etc. It's the equivalent of a README you write for the model rather than for a human. Open convention popularised by Codex and shared with a whole ecosystem of other tools — one file works everywhere. For comparison, `CLAUDE.md` (Anthropic's own convention) is **explicitly ignored** in favour of this common standard.
 
@@ -136,23 +151,23 @@ The agent has access to a full set of tools:
 | `bash` | Run shell commands |
 | `bash_input` | Send input to an interactive shell session |
 | `read` | Read files |
-| `Glob` | Find files by pattern |
-| `Grep` | Search text / regex in files |
+| `glob` | Find files by pattern |
+| `grep` | Search text / regex in files |
 | `edit_file` | Edit existing files with exact search/replace blocks |
 | `write_file` | Write complete files with overwrite guardrails |
-| `WebSearch` | Web search |
-| `WebFetch` | Fetch the contents of a URL |
-| `CreateImage` | Generate images |
-| `Question` | Ask the user questions |
-| `ToDoList` | Manage a task list |
+| `web_search` | Web search |
+| `web_fetch` | Fetch the contents of a URL |
+| `create_image` | Generate images |
+| `question` | Ask the user questions |
+| `todo_list` | Manage a task list |
 | `clean_context` | Clean useless tool results out of the context |
-| `LoadMcpTool` | Load an external MCP tool |
+| `load_mcp_tool` | Load an external MCP tool |
 | `skill` | Load a skill on demand (active when skills are present) |
 | `subagent_*` | Delegate a task to a configured sub-agent (one tool per enabled sub-agent) |
-| `TeamRun` | Launch an agent team |
-| `TeamStatus` | Inspect the team's state |
-| `TeamStop` | Stop one agent or the whole team |
-| `SendMessage` | Send a message between agents |
+| `team_run` | Launch an agent team |
+| `team_status` | Inspect the team's state |
+| `team_stop` | Stop one agent or the whole team |
+| `send_message` | Send a message between agents |
 
 Each tool can be **individually disabled** in Settings, which lets you go from a full-featured setup down to a minimalist one (CLI-style, à la Pi Code). Every tool description is also **editable**, which gives you another lever to tweak the harness.
 
@@ -177,7 +192,7 @@ Two guardrails:
 
 And that "current turn only" limit solves a problem many people will anticipate: **prompt caching**. If we touched older tool results, we'd break the prefix cached by the provider, and every subsequent turn would replay at full price. Here, the current turn isn't cached yet, so we can purge it without losing anything on the billing side. **You gain context without sacrificing the cache.**
 
-Why this is game-changing: tool results blow up the context very fast. A `Glob` can return hundreds of paths, a `read` up to 500 lines, a `Grep` a mountain of matches. On an exploration turn, most of that is noise. Without `clean_context` that noise piles up — especially in Goal mode where the context grows quickly. With it, the agent lives in a context that stays constantly cleaned of dead-end exploration.
+Why this is game-changing: tool results blow up the context very fast. A `glob` can return hundreds of paths, a `read` up to 500 lines, a `grep` a mountain of matches. On an exploration turn, most of that is noise. Without `clean_context` that noise piles up — especially in Goal mode where the context grows quickly. With it, the agent lives in a context that stays constantly cleaned of dead-end exploration.
 
 ---
 
@@ -193,7 +208,7 @@ On the UI side, each command shows up in a card that displays the exact input an
 
 ---
 
-#### Why dedicated tools for `read`, `Glob` and `Grep`?
+#### Why dedicated tools for `read`, `glob` and `grep`?
 
 Some agents like Codex rely on the terminal for most everyday operations — reading a file, searching text, listing paths. The agent has to compose the right shell command every time. Sinew does the opposite: these operations get their own dedicated tools.
 
@@ -226,7 +241,7 @@ And that's Sinew's whole philosophy: give the **minimum useful information**, no
 
 ---
 
-### `Glob`
+### `glob`
 
 Finds files in the workspace by pattern. Three parameters: `pattern`, `limit` and `path`.
 
@@ -234,7 +249,7 @@ Same rule: **`limit` is required**.
 
 The implementation sits on top of **ripgrep**.
 
-Here's what the agent receives after a `Glob` on `src/**/*.tsx`:
+Here's what the agent receives after a `glob` on `src/**/*.tsx`:
 
 ```
 matches: 42
@@ -249,7 +264,7 @@ Two counters: **`matches`** (the total found) and **`shown`** (how many are actu
 
 ---
 
-### `Grep`
+### `grep`
 
 Searches text or a regex in the workspace files. Seven parameters: `pattern`, `limit`, `path`, `include`, `output_mode`, `unique`, `exclude_pattern`.
 
@@ -269,7 +284,7 @@ Two complementary filters:
 - **`unique`** dedups output lines (especially useful with `output_mode=matches`)
 - **`exclude_pattern`** is an anti-match: a regex that excludes lines whose content matches it. Handy to drop tests, comments, or other noise without contorting the main pattern.
 
-Here's what the agent receives after a `Grep` on `forwardRef` filtered to `*.tsx` (`context` mode):
+Here's what the agent receives after a `grep` on `forwardRef` filtered to `*.tsx` (`context` mode):
 
 ```
 matches: 12
@@ -322,25 +337,25 @@ It creates new files directly, including parent directories. If the file already
 
 ---
 
-### `WebSearch`
+### `web_search`
 
 Two providers to choose from, configurable in Settings.
 
-**LinkUp** *(paid, API key required)* — the more powerful one. On LinkUp's side, an LLM receives the query, runs the search, and **synthesises a natural-language answer with numbered inline citations**, plus a list of sources (up to 12) with their excerpts. Two modes: `standard` for a direct answer, `deep` for complex multi-source research. The agent can then chain with `WebFetch` to drill into a specific source.
+**LinkUp** *(paid, API key required)* — the more powerful one. On LinkUp's side, an LLM receives the query, runs the search, and **synthesises a natural-language answer with numbered inline citations**, plus a list of sources (up to 12) with their excerpts. Two modes: `standard` for a direct answer, `deep` for complex multi-source research. The agent can then chain with `web_fetch` to drill into a specific source.
 
 **Exa** *(free, public MCP)* — classic search. Returns a list of results with titles, URLs and content excerpts. It's what most other coding agents that offer web search rely on.
 
 ---
 
-### `WebFetch`
+### `web_fetch`
 
-Fetches the contents of a URL — typically a source returned by `WebSearch`. Single parameter: `url`.
+Fetches the contents of a URL — typically a source returned by `web_search`. Single parameter: `url`.
 
 The page is converted to clean Markdown before it reaches the agent.
 
 ---
 
-### `CreateImage`
+### `create_image`
 
 Image generation, via **GPT Image 2** (OpenAI) or **Nano Banana 2** (Google), your choice in Settings. In both cases the agent controls the usual parameters (size, format, quality, etc.).
 
@@ -348,13 +363,13 @@ For GPT Image 2, two auth modes: either an **OpenAI API key**, or directly your 
 
 ---
 
-### `Question`
+### `question`
 
 A question tool inside the chat. Classic: the agent can send one or several questions at once, in `single_choice` or `multiple_choice` form.
 
 ---
 
-### `ToDoList`
+### `todo_list`
 
 The agent's todo list. A single tool does everything: add, modify, mark as done, or delete a task.
 
@@ -364,11 +379,11 @@ Sinew **re-injects the full state at every turn into the system reminder**. The 
 
 ---
 
-### `LoadMcpTool`
+### `load_mcp_tool`
 
 Sinew supports the MCP protocol. Servers are configured in Settings.
 
-But, unlike what you might expect, **MCP tools are not exposed directly** to the agent. What lives in the system prompt is just a **compact catalog** inside the `LoadMcpTool` description:
+But, unlike what you might expect, **MCP tools are not exposed directly** to the agent. What lives in the system prompt is just a **compact catalog** inside the `load_mcp_tool` description:
 
 ```
 Load one MCP tool before calling it. Available MCP tools:
@@ -379,7 +394,7 @@ Load one MCP tool before calling it. Available MCP tools:
 ...
 ```
 
-The agent calls `LoadMcpTool` with a `server` and a `tool`. From that point on, the tool in question is loaded into the conversation for good, with its full description and input schema. It can then use it normally.
+The agent calls `load_mcp_tool` with a `server` and a `tool`. From that point on, the tool in question is loaded into the conversation for good, with its full description and input schema. It can then use it normally.
 
 Why the gymnastics? The classic MCP problem: if you connect several servers (Context7, Linear, Notion, GitHub…), you can end up with 50+ tools, each with a verbose description and an input schema. Dumped as-is into the system prompt, that eats thousands of tokens **before the agent even starts working**.
 
@@ -389,7 +404,7 @@ With lazy-load via catalog: only a `server / tool` index stays permanently in th
 
 ### `skill`
 
-Same logic as `LoadMcpTool`, but for **skills**. The tool only appears in the system prompt **if at least one skill is discovered** on the machine or in the workspace.
+Same logic as `load_mcp_tool`, but for **skills**. The tool only appears in the system prompt **if at least one skill is discovered** on the machine or in the workspace.
 
 Its description carries a compact catalog:
 
@@ -422,12 +437,12 @@ Skills can be individually enabled or disabled in Settings.
 
 Sinew lets you configure as many **sub-agents** as you want in Settings, each with its own `name`, `description`, system `prompt`, `model`, and an `enabled` flag. Every enabled sub-agent is exposed to the main agent as a tool named `subagent_<id>` (e.g. `subagent_security-reviewer`, `subagent_doc-writer`). The tool description reuses the one you set in Settings, and the schema reduces to a single free-form `prompt`.
 
-When the main agent calls a sub-agent, Sinew launches a **full real turn** with the sub-agent's model and prompt, and the whole harness stays active: standard tools, `clean_context`, `ToDoList`, MCP, skills, all of it. The sub-agent works in isolation, then returns a result to the main agent.
+When the main agent calls a sub-agent, Sinew launches a **full real turn** with the sub-agent's model and prompt, and the whole harness stays active: standard tools, `clean_context`, `todo_list`, MCP, skills, all of it. The sub-agent works in isolation, then returns a result to the main agent.
 
 Two ways to use it:
 
 1. **Direct delegation (one-shot).** The main agent calls `subagent_<id>` for a focused task. Handy for handing off a precise job to a specialised prompt or model without changing the global harness.
-2. **Inside an Agent Team.** You assign a teammate to a sub-agent profile through `agent_profiles` in `TeamRun`. The teammate then inherits the sub-agent's prompt and model (see the next section).
+2. **Inside an Agent Team.** You assign a teammate to a sub-agent profile through `agent_profiles` in `team_run`. The teammate then inherits the sub-agent's prompt and model (see the next section).
 
 ---
 
@@ -454,9 +469,9 @@ The obvious risk of a flat team with no lead is drift — agents going in diverg
 At every turn of every teammate, Sinew injects into its system reminder:
 
 - **The full team state** (`<agent_team_state>`): who is who, each teammate's status (`running`, `idle`, `error`…), the whole task board, and the most recent file changes. Each agent therefore sees, at all times, what the others are doing, without having to dig through its own context.
-- **Messages received from other teammates** (`<queued_peer_messages>`): when a teammate sends a `SendMessage`, the recipient receives it at the start of its next turn via the reminder. No message lost in the conversation, no risk of being buried under further tool calls.
+- **Messages received from other teammates** (`<queued_peer_messages>`): when a teammate sends a `send_message`, the recipient receives it at the start of its next turn via the reminder. No message lost in the conversation, no risk of being buried under further tool calls.
 
-Same philosophy as `ToDoList`: important state is never "somewhere in history", it's **always fresh in front of the model's eyes**.
+Same philosophy as `todo_list`: important state is never "somewhere in history", it's **always fresh in front of the model's eyes**.
 
 Example of what a teammate receives in its system reminder at the start of a turn:
 
@@ -494,10 +509,10 @@ The shared board supports explicit dependencies (`blockedBy`). A blocked task ca
 
 ### Swarm tools
 
-- `TeamRun` *(main agent side)* — launch a team with an objective, named teammates, an initial task board, and optionally per-teammate prompts or sub-agent profiles.
-- `TeamStatus` *(main side)* — inspect the state of the active team.
-- `TeamStop` *(main side)* — stop one teammate, or the whole team.
-- `SendMessage` *(teammate side)* — DM another teammate, or broadcast to all agents in the team.
+- `team_run` *(main agent side)* — launch a team with an objective, named teammates, an initial task board, and optionally per-teammate prompts or sub-agent profiles.
+- `team_status` *(main side)* — inspect the state of the active team.
+- `team_stop` *(main side)* — stop one teammate, or the whole team.
+- `send_message` *(teammate side)* — DM another teammate, or broadcast to all agents in the team.
 - An internal `task_list` tool lets teammates manipulate the shared board (create, update, claim, delete).
 
 ---

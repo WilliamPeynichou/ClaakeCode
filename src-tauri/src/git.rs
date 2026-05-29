@@ -1,7 +1,11 @@
 use crate::*;
 use std::ffi::OsStr;
+#[cfg(target_os = "windows")]
+use std::ffi::OsString;
 use std::path::Component;
 use std::process::Stdio;
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,6 +108,24 @@ pub(super) struct GitCreateBranchInput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct GitDeleteBranchInput {
+    pub(super) workspace_path: String,
+    pub(super) branch_name: String,
+    pub(super) force: bool,
+    pub(super) delete_remote: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct GitRenameBranchInput {
+    pub(super) workspace_path: String,
+    pub(super) old_name: String,
+    pub(super) new_name: String,
+    pub(super) sync_remote: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct GitCommitInput {
     pub(super) workspace_path: String,
     pub(super) message: String,
@@ -131,11 +153,18 @@ struct ParsedWorktree {
     head: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BranchUpstream {
+    remote: String,
+    branch: String,
+}
+
 #[tauri::command]
 pub(super) async fn git_repository_snapshot_command(
     input: WorkspaceInput,
 ) -> std::result::Result<GitRepositorySnapshot, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     Ok(repository_snapshot(&workspace_root))
 }
 
@@ -144,7 +173,8 @@ pub(super) async fn git_init_command(
     app: AppHandle,
     input: WorkspaceInput,
 ) -> std::result::Result<GitRepositorySnapshot, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     ensure_git_available().map_err(error_to_string)?;
     git_checked(&workspace_root, &["init"]).map_err(error_to_string)?;
     emit_workspace_file_change(&app, &workspace_root, "");
@@ -155,9 +185,11 @@ pub(super) async fn git_init_command(
 pub(super) async fn git_create_worktree_command(
     input: GitCreateWorktreeInput,
 ) -> std::result::Result<GitCreateWorktreeOutput, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
-    let branch = validate_branch_name_input(&repo_root, &input.branch_name).map_err(error_to_string)?;
+    let branch =
+        validate_branch_name_input(&repo_root, &input.branch_name).map_err(error_to_string)?;
     let base_branch = input
         .base_branch
         .as_deref()
@@ -196,10 +228,12 @@ pub(super) async fn git_create_worktree_command(
     if input.push_immediately {
         match git_checked(&worktree_path, &["push", "-u", "origin", &branch]) {
             Ok(_) => pushed = true,
-            Err(err) => warning = Some(format!(
-                "Worktree created, but the branch could not be pushed: {}",
-                err
-            )),
+            Err(err) => {
+                warning = Some(format!(
+                    "Worktree created, but the branch could not be pushed: {}",
+                    err
+                ))
+            }
         }
     }
 
@@ -220,7 +254,8 @@ pub(super) async fn git_create_worktree_command(
 pub(super) async fn git_remove_worktree_command(
     input: GitRemoveWorktreeInput,
 ) -> std::result::Result<GitOperationResult, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
     let target = PathBuf::from(input.target_path.trim());
     if target.as_os_str().is_empty() {
@@ -267,9 +302,11 @@ pub(super) async fn git_remove_worktree_command(
 pub(super) async fn git_create_branch_command(
     input: GitCreateBranchInput,
 ) -> std::result::Result<GitOperationResult, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
-    let branch = validate_branch_name_input(&repo_root, &input.branch_name).map_err(error_to_string)?;
+    let branch =
+        validate_branch_name_input(&repo_root, &input.branch_name).map_err(error_to_string)?;
     if local_branch_exists(&repo_root, &branch).map_err(error_to_string)? {
         return Err(format!("branch '{branch}' already exists"));
     }
@@ -289,10 +326,137 @@ pub(super) async fn git_create_branch_command(
 }
 
 #[tauri::command]
+pub(super) async fn git_delete_branch_command(
+    input: GitDeleteBranchInput,
+) -> std::result::Result<GitOperationResult, String> {
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
+    let branch =
+        validate_branch_name_input(&repo_root, &input.branch_name).map_err(error_to_string)?;
+    if !local_branch_exists(&repo_root, &branch).map_err(error_to_string)? {
+        return Err(format!("branch '{branch}' was not found"));
+    }
+    ensure_branch_not_checked_out(&repo_root, &branch).map_err(error_to_string)?;
+
+    let upstream = branch_upstream(&repo_root, &branch).map_err(error_to_string)?;
+    if input.delete_remote && upstream.is_none() {
+        return Err(format!(
+            "branch '{branch}' has no upstream remote branch to delete"
+        ));
+    }
+    let output = delete_local_branch(&repo_root, &branch, input.force).map_err(error_to_string)?;
+    let mut message = format!("Deleted local branch {branch}.");
+    let mut stdout_parts = Vec::new();
+    let mut stderr_parts = Vec::new();
+    collect_command_output(output, &mut stdout_parts, &mut stderr_parts);
+
+    if input.delete_remote {
+        let upstream = upstream.expect("upstream is checked before deleting local branch");
+        match delete_remote_branch(&repo_root, &upstream) {
+            Ok(remote_output) => {
+                message = format!(
+                    "Deleted local branch {branch} and remote {}/{}.",
+                    upstream.remote, upstream.branch
+                );
+                collect_command_output(remote_output, &mut stdout_parts, &mut stderr_parts);
+            }
+            Err(err) => {
+                return Err(format!(
+                    "Local branch {branch} was deleted, but remote {}/{} could not be deleted: {}",
+                    upstream.remote, upstream.branch, err
+                ));
+            }
+        }
+    }
+
+    Ok(operation_result_from_parts(
+        message,
+        stdout_parts,
+        stderr_parts,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn git_rename_branch_command(
+    input: GitRenameBranchInput,
+) -> std::result::Result<GitOperationResult, String> {
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
+    let old_name =
+        validate_branch_name_input(&repo_root, &input.old_name).map_err(error_to_string)?;
+    let new_name =
+        validate_branch_name_input(&repo_root, &input.new_name).map_err(error_to_string)?;
+    if old_name == new_name {
+        return Err("new branch name must be different".into());
+    }
+    if !local_branch_exists(&repo_root, &old_name).map_err(error_to_string)? {
+        return Err(format!("branch '{old_name}' was not found"));
+    }
+    if local_branch_exists(&repo_root, &new_name).map_err(error_to_string)? {
+        return Err(format!("branch '{new_name}' already exists"));
+    }
+    ensure_branch_rename_allowed(&repo_root, &old_name).map_err(error_to_string)?;
+    let upstream = branch_upstream(&repo_root, &old_name).map_err(error_to_string)?;
+
+    let rename_output =
+        rename_local_branch(&repo_root, &old_name, &new_name).map_err(error_to_string)?;
+    let mut message = format!("Renamed branch {old_name} to {new_name}.");
+    let mut stdout_parts = Vec::new();
+    let mut stderr_parts = Vec::new();
+    collect_command_output(rename_output, &mut stdout_parts, &mut stderr_parts);
+
+    if input.sync_remote {
+        let remote = upstream
+            .as_ref()
+            .map(|upstream| upstream.remote.clone())
+            .unwrap_or_else(|| "origin".to_string());
+        match push_branch_to_remote(&repo_root, &remote, &new_name) {
+            Ok(push_output) => {
+                collect_command_output(push_output, &mut stdout_parts, &mut stderr_parts)
+            }
+            Err(err) => {
+                return Err(format!(
+                    "Local branch was renamed to {new_name}, but pushing {new_name} to {remote} failed: {err}"
+                ));
+            }
+        }
+        if let Some(upstream) = upstream {
+            match delete_remote_branch(&repo_root, &upstream) {
+                Ok(delete_output) => {
+                    message = format!(
+                        "Renamed branch {old_name} to {new_name}, pushed {remote}/{new_name}, and deleted {}/{}.",
+                        upstream.remote, upstream.branch
+                    );
+                    collect_command_output(delete_output, &mut stdout_parts, &mut stderr_parts);
+                }
+                Err(err) => {
+                    return Err(format!(
+                        "Local branch was renamed to {new_name} and pushed to {remote}, but old remote {}/{} could not be deleted: {}",
+                        upstream.remote, upstream.branch, err
+                    ));
+                }
+            }
+        } else {
+            message =
+                format!("Renamed branch {old_name} to {new_name} and pushed {remote}/{new_name}.");
+        }
+    }
+
+    Ok(operation_result_from_parts(
+        message,
+        stdout_parts,
+        stderr_parts,
+    ))
+}
+
+#[tauri::command]
 pub(super) async fn git_commit_command(
     input: GitCommitInput,
 ) -> std::result::Result<GitOperationResult, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
     let message = input.message.trim();
     if message.is_empty() {
@@ -322,7 +486,8 @@ pub(super) async fn git_commit_command(
 pub(super) async fn git_push_command(
     input: WorkspaceInput,
 ) -> std::result::Result<GitOperationResult, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
     let output = git_checked(&repo_root, &["push"]).map_err(error_to_string)?;
     Ok(operation_result("Push completed.", output))
@@ -333,7 +498,8 @@ pub(super) async fn git_pull_command(
     app: AppHandle,
     input: WorkspaceInput,
 ) -> std::result::Result<GitOperationResult, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
     let output = git_checked(&repo_root, &["pull", "--no-edit"]).map_err(error_to_string)?;
     emit_workspace_file_change(&app, &repo_root, "");
@@ -344,9 +510,10 @@ pub(super) async fn git_pull_command(
 pub(super) async fn git_create_pull_request_command(
     input: GitCreatePullRequestInput,
 ) -> std::result::Result<GitPullRequestOutput, String> {
-    let workspace_root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
-    ensure_gh_available().map_err(error_to_string)?;
+    let gh = ensure_gh_available().map_err(error_to_string)?;
 
     let title = input.title.trim();
     if title.is_empty() {
@@ -372,7 +539,8 @@ pub(super) async fn git_create_pull_request_command(
         "--head".to_string(),
         head,
     ];
-    let output = run_checked("gh", Some(&repo_root), &args).map_err(error_to_string)?;
+    let output =
+        run_checked_with_program(&gh, "gh", Some(&repo_root), &args).map_err(error_to_string)?;
     let combined = join_output(&output.stdout, &output.stderr);
     let url = extract_url(&combined)
         .ok_or_else(|| "GitHub CLI did not return a pull request URL".to_string())?;
@@ -399,7 +567,10 @@ fn repository_snapshot(workspace_root: &Path) -> GitRepositorySnapshot {
             status: Vec::new(),
             worktrees: Vec::new(),
             branches: Vec::new(),
-            error: Some("Git is not installed or is not available on PATH.".into()),
+            error: Some(
+                "Git is not installed or could not be found in PATH or standard install locations."
+                    .into(),
+            ),
         };
     }
 
@@ -457,7 +628,8 @@ fn repository_snapshot_for_repo(
     let dirty_count = status.len();
     let current_branch = current_branch(repo_root)?;
     let branches = list_branches(repo_root, current_branch.as_deref())?;
-    let main_branch = detect_main_branch_from_branches(repo_root, &branches, current_branch.as_deref())?;
+    let main_branch =
+        detect_main_branch_from_branches(repo_root, &branches, current_branch.as_deref())?;
     let worktrees = list_worktrees(repo_root, workspace_root)?;
 
     Ok(GitRepositorySnapshot {
@@ -476,26 +648,169 @@ fn repository_snapshot_for_repo(
     })
 }
 
-fn ensure_git_available() -> Result<()> {
-    if command_available("git") {
-        Ok(())
-    } else {
-        anyhow::bail!("Git is not installed or is not available on PATH.")
-    }
+fn ensure_git_available() -> Result<PathBuf> {
+    resolve_executable("git").ok_or_else(|| {
+        anyhow::anyhow!(
+            "Git is not installed or could not be found. Install Git and restart Claake Code."
+        )
+    })
 }
 
-fn ensure_gh_available() -> Result<()> {
-    if command_available("gh") {
-        Ok(())
-    } else {
-        anyhow::bail!(
-            "GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ to create pull requests."
+fn ensure_gh_available() -> Result<PathBuf> {
+    resolve_executable("gh").ok_or_else(|| {
+        anyhow::anyhow!(
+            "GitHub CLI (`gh`) is not installed or could not be found. Install it from https://cli.github.com/ to create pull requests."
         )
-    }
+    })
 }
 
 fn command_available(program: &str) -> bool {
-    Command::new(program)
+    resolve_executable(program).is_some()
+}
+
+fn resolve_executable(program: &str) -> Option<PathBuf> {
+    let direct = PathBuf::from(program);
+    if direct.components().count() > 1 {
+        if let Some(candidate) = find_working_executable(&direct) {
+            return Some(candidate);
+        }
+    }
+
+    if let Some(path_var) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            if let Some(candidate) = find_working_executable(&dir.join(program)) {
+                return Some(candidate);
+            }
+        }
+    }
+
+    for dir in fallback_executable_dirs(program) {
+        if let Some(candidate) = find_working_executable(&dir.join(program)) {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn find_working_executable(base: &Path) -> Option<PathBuf> {
+    executable_candidates(base)
+        .into_iter()
+        .find(|candidate| executable_works(candidate))
+}
+
+#[cfg(target_os = "windows")]
+fn executable_candidates(base: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![base.to_path_buf()];
+    if base.extension().is_some() {
+        return candidates;
+    }
+
+    let Some(file_name) = base.file_name() else {
+        return candidates;
+    };
+
+    for extension in windows_executable_extensions() {
+        let mut name = OsString::from(file_name);
+        name.push(OsStr::new(&extension));
+        candidates.push(base.with_file_name(name));
+    }
+    candidates
+}
+
+#[cfg(not(target_os = "windows"))]
+fn executable_candidates(base: &Path) -> Vec<PathBuf> {
+    vec![base.to_path_buf()]
+}
+
+#[cfg(target_os = "windows")]
+fn windows_executable_extensions() -> Vec<String> {
+    let mut extensions = Vec::new();
+    for extension in [".exe", ".cmd", ".bat", ".com"] {
+        push_unique_extension(&mut extensions, extension);
+    }
+    if let Some(path_ext) = std::env::var_os("PATHEXT") {
+        for extension in path_ext.to_string_lossy().split(';') {
+            push_unique_extension(&mut extensions, extension);
+        }
+    }
+    extensions
+}
+
+#[cfg(target_os = "windows")]
+fn push_unique_extension(extensions: &mut Vec<String>, raw: &str) {
+    let extension = raw.trim().trim_matches('"');
+    if extension.is_empty() {
+        return;
+    }
+    let extension = if extension.starts_with('.') {
+        extension.to_string()
+    } else {
+        format!(".{extension}")
+    };
+    if !extensions
+        .iter()
+        .any(|existing| existing.eq_ignore_ascii_case(&extension))
+    {
+        extensions.push(extension);
+    }
+}
+
+fn fallback_executable_dirs(_program: &str) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        if _program.eq_ignore_ascii_case("git") {
+            append_windows_git_dirs(&mut dirs);
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        dirs.extend([
+            PathBuf::from("/opt/homebrew/bin"),
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/opt/local/bin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/bin"),
+        ]);
+        if let Some(home) = home_dir() {
+            dirs.push(home.join(".local/bin"));
+            dirs.push(home.join("bin"));
+        }
+    }
+
+    dirs
+}
+
+#[cfg(target_os = "windows")]
+fn append_windows_git_dirs(dirs: &mut Vec<PathBuf>) {
+    let mut roots = vec![
+        PathBuf::from(r"C:\Program Files\Git"),
+        PathBuf::from(r"C:\Program Files (x86)\Git"),
+    ];
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        roots.push(PathBuf::from(program_files).join("Git"));
+    }
+    if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
+        roots.push(PathBuf::from(program_files_x86).join("Git"));
+    }
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        roots.push(PathBuf::from(local_app_data).join("Programs").join("Git"));
+    }
+
+    for root in roots {
+        dirs.push(root.join("cmd"));
+        dirs.push(root.join("bin"));
+    }
+}
+
+fn executable_works(path: &Path) -> bool {
+    if !path.exists() {
+        return false;
+    }
+    Command::new(path)
         .arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -544,7 +859,15 @@ fn detect_main_branch_from_branches(
     branches: &[GitBranch],
     current_branch: Option<&str>,
 ) -> Result<Option<String>> {
-    let origin_head = git_output(repo_root, &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"])?;
+    let origin_head = git_output(
+        repo_root,
+        &[
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+    )?;
     if origin_head.success {
         let trimmed = origin_head.stdout.trim();
         if let Some((_, name)) = trimmed.split_once('/') {
@@ -787,6 +1110,88 @@ fn local_branch_exists(repo_root: &Path, branch: &str) -> Result<bool> {
     Ok(git_output(repo_root, &["show-ref", "--verify", "--quiet", &refname])?.success)
 }
 
+fn branch_upstream(repo_root: &Path, branch: &str) -> Result<Option<BranchUpstream>> {
+    let remote_key = format!("branch.{branch}.remote");
+    let merge_key = format!("branch.{branch}.merge");
+    let remote = git_output(repo_root, &["config", "--get", &remote_key])?;
+    if !remote.success {
+        return Ok(None);
+    }
+    let remote = remote.stdout.trim();
+    if remote.is_empty() || remote == "." {
+        return Ok(None);
+    }
+    let merge = git_output(repo_root, &["config", "--get", &merge_key])?;
+    if !merge.success {
+        return Ok(None);
+    }
+    let branch_name = merge.stdout.trim();
+    let Some(branch_name) = branch_name.strip_prefix("refs/heads/") else {
+        return Ok(None);
+    };
+    if branch_name.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(BranchUpstream {
+        remote: remote.to_string(),
+        branch: branch_name.to_string(),
+    }))
+}
+
+fn ensure_branch_not_checked_out(repo_root: &Path, branch: &str) -> Result<()> {
+    if let Some(worktree) = worktree_using_branch(repo_root, branch)? {
+        anyhow::bail!(
+            "branch '{branch}' is checked out in worktree {}",
+            worktree.display()
+        );
+    }
+    Ok(())
+}
+
+fn ensure_branch_rename_allowed(repo_root: &Path, branch: &str) -> Result<()> {
+    if let Some(worktree) = worktree_using_branch(repo_root, branch)? {
+        let current = canonical_or_original(repo_root);
+        if !same_path(&worktree, &current) {
+            anyhow::bail!(
+                "branch '{branch}' is checked out in worktree {}",
+                worktree.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn worktree_using_branch(repo_root: &Path, branch: &str) -> Result<Option<PathBuf>> {
+    Ok(list_worktree_records(repo_root)?
+        .into_iter()
+        .find(|record| record.branch.as_deref() == Some(branch))
+        .map(|record| record.path))
+}
+
+fn delete_local_branch(repo_root: &Path, branch: &str, force: bool) -> Result<GitCommandOutput> {
+    let mode = if force { "-D" } else { "-d" };
+    git_checked(repo_root, &["branch", mode, "--", branch])
+}
+
+fn rename_local_branch(
+    repo_root: &Path,
+    old_name: &str,
+    new_name: &str,
+) -> Result<GitCommandOutput> {
+    git_checked(repo_root, &["branch", "-m", "--", old_name, new_name])
+}
+
+fn push_branch_to_remote(repo_root: &Path, remote: &str, branch: &str) -> Result<GitCommandOutput> {
+    git_checked(repo_root, &["push", "-u", remote, branch])
+}
+
+fn delete_remote_branch(repo_root: &Path, upstream: &BranchUpstream) -> Result<GitCommandOutput> {
+    git_checked(
+        repo_root,
+        &["push", &upstream.remote, "--delete", &upstream.branch],
+    )
+}
+
 fn remote_branch_for(repo_root: &Path, branch: &str) -> Result<Option<String>> {
     let explicit_remote_ref = format!("refs/remotes/{branch}");
     if git_output(
@@ -887,6 +1292,31 @@ fn operation_result(message: impl Into<String>, output: GitCommandOutput) -> Git
     }
 }
 
+fn operation_result_from_parts(
+    message: impl Into<String>,
+    stdout_parts: Vec<String>,
+    stderr_parts: Vec<String>,
+) -> GitOperationResult {
+    GitOperationResult {
+        message: message.into(),
+        stdout: optional_output(stdout_parts.join("\n")),
+        stderr: optional_output(stderr_parts.join("\n")),
+    }
+}
+
+fn collect_command_output(
+    output: GitCommandOutput,
+    stdout_parts: &mut Vec<String>,
+    stderr_parts: &mut Vec<String>,
+) {
+    if let Some(stdout) = optional_output(output.stdout) {
+        stdout_parts.push(stdout);
+    }
+    if let Some(stderr) = optional_output(output.stderr) {
+        stderr_parts.push(stderr);
+    }
+}
+
 fn optional_output(value: String) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -911,18 +1341,40 @@ fn git_output(repo: &Path, args: &[&str]) -> Result<GitCommandOutput> {
 }
 
 fn run_checked(program: &str, cwd: Option<&Path>, args: &[String]) -> Result<GitCommandOutput> {
-    let output = run_output(program, cwd, args)?;
+    let path = resolve_executable(program)
+        .ok_or_else(|| anyhow::anyhow!("unable to find executable '{program}'"))?;
+    run_checked_with_program(&path, program, cwd, args)
+}
+
+fn run_checked_with_program(
+    program_path: &Path,
+    program_label: &str,
+    cwd: Option<&Path>,
+    args: &[String],
+) -> Result<GitCommandOutput> {
+    let output = run_output_with_program(program_path, program_label, cwd, args)?;
     if output.success {
         Ok(output)
     } else {
-        anyhow::bail!(format_command_error(program, args, &output))
+        anyhow::bail!(format_command_error(program_label, args, &output))
     }
 }
 
 fn run_output(program: &str, cwd: Option<&Path>, args: &[String]) -> Result<GitCommandOutput> {
-    let mut command = Command::new(program);
+    let path = resolve_executable(program)
+        .ok_or_else(|| anyhow::anyhow!("unable to find executable '{program}'"))?;
+    run_output_with_program(&path, program, cwd, args)
+}
+
+fn run_output_with_program(
+    program_path: &Path,
+    program_label: &str,
+    cwd: Option<&Path>,
+    args: &[String],
+) -> Result<GitCommandOutput> {
+    let mut command = Command::new(program_path);
     if let Some(cwd) = cwd {
-        if program == "git" {
+        if program_label == "git" {
             command.arg("-C").arg(cwd);
         } else {
             command.current_dir(cwd);
@@ -934,7 +1386,7 @@ fn run_output(program: &str, cwd: Option<&Path>, args: &[String]) -> Result<GitC
     command.stdin(Stdio::null());
     let output = command
         .output()
-        .with_context(|| format!("unable to launch {program}"))?;
+        .with_context(|| format!("unable to launch {program_label}"))?;
     Ok(GitCommandOutput {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -968,7 +1420,10 @@ fn extract_url(value: &str) -> Option<String> {
     value
         .split_whitespace()
         .find(|part| part.starts_with("https://") || part.starts_with("http://"))
-        .map(|part| part.trim_matches(|ch: char| matches!(ch, ')' | ']' | ',' | '.')).to_string())
+        .map(|part| {
+            part.trim_matches(|ch: char| matches!(ch, ')' | ']' | ',' | '.'))
+                .to_string()
+        })
 }
 
 fn is_not_git_repository_error(message: &str) -> bool {
@@ -982,4 +1437,128 @@ fn canonical_or_original(path: &Path) -> PathBuf {
 
 fn same_path(left: &Path, right: &Path) -> bool {
     canonical_or_original(left) == canonical_or_original(right)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn executable_candidates_keep_unix_name_unchanged() {
+        assert_eq!(
+            executable_candidates(Path::new("git")),
+            vec![PathBuf::from("git")]
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn executable_candidates_add_windows_extensions() {
+        let candidates = executable_candidates(Path::new("git"));
+
+        assert!(candidates.contains(&PathBuf::from("git.exe")));
+        assert!(candidates.contains(&PathBuf::from("git.cmd")));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn fallback_dirs_include_git_for_windows_locations() {
+        let dirs = fallback_executable_dirs("git");
+
+        assert!(dirs.contains(&PathBuf::from(r"C:\Program Files\Git\cmd")));
+        assert!(dirs.contains(&PathBuf::from(r"C:\Program Files\Git\bin")));
+    }
+
+    #[test]
+    fn branch_upstream_reads_remote_and_merge_config() {
+        let repo = init_test_repo("upstream");
+        run_test_git(&repo, &["branch", "feature"]);
+        run_test_git(&repo, &["config", "branch.feature.remote", "origin"]);
+        run_test_git(
+            &repo,
+            &["config", "branch.feature.merge", "refs/heads/feature"],
+        );
+
+        let upstream = branch_upstream(&repo, "feature")
+            .expect("read upstream")
+            .expect("upstream exists");
+
+        assert_eq!(upstream.remote, "origin");
+        assert_eq!(upstream.branch, "feature");
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn deleting_checked_out_branch_is_rejected() {
+        let repo = init_test_repo("delete-checked-out");
+        let err = ensure_branch_not_checked_out(&repo, "main").unwrap_err();
+
+        assert!(err.to_string().contains("checked out in worktree"));
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn rename_allows_current_worktree_branch() {
+        let repo = init_test_repo("rename-current");
+
+        ensure_branch_rename_allowed(&repo, "main").expect("current branch may be renamed locally");
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn delete_local_branch_uses_force_flag() {
+        let repo = init_test_repo("delete-force");
+        run_test_git(&repo, &["branch", "feature"]);
+
+        delete_local_branch(&repo, "feature", true).expect("force delete branch");
+
+        assert!(!local_branch_exists(&repo, "feature").expect("check deleted branch"));
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn rename_local_branch_changes_ref() {
+        let repo = init_test_repo("rename-local");
+        run_test_git(&repo, &["branch", "old"]);
+
+        rename_local_branch(&repo, "old", "new").expect("rename branch");
+
+        assert!(!local_branch_exists(&repo, "old").expect("old branch missing"));
+        assert!(local_branch_exists(&repo, "new").expect("new branch exists"));
+        fs::remove_dir_all(repo).ok();
+    }
+
+    fn init_test_repo(name: &str) -> PathBuf {
+        if !command_available("git") {
+            panic!("git is required for git.rs tests");
+        }
+        let root = unique_temp_dir(name);
+        fs::create_dir_all(&root).expect("create git test repo");
+        run_test_git(&root, &["init", "-b", "main"]);
+        run_test_git(&root, &["config", "user.email", "test@example.com"]);
+        run_test_git(&root, &["config", "user.name", "Claake Code Test"]);
+        fs::write(root.join("README.md"), "test\n").expect("write test file");
+        run_test_git(&root, &["add", "README.md"]);
+        run_test_git(&root, &["commit", "-m", "initial"]);
+        canonical_or_original(&root)
+    }
+
+    fn run_test_git(repo: &Path, args: &[&str]) {
+        git_checked(repo, args)
+            .unwrap_or_else(|err| panic!("git {} failed: {err}", args.join(" ")));
+    }
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        static NEXT_TEMP_ID: AtomicUsize = AtomicUsize::new(0);
+        let counter = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "claakecode-git-test-{name}-{}-{counter}-{nanos}",
+            std::process::id()
+        ))
+    }
 }

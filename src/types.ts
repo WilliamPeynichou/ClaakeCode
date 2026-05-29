@@ -19,7 +19,7 @@ export type UpdateProgress = {
   total: number | null;
 };
 
-/// Detail payload of the `sinew:install-update` DOM event. Dispatched on the
+/// Detail payload of the `claakecode:install-update` DOM event. Dispatched on the
 /// `window` by <UpdateBadge /> when the user clicks "Install & restart" in
 /// the in-session popover. <App /> listens for it and swaps the whole UI
 /// for <UpdaterLockScreen autoInstall />, which then drives the download +
@@ -30,7 +30,7 @@ export type InstallUpdateEventDetail = {
 
 declare global {
   interface WindowEventMap {
-    "sinew:install-update": CustomEvent<InstallUpdateEventDetail>;
+    "claakecode:install-update": CustomEvent<InstallUpdateEventDetail>;
   }
 }
 
@@ -679,7 +679,7 @@ export type AgentEvent =
       event: AgentEvent;
     }
   | { type: "agent_slept" }
-  | { type: "turn_finished" };
+  | { type: "turn_finished"; duration_ms?: number | null };
 
 export type StreamTokenUsage = {
   input_tokens: number;
