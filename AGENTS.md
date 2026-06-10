@@ -56,6 +56,7 @@ Code map:
 │   │       │   ├── mode.rs
 │   │       │   ├── tests.rs
 │   │       │   ├── tool_dispatch.rs
+│   │       │   ├── tool_preflight.rs
 │   │       │   ├── tool_summary.rs
 │   │       │   └── turn.rs
 │   │       ├── bash.rs
@@ -68,6 +69,7 @@ Code map:
 │   │       ├── image.rs
 │   │       ├── lib.rs
 │   │       ├── mcp.rs
+│   │       ├── powershell.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
 │   │       ├── skill.rs

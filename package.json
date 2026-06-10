@@ -1,7 +1,7 @@
 {
   "name": "claakecode",
   "private": true,
-  "version": "0.1.26",
+  "version": "0.1.36",
   "type": "module",
   "scripts": {
     "dev": "vite",

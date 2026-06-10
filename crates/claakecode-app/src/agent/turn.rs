@@ -31,10 +31,11 @@ use super::{
     },
     mode::{run_update_goal, system_prompt_for_turn, update_goal_descriptor},
     tool_dispatch::{run_tool, should_wait_for_cooperative_cancel},
+    tool_preflight::{preflight_error_result, ToolPreflightRegistry},
     tool_summary::{display_mcp_server_name, pretty_json, should_stream_tool_args, summarize_tool},
 };
 
-use crate::{system_prompt_with_todo, tool_names, ReadFingerprint, ToolRunResult};
+use crate::{system_prompt_with_todo, tool_names, ReadFingerprint, TodoListState, ToolRunResult};
 
 const SAFE_STREAM_MAX_RETRIES: usize = 5;
 
@@ -89,6 +90,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
     let mut current_turn_tool_result_ids = BTreeSet::new();
     let mut eager_tool_results = BTreeMap::<String, JoinHandle<ToolRunResult>>::new();
     let mut read_fingerprints = successful_read_fingerprints(&history, &read);
+    let mut todo_final_answer_guard_attempted = false;
     todo_list.normalize();
 
     'conversation: loop {
@@ -278,6 +280,8 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             let mut stream_error = None;
             let mut saw_message_stop = false;
             let mut finalized_tool_calls = 0usize;
+            let mut tool_preflights = ToolPreflightRegistry::default();
+            let mut preflight_abort: Option<(usize, ToolRunResult)> = None;
 
             loop {
                 tokio::select! {
@@ -309,6 +313,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                                     PartKind::ToolCall => {
                                         if let Some(tool) = tool {
                                             message_builder.register_tool(index, tool.id.clone(), tool.name.clone());
+                                            tool_preflights.start_tool(index, &tool.name);
                                             send_event(&event_tx, event_scope.as_ref(), AgentEvent::ToolStarted { id: tool.id, name: tool.name });
                                         }
                                     }
@@ -326,8 +331,21 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                                 message_builder.push_tool_json(index, &chunk);
                                 if let Some((id, name)) = message_builder.tool_head(index) {
                                     if should_stream_tool_args(&name) {
-                                        send_event(&event_tx, event_scope.as_ref(), AgentEvent::ToolArgsDelta { id, delta: chunk });
+                                        send_event(&event_tx, event_scope.as_ref(), AgentEvent::ToolArgsDelta { id: id.clone(), delta: chunk.clone() });
                                     }
+                                    if preflight_abort.is_none() {
+                                        if let Some(result) = tool_preflights.push_tool_json(
+                                            index,
+                                            &chunk,
+                                            &write_file,
+                                            &read_fingerprints,
+                                        ) {
+                                            preflight_abort = Some((index, result));
+                                        }
+                                    }
+                                }
+                                if preflight_abort.is_some() {
+                                    break;
                                 }
                             }
                             StreamEvent::PartMeta { index, meta } => {
@@ -374,6 +392,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                                             args_pretty: pretty_json(&args),
                                         });
                                         if should_run_eager_write_file(&name, mode, &tool_settings)
+                                            && tool_preflights.failed(index).is_none()
                                             && finalized_tool_calls == 0
                                             && loops < max_tool_rounds
                                             && eager_tool_results.is_empty()
@@ -409,6 +428,15 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 }
             }
 
+            if let Some((index, result)) = &preflight_abort {
+                message_builder.insert_meta_field(*index, "preflight_aborted", json!(true));
+                message_builder.insert_meta_field(
+                    *index,
+                    "preflight_error",
+                    json!(result.content.clone()),
+                );
+            }
+
             // Detect a silent stream close: the underlying SSE source returned `None` (or yielded
             // its last item) without ever emitting a `MessageStop`. This is the classic "OpenAI
             // just stops without an error" symptom — usually a connection drop on the provider /
@@ -419,6 +447,12 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     "{} stream closed without sending a stop event (likely a connection drop)",
                     provider.name()
                 )));
+            }
+
+            if let Some((_index, _)) = &preflight_abort {
+                abort_eager_tool_results(&mut eager_tool_results);
+                stop_reason = StopReason::ToolUse;
+                break 'stream_attempt (message_builder, stop_reason, response_usage);
             }
 
             if let Some(err) = stream_error {
@@ -530,6 +564,21 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             stop_reason = StopReason::ToolUse;
         }
         if !matches!(stop_reason, StopReason::ToolUse) {
+            let todo_guard_tool_available =
+                todo_list_tool.is_some() && tool_settings.is_enabled(tool_names::TODO_LIST);
+            if should_trigger_todo_final_answer_guard(
+                &todo_list,
+                todo_guard_tool_available,
+                stop_reason,
+                &assistant,
+                todo_final_answer_guard_attempted,
+                loops,
+                max_tool_rounds,
+            ) {
+                todo_final_answer_guard_attempted = true;
+                history.push(todo_final_answer_guard_message(&todo_list));
+                continue 'conversation;
+            }
             break;
         }
 
@@ -552,7 +601,9 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 id, name, input, ..
             } = part
             {
-                let result = if name == "clean_context" {
+                let result = if let Some(preflight_error) = preflight_error_result(part) {
+                    preflight_error
+                } else if name == "clean_context" {
                     run_clean_context(&mut history, input.clone(), &current_turn_tool_result_ids)
                 } else if name == "update_goal" {
                     run_update_goal(&mut goal_workflow, input.clone())
@@ -770,6 +821,72 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         interrupted: cancelled,
         compacted,
     }
+}
+
+pub(super) fn should_trigger_todo_final_answer_guard(
+    state: &TodoListState,
+    todo_tool_available: bool,
+    stop_reason: StopReason,
+    assistant: &ChatMessage,
+    already_attempted: bool,
+    tool_loops_used: usize,
+    max_tool_rounds: usize,
+) -> bool {
+    !already_attempted
+        && todo_tool_available
+        && tool_loops_used < max_tool_rounds
+        && matches!(stop_reason, StopReason::EndTurn)
+        && todo_list_needs_final_answer_update(state)
+        && assistant_has_visible_final_text(assistant)
+        && !assistant_has_tool_call(assistant)
+}
+
+pub(super) fn todo_final_answer_guard_message(state: &TodoListState) -> ChatMessage {
+    ChatMessage {
+        role: Role::User,
+        parts: vec![Part::Text {
+            text: todo_final_answer_guard_prompt(state),
+            meta: Some(json!({
+                "system_reminder": true,
+                "todo_final_answer_guard": true,
+            })),
+        }],
+    }
+}
+
+fn todo_final_answer_guard_prompt(state: &TodoListState) -> String {
+    let snapshot = state.render_tool_output("Current todo_list before final-answer guard:");
+    format!(
+        "<todo_final_answer_guard>\n\
+You just produced a final answer while todo_list is still active. Before ending, call todo_list now.\n\
+\n\
+Rules:\n\
+- If the work described in your previous answer is complete, mark any remaining tasks done and close the list in the same todo_list call.\n\
+- If work is not complete, update task statuses truthfully and leave the list active.\n\
+- Do not call unrelated tools for this guard.\n\
+- Do not repeat the previous final answer; after the todo_list result, keep any follow-up minimal.\n\
+\n\
+{snapshot}\n\
+</todo_final_answer_guard>"
+    )
+}
+
+fn todo_list_needs_final_answer_update(state: &TodoListState) -> bool {
+    state.active && !state.tasks.is_empty()
+}
+
+fn assistant_has_visible_final_text(message: &ChatMessage) -> bool {
+    message
+        .parts
+        .iter()
+        .any(|part| matches!(part, Part::Text { text, .. } if !text.trim().is_empty()))
+}
+
+fn assistant_has_tool_call(message: &ChatMessage) -> bool {
+    message
+        .parts
+        .iter()
+        .any(|part| matches!(part, Part::ToolCall { .. }))
 }
 
 pub(super) fn retain_cancelled_eager_parts(

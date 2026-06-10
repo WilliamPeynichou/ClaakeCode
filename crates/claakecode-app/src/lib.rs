@@ -8,6 +8,8 @@ pub mod glob;
 pub mod grep;
 pub mod image;
 pub mod mcp;
+#[cfg(windows)]
+mod powershell;
 pub mod question;
 pub mod read;
 mod ripgrep;
@@ -47,6 +49,8 @@ pub use glob::GlobTool;
 pub use grep::GrepTool;
 pub use image::CreateImageTool;
 pub use mcp::{probe_mcp_servers, McpServerProbe, McpSettings, McpToolRegistry};
+#[cfg(windows)]
+pub use powershell::{ensure_powershell_7_executable, find_powershell_7_executable};
 pub use question::QuestionTool;
 pub use read::{ReadFingerprint, ReadTool};
 pub use skill::{
@@ -70,7 +74,8 @@ pub use todo::{
 pub use tool_names::{canonical_tool_name, is_tool_name};
 pub use tool_run::{
     checkpoint_from_snapshots, restore_turn_checkpoints, snapshot_workspace_for_checkpoint,
-    DiffLine, DiffLineKind, FileChange, FileChangeKind, ToolRunResult, TurnCheckpoint,
+    validate_turn_checkpoints_restorable, DiffLine, DiffLineKind, FileChange, FileChangeKind,
+    ToolRunResult, TurnCheckpoint,
 };
 pub use web::{WebFetchTool, WebSearchTool};
 pub use workspace::{
