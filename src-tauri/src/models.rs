@@ -448,6 +448,115 @@ pub(super) struct DatabaseSourcesChangedPayload {
     pub(super) source_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderDescriptor {
+    pub(super) id: String,
+    pub(super) name: String,
+    pub(super) cli_name: String,
+    pub(super) cli_candidates: Vec<String>,
+    pub(super) install_url: String,
+    pub(super) token_env_var: Option<String>,
+    pub(super) login_label: String,
+    pub(super) auth_check_label: String,
+    pub(super) actions: Vec<ProdQuickActionDescriptor>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdQuickActionDescriptor {
+    pub(super) id: String,
+    pub(super) label: String,
+    pub(super) command: String,
+    pub(super) requires_confirmation: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum ProdProviderAuthState {
+    Unknown,
+    Connected,
+    Disconnected,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderStatus {
+    pub(super) provider_id: String,
+    pub(super) installed: bool,
+    pub(super) cli: String,
+    pub(super) cli_path: Option<String>,
+    pub(super) auth_state: ProdProviderAuthState,
+    pub(super) connected: bool,
+    pub(super) identity: Option<String>,
+    pub(super) message: Option<String>,
+    pub(super) checked_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderOperationResult {
+    pub(super) ok: bool,
+    pub(super) message: String,
+    pub(super) status: ProdProviderStatus,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdRefreshStatusInput {
+    #[serde(default)]
+    pub(super) provider_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderIdInput {
+    pub(super) provider_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderWorkspaceInput {
+    pub(super) provider_id: String,
+    #[serde(default)]
+    pub(super) workspace_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdProviderRuntimeStatus {
+    pub(super) provider_id: String,
+    pub(super) cli_status: String,
+    pub(super) auth_status: String,
+    pub(super) identity: Option<String>,
+    pub(super) error: Option<String>,
+    pub(super) token_configured: bool,
+    pub(super) token_preview: Option<String>,
+    pub(super) last_checked_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdSettingsOutput {
+    pub(super) providers: Vec<ProdProviderRuntimeStatus>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdTokenInput {
+    pub(super) provider_id: String,
+    pub(super) token: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProdConnectInput {
+    pub(super) provider_id: String,
+    #[serde(default)]
+    pub(super) token: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct SaveSkillSettingsInput {

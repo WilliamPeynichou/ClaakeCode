@@ -22,6 +22,18 @@ import { canonicalToolName } from "../lib/tools";
 import { Markdown } from "./chat/Markdown";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { DatabaseSection } from "./DatabaseSettingsSection";
+import { ProdSection } from "./ProdSettingsSection";
+import {
+  EMPTY_PROD_SETTINGS,
+  PROD_PROVIDERS,
+  PROD_SETTINGS_CHANGED_EVENT,
+  mergeProdStatusResult,
+  normalizeProdProviderDefinitions,
+  normalizeProdSettings,
+  prodConnectedCount,
+  prodErrorMessage,
+  prodVisibleCommandHasSecret,
+} from "../lib/prodSettings";
 import {
   MODELS,
   PROVIDERS,
@@ -54,6 +66,9 @@ import type {
   OpenRouterModel,
   OpenRouterModelSearchResult,
   OpenRouterProviderStatus,
+  ProdProviderAction,
+  ProdProviderDefinition,
+  ProdSettings,
   SkillSettings,
   SubAgentConfig,
   SubAgentSettings,
@@ -90,6 +105,7 @@ type Section =
   | "providers"
   | "tools"
   | "database"
+  | "prod"
   | "mcp"
   | "skills"
   | "subagents";
@@ -148,6 +164,13 @@ export function SettingsPane({ workspacePath }: Props) {
   const [selectedDatabaseSourceId, setSelectedDatabaseSourceId] = useState<string | null>(null);
   const [databaseActivity, setDatabaseActivity] = useState<DatabaseActivityEntry[]>([]);
   const [databaseActivityLoading, setDatabaseActivityLoading] = useState(false);
+
+  const [prodProviders, setProdProviders] = useState<ProdProviderDefinition[]>(PROD_PROVIDERS);
+  const [prodSettings, setProdSettings] = useState<ProdSettings>(EMPTY_PROD_SETTINGS);
+  const [prodLoading, setProdLoading] = useState(false);
+  const [prodBusyProviderId, setProdBusyProviderId] = useState<string | null>(null);
+  const [prodTokenSavingProviderId, setProdTokenSavingProviderId] = useState<string | null>(null);
+  const [prodStatus, setProdStatus] = useState<string | null>(null);
 
   const [openAiStatus, setOpenAiStatus] = useState<OpenAiProviderStatus | null>(null);
   const [anthropicStatus, setAnthropicStatus] = useState<AnthropicProviderStatus | null>(null);
@@ -362,6 +385,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const activeDatabaseSourceCount = databaseSettings.sources.filter(
     (source) => source.enabled,
   ).length;
+  const activeProdProviderCount = prodConnectedCount(prodSettings);
 
   const saveToolSettings = useCallback(async () => {
     if (!toolSettings) return;
@@ -531,6 +555,151 @@ export function SettingsPane({ workspacePath }: Props) {
       setDatabaseActivityLoading(false);
     }
   }, [databaseSettings]);
+
+  const loadProdSettings = useCallback(
+    async (refreshStatus = false) => {
+      setProdLoading(true);
+      setProdStatus(null);
+      let nextSettings = EMPTY_PROD_SETTINGS;
+      let message: string | null = null;
+      try {
+        const loadedProviders = await api.prodProviders();
+        setProdProviders(normalizeProdProviderDefinitions(loadedProviders));
+      } catch (err) {
+        setProdProviders(PROD_PROVIDERS);
+        message = prodErrorMessage(err);
+      }
+      try {
+        nextSettings = normalizeProdSettings(await api.prodGetSettings());
+      } catch (err) {
+        message = prodErrorMessage(err);
+      }
+      if (refreshStatus) {
+        try {
+          nextSettings = mergeProdStatusResult(nextSettings, await api.prodRefreshStatus());
+          message = "Refreshed";
+        } catch (err) {
+          message = prodErrorMessage(err);
+        }
+      }
+      setProdSettings(nextSettings);
+      setProdStatus(message);
+      setProdLoading(false);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    void loadProdSettings(false);
+  }, [loadProdSettings]);
+
+  useEffect(() => {
+    if (section !== "prod") return;
+    void loadProdSettings(true);
+  }, [loadProdSettings, section]);
+
+  const mergeProdProviderStatus = useCallback((result: unknown) => {
+    setProdSettings((current) => mergeProdStatusResult(current, result));
+  }, []);
+
+  const saveProdToken = useCallback(
+    async (providerId: string, token: string) => {
+      setProdTokenSavingProviderId(providerId);
+      setProdStatus(null);
+      try {
+        const result = await api.prodSaveToken(providerId, token);
+        mergeProdProviderStatus(result);
+        setProdStatus("Saved");
+        window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      } finally {
+        setProdTokenSavingProviderId(null);
+      }
+    },
+    [mergeProdProviderStatus],
+  );
+
+  const clearProdToken = useCallback(
+    async (providerId: string) => {
+      setProdTokenSavingProviderId(providerId);
+      setProdStatus(null);
+      try {
+        const result = await api.prodClearToken(providerId);
+        mergeProdProviderStatus(result);
+        setProdStatus("Token cleared");
+        window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      } finally {
+        setProdTokenSavingProviderId(null);
+      }
+    },
+    [mergeProdProviderStatus],
+  );
+
+  const connectProdProvider = useCallback(
+    async (providerId: string, tokenDraft?: string) => {
+      setProdBusyProviderId(providerId);
+      setProdStatus(null);
+      try {
+        const result = await api.prodConnect(providerId, tokenDraft ?? null);
+        mergeProdProviderStatus(result);
+        setProdStatus("Connection checked");
+        window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      } finally {
+        setProdBusyProviderId(null);
+      }
+    },
+    [mergeProdProviderStatus],
+  );
+
+  const disconnectProdProvider = useCallback(
+    async (providerId: string) => {
+      setProdBusyProviderId(providerId);
+      setProdStatus(null);
+      try {
+        const result = await api.prodDisconnect(providerId);
+        mergeProdProviderStatus(result);
+        setProdStatus("Disconnected");
+        window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      } finally {
+        setProdBusyProviderId(null);
+      }
+    },
+    [mergeProdProviderStatus],
+  );
+
+  const runProdAction = useCallback(
+    (provider: ProdProviderDefinition, action: ProdProviderAction) => {
+      const command = action.command.trim();
+      if (!command) return;
+      if (prodVisibleCommandHasSecret(command, provider.tokenEnvVar)) {
+        setProdStatus("Refusing to send a token-bearing command to the visible terminal");
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent("claakecode:terminal-command-requested", {
+          detail: {
+            command,
+            title: `${provider.name}: ${action.label}`,
+            providerId: provider.id,
+          },
+        }),
+      );
+      setProdStatus(`Sent ${action.label} to terminal`);
+    },
+    [],
+  );
+
+  const openProdInstallUrl = useCallback((url: string) => {
+    if (!url) return;
+    void api.openExternalUrl(url);
+  }, []);
 
   const updateTool = useCallback((name: string, patch: Partial<ToolConfig>) => {
     setToolSettings((current) => {
@@ -1424,6 +1593,23 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "prod" ? "true" : "false"}
+          onClick={() => setSection("prod")}
+        >
+          <Icon
+            icon="solar:rocket-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">Prod</span>
+          <span className="settings-pane__nav-count">
+            {prodLoading ? "·" : activeProdProviderCount}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "mcp" ? "true" : "false"}
           onClick={() => setSection("mcp")}
         >
@@ -1548,6 +1734,22 @@ export function SettingsPane({ workspacePath }: Props) {
             onTestSource={(source) => void testDatabaseSource(source)}
             onRefreshActivity={(sourceId) => void loadDatabaseActivity(sourceId)}
             onClearActivity={(sourceId) => void clearDatabaseActivity(sourceId)}
+          />
+        ) : section === "prod" ? (
+          <ProdSection
+            providers={prodProviders}
+            settings={prodSettings}
+            loading={prodLoading}
+            busyProviderId={prodBusyProviderId}
+            tokenSavingProviderId={prodTokenSavingProviderId}
+            status={prodStatus}
+            onRefresh={() => void loadProdSettings(true)}
+            onConnect={(providerId, tokenDraft) => void connectProdProvider(providerId, tokenDraft)}
+            onDisconnect={(providerId) => void disconnectProdProvider(providerId)}
+            onSaveToken={(providerId, token) => void saveProdToken(providerId, token)}
+            onClearToken={(providerId) => void clearProdToken(providerId)}
+            onRunAction={runProdAction}
+            onOpenInstallUrl={openProdInstallUrl}
           />
         ) : section === "mcp" ? (
           <McpSection

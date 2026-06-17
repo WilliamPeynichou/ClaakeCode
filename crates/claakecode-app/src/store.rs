@@ -5,17 +5,21 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use claakecode_core::{ChatMessage, ModelRef, Part, Role, ToolDescriptor};
 use directories::ProjectDirs;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use claakecode_core::{ChatMessage, ModelRef, Part, Role, ToolDescriptor};
 use uuid::Uuid;
 
 use crate::agent::AgentMode;
 use crate::bash::active_shell_display_name;
 use crate::database::{DatabaseActivityEntry, DatabaseSettings};
 use crate::mcp::McpSettings;
+use crate::prod::{
+    prod_token_preview, redact_prod_secret_text, validate_prod_provider_id, validate_prod_token,
+    ProdProviderSecretState, ProdSettings, PROD_PROVIDER_IDS,
+};
 use crate::skill::SkillSettings;
 use crate::subagent::SubAgentSettings;
 use crate::todo::TodoListState;
@@ -31,6 +35,7 @@ const TOOL_SETTINGS_KEY: &str = "tool_settings";
 const SKILL_SETTINGS_KEY: &str = "skill_settings";
 const DATABASE_SETTINGS_KEY: &str = "database_settings";
 const DATABASE_ACTIVITY_KEY: &str = "database_activity";
+const PROD_SETTINGS_KEY: &str = "prod_settings";
 const OPENROUTER_MODELS_KEY: &str = "openrouter_models";
 const HIDDEN_TOOL_SETTING_NAMES: &[&str] = &["skill"];
 
@@ -548,6 +553,83 @@ fn humanize_tool_name(name: &str) -> String {
         name.to_string()
     } else {
         trimmed.to_string()
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredProdSecrets {
+    #[serde(default)]
+    provider: String,
+    #[serde(default)]
+    auth_mode: String,
+    #[serde(default)]
+    tokens: HashMap<String, StoredProdProviderToken>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredProdProviderToken {
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    updated_at_ms: i64,
+}
+
+impl StoredProdSecrets {
+    fn normalized(mut self) -> Self {
+        self.provider = "prod".into();
+        self.auth_mode = "provider_tokens".into();
+        self.tokens = self
+            .tokens
+            .into_iter()
+            .filter_map(|(provider_id, record)| {
+                let provider_id = validate_prod_provider_id(&provider_id).ok()?;
+                let token = record.token.trim().to_string();
+                if token.is_empty() {
+                    return None;
+                }
+                Some((
+                    provider_id,
+                    StoredProdProviderToken {
+                        token,
+                        updated_at_ms: record.updated_at_ms.max(0),
+                    },
+                ))
+            })
+            .collect();
+        self
+    }
+
+    fn secret_states(&self) -> Vec<ProdProviderSecretState> {
+        PROD_PROVIDER_IDS
+            .iter()
+            .map(|provider_id| {
+                self.tokens
+                    .get(*provider_id)
+                    .map(|record| {
+                        ProdProviderSecretState::from_token(
+                            provider_id,
+                            &record.token,
+                            record.updated_at_ms,
+                        )
+                    })
+                    .unwrap_or_else(|| ProdProviderSecretState::absent(provider_id))
+            })
+            .collect()
+    }
+
+    fn secret_values(&self) -> Vec<String> {
+        self.tokens
+            .values()
+            .map(|record| record.token.trim())
+            .filter(|token| !token.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
     }
 }
 
@@ -1197,6 +1279,147 @@ impl AppStore {
         Ok(normalized)
     }
 
+    pub fn load_prod_settings(&self) -> Result<ProdSettings> {
+        let conn = self.connection()?;
+        let stored = conn
+            .query_row(
+                "select value_json from app_settings where key = ?1",
+                params![PROD_SETTINGS_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .context("unable to read Prod settings")?;
+
+        let mut settings = if let Some(json) = stored {
+            serde_json::from_str::<ProdSettings>(&json).unwrap_or_default()
+        } else {
+            ProdSettings::default()
+        }
+        .normalized();
+        let secrets = self.load_prod_secrets()?;
+        settings.apply_secret_states(&secrets.secret_states());
+        Ok(settings.redacted_with_secrets(&secrets.secret_values()))
+    }
+
+    pub fn save_prod_settings(&self, settings: &ProdSettings) -> Result<ProdSettings> {
+        let normalized = settings.clone().normalized_for_save()?;
+        let conn = self.connection()?;
+        conn.execute(
+            "insert into app_settings (key, value_json, updated_at_ms)
+             values (?1, ?2, ?3)
+             on conflict(key) do update set
+                value_json = excluded.value_json,
+                updated_at_ms = excluded.updated_at_ms",
+            params![
+                PROD_SETTINGS_KEY,
+                serde_json::to_string(&normalized)?,
+                now_ms(),
+            ],
+        )
+        .context("unable to save Prod settings")?;
+        self.load_prod_settings()
+    }
+
+    pub fn list_prod_provider_secret_states(&self) -> Result<Vec<ProdProviderSecretState>> {
+        Ok(self.load_prod_secrets()?.secret_states())
+    }
+
+    pub fn load_prod_provider_token(&self, provider_id: &str) -> Result<Option<String>> {
+        let provider_id = validate_prod_provider_id(provider_id)?;
+        Ok(self
+            .load_prod_secrets()?
+            .tokens
+            .get(&provider_id)
+            .map(|record| record.token.trim().to_string())
+            .filter(|token| !token.is_empty()))
+    }
+
+    pub fn save_prod_provider_token(
+        &self,
+        provider_id: &str,
+        token: &str,
+    ) -> Result<ProdProviderSecretState> {
+        let provider_id = validate_prod_provider_id(provider_id)?;
+        let token = validate_prod_token(token)?;
+        let mut secrets = self.load_prod_secrets()?;
+        let updated_at_ms = now_ms();
+        secrets.tokens.insert(
+            provider_id.clone(),
+            StoredProdProviderToken {
+                token: token.clone(),
+                updated_at_ms,
+            },
+        );
+        self.save_prod_secrets(&secrets)?;
+        Ok(ProdProviderSecretState {
+            provider_id,
+            has_token: true,
+            token_preview: prod_token_preview(&token),
+            updated_at_ms: Some(updated_at_ms),
+        })
+    }
+
+    pub fn clear_prod_provider_token(&self, provider_id: &str) -> Result<ProdProviderSecretState> {
+        let provider_id = validate_prod_provider_id(provider_id)?;
+        let mut secrets = self.load_prod_secrets()?;
+        secrets.tokens.remove(&provider_id);
+        self.save_prod_secrets(&secrets)?;
+        Ok(ProdProviderSecretState::absent(&provider_id))
+    }
+
+    pub fn prod_secret_values(&self) -> Result<Vec<String>> {
+        Ok(self.load_prod_secrets()?.secret_values())
+    }
+
+    pub fn redact_prod_message(&self, message: impl AsRef<str>) -> String {
+        let secrets = self.prod_secret_values().unwrap_or_default();
+        redact_prod_secret_text(message.as_ref(), &secrets)
+    }
+
+    fn prod_secrets_path(&self) -> PathBuf {
+        if self.path.file_name().and_then(|name| name.to_str()) == Some("desktop-state.sqlite3") {
+            self.path.with_file_name("prod-auth.json")
+        } else {
+            self.path.with_extension("prod-auth.json")
+        }
+    }
+
+    fn load_prod_secrets(&self) -> Result<StoredProdSecrets> {
+        let path = self.prod_secrets_path();
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(StoredProdSecrets::default().normalized())
+            }
+            Err(err) => return Err(err).context("unable to read Prod token store"),
+        };
+        serde_json::from_slice::<StoredProdSecrets>(&bytes)
+            .context("invalid Prod token store")
+            .map(StoredProdSecrets::normalized)
+    }
+
+    fn save_prod_secrets(&self, secrets: &StoredProdSecrets) -> Result<()> {
+        let path = self.prod_secrets_path();
+        let secrets = secrets.clone().normalized();
+        if secrets.is_empty() {
+            match std::fs::remove_file(&path) {
+                Ok(()) => return Ok(()),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(err) => return Err(err).context("unable to delete Prod token store"),
+            }
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).context("unable to create Prod token directory")?;
+        }
+        let temp = path.with_extension("json.tmp");
+        let pretty =
+            serde_json::to_vec_pretty(&secrets).context("unable to serialize Prod tokens")?;
+        std::fs::write(&temp, pretty).context("unable to write Prod token temp file")?;
+        apply_private_file_permissions(&temp)?;
+        std::fs::rename(&temp, &path).context("unable to replace Prod token store")?;
+        Ok(())
+    }
+
     pub fn list_database_source_activity(
         &self,
         source_id: &str,
@@ -1641,6 +1864,19 @@ fn ensure_turn_checkpoints_table(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn apply_private_file_permissions(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        .context("unable to chmod private file")?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn apply_private_file_permissions(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
 fn default_enabled() -> bool {
     true
 }
@@ -1906,8 +2142,10 @@ mod tests {
     #[test]
     fn save_conversation_initializes_title_from_first_user_message_and_preserves_it() -> Result<()>
     {
-        let path =
-            std::env::temp_dir().join(format!("claakecode-store-title-test-{}.sqlite3", Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!(
+            "claakecode-store-title-test-{}.sqlite3",
+            Uuid::new_v4()
+        ));
         let store = AppStore { path: path.clone() };
         let result = (|| -> Result<()> {
             store.migrate()?;
@@ -2089,7 +2327,9 @@ mod tests {
             .save_database_settings(&settings)
             .expect("save database settings");
         assert_eq!(saved.sources.len(), 1);
-        let loaded = store.load_database_settings().expect("load database settings");
+        let loaded = store
+            .load_database_settings()
+            .expect("load database settings");
         assert_eq!(loaded.sources.len(), 1);
         assert_eq!(loaded.sources[0].name, "primary");
 
@@ -2115,7 +2355,11 @@ mod tests {
         let listed = store
             .list_database_source_activity("src-1", Some(1000))
             .expect("list activity");
-        assert!(listed.len() <= 500, "activity cap 500 (got {})", listed.len());
+        assert!(
+            listed.len() <= 500,
+            "activity cap 500 (got {})",
+            listed.len()
+        );
         // Most recent first.
         assert_eq!(listed.first().unwrap().id, "e-599");
 

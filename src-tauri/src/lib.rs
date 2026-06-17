@@ -10,21 +10,6 @@ use std::{
 
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-#[cfg(target_os = "macos")]
-use objc2::{
-    ffi::class_addMethod,
-    rc::Retained,
-    runtime::{AnyClass, AnyObject, Imp, Sel},
-    MainThreadMarker,
-};
-#[cfg(target_os = "macos")]
-use objc2_app_kit::{NSApplication, NSMenu, NSMenuItem};
-#[cfg(target_os = "macos")]
-use objc2_foundation::NSString;
-use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use claakecode_anthropic::{
     delete_default_auth as delete_default_anthropic_auth,
     exchange_oauth_code as exchange_anthropic_oauth_code, generate_pkce as generate_anthropic_pkce,
@@ -35,25 +20,26 @@ use claakecode_anthropic::{
 };
 use claakecode_app::{
     checkpoint_from_snapshots, clean_context_descriptor, compact_conversation_history,
-    copy_workspace_entries, create_workspace_directory,
-    create_workspace_file, delete_workspace_entry, import_workspace_paths, list_installed_skills,
-    list_workspace_entries, list_workspace_files, normalize_workspace_root, probe_mcp_servers,
-    read_external_file, read_workspace_file, rename_workspace_entry, resolve_terminal_path,
+    copy_workspace_entries, create_workspace_directory, create_workspace_file,
+    delete_workspace_entry, import_workspace_paths, list_installed_skills, list_workspace_entries,
+    list_workspace_files, normalize_workspace_root, probe_mcp_servers, read_external_file,
+    read_workspace_file, redact_prod_secret_text, rename_workspace_entry, resolve_terminal_path,
     restore_turn_checkpoints, restore_workspace_deleted_entries, run_turn, search_workspace_files,
     shell_system_prompt, snapshot_workspace_for_checkpoint, subagent_system_prompt,
-    system_prompt_for_mode_with_plan_prompt, system_prompt_with_todo, todo_list_from_history,
-    tool_settings_view, trash_workspace_entry, validate_turn_checkpoints_restorable,
-    write_workspace_file, AgentEvent, AgentMode, AppStore, BashTool, ConversationEvent,
-    ConversationSummary, CreateImageTool, DatabaseActivityEntry, DatabaseConnectionStatus,
-    DatabaseConnectionTestResult, DatabaseSettings, DatabaseSourceConfig, DatabaseTool,
-    EditFileTool, GlobTool, GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill,
-    McpSettings, McpToolRegistry, ModeModelSettings, OpenRouterModelRecord, PlanArtifactState,
-    PlanWorkflowState, QuestionTool, ReadTool, SavedConversation, SkillSettings, SkillTool,
-    SubAgentConfig, SubAgentSettings, SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution,
-    ToDoListTool, TodoListState, ToolSettings, ToolSettingsView, TurnCancel, TurnContext,
-    WebFetchTool, WebSearchTool, WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry,
-    WorkspaceFileChangeEvent, WorkspaceSearchResult, WriteFileTool,
-    test_database_source_connection,
+    system_prompt_for_mode_with_plan_prompt, system_prompt_with_todo,
+    test_database_source_connection, todo_list_from_history, tool_settings_view,
+    trash_workspace_entry, validate_turn_checkpoints_restorable, write_workspace_file, AgentEvent,
+    AgentMode, AppStore, BashTool, ConversationEvent, ConversationSummary, CreateImageTool,
+    DatabaseActivityEntry, DatabaseConnectionStatus, DatabaseConnectionTestResult,
+    DatabaseSettings, DatabaseSourceConfig, DatabaseTool, EditFileTool, GlobTool,
+    GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpSettings, McpToolRegistry,
+    ModeModelSettings, OpenRouterModelRecord, PlanArtifactState, PlanWorkflowState,
+    ProdProviderCachedStatus, ProdProviderConnectionState, ProdProviderSettings, QuestionTool,
+    ReadTool, SavedConversation, SkillSettings, SkillTool, SubAgentConfig, SubAgentSettings,
+    SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
+    ToolSettings, ToolSettingsView, TurnCancel, TurnContext, WebFetchTool, WebSearchTool,
+    WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry, WorkspaceFileChangeEvent,
+    WorkspaceSearchResult, WriteFileTool,
 };
 use claakecode_core::{
     ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
@@ -91,6 +77,21 @@ use claakecode_openrouter::{
     validate_api_key as validate_openrouter_api_key_remote, OpenRouterAuthStatus,
     OpenRouterCatalogModel, OpenRouterProvider, PROVIDER_ID as OPENROUTER_PROVIDER_ID,
 };
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+#[cfg(target_os = "macos")]
+use objc2::{
+    ffi::class_addMethod,
+    rc::Retained,
+    runtime::{AnyClass, AnyObject, Imp, Sel},
+    MainThreadMarker,
+};
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{NSApplication, NSMenu, NSMenuItem};
+#[cfg(target_os = "macos")]
+use objc2_foundation::NSString;
+use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -102,6 +103,7 @@ mod conversations;
 mod git;
 mod models;
 mod platform;
+mod prod;
 mod providers;
 mod state;
 mod swarm;
@@ -303,6 +305,13 @@ pub fn run() {
             conversations::test_database_connection,
             conversations::list_database_source_activity,
             conversations::clear_database_source_activity,
+            prod::prod_providers,
+            prod::prod_get_settings,
+            prod::prod_save_token,
+            prod::prod_clear_token,
+            prod::prod_refresh_status,
+            prod::prod_connect,
+            prod::prod_disconnect,
             providers::list_configured_model_providers,
             providers::get_openai_provider_status,
             providers::start_openai_oauth_login,
