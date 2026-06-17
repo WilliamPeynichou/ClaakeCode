@@ -29,6 +29,8 @@ type Props = {
   active: boolean;
   fullHeight: boolean;
   workspacePath: string;
+  pendingCommand: TerminalCommandRequest | null;
+  onPendingCommandHandled: (id: number) => void;
   onClose: () => void;
   onCloseLastSession: () => void;
   onToggleFullHeight: () => void;
@@ -40,6 +42,12 @@ type Props = {
   onOpenTerminalPath?: (rawPath: string) => void;
 };
 
+type TerminalCommandRequest = {
+  id: number;
+  command: string;
+  title?: string | null;
+};
+
 type Disposable = {
   dispose: () => void;
 };
@@ -48,6 +56,8 @@ export function TerminalPanel({
   active,
   fullHeight,
   workspacePath,
+  pendingCommand,
+  onPendingCommandHandled,
   onClose,
   onCloseLastSession,
   onToggleFullHeight,
@@ -193,6 +203,8 @@ export function TerminalPanel({
             session={session}
             active={active && session.id === activeId}
             workspacePath={workspacePath}
+            pendingCommand={session.id === activeId ? pendingCommand : null}
+            onPendingCommandHandled={onPendingCommandHandled}
             onStatus={(status) => patchSession(session.id, { status })}
             onTitle={(title) => patchSession(session.id, { title })}
             onOpenTerminalPath={onOpenTerminalPath}
@@ -207,6 +219,8 @@ function TerminalSurface({
   session,
   active,
   workspacePath,
+  pendingCommand,
+  onPendingCommandHandled,
   onStatus,
   onTitle,
   onOpenTerminalPath,
@@ -214,6 +228,8 @@ function TerminalSurface({
   session: TerminalSession;
   active: boolean;
   workspacePath: string;
+  pendingCommand: TerminalCommandRequest | null;
+  onPendingCommandHandled: (id: number) => void;
   onStatus: (status: TerminalStatus) => void;
   onTitle: (title: string) => void;
   onOpenTerminalPath?: (rawPath: string) => void;
@@ -227,10 +243,37 @@ function TerminalSurface({
   const disposablesRef = useRef<Disposable[]>([]);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const disposedRef = useRef(false);
+  const commandQueueRef = useRef<TerminalCommandRequest[]>([]);
+  const handledCommandIdsRef = useRef<Set<number>>(new Set());
   // Latest path-click handler kept in a ref so the link provider sees
   // updates without having to re-register every time the parent re-renders.
   const onOpenTerminalPathRef = useRef(onOpenTerminalPath);
   onOpenTerminalPathRef.current = onOpenTerminalPath;
+
+  const sendQueuedCommands = useCallback(() => {
+    const token = tokenRef.current;
+    if (!token || commandQueueRef.current.length === 0) return;
+    const queued = commandQueueRef.current.splice(0);
+    for (const request of queued) {
+      const command = request.command.trim();
+      if (!command) {
+        onPendingCommandHandled(request.id);
+        continue;
+      }
+      void api.writeTerminal(session.id, token, `${command}\n`);
+      onPendingCommandHandled(request.id);
+    }
+  }, [onPendingCommandHandled, session.id]);
+
+  useEffect(() => {
+    if (!pendingCommand || handledCommandIdsRef.current.has(pendingCommand.id)) return;
+    if (pendingCommand.title?.trim()) {
+      onTitle(pendingCommand.title.trim());
+    }
+    handledCommandIdsRef.current.add(pendingCommand.id);
+    commandQueueRef.current.push(pendingCommand);
+    sendQueuedCommands();
+  }, [pendingCommand, sendQueuedCommands, onTitle]);
 
   const fitTerminal = useCallback(() => {
     const terminal = terminalRef.current;
@@ -434,6 +477,7 @@ function TerminalSurface({
           .then(() => {
             if (disposedRef.current || tokenRef.current !== token) return;
             onStatus("running");
+            sendQueuedCommands();
             if (active) terminal.focus();
           })
           .catch((err) => {
@@ -449,7 +493,7 @@ function TerminalSurface({
       onStatus("error");
       terminal.write(`\r\n\x1b[31m${stripAnsi(String(err))}\x1b[0m\r\n`);
     });
-  }, [active, fitTerminal, onStatus, onTitle, session.id, workspacePath]);
+  }, [active, fitTerminal, onStatus, onTitle, sendQueuedCommands, session.id, workspacePath]);
 
   useEffect(() => {
     if (active) startTerminal();
@@ -478,6 +522,7 @@ function TerminalSurface({
       disposablesRef.current = [];
       for (const unlisten of unlistenersRef.current) unlisten();
       unlistenersRef.current = [];
+      commandQueueRef.current = [];
       // WebGL must be disposed before the parent terminal so its GPU
       // resources are released cleanly.
       try {

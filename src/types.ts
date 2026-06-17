@@ -31,8 +31,15 @@ export type InstallUpdateEventDetail = {
 declare global {
   interface WindowEventMap {
     "claakecode:install-update": CustomEvent<InstallUpdateEventDetail>;
+    "claakecode:terminal-command-requested": CustomEvent<TerminalCommandRequestEventDetail>;
   }
 }
+
+export type TerminalCommandRequestEventDetail = {
+  command: string;
+  title?: string | null;
+  providerId?: ProdProviderId | string | null;
+};
 
 export type TextPart = {
   type: "text";
@@ -268,6 +275,71 @@ export type DatabaseActivityEntry = {
   rowsReturned?: number | null;
   error?: string | null;
 };
+
+export type ProdProviderId =
+  | "vercel"
+  | "railway"
+  | "netlify"
+  | "render"
+  | "fly"
+  | "heroku"
+  | "cloudflare"
+  | "supabase";
+
+export type ProdAuthMode = "oauth" | "token";
+
+export type ProdProviderAction = {
+  id: string;
+  label: string;
+  command: string;
+  description?: string | null;
+  icon?: string | null;
+  requiresConfirmation?: boolean;
+};
+
+export type ProdProviderDefinition = {
+  id: ProdProviderId | string;
+  name: string;
+  cli: string;
+  cliName?: string;
+  cliCandidates?: string[];
+  cliAliases?: string[];
+  icon: string;
+  installUrl: string;
+  loginCommand: string;
+  loginLabel?: string | null;
+  logoutCommand?: string | null;
+  authCheckCommand?: string | null;
+  authCheckLabel?: string | null;
+  tokenEnvVar?: string | null;
+  authModes: ProdAuthMode[];
+  actions: ProdProviderAction[];
+};
+
+export type ProdCliStatus = "unknown" | "checking" | "installed" | "missing" | "error";
+
+export type ProdAuthStatus =
+  | "unknown"
+  | "checking"
+  | "connected"
+  | "disconnected"
+  | "error";
+
+export type ProdProviderRuntimeStatus = {
+  providerId: ProdProviderId | string;
+  cliStatus: ProdCliStatus;
+  authStatus: ProdAuthStatus;
+  identity?: string | null;
+  error?: string | null;
+  tokenConfigured?: boolean;
+  tokenPreview?: string | null;
+  lastCheckedMs?: number | null;
+};
+
+export type ProdSettings = {
+  providers: ProdProviderRuntimeStatus[];
+};
+
 
 export type ProviderConnectionState =
   | "connected"

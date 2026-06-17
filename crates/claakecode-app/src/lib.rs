@@ -10,6 +10,7 @@ pub mod image;
 pub mod mcp;
 #[cfg(windows)]
 mod powershell;
+pub mod prod;
 pub mod question;
 pub mod read;
 mod ripgrep;
@@ -35,7 +36,7 @@ pub use compact::{compact_conversation_history, CompactConversationOutput};
 pub use database::{
     classify_sql_operation, sanitize_query_preview, test_database_source_connection,
     DatabaseActivityEntry, DatabaseActivityOperation, DatabaseActivityStatus,
-    DatabaseConnectionFields, DatabaseConnectionStatus, DatabaseConnectionState,
+    DatabaseConnectionFields, DatabaseConnectionState, DatabaseConnectionStatus,
     DatabaseConnectionTestResult, DatabaseConnectionTestState, DatabaseCredentialMode,
     DatabaseSettings, DatabaseSourceConfig, DatabaseSourceEngine, DatabaseSourceSummary,
     DatabaseSqliteConfig, DatabaseSslMode, DatabaseSupabaseRestConfig,
@@ -51,6 +52,12 @@ pub use image::CreateImageTool;
 pub use mcp::{probe_mcp_servers, McpServerProbe, McpSettings, McpToolRegistry};
 #[cfg(windows)]
 pub use powershell::{ensure_powershell_7_executable, find_powershell_7_executable};
+pub use prod::{
+    normalize_prod_provider_id, prod_token_env_var, prod_token_preview, redact_prod_secret_text,
+    validate_prod_provider_id, validate_prod_token, ProdProviderCachedStatus,
+    ProdProviderConnectionState, ProdProviderSecretState, ProdProviderSettings,
+    ProdSecretStorageInfo, ProdSettings, PROD_PROVIDER_IDS, PROD_TOKEN_ENV_KEYS,
+};
 pub use question::QuestionTool;
 pub use read::{ReadFingerprint, ReadTool};
 pub use skill::{

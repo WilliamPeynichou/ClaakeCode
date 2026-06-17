@@ -32,6 +32,9 @@ import type {
   OpenRouterModelSearchResult,
   OpenRouterProviderStatus,
   PlanControl,
+  ProdProviderDefinition,
+  ProdProviderRuntimeStatus,
+  ProdSettings,
   QuestionAnswer,
   SavedConversation,
   ServiceTier,
@@ -403,6 +406,37 @@ export const api = {
   clearDatabaseSourceActivity(sourceId: string) {
     return invoke<DatabaseActivityEntry[]>("clear_database_source_activity", {
       input: { sourceId },
+    });
+  },
+  prodProviders() {
+    return invoke<ProdProviderDefinition[]>("prod_providers");
+  },
+  prodGetSettings() {
+    return invoke<ProdSettings>("prod_get_settings");
+  },
+  prodSaveToken(providerId: string, token: string) {
+    return invoke<ProdProviderRuntimeStatus>("prod_save_token", {
+      input: { providerId, token },
+    });
+  },
+  prodClearToken(providerId: string) {
+    return invoke<ProdProviderRuntimeStatus>("prod_clear_token", {
+      input: { providerId },
+    });
+  },
+  prodRefreshStatus(providerId?: string | null) {
+    return invoke<ProdSettings>("prod_refresh_status", {
+      input: { providerId: providerId ?? null },
+    });
+  },
+  prodConnect(providerId: string, token?: string | null) {
+    return invoke<ProdProviderRuntimeStatus>("prod_connect", {
+      input: { providerId, token: token ?? null },
+    });
+  },
+  prodDisconnect(providerId: string) {
+    return invoke<ProdProviderRuntimeStatus>("prod_disconnect", {
+      input: { providerId },
     });
   },
   listSubAgentSettings() {

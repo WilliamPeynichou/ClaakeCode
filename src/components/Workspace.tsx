@@ -40,6 +40,7 @@ import type {
   PlanControl,
   SavedConversation,
   ServiceTier,
+  TerminalCommandRequestEventDetail,
   ThinkingLevel,
   WorkspaceBootstrap,
   WorkspaceEntry,
@@ -1649,6 +1650,12 @@ export function Workspace({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalFullHeight, setTerminalFullHeight] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(INITIAL_TERMINAL_HEIGHT);
+  const [pendingTerminalCommand, setPendingTerminalCommand] = useState<{
+    id: number;
+    command: string;
+    title?: string | null;
+  } | null>(null);
+  const nextTerminalCommandIdRef = useRef(1);
 
   const clampColumn = useCallback((v: number) => {
     if (typeof window === "undefined") return v;
@@ -1711,6 +1718,25 @@ export function Workspace({
       unlisten?.();
     };
   }, [showTerminal]);
+
+  useEffect(() => {
+    const handler = (event: CustomEvent<TerminalCommandRequestEventDetail>) => {
+      const command = event.detail?.command?.trim();
+      if (!command) return;
+      showTerminal();
+      setPendingTerminalCommand({
+        id: nextTerminalCommandIdRef.current++,
+        command,
+        title: event.detail.title ?? null,
+      });
+    };
+    window.addEventListener("claakecode:terminal-command-requested", handler);
+    return () => window.removeEventListener("claakecode:terminal-command-requested", handler);
+  }, [showTerminal]);
+
+  const handlePendingTerminalCommandHandled = useCallback((id: number) => {
+    setPendingTerminalCommand((current) => (current?.id === id ? null : current));
+  }, []);
 
   const sidebarHeightRef = useRef<HTMLDivElement | null>(null);
   const applyTopDelta = useCallback((delta: number) => {
@@ -2056,6 +2082,8 @@ export function Workspace({
                 active={terminalVisible}
                 fullHeight={terminalFullHeight}
                 workspacePath={workspacePath}
+                pendingCommand={pendingTerminalCommand}
+                onPendingCommandHandled={handlePendingTerminalCommandHandled}
                 onClose={hideTerminal}
                 onCloseLastSession={closeTerminalPanel}
                 onToggleFullHeight={toggleTerminalFullHeight}
