@@ -748,6 +748,36 @@ export function SettingsPane({ workspacePath }: Props) {
     void api.openExternalUrl(url);
   }, []);
 
+  const sendProdLogin = useCallback((provider: ProdProviderDefinition) => {
+    const command = (provider.loginCommand || `${provider.cli} login`).trim();
+    if (!command) return;
+    window.dispatchEvent(
+      new CustomEvent("claakecode:terminal-command-requested", {
+        detail: {
+          command,
+          title: `${provider.name}: login`,
+          providerId: provider.id,
+        },
+      }),
+    );
+    setProdStatus("Login sent to terminal — finish it there, then Refresh");
+  }, []);
+
+  const sendProdLogout = useCallback((provider: ProdProviderDefinition) => {
+    const command = (provider.logoutCommand || `${provider.cli} logout`).trim();
+    if (!command) return;
+    window.dispatchEvent(
+      new CustomEvent("claakecode:terminal-command-requested", {
+        detail: {
+          command,
+          title: `${provider.name}: logout`,
+          providerId: provider.id,
+        },
+      }),
+    );
+    setProdStatus("Logout sent to terminal — then Refresh");
+  }, []);
+
   const updateTool = useCallback((name: string, patch: Partial<ToolConfig>) => {
     setToolSettings((current) => {
       if (!current) return current;
@@ -1793,6 +1823,8 @@ export function SettingsPane({ workspacePath }: Props) {
             onRefresh={() => void loadProdSettings(true)}
             onConnect={(providerId, tokenDraft) => void connectProdProvider(providerId, tokenDraft)}
             onDisconnect={(providerId) => void disconnectProdProvider(providerId)}
+            onLoginInTerminal={sendProdLogin}
+            onLogoutInTerminal={sendProdLogout}
             onInstall={(providerId) => void installProdProvider(providerId)}
             onInstallAll={() => void installAllProdProviders()}
             onSaveToken={(providerId, token) => void saveProdToken(providerId, token)}

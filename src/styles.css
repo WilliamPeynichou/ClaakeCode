@@ -3383,14 +3383,64 @@ textarea {
   overflow-y: auto;
 }
 
-.settings-pane__body--database,
-.settings-pane__body--prod {
+.settings-pane__body--database {
   grid-template-columns: minmax(260px, 340px) minmax(420px, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 .settings-pane__body--prod {
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.settings-pane__prod-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-pane__prod-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, opacity 140ms ease;
+}
+
+.settings-pane__prod-tab:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.settings-pane__prod-tab[data-active="true"] {
+  background: var(--bg-4);
+  border-color: var(--line-2, var(--line-1));
+  color: var(--text-0);
+}
+
+.settings-pane__prod-tab[data-on="false"]:not([data-active="true"]):not(:hover) {
+  opacity: 0.62;
+}
+
+.settings-pane__prod-tab-name {
+  white-space: nowrap;
+}
+
+.settings-pane__prod-detail-pane {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .settings-pane__body--about {
@@ -4346,20 +4396,19 @@ textarea {
   font-size: var(--fs-xs);
 }
 
-/* ----- Prod / Database responsive (container-based) ----- */
+/* ----- Database responsive (container-based) ----- */
 /* The settings pane lives inside the resizable editor area, so we react to
    the pane's own width rather than the viewport: when the agent panel
    shrinks the editor, the two-column grid would otherwise overflow and let
-   the detail content slide under the agent panel. */
+   the detail content slide under the agent panel. (The Prod tab uses a
+   wrapping tab-bar instead of a grid, so it stays fluid by itself.) */
 @container settingsmain (max-width: 760px) {
-  .settings-pane__body--database,
-  .settings-pane__body--prod {
+  .settings-pane__body--database {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     overflow-y: auto;
   }
-  .settings-pane__body--database .settings-pane__nav-list,
-  .settings-pane__body--prod .settings-pane__nav-list {
+  .settings-pane__body--database .settings-pane__nav-list {
     max-height: 220px;
   }
   .settings-pane__prod-detail-head {

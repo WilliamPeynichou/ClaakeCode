@@ -27,6 +27,8 @@ export type ProdSectionProps = {
   onRefresh: () => void;
   onConnect: (providerId: string, tokenDraft?: string) => void;
   onDisconnect: (providerId: string) => void;
+  onLoginInTerminal: (provider: ProdProviderDefinition) => void;
+  onLogoutInTerminal: (provider: ProdProviderDefinition) => void;
   onInstall: (providerId: string) => void;
   onInstallAll: () => void;
   onSaveToken: (providerId: string, token: string) => void;
@@ -45,6 +47,8 @@ export function ProdSection({
   onRefresh,
   onConnect,
   onDisconnect,
+  onLoginInTerminal,
+  onLogoutInTerminal,
   onInstall,
   onInstallAll,
   onSaveToken,
@@ -121,45 +125,39 @@ export function ProdSection({
       </header>
 
       <div className="settings-pane__body settings-pane__body--prod">
-        <aside className="settings-pane__nav-list settings-pane__prod-list">
-          <div className="settings-pane__nav-list-head">
-            <span>Providers</span>
-            <span className="settings-pane__servers-meta">
-              {connectedCount}/{providers.length} connected
-            </span>
-          </div>
-          <div className="settings-pane__nav-list-items">
-            {providers.map((provider) => {
-              const providerStatus = prodStatusForProvider(settings, provider.id);
-              return (
-                <button
-                  type="button"
-                  key={provider.id}
-                  className="settings-pane__nav-list-item settings-pane__prod-provider-row"
-                  data-active={selectedProvider?.id === provider.id ? "true" : "false"}
-                  data-on={providerStatus.authStatus === "connected" ? "true" : "false"}
-                  onClick={() => setSelectedProviderId(provider.id)}
-                >
-                  <span
-                    className="settings-pane__nav-list-item-dot"
-                    data-tone={prodProviderDotTone(providerStatus)}
-                    aria-hidden
-                  />
-                  <Icon
-                    icon={provider.icon}
-                    width={14}
-                    height={14}
-                    className="settings-pane__nav-list-item-glyph"
-                  />
-                  <span className="settings-pane__nav-list-item-name">{provider.name}</span>
-                  <span className="settings-pane__database-engine-pill">{provider.cli}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+        <div className="settings-pane__prod-tabs" role="tablist" aria-label="Deployment providers">
+          {providers.map((provider) => {
+            const providerStatus = prodStatusForProvider(settings, provider.id);
+            return (
+              <button
+                type="button"
+                key={provider.id}
+                role="tab"
+                aria-selected={selectedProvider?.id === provider.id ? "true" : "false"}
+                className="settings-pane__prod-tab"
+                data-active={selectedProvider?.id === provider.id ? "true" : "false"}
+                data-on={providerStatus.authStatus === "connected" ? "true" : "false"}
+                onClick={() => setSelectedProviderId(provider.id)}
+                title={`${provider.name} · ${provider.cli}`}
+              >
+                <span
+                  className="settings-pane__nav-list-item-dot"
+                  data-tone={prodProviderDotTone(providerStatus)}
+                  aria-hidden
+                />
+                <Icon
+                  icon={provider.icon}
+                  width={14}
+                  height={14}
+                  className="settings-pane__nav-list-item-glyph"
+                />
+                <span className="settings-pane__prod-tab-name">{provider.name}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        <main className="settings-pane__detail-pane">
+        <main className="settings-pane__detail-pane settings-pane__prod-detail-pane">
           {selectedProvider && selectedStatus ? (
             <ProdProviderEditor
               provider={selectedProvider}
@@ -169,6 +167,8 @@ export function ProdSection({
               disabled={loading}
               onConnect={onConnect}
               onDisconnect={onDisconnect}
+              onLoginInTerminal={onLoginInTerminal}
+              onLogoutInTerminal={onLogoutInTerminal}
               onInstall={onInstall}
               onSaveToken={onSaveToken}
               onClearToken={onClearToken}
@@ -198,6 +198,8 @@ function ProdProviderEditor({
   disabled,
   onConnect,
   onDisconnect,
+  onLoginInTerminal,
+  onLogoutInTerminal,
   onInstall,
   onSaveToken,
   onClearToken,
@@ -211,6 +213,8 @@ function ProdProviderEditor({
   disabled: boolean;
   onConnect: (providerId: string, tokenDraft?: string) => void;
   onDisconnect: (providerId: string) => void;
+  onLoginInTerminal: (provider: ProdProviderDefinition) => void;
+  onLogoutInTerminal: (provider: ProdProviderDefinition) => void;
   onInstall: (providerId: string) => void;
   onSaveToken: (providerId: string, token: string) => void;
   onClearToken: (providerId: string) => void;
@@ -302,8 +306,9 @@ function ProdProviderEditor({
         <div className="settings-pane__database-help">
           <Icon icon="solar:shield-warning-linear" width={14} height={14} />
           <span>
-            Login, logout and detection run in a hidden backend terminal. Quick actions are
-            public commands injected into the visible terminal; tokens are never included.
+            Login and logout run in the visible terminal so you can complete browser or
+            device-code steps yourself. Status detection runs silently in the background.
+            Quick actions are public commands; tokens are never injected into the terminal.
           </span>
         </div>
 
@@ -448,23 +453,40 @@ function ProdProviderEditor({
               <button
                 type="button"
                 className="settings-pane__btn"
-                onClick={() => onDisconnect(provider.id)}
-                disabled={disabled || busy}
+                onClick={() => onLogoutInTerminal(provider)}
+                disabled={disabled || cliMissing}
               >
                 <Icon icon="solar:logout-2-linear" width={13} height={13} />
-                <span>{busy ? "Disconnecting…" : "Disconnect"}</span>
+                <span>Logout in terminal</span>
               </button>
             ) : (
-              <button
-                type="button"
-                className="settings-pane__btn"
-                data-primary="true"
-                onClick={connect}
-                disabled={disabled || busy || cliMissing}
-              >
-                <Icon icon={busy ? "solar:refresh-linear" : "solar:login-2-linear"} width={13} height={13} />
-                <span>{busy ? "Connecting…" : "Connect"}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  data-primary="true"
+                  onClick={() => onLoginInTerminal(provider)}
+                  disabled={disabled || cliMissing}
+                >
+                  <Icon icon="solar:login-2-linear" width={13} height={13} />
+                  <span>Login in terminal</span>
+                </button>
+                {status.tokenConfigured && tokenSupported && (
+                  <button
+                    type="button"
+                    className="settings-pane__btn"
+                    onClick={connect}
+                    disabled={disabled || busy || cliMissing}
+                  >
+                    <Icon
+                      icon={busy ? "solar:refresh-linear" : "solar:shield-check-linear"}
+                      width={13}
+                      height={13}
+                    />
+                    <span>{busy ? "Verifying…" : "Verify token"}</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
