@@ -439,6 +439,11 @@ export const api = {
       input: { providerId },
     });
   },
+  prodInstallCli(providerId: string) {
+    return invoke<ProdProviderRuntimeStatus>("prod_install_cli", {
+      input: { providerId },
+    });
+  },
   listSubAgentSettings() {
     return invoke<SubAgentSettings>("list_sub_agent_settings");
   },

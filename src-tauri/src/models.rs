@@ -456,6 +456,7 @@ pub(super) struct ProdProviderDescriptor {
     pub(super) cli_name: String,
     pub(super) cli_candidates: Vec<String>,
     pub(super) install_url: String,
+    pub(super) install_command: Option<String>,
     pub(super) token_env_var: Option<String>,
     pub(super) login_label: String,
     pub(super) auth_check_label: String,

@@ -27,6 +27,8 @@ export type ProdSectionProps = {
   onRefresh: () => void;
   onConnect: (providerId: string, tokenDraft?: string) => void;
   onDisconnect: (providerId: string) => void;
+  onInstall: (providerId: string) => void;
+  onInstallAll: () => void;
   onSaveToken: (providerId: string, token: string) => void;
   onClearToken: (providerId: string) => void;
   onRunAction: (provider: ProdProviderDefinition, action: ProdProviderAction) => void;
@@ -43,6 +45,8 @@ export function ProdSection({
   onRefresh,
   onConnect,
   onDisconnect,
+  onInstall,
+  onInstallAll,
   onSaveToken,
   onClearToken,
   onRunAction,
@@ -52,6 +56,15 @@ export function ProdSection({
     providers[0]?.id ?? "",
   );
   const connectedCount = prodConnectedCount(settings);
+  const installableCount = useMemo(
+    () =>
+      providers.filter((provider) => {
+        if (!provider.installCommand) return false;
+        const providerStatus = prodStatusForProvider(settings, provider.id);
+        return providerStatus.cliStatus !== "installed";
+      }).length,
+    [providers, settings],
+  );
   const selectedProvider =
     providers.find((provider) => provider.id === selectedProviderId) ?? providers[0] ?? null;
   const selectedStatus = selectedProvider
@@ -82,6 +95,18 @@ export function ProdSection({
             >
               {status}
             </span>
+          )}
+          {installableCount > 0 && (
+            <button
+              type="button"
+              className="settings-pane__btn"
+              data-primary="true"
+              onClick={onInstallAll}
+              disabled={loading || busyProviderId !== null}
+            >
+              <Icon icon="solar:download-minimalistic-linear" width={13} height={13} />
+              <span>Install all ({installableCount})</span>
+            </button>
           )}
           <button
             type="button"
@@ -144,6 +169,7 @@ export function ProdSection({
               disabled={loading}
               onConnect={onConnect}
               onDisconnect={onDisconnect}
+              onInstall={onInstall}
               onSaveToken={onSaveToken}
               onClearToken={onClearToken}
               onRunAction={onRunAction}
@@ -172,6 +198,7 @@ function ProdProviderEditor({
   disabled,
   onConnect,
   onDisconnect,
+  onInstall,
   onSaveToken,
   onClearToken,
   onRunAction,
@@ -184,6 +211,7 @@ function ProdProviderEditor({
   disabled: boolean;
   onConnect: (providerId: string, tokenDraft?: string) => void;
   onDisconnect: (providerId: string) => void;
+  onInstall: (providerId: string) => void;
   onSaveToken: (providerId: string, token: string) => void;
   onClearToken: (providerId: string) => void;
   onRunAction: (provider: ProdProviderDefinition, action: ProdProviderAction) => void;
@@ -307,18 +335,43 @@ function ProdProviderEditor({
         {cliMissing && (
           <div className="settings-pane__database-warning settings-pane__prod-install-warning">
             <span>
-              The <code>{provider.cli}</code> CLI was not detected. Install it before connecting.
+              The <code>{provider.cli}</code> CLI was not detected.{" "}
+              {provider.installCommand ? (
+                <>
+                  Install it with <code>{provider.installCommand}</code>.
+                </>
+              ) : (
+                <>Install it before connecting.</>
+              )}
             </span>
-            {provider.installUrl && (
-              <button
-                type="button"
-                className="settings-pane__btn"
-                onClick={() => onOpenInstallUrl(provider.installUrl)}
-              >
-                <Icon icon="solar:external-link-linear" width={13} height={13} />
-                <span>Install docs</span>
-              </button>
-            )}
+            <div className="settings-pane__prod-install-actions">
+              {provider.installCommand && (
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  data-primary="true"
+                  onClick={() => onInstall(provider.id)}
+                  disabled={disabled || busy}
+                >
+                  <Icon
+                    icon={busy ? "solar:refresh-linear" : "solar:download-minimalistic-linear"}
+                    width={13}
+                    height={13}
+                  />
+                  <span>{busy ? "Installing…" : "Install CLI"}</span>
+                </button>
+              )}
+              {provider.installUrl && (
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  onClick={() => onOpenInstallUrl(provider.installUrl)}
+                >
+                  <Icon icon="solar:external-link-linear" width={13} height={13} />
+                  <span>Install docs</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
 

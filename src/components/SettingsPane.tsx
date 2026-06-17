@@ -674,6 +674,53 @@ export function SettingsPane({ workspacePath }: Props) {
     [mergeProdProviderStatus],
   );
 
+  const installProdProvider = useCallback(
+    async (providerId: string) => {
+      setProdBusyProviderId(providerId);
+      setProdStatus("Installing CLI…");
+      try {
+        const result = await api.prodInstallCli(providerId);
+        mergeProdProviderStatus(result);
+        setProdStatus(
+          result.cliStatus === "installed" ? "CLI installed" : "Install finished",
+        );
+        window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      } finally {
+        setProdBusyProviderId(null);
+      }
+    },
+    [mergeProdProviderStatus],
+  );
+
+  const installAllProdProviders = useCallback(async () => {
+    const installable = prodProviders.filter((provider) => {
+      if (!provider.installCommand) return false;
+      const status = prodSettings.providers.find(
+        (entry) => entry.providerId === provider.id,
+      );
+      return !status || status.cliStatus === "missing" || status.cliStatus === "unknown";
+    });
+    if (installable.length === 0) {
+      setProdStatus("All CLIs already installed");
+      return;
+    }
+    setProdStatus(`Installing ${installable.length} CLIs…`);
+    for (const provider of installable) {
+      setProdBusyProviderId(provider.id);
+      try {
+        const result = await api.prodInstallCli(provider.id);
+        mergeProdProviderStatus(result);
+      } catch (err) {
+        setProdStatus(prodErrorMessage(err));
+      }
+    }
+    setProdBusyProviderId(null);
+    setProdStatus("Install finished");
+    window.dispatchEvent(new CustomEvent(PROD_SETTINGS_CHANGED_EVENT));
+  }, [mergeProdProviderStatus, prodProviders, prodSettings]);
+
   const runProdAction = useCallback(
     (provider: ProdProviderDefinition, action: ProdProviderAction) => {
       const command = action.command.trim();
@@ -1746,6 +1793,8 @@ export function SettingsPane({ workspacePath }: Props) {
             onRefresh={() => void loadProdSettings(true)}
             onConnect={(providerId, tokenDraft) => void connectProdProvider(providerId, tokenDraft)}
             onDisconnect={(providerId) => void disconnectProdProvider(providerId)}
+            onInstall={(providerId) => void installProdProvider(providerId)}
+            onInstallAll={() => void installAllProdProviders()}
             onSaveToken={(providerId, token) => void saveProdToken(providerId, token)}
             onClearToken={(providerId) => void clearProdToken(providerId)}
             onRunAction={runProdAction}

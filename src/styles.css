@@ -3244,6 +3244,8 @@ textarea {
   display: flex;
   flex-direction: column;
   background: var(--bg-0);
+  container-type: inline-size;
+  container-name: settingsmain;
 }
 
 .settings-pane__header {
@@ -4318,6 +4320,12 @@ textarea {
   justify-content: space-between;
   align-items: center;
 }
+.settings-pane__prod-install-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .settings-pane__prod-auth-actions {
   display: flex;
   align-items: center;
@@ -4336,6 +4344,45 @@ textarea {
   color: var(--text-3);
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
+}
+
+/* ----- Prod / Database responsive (container-based) ----- */
+/* The settings pane lives inside the resizable editor area, so we react to
+   the pane's own width rather than the viewport: when the agent panel
+   shrinks the editor, the two-column grid would otherwise overflow and let
+   the detail content slide under the agent panel. */
+@container settingsmain (max-width: 760px) {
+  .settings-pane__body--database,
+  .settings-pane__body--prod {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow-y: auto;
+  }
+  .settings-pane__body--database .settings-pane__nav-list,
+  .settings-pane__body--prod .settings-pane__nav-list {
+    max-height: 220px;
+  }
+  .settings-pane__prod-detail-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .settings-pane__prod-head-actions {
+    justify-content: flex-start;
+  }
+}
+@container settingsmain (max-width: 460px) {
+  .settings-pane__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .settings-pane__header .settings-pane__actions {
+    flex-wrap: wrap;
+  }
+  .settings-pane__prod-action {
+    flex: 1 1 auto;
+  }
 }
 .settings-pane__database-file-row {
   display: grid;

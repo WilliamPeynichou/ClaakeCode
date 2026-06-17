@@ -4,6 +4,7 @@ const PROD_STATUS_TIMEOUT_SECS: u64 = 30;
 const PROD_INSTALL_TIMEOUT_SECS: u64 = 10;
 const PROD_LOGIN_TIMEOUT_SECS: u64 = 180;
 const PROD_LOGOUT_TIMEOUT_SECS: u64 = 60;
+const PROD_INSTALL_RUN_TIMEOUT_SECS: u64 = 600;
 const PROD_OUTPUT_LIMIT_BYTES: usize = 64 * 1024;
 const PROD_MESSAGE_LIMIT_CHARS: usize = 500;
 
@@ -14,6 +15,7 @@ struct ProdProviderSpec {
     cli_name: &'static str,
     cli_candidates: &'static [&'static str],
     install_url: &'static str,
+    install_command: Option<&'static str>,
     token_env_var: Option<&'static str>,
     login_args: &'static [&'static str],
     auth_check_args: &'static [&'static str],
@@ -132,6 +134,16 @@ pub(super) async fn prod_disconnect(
         },
     )
     .await?;
+    persist_prod_statuses(&state, std::slice::from_ref(&result.status))?;
+    prod_runtime_status_from_status(&state, result.status)
+}
+
+#[tauri::command]
+pub(super) async fn prod_install_cli(
+    state: State<'_, DesktopState>,
+    input: ProdProviderIdInput,
+) -> std::result::Result<ProdProviderRuntimeStatus, String> {
+    let result = install_prod_provider_impl(&state, input.provider_id).await?;
     persist_prod_statuses(&state, std::slice::from_ref(&result.status))?;
     prod_runtime_status_from_status(&state, result.status)
 }
@@ -273,6 +285,83 @@ async fn disconnect_prod_provider_impl(
         },
         status,
     })
+}
+
+async fn install_prod_provider_impl(
+    state: &DesktopState,
+    provider_id: String,
+) -> std::result::Result<ProdProviderOperationResult, String> {
+    let provider = prod_provider_by_id(&provider_id)?;
+
+    // Already installed? Just re-report the current status.
+    if let Some(cli) = detect_installed_cli(provider).await? {
+        let status = provider_status_with_cli(provider, state, &cli, None).await?;
+        return Ok(ProdProviderOperationResult {
+            ok: true,
+            message: format!("{} CLI is already installed.", provider.name),
+            status,
+        });
+    }
+
+    let Some(install_command) = provider.install_command else {
+        let status = not_installed_status(provider);
+        return Ok(ProdProviderOperationResult {
+            ok: false,
+            message: format!(
+                "No automatic installer for {}. Install it from {}.",
+                provider.name, provider.install_url
+            ),
+            status,
+        });
+    };
+
+    let run = run_hidden_install_command(
+        install_command,
+        Duration::from_secs(PROD_INSTALL_RUN_TIMEOUT_SECS),
+    )
+    .await?;
+
+    // Re-detect after installing.
+    let status = match detect_installed_cli(provider).await? {
+        Some(cli) => provider_status_with_cli(provider, state, &cli, None).await?,
+        None => not_installed_status(provider),
+    };
+    let installed = status.installed;
+    let message = if installed {
+        format!("{} CLI installed.", provider.name)
+    } else if run.timed_out {
+        format!(
+            "{} install timed out. Try installing manually from {}.",
+            provider.name, provider.install_url
+        )
+    } else {
+        format!(
+            "{} install command finished but the CLI was not detected. Install it from {}.",
+            provider.name, provider.install_url
+        )
+    };
+
+    Ok(ProdProviderOperationResult {
+        ok: installed,
+        message,
+        status,
+    })
+}
+
+/// Runs a package-manager install command (brew/npm) inside a hidden login
+/// shell so Homebrew/npm are reachable. No secrets are involved here.
+async fn run_hidden_install_command(
+    command: &str,
+    timeout: Duration,
+) -> std::result::Result<HiddenPtyOutput, String> {
+    #[cfg(windows)]
+    {
+        run_hidden_provider_command("cmd", &["/C", command], None, None, timeout, &[]).await
+    }
+    #[cfg(not(windows))]
+    {
+        run_hidden_provider_command("/bin/sh", &["-lc", command], None, None, timeout, &[]).await
+    }
 }
 
 async fn provider_status(
@@ -443,6 +532,17 @@ fn run_hidden_provider_command_blocking(
     }
     command.env("TERM", "xterm-256color");
     command.env("NO_COLOR", "1");
+    // GUI apps launched from a .dmg inherit a minimal PATH that usually omits
+    // Homebrew (/opt/homebrew/bin, /usr/local/bin) and global npm bins, so CLI
+    // detection and installation would fail. Prepend the common locations.
+    #[cfg(unix)]
+    {
+        let inherited = std::env::var("PATH").unwrap_or_default();
+        command.env(
+            "PATH",
+            format!("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{inherited}"),
+        );
+    }
     if let Some((key, value)) = token_env {
         command.env(key, value);
     }
@@ -556,6 +656,7 @@ impl ProdProviderSpec {
                 .map(|candidate| (*candidate).to_string())
                 .collect(),
             install_url: self.install_url.to_string(),
+            install_command: self.install_command.map(str::to_string),
             token_env_var: self.token_env_var.map(str::to_string),
             login_label: format!("{} {}", self.cli_candidates[0], self.login_args.join(" ")),
             auth_check_label: self.auth_check_label.to_string(),
@@ -1059,6 +1160,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "vercel",
         cli_candidates: &["vercel"],
         install_url: "https://vercel.com/docs/cli",
+        install_command: Some("npm install -g vercel"),
         token_env_var: Some("VERCEL_TOKEN"),
         login_args: &["login"],
         auth_check_args: &["whoami"],
@@ -1072,6 +1174,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "railway",
         cli_candidates: &["railway"],
         install_url: "https://docs.railway.app/guides/cli",
+        install_command: Some("npm install -g @railway/cli"),
         token_env_var: Some("RAILWAY_TOKEN"),
         login_args: &["login"],
         auth_check_args: &["whoami"],
@@ -1085,6 +1188,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "netlify",
         cli_candidates: &["netlify"],
         install_url: "https://docs.netlify.com/cli/get-started/",
+        install_command: Some("npm install -g netlify-cli"),
         token_env_var: Some("NETLIFY_AUTH_TOKEN"),
         login_args: &["login"],
         auth_check_args: &["status"],
@@ -1098,6 +1202,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "render",
         cli_candidates: &["render"],
         install_url: "https://render.com/docs/cli",
+        install_command: Some("brew tap render-oss/render && brew install render"),
         token_env_var: Some("RENDER_API_KEY"),
         login_args: &["login"],
         auth_check_args: &["services"],
@@ -1111,6 +1216,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "fly",
         cli_candidates: &["fly", "flyctl"],
         install_url: "https://fly.io/docs/flyctl/install/",
+        install_command: Some("brew install flyctl"),
         token_env_var: Some("FLY_API_TOKEN"),
         login_args: &["auth", "login"],
         auth_check_args: &["auth", "whoami"],
@@ -1124,6 +1230,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "heroku",
         cli_candidates: &["heroku"],
         install_url: "https://devcenter.heroku.com/articles/heroku-cli",
+        install_command: Some("brew tap heroku/brew && brew install heroku"),
         token_env_var: Some("HEROKU_API_KEY"),
         login_args: &["login"],
         auth_check_args: &["auth:whoami"],
@@ -1137,6 +1244,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "wrangler",
         cli_candidates: &["wrangler"],
         install_url: "https://developers.cloudflare.com/workers/wrangler/install-and-update/",
+        install_command: Some("npm install -g wrangler"),
         token_env_var: Some("CLOUDFLARE_API_TOKEN"),
         login_args: &["login"],
         auth_check_args: &["whoami"],
@@ -1150,6 +1258,7 @@ static PROD_PROVIDERS: [ProdProviderSpec; 8] = [
         cli_name: "supabase",
         cli_candidates: &["supabase"],
         install_url: "https://supabase.com/docs/guides/cli/getting-started",
+        install_command: Some("brew install supabase/tap/supabase"),
         token_env_var: Some("SUPABASE_ACCESS_TOKEN"),
         login_args: &["login"],
         auth_check_args: &["projects", "list"],

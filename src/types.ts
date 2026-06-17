@@ -306,6 +306,7 @@ export type ProdProviderDefinition = {
   cliAliases?: string[];
   icon: string;
   installUrl: string;
+  installCommand?: string | null;
   loginCommand: string;
   loginLabel?: string | null;
   logoutCommand?: string | null;

@@ -312,6 +312,7 @@ pub fn run() {
             prod::prod_refresh_status,
             prod::prod_connect,
             prod::prod_disconnect,
+            prod::prod_install_cli,
             providers::list_configured_model_providers,
             providers::get_openai_provider_status,
             providers::start_openai_oauth_login,
