@@ -20,6 +20,7 @@ claakecode-app = { workspace = true }
 claakecode-core = { workspace = true }
 claakecode-google = { workspace = true }
 claakecode-kimi = { workspace = true }
+claakecode-mistral = { workspace = true }
 claakecode-openai = { workspace = true }
 claakecode-openrouter = { workspace = true }
 

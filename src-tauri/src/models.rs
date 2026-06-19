@@ -81,6 +81,33 @@ pub(super) struct StartKimiLoginOutput {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct MistralProviderStatus {
+    pub(super) connected: bool,
+    pub(super) connection_state: String,
+    pub(super) auth_mode: Option<String>,
+    pub(super) key_preview: Option<String>,
+    pub(super) expires_at_ms: Option<i64>,
+    pub(super) last_refresh_ms: Option<i64>,
+    pub(super) last_validated_ms: Option<i64>,
+    pub(super) login_id: Option<String>,
+    pub(super) error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StartMistralLoginOutput {
+    pub(super) login_id: String,
+    pub(super) auth_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ValidateMistralApiKeyInput {
+    pub(super) api_key: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct OpenRouterProviderStatus {
     pub(super) connected: bool,
     pub(super) connection_state: String,

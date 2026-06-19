@@ -413,6 +413,23 @@ export type StartKimiLoginOutput = {
   userCode: string;
 };
 
+export type MistralProviderStatus = {
+  connected: boolean;
+  connectionState: ProviderConnectionState;
+  authMode?: string | null;
+  keyPreview?: string | null;
+  expiresAtMs?: number | null;
+  lastRefreshMs?: number | null;
+  lastValidatedMs?: number | null;
+  loginId?: string | null;
+  error?: string | null;
+};
+
+export type StartMistralLoginOutput = {
+  loginId: string;
+  authUrl: string;
+};
+
 export type OpenRouterProviderStatus = {
   connected: boolean;
   connectionState: ProviderConnectionState;

@@ -7,7 +7,7 @@ import type {
 } from "../types";
 
 export type ModelId = string;
-export type ProviderId = "anthropic" | "openai" | "google" | "kimi" | "openrouter";
+export type ProviderId = "anthropic" | "openai" | "google" | "kimi" | "mistral" | "openrouter";
 export type ModeModelSelection = {
   model: ModelId;
   thinking: ThinkingLevel;
@@ -69,6 +69,11 @@ export const PROVIDERS: {
     value: "kimi",
     label: "Kimi",
     icon: "local:kimi",
+  },
+  {
+    value: "mistral",
+    label: "Mistral",
+    icon: "simple-icons:mistralai",
   },
   {
     value: "openrouter",
@@ -206,6 +211,20 @@ export const MODELS: ModelEntry[] = [
     thinking: ["off", "high"],
     defaultThinking: "high",
   },
+  {
+    value: "mistral:mistral-large-latest",
+    provider: "mistral",
+    label: "Mistral Large",
+    thinking: ["off"],
+    defaultThinking: "off",
+  },
+  {
+    value: "mistral:codestral-latest",
+    provider: "mistral",
+    label: "Codestral",
+    thinking: ["off"],
+    defaultThinking: "off",
+  },
 ];
 
 const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high"];
@@ -287,6 +306,9 @@ export function thinkingFromRef(
     if (model.effort === "none") return "off";
     return "high";
   }
+  if (model?.provider === "mistral") {
+    return "off";
+  }
   if (model?.provider === "openrouter") {
     if (model.effort === "none") return "off";
     if (
@@ -344,6 +366,7 @@ export function modelRefWithThinking(
   }
   if (thinking === "off") return { ...model, effort: "none" };
   if (model.provider === "kimi") return { ...model, effort: "high" };
+  if (model.provider === "mistral") return { ...model, effort: "none" };
   if (model.provider === "openrouter" && (thinking === "xhigh" || thinking === "max")) {
     return { ...model, effort: "high" };
   }

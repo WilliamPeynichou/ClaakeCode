@@ -49,6 +49,7 @@ pub(super) struct DesktopState {
     pub(super) anthropic_login: Arc<Mutex<Option<AnthropicLoginAttempt>>>,
     pub(super) google_login: Arc<Mutex<Option<GoogleLoginAttempt>>>,
     pub(super) kimi_login: Arc<Mutex<Option<KimiLoginAttempt>>>,
+    pub(super) mistral_login: Arc<Mutex<Option<MistralLoginAttempt>>>,
 }
 
 #[derive(Clone)]
@@ -122,6 +123,19 @@ pub(super) struct KimiLoginAttempt {
 
 #[derive(Clone)]
 pub(super) struct KimiLoginOutcome {
+    pub(super) success: bool,
+    pub(super) error: Option<String>,
+}
+
+#[derive(Clone)]
+pub(super) struct MistralLoginAttempt {
+    pub(super) id: String,
+    pub(super) cancel: Arc<Notify>,
+    pub(super) outcome: Arc<StdMutex<Option<MistralLoginOutcome>>>,
+}
+
+#[derive(Clone)]
+pub(super) struct MistralLoginOutcome {
     pub(super) success: bool,
     pub(super) error: Option<String>,
 }

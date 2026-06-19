@@ -105,6 +105,17 @@ pub(super) fn install_kimi_provider(
     Ok(())
 }
 
+pub(super) fn install_mistral_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+) -> std::result::Result<(), String> {
+    let provider = MistralProvider::from_default_sources().map_err(error_to_string)?;
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .insert("mistral".into(), Arc::new(provider) as Arc<dyn Provider>);
+    Ok(())
+}
+
 pub(super) fn install_openrouter_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
     models: &[OpenRouterModelRecord],
@@ -187,6 +198,16 @@ pub(super) fn remove_kimi_provider(
     Ok(())
 }
 
+pub(super) fn remove_mistral_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+) -> std::result::Result<(), String> {
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .remove("mistral");
+    Ok(())
+}
+
 pub(super) fn remove_openrouter_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
 ) -> std::result::Result<(), String> {
@@ -262,6 +283,25 @@ pub(super) fn kimi_provider_status_from_auth(
         connection_state: connection_state.to_string(),
         expires_at_ms: auth.expires_at_ms,
         last_refresh_ms: auth.last_refresh_ms,
+        login_id,
+        error,
+    }
+}
+
+pub(super) fn mistral_provider_status_from_auth(
+    auth: MistralAuthStatus,
+    connection_state: &str,
+    login_id: Option<String>,
+    error: Option<String>,
+) -> MistralProviderStatus {
+    MistralProviderStatus {
+        connected: auth.connected && connection_state == "connected",
+        connection_state: connection_state.to_string(),
+        auth_mode: auth.auth_mode,
+        key_preview: auth.key_preview,
+        expires_at_ms: auth.expires_at_ms,
+        last_refresh_ms: auth.last_refresh_ms,
+        last_validated_ms: auth.last_validated_ms,
         login_id,
         error,
     }
@@ -1372,6 +1412,362 @@ pub(super) async fn disconnect_kimi_provider(
     remove_kimi_provider(&state.providers)?;
     Ok(kimi_provider_status_from_auth(
         KimiAuthStatus::disconnected(),
+        "disconnected",
+        None,
+        None,
+    ))
+}
+
+pub(super) async fn bind_mistral_oauth_listener() -> Result<tokio::net::TcpListener> {
+    tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .context("unable to bind Mistral OAuth callback port")
+}
+
+pub(super) async fn run_mistral_oauth_server(
+    listener: tokio::net::TcpListener,
+    redirect_uri: String,
+    expected_state: String,
+    pkce: MistralPkceCodes,
+    cancel: Arc<Notify>,
+) -> Result<()> {
+    let http = reqwest::Client::builder()
+        .user_agent("ClaakeCode/0.1")
+        .build()
+        .context("unable to build OAuth client")?;
+
+    loop {
+        tokio::select! {
+            _ = cancel.notified() => {
+                anyhow::bail!("Login canceled");
+            }
+            accepted = listener.accept() => {
+                let (mut stream, _) = accepted.context("OAuth callback accept failed")?;
+                if let Some(result) = handle_mistral_oauth_request(
+                    &http,
+                    &mut stream,
+                    &redirect_uri,
+                    &expected_state,
+                    &pkce,
+                ).await? {
+                    return result;
+                }
+            }
+        }
+    }
+}
+
+pub(super) async fn handle_mistral_oauth_request(
+    http: &reqwest::Client,
+    stream: &mut tokio::net::TcpStream,
+    redirect_uri: &str,
+    expected_state: &str,
+    pkce: &MistralPkceCodes,
+) -> Result<Option<Result<()>>> {
+    let mut buffer = [0u8; 8192];
+    let read = stream
+        .read(&mut buffer)
+        .await
+        .context("OAuth callback read failed")?;
+    if read == 0 {
+        return Ok(None);
+    }
+
+    let request = String::from_utf8_lossy(&buffer[..read]);
+    let Some(first_line) = request.lines().next() else {
+        write_http_response(stream, 400, "Bad Request", "Bad Request").await?;
+        return Ok(None);
+    };
+    let mut parts = first_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let target = parts.next().unwrap_or_default();
+    if method != "GET" {
+        write_http_response(stream, 405, "Method Not Allowed", "Method Not Allowed").await?;
+        return Ok(None);
+    }
+
+    let parsed = parse_local_oauth_url(target)?;
+    match parsed.path() {
+        "/callback" => {
+            let params = parsed
+                .query_pairs()
+                .into_owned()
+                .collect::<HashMap<String, String>>();
+            if let Some(error) = params.get("error") {
+                let message = params
+                    .get("error_description")
+                    .filter(|value| !value.trim().is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| error.clone());
+                write_html_response(stream, 400, openai_login_error_html(&message)).await?;
+                return Ok(Some(Err(anyhow::anyhow!(message))));
+            }
+            if params.get("state").map(String::as_str) != Some(expected_state) {
+                write_html_response(stream, 400, openai_login_error_html("State mismatch")).await?;
+                return Ok(Some(Err(anyhow::anyhow!("State mismatch"))));
+            }
+            let Some(code) = params.get("code").filter(|value| !value.is_empty()) else {
+                write_html_response(
+                    stream,
+                    400,
+                    openai_login_error_html("Missing authorization code"),
+                )
+                .await?;
+                return Ok(Some(Err(anyhow::anyhow!("Missing authorization code"))));
+            };
+
+            match exchange_mistral_oauth_code(http, code, expected_state, redirect_uri, pkce).await
+            {
+                Ok(_) => {
+                    write_html_response(stream, 200, mistral_login_success_html()).await?;
+                    Ok(Some(Ok(())))
+                }
+                Err(err) => {
+                    let message = err.to_string();
+                    write_html_response(stream, 500, openai_login_error_html(&message)).await?;
+                    Ok(Some(Err(anyhow::anyhow!(message))))
+                }
+            }
+        }
+        "/cancel" => {
+            write_http_response(stream, 200, "OK", "Login canceled").await?;
+            Ok(Some(Err(anyhow::anyhow!("Login canceled"))))
+        }
+        _ => {
+            write_http_response(stream, 404, "Not Found", "Not Found").await?;
+            Ok(None)
+        }
+    }
+}
+
+pub(super) fn mistral_login_success_html() -> String {
+    r#"<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Claake Code connected</title>
+    <style>
+      body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0b0d;color:#f4f4f5;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      main{max-width:420px;padding:32px;text-align:center}
+      h1{font-size:22px;margin:0 0 10px}
+      p{margin:0;color:#a1a1aa;line-height:1.5}
+    </style>
+  </head>
+  <body><main><h1>Mistral is connected</h1><p>You can close this tab and return to Claake Code.</p></main></body>
+</html>"#
+        .to_string()
+}
+
+#[tauri::command]
+pub(super) async fn get_mistral_provider_status(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<MistralProviderStatus, String> {
+    let mut active_login = state.mistral_login.lock().await;
+    let attempt = active_login.clone();
+    if let Some(attempt) = attempt {
+        let outcome = attempt
+            .outcome
+            .lock()
+            .map_err(|_| "login state is unavailable".to_string())?
+            .clone();
+
+        if let Some(outcome) = outcome {
+            *active_login = None;
+            let auth = load_default_mistral_auth_status().map_err(error_to_string)?;
+            if outcome.success {
+                return Ok(mistral_provider_status_from_auth(
+                    auth,
+                    "connected",
+                    None,
+                    None,
+                ));
+            }
+            return Ok(mistral_provider_status_from_auth(
+                auth,
+                "error",
+                None,
+                outcome.error,
+            ));
+        }
+
+        let auth = load_default_mistral_auth_status().map_err(error_to_string)?;
+        return Ok(mistral_provider_status_from_auth(
+            auth,
+            "connecting",
+            Some(attempt.id),
+            None,
+        ));
+    }
+    drop(active_login);
+
+    let auth = load_default_mistral_auth_status().map_err(error_to_string)?;
+
+    if auth.auth_mode.as_deref() == Some("oauth") && auth.connected {
+        install_mistral_provider(&state.providers)?;
+        return Ok(mistral_provider_status_from_auth(
+            auth,
+            "connected",
+            None,
+            None,
+        ));
+    }
+
+    if let Some(api_key) = load_default_mistral_api_key().map_err(error_to_string)? {
+        match validate_mistral_api_key_remote(&api_key).await {
+            Ok(()) => {
+                let auth = touch_default_mistral_auth_validation().map_err(error_to_string)?;
+                install_mistral_provider(&state.providers)?;
+                return Ok(mistral_provider_status_from_auth(
+                    auth,
+                    "connected",
+                    None,
+                    None,
+                ));
+            }
+            Err(err) => {
+                remove_mistral_provider(&state.providers)?;
+                return Ok(mistral_provider_status_from_auth(
+                    auth,
+                    "error",
+                    None,
+                    Some(err.to_string()),
+                ));
+            }
+        }
+    }
+
+    remove_mistral_provider(&state.providers)?;
+    Ok(mistral_provider_status_from_auth(
+        auth,
+        "disconnected",
+        None,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn start_mistral_oauth_login(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<StartMistralLoginOutput, String> {
+    if let Some(existing) = state.mistral_login.lock().await.take() {
+        existing.cancel.notify_one();
+    }
+
+    let listener = bind_mistral_oauth_listener()
+        .await
+        .map_err(error_to_string)?;
+    let port = listener.local_addr().map_err(error_to_string)?.port();
+    let redirect_uri = format!("http://localhost:{port}/callback");
+    let pkce = generate_mistral_pkce();
+    let oauth_state = generate_mistral_state();
+    let auth_url = mistral_oauth_authorize_url(&redirect_uri, &pkce, &oauth_state)
+        .map_err(error_to_string)?;
+    let login_id = generate_mistral_state();
+    let cancel = Arc::new(Notify::new());
+    let outcome = Arc::new(StdMutex::new(None));
+
+    {
+        let mut active_login = state.mistral_login.lock().await;
+        *active_login = Some(MistralLoginAttempt {
+            id: login_id.clone(),
+            cancel: cancel.clone(),
+            outcome: outcome.clone(),
+        });
+    }
+
+    let providers = state.providers.clone();
+    tauri::async_runtime::spawn(async move {
+        let result =
+            run_mistral_oauth_server(listener, redirect_uri, oauth_state, pkce, cancel).await;
+        let login_outcome = match result {
+            Ok(()) => match install_mistral_provider(&providers) {
+                Ok(()) => MistralLoginOutcome {
+                    success: true,
+                    error: None,
+                },
+                Err(err) => MistralLoginOutcome {
+                    success: false,
+                    error: Some(err),
+                },
+            },
+            Err(err) => MistralLoginOutcome {
+                success: false,
+                error: Some(err.to_string()),
+            },
+        };
+        if let Ok(mut slot) = outcome.lock() {
+            *slot = Some(login_outcome);
+        }
+    });
+
+    Ok(StartMistralLoginOutput { login_id, auth_url })
+}
+
+#[tauri::command]
+pub(super) async fn cancel_mistral_oauth_login(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<MistralProviderStatus, String> {
+    if let Some(attempt) = state.mistral_login.lock().await.take() {
+        attempt.cancel.notify_one();
+    }
+    let auth = load_default_mistral_auth_status().map_err(error_to_string)?;
+    let connection_state = if auth.connected {
+        "connected"
+    } else {
+        "disconnected"
+    };
+    Ok(mistral_provider_status_from_auth(
+        auth,
+        connection_state,
+        None,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn validate_mistral_api_key(
+    state: State<'_, DesktopState>,
+    input: ValidateMistralApiKeyInput,
+) -> std::result::Result<MistralProviderStatus, String> {
+    let api_key = input.api_key.trim().to_string();
+    if api_key.is_empty() {
+        return Ok(mistral_provider_status_from_auth(
+            MistralAuthStatus::disconnected(),
+            "disconnected",
+            None,
+            None,
+        ));
+    }
+
+    if let Some(attempt) = state.mistral_login.lock().await.take() {
+        attempt.cancel.notify_one();
+    }
+
+    validate_mistral_api_key_remote(&api_key)
+        .await
+        .map_err(error_to_string)?;
+    let auth = save_default_mistral_api_key(&api_key).map_err(error_to_string)?;
+    install_mistral_provider(&state.providers)?;
+    Ok(mistral_provider_status_from_auth(
+        auth,
+        "connected",
+        None,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn disconnect_mistral_provider(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<MistralProviderStatus, String> {
+    if let Some(attempt) = state.mistral_login.lock().await.take() {
+        attempt.cancel.notify_one();
+    }
+    cancel_active_turns_for_provider(&state, "mistral").await;
+    delete_default_mistral_auth().map_err(error_to_string)?;
+    remove_mistral_provider(&state.providers)?;
+    Ok(mistral_provider_status_from_auth(
+        MistralAuthStatus::disconnected(),
         "disconnected",
         None,
         None,

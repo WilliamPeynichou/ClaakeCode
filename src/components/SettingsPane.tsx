@@ -58,6 +58,7 @@ import type {
   ImageProvider,
   InstalledSkill,
   KimiProviderStatus,
+  MistralProviderStatus,
   McpEnvVar,
   McpServerConfig,
   McpServerProbe,
@@ -176,6 +177,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const [anthropicStatus, setAnthropicStatus] = useState<AnthropicProviderStatus | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleProviderStatus | null>(null);
   const [kimiStatus, setKimiStatus] = useState<KimiProviderStatus | null>(null);
+  const [mistralStatus, setMistralStatus] = useState<MistralProviderStatus | null>(null);
   const [openRouterStatus, setOpenRouterStatus] = useState<OpenRouterProviderStatus | null>(null);
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
@@ -923,6 +925,23 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [loadConfiguredProviders]);
 
+  const loadMistralStatus = useCallback(async () => {
+    setProvidersLoading(true);
+    try {
+      const status = await api.getMistralProviderStatus();
+      setMistralStatus(status);
+      setProvidersMessage(status.error ?? null);
+      if (status.connectionState !== "connecting") {
+        void loadConfiguredProviders();
+        window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+      }
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [loadConfiguredProviders]);
+
   const loadOpenRouterStatus = useCallback(async () => {
     setProvidersLoading(true);
     try {
@@ -949,6 +968,7 @@ export function SettingsPane({ workspacePath }: Props) {
     if (anthropicStatus === null) void loadAnthropicStatus();
     if (googleStatus === null) void loadGoogleStatus();
     if (kimiStatus === null) void loadKimiStatus();
+    if (mistralStatus === null) void loadMistralStatus();
     if (openRouterStatus === null) void loadOpenRouterStatus();
   }, [
     section,
@@ -956,11 +976,13 @@ export function SettingsPane({ workspacePath }: Props) {
     anthropicStatus,
     googleStatus,
     kimiStatus,
+    mistralStatus,
     openRouterStatus,
     loadOpenAiStatus,
     loadAnthropicStatus,
     loadGoogleStatus,
     loadKimiStatus,
+    loadMistralStatus,
     loadOpenRouterStatus,
   ]);
 
@@ -977,12 +999,21 @@ export function SettingsPane({ workspacePath }: Props) {
     const anthropicConnecting = anthropicStatus?.connectionState === "connecting";
     const googleConnecting = googleStatus?.connectionState === "connecting";
     const kimiConnecting = kimiStatus?.connectionState === "connecting";
-    if (!openAiConnecting && !anthropicConnecting && !googleConnecting && !kimiConnecting) return;
+    const mistralConnecting = mistralStatus?.connectionState === "connecting";
+    if (
+      !openAiConnecting &&
+      !anthropicConnecting &&
+      !googleConnecting &&
+      !kimiConnecting &&
+      !mistralConnecting
+    )
+      return;
     const timer = window.setInterval(() => {
       if (openAiConnecting) void loadOpenAiStatus();
       if (anthropicConnecting) void loadAnthropicStatus();
       if (googleConnecting) void loadGoogleStatus();
       if (kimiConnecting) void loadKimiStatus();
+      if (mistralConnecting) void loadMistralStatus();
     }, 1200);
     return () => window.clearInterval(timer);
   }, [
@@ -990,10 +1021,12 @@ export function SettingsPane({ workspacePath }: Props) {
     anthropicStatus?.connectionState,
     googleStatus?.connectionState,
     kimiStatus?.connectionState,
+    mistralStatus?.connectionState,
     loadOpenAiStatus,
     loadAnthropicStatus,
     loadGoogleStatus,
     loadKimiStatus,
+    loadMistralStatus,
   ]);
 
   const connectOpenAi = useCallback(async () => {
@@ -1178,6 +1211,54 @@ export function SettingsPane({ workspacePath }: Props) {
     setProvidersMessage(null);
     try {
       setKimiStatus(await api.disconnectKimiProvider());
+      setProvidersMessage("Disconnected");
+      void loadConfiguredProviders();
+      window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, [loadConfiguredProviders]);
+
+  const connectMistral = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      const login = await api.startMistralOAuthLogin();
+      const connecting: MistralProviderStatus = {
+        connected: false,
+        connectionState: "connecting",
+        loginId: login.loginId,
+      };
+      setMistralStatus(connecting);
+      await api.openExternalUrl(login.authUrl);
+      setProvidersMessage("Waiting for Mistral browser confirmation...");
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+      void loadMistralStatus();
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, [loadMistralStatus]);
+
+  const cancelMistral = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      setMistralStatus(await api.cancelMistralOAuthLogin());
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, []);
+
+  const disconnectMistral = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      setMistralStatus(await api.disconnectMistralProvider());
       setProvidersMessage("Disconnected");
       void loadConfiguredProviders();
       window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
@@ -1742,6 +1823,7 @@ export function SettingsPane({ workspacePath }: Props) {
             anthropicStatus={anthropicStatus}
             googleStatus={googleStatus}
             kimiStatus={kimiStatus}
+            mistralStatus={mistralStatus}
             openRouterStatus={openRouterStatus}
             openRouterModels={openRouterModels}
             loading={providersLoading}
@@ -1752,6 +1834,7 @@ export function SettingsPane({ workspacePath }: Props) {
               void loadAnthropicStatus();
               void loadGoogleStatus();
               void loadKimiStatus();
+              void loadMistralStatus();
               void loadOpenRouterStatus();
             }}
             onConnect={() => void connectOpenAi()}
@@ -1766,6 +1849,10 @@ export function SettingsPane({ workspacePath }: Props) {
             onConnectKimi={() => void connectKimi()}
             onCancelKimi={() => void cancelKimi()}
             onDisconnectKimi={() => void disconnectKimi()}
+            onConnectMistral={() => void connectMistral()}
+            onCancelMistral={() => void cancelMistral()}
+            onDisconnectMistral={() => void disconnectMistral()}
+            onMistralStatusChange={setMistralStatus}
             onDisconnectOpenRouter={() => void disconnectOpenRouter()}
             onOpenRouterStatusChange={setOpenRouterStatus}
             onOpenRouterModelsChange={setOpenRouterModels}
@@ -1960,6 +2047,7 @@ type ProvidersSectionProps = {
   anthropicStatus: AnthropicProviderStatus | null;
   googleStatus: GoogleProviderStatus | null;
   kimiStatus: KimiProviderStatus | null;
+  mistralStatus: MistralProviderStatus | null;
   openRouterStatus: OpenRouterProviderStatus | null;
   openRouterModels: OpenRouterModel[];
   loading: boolean;
@@ -1978,6 +2066,10 @@ type ProvidersSectionProps = {
   onConnectKimi: () => void;
   onCancelKimi: () => void;
   onDisconnectKimi: () => void;
+  onConnectMistral: () => void;
+  onCancelMistral: () => void;
+  onDisconnectMistral: () => void;
+  onMistralStatusChange: (status: MistralProviderStatus) => void;
   onDisconnectOpenRouter: () => void;
   onOpenRouterStatusChange: (status: OpenRouterProviderStatus) => void;
   onOpenRouterModelsChange: (models: OpenRouterModel[]) => void;
@@ -1989,6 +2081,7 @@ function ProvidersSection({
   anthropicStatus,
   googleStatus,
   kimiStatus,
+  mistralStatus,
   openRouterStatus,
   openRouterModels,
   loading,
@@ -2007,6 +2100,10 @@ function ProvidersSection({
   onConnectKimi,
   onCancelKimi,
   onDisconnectKimi,
+  onConnectMistral,
+  onCancelMistral,
+  onDisconnectMistral,
+  onMistralStatusChange,
   onDisconnectOpenRouter,
   onOpenRouterStatusChange,
   onOpenRouterModelsChange,
@@ -2100,6 +2197,15 @@ function ProvidersSection({
           onCancel={onCancelKimi}
           onDisconnect={onDisconnectKimi}
         />
+        <MistralProviderCard
+          status={mistralStatus}
+          loading={loading}
+          busy={busy}
+          onConnect={onConnectMistral}
+          onCancel={onCancelMistral}
+          onDisconnect={onDisconnectMistral}
+          onStatusChange={onMistralStatusChange}
+        />
         <OpenRouterProviderCard
           status={openRouterStatus}
           models={openRouterModels}
@@ -2120,6 +2226,7 @@ type ProviderCardStatus =
   | AnthropicProviderStatus
   | GoogleProviderStatus
   | KimiProviderStatus
+  | MistralProviderStatus
   | null;
 
 type ProviderCardProps = {
@@ -2231,6 +2338,111 @@ function ProviderCard({
         )}
       </div>
     </section>
+  );
+}
+
+type MistralProviderCardProps = {
+  status: MistralProviderStatus | null;
+  loading: boolean;
+  busy: boolean;
+  onConnect: () => void;
+  onCancel: () => void;
+  onDisconnect: () => void;
+  onStatusChange: (status: MistralProviderStatus) => void;
+};
+
+function MistralProviderCard({
+  status,
+  loading,
+  busy,
+  onConnect,
+  onCancel,
+  onDisconnect,
+  onStatusChange,
+}: MistralProviderCardProps) {
+  const [apiKey, setApiKey] = useState("");
+  const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const validationSeq = useRef(0);
+  const authMode = status?.authMode ?? null;
+  const connectedMeta = useMemo(() => {
+    if (!status?.connected) return [] as string[];
+    if (authMode === "oauth") return ["Mistral OAuth"];
+    if (authMode === "api_key") {
+      return [status?.keyPreview ? `API key ${status.keyPreview}` : "API key"];
+    }
+    return [];
+  }, [authMode, status?.connected, status?.keyPreview]);
+
+  useEffect(() => {
+    const key = apiKey.trim();
+    validationSeq.current += 1;
+    const seq = validationSeq.current;
+    setValidationError(null);
+    if (!key) {
+      setValidating(false);
+      return;
+    }
+    setValidating(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const next = await api.validateMistralApiKey(key);
+          if (validationSeq.current !== seq) return;
+          onStatusChange(next);
+          setApiKey("");
+          setValidationError(null);
+        } catch (err) {
+          if (validationSeq.current !== seq) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setValidationError(message);
+        } finally {
+          if (validationSeq.current === seq) setValidating(false);
+        }
+      })();
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [apiKey, onStatusChange]);
+
+  return (
+    <div className="settings-pane__provider-stack">
+      <ProviderCard
+        name="Mistral"
+        icon="simple-icons:mistralai"
+        description="Connect via OAuth, or paste a Mistral API key below as fallback."
+        status={status}
+        connectedMeta={connectedMeta}
+        loading={loading}
+        busy={busy}
+        onConnect={onConnect}
+        onCancel={onCancel}
+        onDisconnect={onDisconnect}
+      />
+      {!status?.connected && (
+        <div className="settings-pane__provider-apikey">
+          <label htmlFor="mistral-api-key" className="settings-pane__provider-apikey-label">
+            Or paste a Mistral API key
+          </label>
+          <input
+            id="mistral-api-key"
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder="mistral-..."
+            autoComplete="off"
+            spellCheck={false}
+            disabled={busy || loading}
+            className="settings-pane__input"
+          />
+          {validating && (
+            <div className="settings-pane__provider-hint">Validating API key…</div>
+          )}
+          {validationError && (
+            <div className="settings-pane__provider-error">{validationError}</div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

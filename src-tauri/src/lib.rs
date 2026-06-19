@@ -62,6 +62,18 @@ use claakecode_kimi::{
     DeviceAuthorization as KimiDeviceAuthorization, KimiAuthStatus, KimiProvider,
     MODEL_ID as KIMI_MODEL_ID,
 };
+use claakecode_mistral::{
+    delete_default_auth as delete_default_mistral_auth,
+    exchange_oauth_code as exchange_mistral_oauth_code, generate_pkce as generate_mistral_pkce,
+    generate_state as generate_mistral_state,
+    load_default_api_key as load_default_mistral_api_key,
+    load_default_auth_status as load_default_mistral_auth_status,
+    oauth_authorize_url as mistral_oauth_authorize_url,
+    save_default_api_key as save_default_mistral_api_key,
+    touch_default_auth_validation as touch_default_mistral_auth_validation,
+    validate_api_key as validate_mistral_api_key_remote, MistralAuthStatus, MistralProvider,
+    PkceCodes as MistralPkceCodes, MODEL_ID as MISTRAL_MODEL_ID,
+};
 use claakecode_openai::{
     delete_default_auth, exchange_oauth_code, generate_pkce, generate_state,
     load_default_auth_status, oauth_authorize_url, OpenAiAuthStatus, OpenAiProvider, PkceCodes,
@@ -148,6 +160,9 @@ pub fn run() {
     if let Ok(provider) = KimiProvider::from_default_sources() {
         providers.insert("kimi".into(), Arc::new(provider) as Arc<dyn Provider>);
     }
+    if let Ok(provider) = MistralProvider::from_default_sources() {
+        providers.insert("mistral".into(), Arc::new(provider) as Arc<dyn Provider>);
+    }
     if let Ok(provider) =
         OpenRouterProvider::from_default_sources(openrouter_capabilities(&openrouter_models))
     {
@@ -163,6 +178,8 @@ pub fn run() {
         ModelRef::new("openai", OPENAI_MODEL_ID).with_effort(Effort::Medium)
     } else if providers.contains_key("kimi") {
         ModelRef::new("kimi", KIMI_MODEL_ID).with_effort(Effort::High)
+    } else if providers.contains_key("mistral") {
+        ModelRef::new("mistral", MISTRAL_MODEL_ID).with_effort(Effort::None)
     } else if providers.contains_key(OPENROUTER_PROVIDER_ID) {
         openrouter_models
             .first()
@@ -187,6 +204,7 @@ pub fn run() {
         anthropic_login: Arc::new(Mutex::new(None)),
         google_login: Arc::new(Mutex::new(None)),
         kimi_login: Arc::new(Mutex::new(None)),
+        mistral_login: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -330,6 +348,11 @@ pub fn run() {
             providers::start_kimi_oauth_login,
             providers::cancel_kimi_oauth_login,
             providers::disconnect_kimi_provider,
+            providers::get_mistral_provider_status,
+            providers::start_mistral_oauth_login,
+            providers::cancel_mistral_oauth_login,
+            providers::validate_mistral_api_key,
+            providers::disconnect_mistral_provider,
             providers::get_openrouter_provider_status,
             providers::validate_openrouter_api_key,
             providers::disconnect_openrouter_provider,

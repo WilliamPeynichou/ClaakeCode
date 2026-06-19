@@ -22,6 +22,7 @@ import type {
   GoogleProviderStatus,
   InstalledSkill,
   KimiProviderStatus,
+  MistralProviderStatus,
   MessageVisibility,
   McpServerProbe,
   McpSettings,
@@ -42,6 +43,7 @@ import type {
   StartAnthropicLoginOutput,
   StartGoogleLoginOutput,
   StartKimiLoginOutput,
+  StartMistralLoginOutput,
   StartOpenAiLoginOutput,
   SubAgentSettings,
   TerminalCommandResult,
@@ -502,6 +504,23 @@ export const api = {
   },
   disconnectKimiProvider() {
     return invoke<KimiProviderStatus>("disconnect_kimi_provider");
+  },
+  getMistralProviderStatus() {
+    return invoke<MistralProviderStatus>("get_mistral_provider_status");
+  },
+  startMistralOAuthLogin() {
+    return invoke<StartMistralLoginOutput>("start_mistral_oauth_login");
+  },
+  cancelMistralOAuthLogin() {
+    return invoke<MistralProviderStatus>("cancel_mistral_oauth_login");
+  },
+  validateMistralApiKey(apiKey: string) {
+    return invoke<MistralProviderStatus>("validate_mistral_api_key", {
+      input: { apiKey },
+    });
+  },
+  disconnectMistralProvider() {
+    return invoke<MistralProviderStatus>("disconnect_mistral_provider");
   },
   getOpenRouterProviderStatus() {
     return invoke<OpenRouterProviderStatus>("get_openrouter_provider_status");
