@@ -1221,39 +1221,6 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [loadConfiguredProviders]);
 
-  const connectMistral = useCallback(async () => {
-    setProvidersBusy(true);
-    setProvidersMessage(null);
-    try {
-      const login = await api.startMistralOAuthLogin();
-      const connecting: MistralProviderStatus = {
-        connected: false,
-        connectionState: "connecting",
-        loginId: login.loginId,
-      };
-      setMistralStatus(connecting);
-      await api.openExternalUrl(login.authUrl);
-      setProvidersMessage("Waiting for Mistral browser confirmation...");
-    } catch (err) {
-      setProvidersMessage(err instanceof Error ? err.message : String(err));
-      void loadMistralStatus();
-    } finally {
-      setProvidersBusy(false);
-    }
-  }, [loadMistralStatus]);
-
-  const cancelMistral = useCallback(async () => {
-    setProvidersBusy(true);
-    setProvidersMessage(null);
-    try {
-      setMistralStatus(await api.cancelMistralOAuthLogin());
-    } catch (err) {
-      setProvidersMessage(err instanceof Error ? err.message : String(err));
-    } finally {
-      setProvidersBusy(false);
-    }
-  }, []);
-
   const disconnectMistral = useCallback(async () => {
     setProvidersBusy(true);
     setProvidersMessage(null);
@@ -1849,8 +1816,6 @@ export function SettingsPane({ workspacePath }: Props) {
             onConnectKimi={() => void connectKimi()}
             onCancelKimi={() => void cancelKimi()}
             onDisconnectKimi={() => void disconnectKimi()}
-            onConnectMistral={() => void connectMistral()}
-            onCancelMistral={() => void cancelMistral()}
             onDisconnectMistral={() => void disconnectMistral()}
             onMistralStatusChange={setMistralStatus}
             onDisconnectOpenRouter={() => void disconnectOpenRouter()}
@@ -2066,8 +2031,6 @@ type ProvidersSectionProps = {
   onConnectKimi: () => void;
   onCancelKimi: () => void;
   onDisconnectKimi: () => void;
-  onConnectMistral: () => void;
-  onCancelMistral: () => void;
   onDisconnectMistral: () => void;
   onMistralStatusChange: (status: MistralProviderStatus) => void;
   onDisconnectOpenRouter: () => void;
@@ -2100,8 +2063,6 @@ function ProvidersSection({
   onConnectKimi,
   onCancelKimi,
   onDisconnectKimi,
-  onConnectMistral,
-  onCancelMistral,
   onDisconnectMistral,
   onMistralStatusChange,
   onDisconnectOpenRouter,
@@ -2201,8 +2162,6 @@ function ProvidersSection({
           status={mistralStatus}
           loading={loading}
           busy={busy}
-          onConnect={onConnectMistral}
-          onCancel={onCancelMistral}
           onDisconnect={onDisconnectMistral}
           onStatusChange={onMistralStatusChange}
         />
@@ -2345,34 +2304,47 @@ type MistralProviderCardProps = {
   status: MistralProviderStatus | null;
   loading: boolean;
   busy: boolean;
-  onConnect: () => void;
-  onCancel: () => void;
   onDisconnect: () => void;
   onStatusChange: (status: MistralProviderStatus) => void;
 };
+
+const MISTRAL_API_KEY_CONSOLE_URL = "https://console.mistral.ai/api-keys/";
 
 function MistralProviderCard({
   status,
   loading,
   busy,
-  onConnect,
-  onCancel,
   onDisconnect,
   onStatusChange,
 }: MistralProviderCardProps) {
   const [apiKey, setApiKey] = useState("");
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [openingConsole, setOpeningConsole] = useState(false);
   const validationSeq = useRef(0);
-  const authMode = status?.authMode ?? null;
-  const connectedMeta = useMemo(() => {
-    if (!status?.connected) return [] as string[];
-    if (authMode === "oauth") return ["Mistral OAuth"];
-    if (authMode === "api_key") {
-      return [status?.keyPreview ? `API key ${status.keyPreview}` : "API key"];
-    }
-    return [];
-  }, [authMode, status?.connected, status?.keyPreview]);
+
+  const state = status?.connectionState ?? "disconnected";
+  const connected = Boolean(status?.connected);
+  const error = validationError ?? (state === "error" ? status?.error : null);
+  const statusLabel = validating
+    ? "Validating"
+    : connected
+      ? "Connected"
+      : error
+        ? "Needs attention"
+        : "Not connected";
+  const statusTone = validating
+    ? "pending"
+    : connected
+      ? "ok"
+      : error
+        ? "error"
+        : "off";
+  const meta = useMemo(() => {
+    if (!connected) return [] as string[];
+    if (status?.authMode === "oauth") return ["Mistral OAuth"];
+    return [status?.keyPreview ? `API key ${status.keyPreview}` : "API key"];
+  }, [connected, status?.authMode, status?.keyPreview]);
 
   useEffect(() => {
     const key = apiKey.trim();
@@ -2404,45 +2376,98 @@ function MistralProviderCard({
     return () => window.clearTimeout(timer);
   }, [apiKey, onStatusChange]);
 
+  const openConsole = useCallback(async () => {
+    setOpeningConsole(true);
+    try {
+      await api.openExternalUrl(MISTRAL_API_KEY_CONSOLE_URL);
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOpeningConsole(false);
+    }
+  }, []);
+
   return (
-    <div className="settings-pane__provider-stack">
-      <ProviderCard
-        name="Mistral"
-        icon="simple-icons:mistralai"
-        description="Connect via OAuth, or paste a Mistral API key below as fallback."
-        status={status}
-        connectedMeta={connectedMeta}
-        loading={loading}
-        busy={busy}
-        onConnect={onConnect}
-        onCancel={onCancel}
-        onDisconnect={onDisconnect}
-      />
-      {!status?.connected && (
-        <div className="settings-pane__provider-apikey">
-          <label htmlFor="mistral-api-key" className="settings-pane__provider-apikey-label">
-            Or paste a Mistral API key
-          </label>
-          <input
-            id="mistral-api-key"
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder="mistral-..."
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy || loading}
-            className="settings-pane__input"
-          />
-          {validating && (
-            <div className="settings-pane__provider-hint">Validating API key…</div>
-          )}
-          {validationError && (
-            <div className="settings-pane__provider-error">{validationError}</div>
-          )}
+    <section className="settings-pane__provider-card">
+      <div className="settings-pane__provider-main">
+        <div className="settings-pane__provider-mark" aria-hidden>
+          <Icon icon="simple-icons:mistralai" width={24} height={24} />
         </div>
-      )}
-    </div>
+        <div className="settings-pane__provider-copy">
+          <div className="settings-pane__provider-title-row">
+            <h2>Mistral</h2>
+            <span className="settings-pane__chip" data-tone={statusTone}>
+              <span className="settings-pane__chip-dot" />
+              {statusLabel}
+            </span>
+          </div>
+          <p>
+            Click <strong>Connect</strong> to open the Mistral console, copy an API key, then
+            paste it below.
+          </p>
+          {connected && meta.length > 0 && (
+            <div className="settings-pane__provider-meta">
+              {meta.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          )}
+          {!connected && (
+            <div className="settings-pane__provider-apikey">
+              <label
+                htmlFor="mistral-api-key"
+                className="settings-pane__provider-apikey-label"
+              >
+                Paste your Mistral API key
+              </label>
+              <input
+                id="mistral-api-key"
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="mistral-…"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={busy || loading}
+                className="settings-pane__input"
+              />
+              {validating && (
+                <div className="settings-pane__provider-hint">Validating API key…</div>
+              )}
+            </div>
+          )}
+          {error && <div className="settings-pane__provider-error">{error}</div>}
+        </div>
+      </div>
+      <div className="settings-pane__provider-actions">
+        {connected ? (
+          <button
+            type="button"
+            className="settings-pane__btn"
+            onClick={onDisconnect}
+            disabled={busy}
+          >
+            <Icon icon="solar:logout-2-linear" width={13} height={13} />
+            <span>{busy ? "Disconnecting..." : "Disconnect"}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="settings-pane__btn"
+            data-primary="true"
+            onClick={() => void openConsole()}
+            disabled={loading || busy || openingConsole}
+          >
+            <Icon
+              icon={openingConsole ? "solar:refresh-linear" : "solar:login-2-linear"}
+              width={13}
+              height={13}
+            />
+            <span>{openingConsole ? "Opening…" : "Connect"}</span>
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
