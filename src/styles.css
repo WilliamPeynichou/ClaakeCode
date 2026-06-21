@@ -3219,6 +3219,19 @@ textarea {
   color: var(--text-0);
 }
 
+.settings-pane__nav-item--embedding {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.settings-pane__nav-item--embedding .settings-pane__nav-label {
+  font-weight: 650;
+}
+
+.settings-pane__nav-item--embedding .settings-pane__nav-count {
+  color: var(--text-1);
+}
+
 .settings-pane__nav-icon {
   color: currentColor;
   opacity: 0.85;

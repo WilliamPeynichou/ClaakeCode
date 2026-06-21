@@ -1962,7 +1962,7 @@ export function SettingsPane({ workspacePath }: Props) {
         </button>
         <button
           type="button"
-          className="settings-pane__nav-item"
+          className="settings-pane__nav-item settings-pane__nav-item--embedding"
           data-active={section === "embedding" ? "true" : "false"}
           onClick={() => setSection("embedding")}
         >
@@ -1972,9 +1972,9 @@ export function SettingsPane({ workspacePath }: Props) {
             height={15}
             className="settings-pane__nav-icon"
           />
-          <span className="settings-pane__nav-label">Embedding</span>
+          <span className="settings-pane__nav-label">Embeddings</span>
           <span className="settings-pane__nav-count">
-            {embeddingLoading ? "·" : activeEmbeddingCount > 0 ? activeEmbeddingCount : ""}
+            {embeddingLoading ? "·" : `${activeEmbeddingCount}/7`}
           </span>
         </button>
         <button
