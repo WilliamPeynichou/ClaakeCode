@@ -11,5 +11,10 @@ pub use auth::{
     MISTRAL_API_KEY_ENV, MISTRAL_OAUTH_AUTHORIZE_URL_ENV, MISTRAL_OAUTH_CLIENT_ID_ENV,
     MISTRAL_OAUTH_SCOPE_ENV, MISTRAL_OAUTH_TOKEN_URL_ENV,
 };
-pub use client::{validate_api_key, MistralConfig, MistralProvider};
-pub use model_info::{MODEL_ID, PROVIDER_ID};
+pub use client::{
+    fetch_model_catalog, validate_api_key, MistralCatalogModel, MistralConfig, MistralProvider,
+};
+pub use model_info::{
+    capabilities_from_catalog_model, capabilities_from_parts, fallback_capabilities, MODEL_ID,
+    PROVIDER_ID,
+};

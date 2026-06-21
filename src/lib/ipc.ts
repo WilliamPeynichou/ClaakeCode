@@ -23,6 +23,7 @@ import type {
   InstalledSkill,
   KimiProviderStatus,
   MistralProviderStatus,
+  MistralModel,
   MessageVisibility,
   McpServerProbe,
   McpSettings,
@@ -521,6 +522,12 @@ export const api = {
   },
   disconnectMistralProvider() {
     return invoke<MistralProviderStatus>("disconnect_mistral_provider");
+  },
+  listMistralModels() {
+    return invoke<MistralModel[]>("list_mistral_models");
+  },
+  refreshMistralModels() {
+    return invoke<MistralModel[]>("refresh_mistral_models");
   },
   getOpenRouterProviderStatus() {
     return invoke<OpenRouterProviderStatus>("get_openrouter_provider_status");

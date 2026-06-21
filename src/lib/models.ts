@@ -1,5 +1,6 @@
 import type {
   AgentMode,
+  MistralModel,
   ModeModelSettings,
   ModelRef,
   OpenRouterModel,
@@ -227,6 +228,24 @@ export const MODELS: ModelEntry[] = [
   },
 ];
 
+// Fallback Mistral models when no catalog is loaded
+const MISTRAL_FALLBACK_MODELS: ModelEntry[] = [
+  {
+    value: "mistral:mistral-large-latest",
+    provider: "mistral",
+    label: "Mistral Large",
+    thinking: ["off"],
+    defaultThinking: "off",
+  },
+  {
+    value: "mistral:codestral-latest",
+    provider: "mistral",
+    label: "Codestral",
+    thinking: ["off"],
+    defaultThinking: "off",
+  },
+];
+
 const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high"];
 const OPENROUTER_NO_THINKING: readonly ThinkingLevel[] = ["off"];
 
@@ -247,13 +266,32 @@ export function modelsWithOpenRouter(
   return [...MODELS, ...openRouterModelEntries(openRouterModels)];
 }
 
+export function modelsWithMistralAndOpenRouter(
+  mistralModels: readonly MistralModel[] = [],
+  openRouterModels: readonly OpenRouterModel[] = [],
+): ModelEntry[] {
+  const mistralEntries =
+    mistralModels.length > 0 ? mistralModelEntries(mistralModels) : MISTRAL_FALLBACK_MODELS;
+  // Replace MODELS' mistral entries with dynamic ones
+  const base = MODELS.filter((m) => m.provider !== "mistral");
+  return [...base, ...mistralEntries, ...openRouterModelEntries(openRouterModels)];
+}
+
 export function availableModelsForProviders(
   configuredProviders: readonly string[],
   openRouterModels: readonly OpenRouterModel[] = [],
+  mistralModels: readonly MistralModel[] = [],
 ): ModelEntry[] {
   const configured = new Set(configuredProviders);
+  const mistralEntries =
+    mistralModels.length > 0
+      ? mistralModelEntries(mistralModels)
+      : MODELS.filter((m) => m.provider === "mistral");
   return [
-    ...MODELS.filter((model) => configured.has(model.provider)),
+    ...MODELS.filter(
+      (model) => configured.has(model.provider) && model.provider !== "mistral",
+    ),
+    ...(configured.has("mistral") ? mistralEntries : []),
     ...(configured.has("openrouter") ? openRouterModelEntries(openRouterModels) : []),
   ];
 }
@@ -268,6 +306,18 @@ function openRouterModelEntries(
     thinking: model.supportsThinking ? OPENROUTER_THINKING : OPENROUTER_NO_THINKING,
     defaultThinking: model.supportsThinking ? "medium" : "off",
   }));
+}
+
+function mistralModelEntries(mistralModels: readonly MistralModel[]): ModelEntry[] {
+  return mistralModels
+    .filter((m) => !m.deprecated)
+    .map((model) => ({
+      value: modelId("mistral", model.id),
+      provider: "mistral",
+      label: model.name || model.id,
+      thinking: ["off"] as ThinkingLevel[],
+      defaultThinking: "off" as ThinkingLevel,
+    }));
 }
 
 export function modelIdFromRef(model: ModelRef | null | undefined): ModelId {

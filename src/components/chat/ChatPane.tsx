@@ -38,6 +38,7 @@ import {
   modelRefWithUse1mContext,
   modelSupports1mContextBeta,
   modelsWithOpenRouter,
+  modelsWithMistralAndOpenRouter,
   selectionFromRef,
   selectionsFromSettings,
   thinkingFromRef,
@@ -57,6 +58,7 @@ import type {
   ModeModelSettings,
   ModelRef,
   OpenRouterModel,
+  MistralModel,
   Part,
   PlanArtifact,
   PlanControl,
@@ -484,6 +486,7 @@ export function ChatPane({
   );
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
+  const [mistralModels, setMistralModels] = useState<MistralModel[]>([]);
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
   const modelRef = useRef<HTMLDivElement | null>(null);
   const thinkingRef = useRef<HTMLDivElement | null>(null);
@@ -597,15 +600,18 @@ export function ChatPane({
 
   const loadConfiguredProviders = useCallback(async () => {
     try {
-      const [providers, models] = await Promise.all([
+      const [providers, models, mModels] = await Promise.all([
         api.listConfiguredModelProviders(),
         api.listOpenRouterModels().catch(() => []),
+        api.listMistralModels().catch(() => []),
       ]);
       setConfiguredProviders(providers);
       setOpenRouterModels(models);
+      setMistralModels(mModels);
     } catch {
       setConfiguredProviders([]);
       setOpenRouterModels([]);
+      setMistralModels([]);
     }
   }, []);
 
@@ -652,12 +658,12 @@ export function ChatPane({
   }, [loadAgentTeamsEnabled]);
 
   const allModels = useMemo(
-    () => modelsWithOpenRouter(openRouterModels),
-    [openRouterModels],
+    () => modelsWithMistralAndOpenRouter(mistralModels, openRouterModels),
+    [mistralModels, openRouterModels],
   );
   const availableModels = useMemo(
-    () => availableModelsForProviders(configuredProviders, openRouterModels),
-    [configuredProviders, openRouterModels],
+    () => availableModelsForProviders(configuredProviders, openRouterModels, mistralModels),
+    [configuredProviders, openRouterModels, mistralModels],
   );
 
   const baseModeSelections = useMemo(

@@ -66,7 +66,7 @@ pub use skill::{
 };
 pub use store::{
     tool_settings_view, AppStore, ConversationSummary, GoalWorkflowState, ModeModelSettings,
-    OpenRouterModelRecord, PlanArtifactState, PlanWorkflowState, SavedConversation, ToolConfig,
+    OpenRouterModelRecord, MistralModelRecord, PlanArtifactState, PlanWorkflowState, SavedConversation, ToolConfig,
     ToolConfigView, ToolSettings, ToolSettingsView, TurnCheckpointRecord, WebSearchProvider,
     WorkspaceBootstrap, DEFAULT_PLAN_MODE_PROMPT,
 };

@@ -39,6 +39,7 @@ import {
   PROVIDERS,
   THINKING_LEVELS,
   availableModelsForProviders,
+  modelsWithMistralAndOpenRouter,
   modelIdFromRef,
   modelRefFromId,
   modelRefWithThinking,
@@ -63,6 +64,7 @@ import type {
   McpServerConfig,
   McpServerProbe,
   McpSettings,
+  MistralModel,
   OpenAiProviderStatus,
   OpenRouterModel,
   OpenRouterModelSearchResult,
@@ -180,6 +182,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const [mistralStatus, setMistralStatus] = useState<MistralProviderStatus | null>(null);
   const [openRouterStatus, setOpenRouterStatus] = useState<OpenRouterProviderStatus | null>(null);
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
+  const [mistralModels, setMistralModels] = useState<MistralModel[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersBusy, setProvidersBusy] = useState(false);
   const [providersMessage, setProvidersMessage] = useState<string | null>(null);
@@ -836,15 +839,18 @@ export function SettingsPane({ workspacePath }: Props) {
 
   const loadConfiguredProviders = useCallback(async () => {
     try {
-      const [providers, models] = await Promise.all([
+      const [providers, models, mModels] = await Promise.all([
         api.listConfiguredModelProviders(),
         api.listOpenRouterModels().catch(() => []),
+        api.listMistralModels().catch(() => []),
       ]);
       setConfiguredProviders(providers);
       setOpenRouterModels(models);
+      setMistralModels(mModels);
     } catch {
       setConfiguredProviders([]);
       setOpenRouterModels([]);
+      setMistralModels([]);
     }
   }, []);
 
@@ -853,8 +859,8 @@ export function SettingsPane({ workspacePath }: Props) {
   }, [loadConfiguredProviders]);
 
   const availableModels = useMemo(
-    () => availableModelsForProviders(configuredProviders, openRouterModels),
-    [configuredProviders, openRouterModels],
+    () => availableModelsForProviders(configuredProviders, openRouterModels, mistralModels),
+    [configuredProviders, openRouterModels, mistralModels],
   );
 
   const loadOpenAiStatus = useCallback(async () => {
@@ -1791,6 +1797,7 @@ export function SettingsPane({ workspacePath }: Props) {
             googleStatus={googleStatus}
             kimiStatus={kimiStatus}
             mistralStatus={mistralStatus}
+            mistralModels={mistralModels}
             openRouterStatus={openRouterStatus}
             openRouterModels={openRouterModels}
             loading={providersLoading}
@@ -1818,6 +1825,7 @@ export function SettingsPane({ workspacePath }: Props) {
             onDisconnectKimi={() => void disconnectKimi()}
             onDisconnectMistral={() => void disconnectMistral()}
             onMistralStatusChange={setMistralStatus}
+            onMistralModelsChange={setMistralModels}
             onDisconnectOpenRouter={() => void disconnectOpenRouter()}
             onOpenRouterStatusChange={setOpenRouterStatus}
             onOpenRouterModelsChange={setOpenRouterModels}
@@ -2013,6 +2021,7 @@ type ProvidersSectionProps = {
   googleStatus: GoogleProviderStatus | null;
   kimiStatus: KimiProviderStatus | null;
   mistralStatus: MistralProviderStatus | null;
+  mistralModels: MistralModel[];
   openRouterStatus: OpenRouterProviderStatus | null;
   openRouterModels: OpenRouterModel[];
   loading: boolean;
@@ -2033,6 +2042,7 @@ type ProvidersSectionProps = {
   onDisconnectKimi: () => void;
   onDisconnectMistral: () => void;
   onMistralStatusChange: (status: MistralProviderStatus) => void;
+  onMistralModelsChange: (models: MistralModel[]) => void;
   onDisconnectOpenRouter: () => void;
   onOpenRouterStatusChange: (status: OpenRouterProviderStatus) => void;
   onOpenRouterModelsChange: (models: OpenRouterModel[]) => void;
@@ -2045,6 +2055,7 @@ function ProvidersSection({
   googleStatus,
   kimiStatus,
   mistralStatus,
+  mistralModels,
   openRouterStatus,
   openRouterModels,
   loading,
@@ -2065,6 +2076,7 @@ function ProvidersSection({
   onDisconnectKimi,
   onDisconnectMistral,
   onMistralStatusChange,
+  onMistralModelsChange,
   onDisconnectOpenRouter,
   onOpenRouterStatusChange,
   onOpenRouterModelsChange,
@@ -2160,10 +2172,12 @@ function ProvidersSection({
         />
         <MistralProviderCard
           status={mistralStatus}
+          models={mistralModels}
           loading={loading}
           busy={busy}
           onDisconnect={onDisconnectMistral}
           onStatusChange={onMistralStatusChange}
+          onModelsChange={onMistralModelsChange}
         />
         <OpenRouterProviderCard
           status={openRouterStatus}
@@ -2302,25 +2316,30 @@ function ProviderCard({
 
 type MistralProviderCardProps = {
   status: MistralProviderStatus | null;
+  models: MistralModel[];
   loading: boolean;
   busy: boolean;
   onDisconnect: () => void;
   onStatusChange: (status: MistralProviderStatus) => void;
+  onModelsChange: (models: MistralModel[]) => void;
 };
 
 const MISTRAL_API_KEY_CONSOLE_URL = "https://console.mistral.ai/api-keys/";
 
 function MistralProviderCard({
   status,
+  models,
   loading,
   busy,
   onDisconnect,
   onStatusChange,
+  onModelsChange,
 }: MistralProviderCardProps) {
   const [apiKey, setApiKey] = useState("");
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [openingConsole, setOpeningConsole] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const validationSeq = useRef(0);
 
   const state = status?.connectionState ?? "disconnected";
@@ -2342,9 +2361,14 @@ function MistralProviderCard({
         : "off";
   const meta = useMemo(() => {
     if (!connected) return [] as string[];
-    if (status?.authMode === "oauth") return ["Mistral OAuth"];
-    return [status?.keyPreview ? `API key ${status.keyPreview}` : "API key"];
-  }, [connected, status?.authMode, status?.keyPreview]);
+    const modelCount = models.filter((m) => !m.deprecated).length;
+    const modelLabel = modelCount > 0 ? `${modelCount} models` : null;
+    if (status?.authMode === "oauth") return ["Mistral OAuth", ...(modelLabel ? [modelLabel] : [])];
+    return [
+      status?.keyPreview ? `API key ${status.keyPreview}` : "API key",
+      ...(modelLabel ? [modelLabel] : []),
+    ];
+  }, [connected, models, status?.authMode, status?.keyPreview]);
 
   useEffect(() => {
     const key = apiKey.trim();
@@ -2386,6 +2410,18 @@ function MistralProviderCard({
       setOpeningConsole(false);
     }
   }, []);
+
+  const refreshModels = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const updated = await api.refreshMistralModels();
+      onModelsChange(updated);
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [onModelsChange]);
 
   return (
     <section className="settings-pane__provider-card">
@@ -2441,15 +2477,26 @@ function MistralProviderCard({
       </div>
       <div className="settings-pane__provider-actions">
         {connected ? (
-          <button
-            type="button"
-            className="settings-pane__btn"
-            onClick={onDisconnect}
-            disabled={busy}
-          >
-            <Icon icon="solar:logout-2-linear" width={13} height={13} />
-            <span>{busy ? "Disconnecting..." : "Disconnect"}</span>
-          </button>
+          <>
+            <button
+              type="button"
+              className="settings-pane__btn"
+              onClick={() => void refreshModels()}
+              disabled={busy || refreshing}
+            >
+              <Icon icon="solar:refresh-linear" width={13} height={13} />
+              <span>{refreshing ? "Refreshing…" : "Refresh models"}</span>
+            </button>
+            <button
+              type="button"
+              className="settings-pane__btn"
+              onClick={onDisconnect}
+              disabled={busy}
+            >
+              <Icon icon="solar:logout-2-linear" width={13} height={13} />
+              <span>{busy ? "Disconnecting..." : "Disconnect"}</span>
+            </button>
+          </>
         ) : (
           <button
             type="button"

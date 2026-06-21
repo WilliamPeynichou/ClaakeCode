@@ -1,71 +1,62 @@
 use claakecode_core::{EffortMode, ModelCapabilities, ModelRef};
 
+use crate::client::MistralCatalogModel;
+
 pub const PROVIDER_ID: &str = "mistral";
+/// Reasonable default model when no live catalogue has been fetched yet.
 pub const MODEL_ID: &str = "mistral-large-latest";
 
-struct MistralModelInfo {
-    id: &'static str,
+/// Build [`ModelCapabilities`] from a single field-by-field description.
+pub fn capabilities_from_parts(
+    model: &ModelRef,
     context_window: u32,
-    preferred_window: u32,
     max_output_tokens: u32,
     supports_images: bool,
     supports_tools: bool,
-}
-
-const MODELS: &[MistralModelInfo] = &[
-    MistralModelInfo {
-        id: "mistral-large-latest",
-        context_window: 131_072,
-        preferred_window: 120_000,
-        max_output_tokens: 8_192,
-        supports_images: true,
-        supports_tools: true,
-    },
-    MistralModelInfo {
-        id: "mistral-medium-latest",
-        context_window: 131_072,
-        preferred_window: 120_000,
-        max_output_tokens: 8_192,
-        supports_images: true,
-        supports_tools: true,
-    },
-    MistralModelInfo {
-        id: "mistral-small-latest",
-        context_window: 131_072,
-        preferred_window: 120_000,
-        max_output_tokens: 8_192,
-        supports_images: true,
-        supports_tools: true,
-    },
-    MistralModelInfo {
-        id: "codestral-latest",
-        context_window: 262_144,
-        preferred_window: 240_000,
-        max_output_tokens: 8_192,
-        supports_images: false,
-        supports_tools: true,
-    },
-];
-
-fn model_info(model_id: &str) -> &'static MistralModelInfo {
-    MODELS
-        .iter()
-        .find(|info| info.id == model_id)
-        .unwrap_or(&MODELS[0])
-}
-
-pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
-    let info = model_info(&model.name);
+) -> ModelCapabilities {
+    let context_window = context_window.max(1);
+    let max_output_tokens = max_output_tokens.max(1).min(context_window);
+    let preferred_window = context_window.saturating_sub(context_window / 16).max(1);
     ModelCapabilities {
         model: model.clone(),
-        context_window: info.context_window,
-        preferred_window: info.preferred_window,
-        max_output_tokens: info.max_output_tokens,
-        // The default Mistral chat models do not expose a reasoning channel.
+        context_window,
+        preferred_window,
+        max_output_tokens,
+        // Mistral standard chat models do not expose a reasoning channel.
+        // Magistral models will surface that via a future `supports_thinking`
+        // capability flag returned by /v1/models.
         supports_thinking: false,
         visible_thinking: false,
-        supports_tools: info.supports_tools,
-        supports_images: info.supports_images,
+        supports_tools,
+        supports_images,
         effort_mode: EffortMode::None,
     }
+}
+
+/// Build [`ModelCapabilities`] for a model returned by Mistral's `/v1/models`
+/// endpoint.
+pub fn capabilities_from_catalog_model(
+    model: &ModelRef,
+    catalog: &MistralCatalogModel,
+) -> ModelCapabilities {
+    capabilities_from_parts(
+        model,
+        catalog.context_window,
+        catalog.max_output_tokens,
+        catalog.supports_images,
+        catalog.supports_tools,
+    )
+}
+
+/// Fallback capabilities when the model is unknown (no catalogue fetched yet).
+///
+/// Tuned for Mistral Large 2 / Codestral 25.01 ranges.
+pub fn fallback_capabilities(model: &ModelRef) -> ModelCapabilities {
+    let (context, output, images, tools) = match model.name.as_str() {
+        name if name.starts_with("codestral") => (262_144, 8_192, false, true),
+        name if name.starts_with("pixtral") => (131_072, 8_192, true, true),
+        name if name.starts_with("ministral") => (131_072, 8_192, false, true),
+        _ => (131_072, 8_192, true, true),
+    };
+    capabilities_from_parts(model, context, output, images, tools)
 }

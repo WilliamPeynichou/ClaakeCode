@@ -33,7 +33,7 @@ use claakecode_app::{
     DatabaseActivityEntry, DatabaseConnectionStatus, DatabaseConnectionTestResult,
     DatabaseSettings, DatabaseSourceConfig, DatabaseTool, EditFileTool, GlobTool,
     GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpSettings, McpToolRegistry,
-    ModeModelSettings, OpenRouterModelRecord, PlanArtifactState, PlanWorkflowState,
+    ModeModelSettings, OpenRouterModelRecord, MistralModelRecord, PlanArtifactState, PlanWorkflowState,
     ProdProviderCachedStatus, ProdProviderConnectionState, ProdProviderSettings, QuestionTool,
     ReadTool, SavedConversation, SkillSettings, SkillTool, SubAgentConfig, SubAgentSettings,
     SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
@@ -64,15 +64,16 @@ use claakecode_kimi::{
 };
 use claakecode_mistral::{
     delete_default_auth as delete_default_mistral_auth,
-    exchange_oauth_code as exchange_mistral_oauth_code, generate_pkce as generate_mistral_pkce,
+    exchange_oauth_code as exchange_mistral_oauth_code,
+    fetch_model_catalog as fetch_mistral_model_catalog, generate_pkce as generate_mistral_pkce,
     generate_state as generate_mistral_state,
     load_default_api_key as load_default_mistral_api_key,
     load_default_auth_status as load_default_mistral_auth_status,
     oauth_authorize_url as mistral_oauth_authorize_url,
     save_default_api_key as save_default_mistral_api_key,
     touch_default_auth_validation as touch_default_mistral_auth_validation,
-    validate_api_key as validate_mistral_api_key_remote, MistralAuthStatus, MistralProvider,
-    PkceCodes as MistralPkceCodes, MODEL_ID as MISTRAL_MODEL_ID,
+    validate_api_key as validate_mistral_api_key_remote, MistralAuthStatus, MistralCatalogModel,
+    MistralProvider, PkceCodes as MistralPkceCodes, MODEL_ID as MISTRAL_MODEL_ID,
 };
 use claakecode_openai::{
     delete_default_auth, exchange_oauth_code, generate_pkce, generate_state,
@@ -147,6 +148,7 @@ pub fn run() {
 
     let store = AppStore::open_default().expect("unable to open app store");
     let openrouter_models = store.load_openrouter_models().unwrap_or_default();
+    let mistral_models = store.load_mistral_models().unwrap_or_default();
     let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
     if let Ok(provider) = AnthropicProvider::from_default_sources() {
         providers.insert("anthropic".into(), Arc::new(provider) as Arc<dyn Provider>);
@@ -160,7 +162,9 @@ pub fn run() {
     if let Ok(provider) = KimiProvider::from_default_sources() {
         providers.insert("kimi".into(), Arc::new(provider) as Arc<dyn Provider>);
     }
-    if let Ok(provider) = MistralProvider::from_default_sources() {
+    if let Ok(provider) =
+        MistralProvider::from_default_sources_with(mistral_capabilities(&mistral_models))
+    {
         providers.insert("mistral".into(), Arc::new(provider) as Arc<dyn Provider>);
     }
     if let Ok(provider) =
@@ -353,6 +357,8 @@ pub fn run() {
             providers::cancel_mistral_oauth_login,
             providers::validate_mistral_api_key,
             providers::disconnect_mistral_provider,
+            providers::list_mistral_models,
+            providers::refresh_mistral_models,
             providers::get_openrouter_provider_status,
             providers::validate_openrouter_api_key,
             providers::disconnect_openrouter_provider,

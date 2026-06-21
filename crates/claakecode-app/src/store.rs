@@ -37,6 +37,7 @@ const DATABASE_SETTINGS_KEY: &str = "database_settings";
 const DATABASE_ACTIVITY_KEY: &str = "database_activity";
 const PROD_SETTINGS_KEY: &str = "prod_settings";
 const OPENROUTER_MODELS_KEY: &str = "openrouter_models";
+const MISTRAL_MODELS_KEY: &str = "mistral_models";
 const HIDDEN_TOOL_SETTING_NAMES: &[&str] = &["skill"];
 
 pub const DEFAULT_PLAN_MODE_PROMPT: &str = r#"You are in Plan mode.
@@ -288,6 +289,44 @@ pub struct OpenRouterModelRecord {
 }
 
 impl OpenRouterModelRecord {
+    pub fn normalized(mut self) -> Option<Self> {
+        self.id = self.id.trim().to_string();
+        self.name = self.name.trim().to_string();
+        if self.id.is_empty() {
+            return None;
+        }
+        if self.name.is_empty() {
+            self.name = self.id.clone();
+        }
+        self.context_window = self.context_window.max(1);
+        self.max_output_tokens = self.max_output_tokens.max(1).min(self.context_window);
+        if self.added_at_ms <= 0 {
+            self.added_at_ms = now_ms();
+        }
+        Some(self)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MistralModelRecord {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub context_window: u32,
+    pub max_output_tokens: u32,
+    #[serde(default)]
+    pub supports_images: bool,
+    #[serde(default = "default_enabled")]
+    pub supports_tools: bool,
+    #[serde(default)]
+    pub deprecated: bool,
+    #[serde(default)]
+    pub added_at_ms: i64,
+}
+
+impl MistralModelRecord {
     pub fn normalized(mut self) -> Option<Self> {
         self.id = self.id.trim().to_string();
         self.name = self.name.trim().to_string();
@@ -1625,6 +1664,48 @@ impl AppStore {
         self.save_openrouter_models(&models)
     }
 
+    pub fn load_mistral_models(&self) -> Result<Vec<MistralModelRecord>> {
+        let conn = self.connection()?;
+        let stored = conn
+            .query_row(
+                "select value_json from app_settings where key = ?1",
+                params![MISTRAL_MODELS_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .context("unable to read Mistral model list")?;
+
+        if let Some(json) = stored {
+            if let Ok(models) = serde_json::from_str::<Vec<MistralModelRecord>>(&json) {
+                return Ok(normalize_mistral_models(models));
+            }
+        }
+
+        Ok(Vec::new())
+    }
+
+    pub fn save_mistral_models(
+        &self,
+        models: &[MistralModelRecord],
+    ) -> Result<Vec<MistralModelRecord>> {
+        let normalized = normalize_mistral_models(models.to_vec());
+        let conn = self.connection()?;
+        conn.execute(
+            "insert into app_settings (key, value_json, updated_at_ms)
+             values (?1, ?2, ?3)
+             on conflict(key) do update set
+                value_json = excluded.value_json,
+                updated_at_ms = excluded.updated_at_ms",
+            params![
+                MISTRAL_MODELS_KEY,
+                serde_json::to_string(&normalized)?,
+                now_ms(),
+            ],
+        )
+        .context("unable to save Mistral model list")?;
+        Ok(normalized)
+    }
+
     pub fn save_sub_agent_settings(&self, settings: &SubAgentSettings) -> Result<SubAgentSettings> {
         let normalized = settings.clone().normalized();
         let conn = self.connection()?;
@@ -1894,6 +1975,15 @@ fn normalize_openrouter_models(models: Vec<OpenRouterModelRecord>) -> Vec<OpenRo
     models
         .into_iter()
         .filter_map(OpenRouterModelRecord::normalized)
+        .filter(|model| seen.insert(model.id.clone()))
+        .collect()
+}
+
+fn normalize_mistral_models(models: Vec<MistralModelRecord>) -> Vec<MistralModelRecord> {
+    let mut seen = HashSet::new();
+    models
+        .into_iter()
+        .filter_map(MistralModelRecord::normalized)
         .filter(|model| seen.insert(model.id.clone()))
         .collect()
 }

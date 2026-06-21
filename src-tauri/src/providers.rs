@@ -107,13 +107,31 @@ pub(super) fn install_kimi_provider(
 
 pub(super) fn install_mistral_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+    models: &[MistralModelRecord],
 ) -> std::result::Result<(), String> {
-    let provider = MistralProvider::from_default_sources().map_err(error_to_string)?;
+    let provider =
+        MistralProvider::from_default_sources_with(mistral_capabilities(models))
+            .map_err(error_to_string)?;
     providers
         .lock()
         .map_err(|_| "provider registry is unavailable".to_string())?
         .insert("mistral".into(), Arc::new(provider) as Arc<dyn Provider>);
     Ok(())
+}
+
+pub(super) fn mistral_capabilities(models: &[MistralModelRecord]) -> Vec<ModelCapabilities> {
+    models
+        .iter()
+        .map(|model| {
+            claakecode_mistral::capabilities_from_parts(
+                &ModelRef::new("mistral", model.id.clone()),
+                model.context_window,
+                model.max_output_tokens,
+                model.supports_images,
+                model.supports_tools,
+            )
+        })
+        .collect()
 }
 
 pub(super) fn install_openrouter_provider(
@@ -1603,7 +1621,8 @@ pub(super) async fn get_mistral_provider_status(
     let auth = load_default_mistral_auth_status().map_err(error_to_string)?;
 
     if auth.auth_mode.as_deref() == Some("oauth") && auth.connected {
-        install_mistral_provider(&state.providers)?;
+        let mistral_models = state.store.load_mistral_models().unwrap_or_default();
+        install_mistral_provider(&state.providers, &mistral_models)?;
         return Ok(mistral_provider_status_from_auth(
             auth,
             "connected",
@@ -1616,7 +1635,8 @@ pub(super) async fn get_mistral_provider_status(
         match validate_mistral_api_key_remote(&api_key).await {
             Ok(()) => {
                 let auth = touch_default_mistral_auth_validation().map_err(error_to_string)?;
-                install_mistral_provider(&state.providers)?;
+                let mistral_models = state.store.load_mistral_models().unwrap_or_default();
+                install_mistral_provider(&state.providers, &mistral_models)?;
                 return Ok(mistral_provider_status_from_auth(
                     auth,
                     "connected",
@@ -1676,19 +1696,23 @@ pub(super) async fn start_mistral_oauth_login(
     }
 
     let providers = state.providers.clone();
+    let mistral_store = state.store.clone();
     tauri::async_runtime::spawn(async move {
         let result =
             run_mistral_oauth_server(listener, redirect_uri, oauth_state, pkce, cancel).await;
         let login_outcome = match result {
-            Ok(()) => match install_mistral_provider(&providers) {
-                Ok(()) => MistralLoginOutcome {
-                    success: true,
-                    error: None,
-                },
-                Err(err) => MistralLoginOutcome {
-                    success: false,
-                    error: Some(err),
-                },
+            Ok(()) => {
+                let oauth_models = mistral_store.load_mistral_models().unwrap_or_default();
+                match install_mistral_provider(&providers, &oauth_models) {
+                    Ok(()) => MistralLoginOutcome {
+                        success: true,
+                        error: None,
+                    },
+                    Err(err) => MistralLoginOutcome {
+                        success: false,
+                        error: Some(err),
+                    },
+                }
             },
             Err(err) => MistralLoginOutcome {
                 success: false,
@@ -1747,13 +1771,67 @@ pub(super) async fn validate_mistral_api_key(
         .await
         .map_err(error_to_string)?;
     let auth = save_default_mistral_api_key(&api_key).map_err(error_to_string)?;
-    install_mistral_provider(&state.providers)?;
+    // Auto-fetch catalog after successful validation
+    let catalog = fetch_mistral_model_catalog(&api_key).await.unwrap_or_default();
+    let records = catalog_to_mistral_records(&catalog);
+    let models = state
+        .store
+        .save_mistral_models(&records)
+        .map_err(error_to_string)?;
+    install_mistral_provider(&state.providers, &models)?;
     Ok(mistral_provider_status_from_auth(
         auth,
         "connected",
         None,
         None,
     ))
+}
+
+fn catalog_to_mistral_records(catalog: &[MistralCatalogModel]) -> Vec<MistralModelRecord> {
+    let added_at_ms = now_ms();
+    catalog
+        .iter()
+        .map(|m| MistralModelRecord {
+            id: m.id.clone(),
+            name: m.name.clone(),
+            description: m.description.clone(),
+            context_window: m.context_window,
+            max_output_tokens: m.max_output_tokens,
+            supports_images: m.supports_images,
+            supports_tools: m.supports_tools,
+            deprecated: m.deprecated,
+            added_at_ms,
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub(super) fn list_mistral_models(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<Vec<MistralModelRecord>, String> {
+    state
+        .store
+        .load_mistral_models()
+        .map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn refresh_mistral_models(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<Vec<MistralModelRecord>, String> {
+    let api_key = load_default_mistral_api_key()
+        .map_err(error_to_string)?
+        .ok_or_else(|| "Mistral is not connected".to_string())?;
+    let catalog = fetch_mistral_model_catalog(&api_key)
+        .await
+        .map_err(error_to_string)?;
+    let records = catalog_to_mistral_records(&catalog);
+    let models = state
+        .store
+        .save_mistral_models(&records)
+        .map_err(error_to_string)?;
+    install_mistral_provider(&state.providers, &models)?;
+    Ok(models)
 }
 
 #[tauri::command]

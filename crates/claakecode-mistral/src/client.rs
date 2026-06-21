@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use claakecode_core::{
@@ -20,6 +23,7 @@ const USER_AGENT: &str = "ClaakeCode/0.1";
 pub struct MistralConfig {
     pub credential: Credential,
     pub base_url: String,
+    pub capabilities: HashMap<String, ModelCapabilities>,
 }
 
 impl MistralConfig {
@@ -27,17 +31,30 @@ impl MistralConfig {
         Self {
             credential,
             base_url: BASE_URL.into(),
+            capabilities: HashMap::new(),
         }
     }
 
     pub fn from_default_sources() -> Result<Self> {
-        if let Some(credential) = Credential::load_default()? {
-            return Ok(Self::new(credential));
-        }
+        Self::from_default_sources_with(Vec::new())
+    }
 
+    pub fn from_default_sources_with(catalog: Vec<ModelCapabilities>) -> Result<Self> {
+        if let Some(credential) = Credential::load_default()? {
+            return Ok(Self::with_catalog(credential, catalog));
+        }
         Err(AppError::Auth(
             "no Mistral API key found. Connect Mistral in Settings > Providers.".into(),
         ))
+    }
+
+    pub fn with_catalog(credential: Credential, catalog: Vec<ModelCapabilities>) -> Self {
+        let mut config = Self::new(credential);
+        config.capabilities = catalog
+            .into_iter()
+            .map(|caps| (caps.model.name.clone(), caps))
+            .collect();
+        config
     }
 }
 
@@ -57,6 +74,12 @@ impl MistralProvider {
 
     pub fn from_default_sources() -> Result<Self> {
         Self::new(MistralConfig::from_default_sources()?)
+    }
+
+    pub fn from_default_sources_with(
+        catalog: Vec<ModelCapabilities>,
+    ) -> Result<Self> {
+        Self::new(MistralConfig::from_default_sources_with(catalog)?)
     }
 
     async fn post(&self, route: &str) -> Result<reqwest::RequestBuilder> {
@@ -84,7 +107,12 @@ impl Provider for MistralProvider {
         if model.provider != PROVIDER_ID {
             return None;
         }
-        Some(model_info::capabilities(model))
+        if let Some(caps) = self.config.capabilities.get(&model.name) {
+            let mut caps = caps.clone();
+            caps.model = model.clone();
+            return Some(caps);
+        }
+        Some(model_info::fallback_capabilities(model))
     }
 
     async fn estimate_tokens(&self, request: ProviderRequest) -> Result<TokenEstimate> {
@@ -108,7 +136,9 @@ impl Provider for MistralProvider {
             )));
         }
 
-        let caps = model_info::capabilities(&request.model);
+        let caps = self
+            .capabilities(&request.model)
+            .unwrap_or_else(|| model_info::fallback_capabilities(&request.model));
         if !caps.supports_images && request_contains_images(&request) {
             return Err(AppError::InvalidRequest(format!(
                 "Mistral model `{}` does not support image input",
@@ -513,4 +543,129 @@ async fn read_http_error(response: reqwest::Response) -> AppError {
     } else {
         AppError::Provider(format!("HTTP {status}: {message}"))
     }
+}
+
+// =============================================================================
+// Catalogue (GET /v1/models)
+// =============================================================================
+
+/// Normalised representation of a model returned by Mistral's `/v1/models`
+/// endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MistralCatalogModel {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub context_window: u32,
+    pub max_output_tokens: u32,
+    #[serde(default)]
+    pub supports_images: bool,
+    #[serde(default)]
+    pub supports_tools: bool,
+    #[serde(default)]
+    pub deprecated: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelsResponse {
+    #[serde(default)]
+    data: Vec<CatalogModelBody>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CatalogModelBody {
+    id: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    max_context_length: Option<u32>,
+    #[serde(default)]
+    capabilities: Option<CatalogCapabilities>,
+    #[serde(default)]
+    deprecation: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CatalogCapabilities {
+    #[serde(default)]
+    completion_chat: Option<bool>,
+    #[serde(default)]
+    function_calling: Option<bool>,
+    #[serde(default)]
+    vision: Option<bool>,
+}
+
+/// Fetch the list of models available for this API key. Filters out non-chat
+/// models (embeddings, moderation, fine-tuning-only endpoints, etc.).
+pub async fn fetch_model_catalog(api_key: &str) -> Result<Vec<MistralCatalogModel>> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err(AppError::Auth("Mistral API key cannot be empty".into()));
+    }
+    let http = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .build()
+        .map_err(|err| AppError::Network(err.to_string()))?;
+    let response = http
+        .get(format!("{BASE_URL}/models"))
+        .header("accept", "application/json")
+        .header("authorization", format!("Bearer {api_key}"))
+        .send()
+        .await
+        .map_err(|err| AppError::Network(format!("Mistral catalog fetch failed: {err}")))?;
+    if !response.status().is_success() {
+        return Err(read_http_error(response).await);
+    }
+    let body: ModelsResponse = response
+        .json()
+        .await
+        .map_err(|err| AppError::Decode(format!("invalid Mistral models body: {err}")))?;
+    Ok(body
+        .data
+        .into_iter()
+        .filter_map(catalog_model_from_body)
+        .collect())
+}
+
+fn catalog_model_from_body(body: CatalogModelBody) -> Option<MistralCatalogModel> {
+    let id = body.id.trim().to_string();
+    if id.is_empty() {
+        return None;
+    }
+    // Skip non-chat endpoints (embeddings, moderation, ocr, etc.). They have
+    // `completion_chat: false`. When the field is missing we keep them.
+    let caps = body.capabilities.unwrap_or_default();
+    if matches!(caps.completion_chat, Some(false)) {
+        return None;
+    }
+    let name = body
+        .name
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| id.clone());
+    let context_window = body.max_context_length.unwrap_or(32_768).max(1);
+    let max_output_tokens = context_window.min(8_192).max(1);
+    let supports_images = caps.vision.unwrap_or_else(|| {
+        let lower = id.to_ascii_lowercase();
+        lower.starts_with("pixtral") || lower.contains("vision")
+    });
+    let supports_tools = caps.function_calling.unwrap_or(true);
+    let deprecated = body
+        .deprecation
+        .map(|value| !value.is_null())
+        .unwrap_or(false);
+    Some(MistralCatalogModel {
+        id,
+        name,
+        description: body.description.unwrap_or_default(),
+        context_window,
+        max_output_tokens,
+        supports_images,
+        supports_tools,
+        deprecated,
+    })
 }

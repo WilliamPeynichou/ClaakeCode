@@ -452,6 +452,18 @@ export type OpenRouterModel = {
 
 export type OpenRouterModelSearchResult = Omit<OpenRouterModel, "addedAtMs">;
 
+export type MistralModel = {
+  id: string;
+  name: string;
+  description?: string | null;
+  contextWindow: number;
+  maxOutputTokens: number;
+  supportsImages: boolean;
+  supportsTools: boolean;
+  deprecated: boolean;
+  addedAtMs?: number | null;
+};
+
 export type McpEnvVar = {
   key: string;
   value: string;
