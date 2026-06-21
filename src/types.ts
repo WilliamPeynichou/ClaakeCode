@@ -341,6 +341,58 @@ export type ProdSettings = {
   providers: ProdProviderRuntimeStatus[];
 };
 
+// ─── Embedding providers ───────────────────────────────────────────────────
+
+export type EmbeddingProviderId =
+  | "openai"
+  | "voyage"
+  | "cohere"
+  | "mistral"
+  | "google"
+  | "ollama"
+  | "custom";
+
+export type EmbeddingModel = {
+  id: string;
+  label: string;
+  dimensions: number;
+  description?: string | null;
+};
+
+export type EmbeddingProviderDefinition = {
+  id: EmbeddingProviderId;
+  name: string;
+  icon: string;
+  description: string;
+  models: EmbeddingModel[];
+  credentialsSource?: "openai" | "mistral" | "google" | "ollama" | null;
+  tokenEnvHint?: string | null;
+  isLocal?: boolean;
+};
+
+export type EmbeddingConnectionStatus =
+  | "disconnected"
+  | "connected"
+  | "connecting"
+  | "error";
+
+export type EmbeddingProviderStatus = {
+  providerId: EmbeddingProviderId | string;
+  enabled: boolean;
+  selectedModel: string | null;
+  connectionStatus: EmbeddingConnectionStatus;
+  error?: string | null;
+  tokenConfigured?: boolean;
+  tokenPreview?: string | null;
+  priorityOrder: number;
+  budgetCap?: number | null;
+};
+
+export type EmbeddingSettings = {
+  providers: EmbeddingProviderStatus[];
+  localOnlyMode: boolean;
+};
+
 
 export type ProviderConnectionState =
   | "connected"

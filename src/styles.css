@@ -9655,3 +9655,294 @@ textarea {
   flex: 1 1 0;
   min-height: 0;
 }
+
+/* ============================================================
+   EMBEDDING SETTINGS SECTION
+   Layout mirrors the Skills section:
+   left sidebar list + right detail panel
+   ============================================================ */
+
+.settings-pane__body--embedding {
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* ── Left list ── */
+
+.settings-pane__embedding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  border-right: 1px solid var(--line-0);
+  padding-right: 14px;
+}
+
+.settings-pane__embedding-summary {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-0);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+}
+
+.settings-pane__embedding-summary-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+.settings-pane__embedding-scroll {
+  flex: 1 1 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 6px;
+}
+
+/* ── Provider row items ── */
+
+.settings-pane__embedding-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.settings-pane__embedding-item:hover {
+  background: var(--bg-2);
+}
+
+.settings-pane__embedding-item[data-active="true"] {
+  background: var(--bg-3);
+  border-color: var(--line-1);
+}
+
+.settings-pane__embedding-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.settings-pane__embedding-item[data-on="false"]:not([data-active="true"]):not(:hover) {
+  opacity: 0.6;
+}
+
+.settings-pane__embedding-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-pane__embedding-item-icon {
+  flex: 0 0 auto;
+  color: var(--text-2);
+}
+
+.settings-pane__embedding-item-name {
+  flex: 1 1 auto;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-pane__embedding-item-model {
+  padding-left: 26px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono-sm);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-pane__embedding-priority-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--bg-4);
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  padding: 0 5px;
+  line-height: 16px;
+}
+
+.settings-pane__embedding-local-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  padding: 0 5px;
+  line-height: 16px;
+  opacity: 0.7;
+}
+
+/* ── Right detail pane ── */
+
+.settings-pane__embedding-detail-pane {
+  overflow-y: auto;
+  padding-left: 2px;
+}
+
+.settings-pane__embedding-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.settings-pane__embedding-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-0);
+  margin-bottom: 14px;
+}
+
+.settings-pane__embedding-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.settings-pane__embedding-detail-desc {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.settings-pane__embedding-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-pane__embedding-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Enable row ── */
+
+.settings-pane__embedding-enable-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-pane__embedding-enable-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.settings-pane__embedding-priority-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Model selector grid ── */
+
+.settings-pane__embedding-model-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-pane__embedding-model-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  cursor: pointer;
+  text-align: left;
+  min-width: 140px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.settings-pane__embedding-model-card:hover {
+  background: var(--bg-3);
+  border-color: var(--line-2, var(--line-1));
+}
+
+.settings-pane__embedding-model-card[data-selected="true"] {
+  background: var(--bg-4);
+  border-color: var(--accent, var(--line-2, var(--line-1)));
+}
+
+.settings-pane__embedding-model-name {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono-sm);
+  font-weight: 500;
+  color: var(--text-0);
+}
+
+.settings-pane__embedding-model-dim {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+
+.settings-pane__embedding-model-desc {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+/* ── Budget row ── */
+
+.settings-pane__embedding-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.settings-pane__embedding-budget-prefix {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.settings-pane__embedding-budget-input {
+  width: 80px;
+  text-align: right;
+}

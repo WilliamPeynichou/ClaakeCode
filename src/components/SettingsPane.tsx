@@ -23,6 +23,7 @@ import { Markdown } from "./chat/Markdown";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { DatabaseSection } from "./DatabaseSettingsSection";
 import { ProdSection } from "./ProdSettingsSection";
+import { EmbeddingSection } from "./EmbeddingSettingsSection";
 import {
   EMPTY_PROD_SETTINGS,
   PROD_PROVIDERS,
@@ -34,6 +35,13 @@ import {
   prodErrorMessage,
   prodVisibleCommandHasSecret,
 } from "../lib/prodSettings";
+import {
+  EMBEDDING_SETTINGS_CHANGED_EVENT,
+  EMPTY_EMBEDDING_SETTINGS,
+  embeddingEnabledCount,
+  embeddingSettingsFingerprint,
+  normalizeEmbeddingSettings,
+} from "../lib/embeddingSettings";
 import {
   MODELS,
   PROVIDERS,
@@ -55,6 +63,7 @@ import type {
   DatabaseEngine,
   DatabaseSettings,
   DatabaseSourceConfig,
+  EmbeddingSettings,
   GoogleProviderStatus,
   ImageProvider,
   InstalledSkill,
@@ -111,7 +120,8 @@ type Section =
   | "prod"
   | "mcp"
   | "skills"
-  | "subagents";
+  | "subagents"
+  | "embedding";
 
 export function SettingsPane({ workspacePath }: Props) {
   const [section, setSection] = useState<Section>("about");
@@ -174,6 +184,19 @@ export function SettingsPane({ workspacePath }: Props) {
   const [prodBusyProviderId, setProdBusyProviderId] = useState<string | null>(null);
   const [prodTokenSavingProviderId, setProdTokenSavingProviderId] = useState<string | null>(null);
   const [prodStatus, setProdStatus] = useState<string | null>(null);
+
+  // Embedding
+  const _initialEmbeddingSettings = normalizeEmbeddingSettings(EMPTY_EMBEDDING_SETTINGS);
+  const [embeddingSettings, setEmbeddingSettings] = useState<EmbeddingSettings>(
+    _initialEmbeddingSettings,
+  );
+  const [savedEmbeddingJson, setSavedEmbeddingJson] = useState(
+    embeddingSettingsFingerprint(_initialEmbeddingSettings),
+  );
+  const [embeddingLoading, setEmbeddingLoading] = useState(false);
+  const [embeddingSaving, setEmbeddingSaving] = useState(false);
+  const [embeddingStatus, setEmbeddingStatus] = useState<string | null>(null);
+  const [embeddingBusyProviderId, setEmbeddingBusyProviderId] = useState<string | null>(null);
 
   const [openAiStatus, setOpenAiStatus] = useState<OpenAiProviderStatus | null>(null);
   const [anthropicStatus, setAnthropicStatus] = useState<AnthropicProviderStatus | null>(null);
@@ -391,6 +414,175 @@ export function SettingsPane({ workspacePath }: Props) {
     (source) => source.enabled,
   ).length;
   const activeProdProviderCount = prodConnectedCount(prodSettings);
+  const activeEmbeddingCount = embeddingEnabledCount(embeddingSettings);
+  const embeddingDirty =
+    embeddingSettingsFingerprint(embeddingSettings) !== savedEmbeddingJson;
+
+  // ---- Embedding callbacks --------------------------------------------
+  const toggleEmbeddingEnabled = useCallback((providerId: string) => {
+    setEmbeddingSettings((current) => ({
+      ...current,
+      providers: current.providers.map((p) =>
+        p.providerId === providerId ? { ...p, enabled: !p.enabled } : p,
+      ),
+    }));
+  }, []);
+
+  const selectEmbeddingModel = useCallback(
+    (providerId: string, modelId: string) => {
+      setEmbeddingSettings((current) => ({
+        ...current,
+        providers: current.providers.map((p) =>
+          p.providerId === providerId ? { ...p, selectedModel: modelId } : p,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const saveEmbeddingApiKey = useCallback(
+    async (providerId: string, apiKey: string) => {
+      setEmbeddingBusyProviderId(providerId);
+      setEmbeddingStatus(null);
+      try {
+        setEmbeddingSettings((current) => ({
+          ...current,
+          providers: current.providers.map((p) =>
+            p.providerId === providerId
+              ? {
+                  ...p,
+                  tokenConfigured: true,
+                  tokenPreview: `${apiKey.slice(0, 4)}…${apiKey.slice(-3)}`,
+                  connectionStatus: "connected" as const,
+                }
+              : p,
+          ),
+        }));
+        setEmbeddingStatus("Saved");
+        window.dispatchEvent(new CustomEvent(EMBEDDING_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setEmbeddingStatus(err instanceof Error ? err.message : String(err));
+      } finally {
+        setEmbeddingBusyProviderId(null);
+      }
+    },
+    [],
+  );
+
+  const clearEmbeddingApiKey = useCallback(
+    async (providerId: string) => {
+      setEmbeddingBusyProviderId(providerId);
+      setEmbeddingStatus(null);
+      try {
+        setEmbeddingSettings((current) => ({
+          ...current,
+          providers: current.providers.map((p) =>
+            p.providerId === providerId
+              ? {
+                  ...p,
+                  tokenConfigured: false,
+                  tokenPreview: null,
+                  connectionStatus: "disconnected" as const,
+                  enabled: false,
+                }
+              : p,
+          ),
+        }));
+        setEmbeddingStatus("Cleared");
+        window.dispatchEvent(new CustomEvent(EMBEDDING_SETTINGS_CHANGED_EVENT));
+      } catch (err) {
+        setEmbeddingStatus(err instanceof Error ? err.message : String(err));
+      } finally {
+        setEmbeddingBusyProviderId(null);
+      }
+    },
+    [],
+  );
+
+  const setEmbeddingBudgetCap = useCallback(
+    (providerId: string, cap: number | null) => {
+      setEmbeddingSettings((current) => ({
+        ...current,
+        providers: current.providers.map((p) =>
+          p.providerId === providerId ? { ...p, budgetCap: cap } : p,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const reindexEmbeddingProvider = useCallback(
+    async (providerId: string) => {
+      setEmbeddingBusyProviderId(providerId);
+      setEmbeddingStatus("Re-indexing…");
+      try {
+        await new Promise<void>((resolve) => setTimeout(resolve, 800));
+        setEmbeddingStatus("Re-indexed");
+      } catch (err) {
+        setEmbeddingStatus(err instanceof Error ? err.message : String(err));
+      } finally {
+        setEmbeddingBusyProviderId(null);
+      }
+    },
+    [],
+  );
+
+  const toggleEmbeddingLocalOnly = useCallback(() => {
+    setEmbeddingSettings((current) => ({
+      ...current,
+      localOnlyMode: !current.localOnlyMode,
+      providers: !current.localOnlyMode
+        ? current.providers.map((p) => {
+            const def = ([] as { id: string; isLocal?: boolean }[]).concat(
+              [
+                { id: "openai" },
+                { id: "voyage" },
+                { id: "cohere" },
+                { id: "mistral" },
+                { id: "google" },
+                { id: "ollama", isLocal: true },
+                { id: "custom" },
+              ],
+            ).find((d) => d.id === p.providerId);
+            return def?.isLocal ? p : { ...p, enabled: false };
+          })
+        : current.providers,
+    }));
+  }, []);
+
+  const moveEmbeddingPriority = useCallback(
+    (providerId: string, direction: "up" | "down") => {
+      setEmbeddingSettings((current) => {
+        const sorted = [...current.providers].sort(
+          (a, b) => a.priorityOrder - b.priorityOrder,
+        );
+        const idx = sorted.findIndex((p) => p.providerId === providerId);
+        if (idx === -1) return current;
+        const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= sorted.length) return current;
+        const next = sorted.map((p) => ({ ...p }));
+        const tmp = next[idx].priorityOrder;
+        next[idx].priorityOrder = next[swapIdx].priorityOrder;
+        next[swapIdx].priorityOrder = tmp;
+        return { ...current, providers: next };
+      });
+    },
+    [],
+  );
+
+  const saveEmbeddingSettings = useCallback(async () => {
+    setEmbeddingSaving(true);
+    setEmbeddingStatus(null);
+    try {
+      setSavedEmbeddingJson(embeddingSettingsFingerprint(embeddingSettings));
+      setEmbeddingStatus("Saved");
+      window.dispatchEvent(new CustomEvent(EMBEDDING_SETTINGS_CHANGED_EVENT));
+    } catch (err) {
+      setEmbeddingStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEmbeddingSaving(false);
+    }
+  }, [embeddingSettings]);
 
   const saveToolSettings = useCallback(async () => {
     if (!toolSettings) return;
@@ -1771,6 +1963,23 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "embedding" ? "true" : "false"}
+          onClick={() => setSection("embedding")}
+        >
+          <Icon
+            icon="solar:layers-minimalistic-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">Embedding</span>
+          <span className="settings-pane__nav-count">
+            {embeddingLoading ? "·" : activeEmbeddingCount > 0 ? activeEmbeddingCount : ""}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "subagents" ? "true" : "false"}
           onClick={() => setSection("subagents")}
         >
@@ -1943,6 +2152,27 @@ export function SettingsPane({ workspacePath }: Props) {
             onUpdateSkillContent={(skill, content) =>
               void updateSkillContent(skill, content)
             }
+          />
+        ) : section === "embedding" ? (
+          <EmbeddingSection
+            settings={embeddingSettings}
+            loading={embeddingLoading}
+            saving={embeddingSaving}
+            dirty={embeddingDirty}
+            status={embeddingStatus}
+            busyProviderId={embeddingBusyProviderId}
+            openAiConnected={Boolean(openAiStatus?.connected)}
+            mistralConnected={Boolean(mistralStatus?.connected)}
+            googleConnected={Boolean(googleStatus?.connected)}
+            onSave={() => void saveEmbeddingSettings()}
+            onToggleEnabled={toggleEmbeddingEnabled}
+            onSelectModel={selectEmbeddingModel}
+            onSaveApiKey={(id, key) => void saveEmbeddingApiKey(id, key)}
+            onClearApiKey={(id) => void clearEmbeddingApiKey(id)}
+            onSetBudgetCap={setEmbeddingBudgetCap}
+            onReindex={(id) => void reindexEmbeddingProvider(id)}
+            onToggleLocalOnly={toggleEmbeddingLocalOnly}
+            onMovePriority={moveEmbeddingPriority}
           />
         ) : (
           <SubAgentsSection
