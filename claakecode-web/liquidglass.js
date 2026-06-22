@@ -23,8 +23,11 @@
     navigator.hardwareConcurrency <= 4 ||
     (navigator.deviceMemory && navigator.deviceMemory < 4)
   );
-  const FILL      = isLowEnd ? 0.25 : 0.5;   // fraction of viewport pixels
-  const TARGET_FPS = isLowEnd ? 24 : 30;
+  // 70 % fill → rendu 49 % des pixels, étiré proprement par GPU bilinéaire
+  // 24 fps cap compense la hausse de fill vs l'ancienne config 50 %/30 fps
+  // Net : ~5× moins de travail GPU que l'original (100 % / 60 fps / 8 fbm)
+  const FILL       = isLowEnd ? 0.4 : 0.7;
+  const TARGET_FPS = isLowEnd ? 20  : 24;
   const FRAME_MS   = 1000 / TARGET_FPS;
 
   /* ── Renderer ─────────────────────────────────────────────────────── */
