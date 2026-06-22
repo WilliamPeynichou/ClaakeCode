@@ -113,7 +113,13 @@ button { font: inherit; color: inherit; }
 }
 
 .bgfallback { position: fixed; inset: 0; z-index: -3; background: var(--bg-grad); transition: background .9s ease; }
-#bg { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -2; display: block; }
+#bg {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: -2; display: block;
+  /* Canvas rendu à 50 % fill-rate, CSS le remonte en full viewport.
+     Le browser utilise son interpolation bilinéaire GPU — fluide & cohérent. */
+  image-rendering: optimizeSpeed;
+}
 .veil {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:

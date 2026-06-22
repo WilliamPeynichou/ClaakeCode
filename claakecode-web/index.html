@@ -25,7 +25,10 @@
 <!-- ── Loading screen ──────────────────────────────────────────────── -->
 <div id="loader" role="status" aria-label="Loading Claake Code">
   <div class="loader-inner">
-    <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    </picture>
     <span class="loader-wordmark">claake <em>code</em></span>
   </div>
 </div>
@@ -36,7 +39,10 @@
 
 <nav class="nav glass" id="nav" aria-label="Primary navigation">
   <a class="brand" href="#top" aria-label="Claake Code home">
-    <img src="assets/claakecode-icon.png" alt="" />
+    <picture>
+              <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+              <img src="assets/claakecode-icon.png" alt="" />
+            </picture>
     <strong>claake <em>code</em></strong>
     <span class="version">v0.1.45</span>
   </a>
@@ -87,9 +93,8 @@
       <div class="split">
         <figure class="glass media reveal" aria-label="Claake Code product video">
           <div class="video-frame">
-            <video autoplay loop muted playsinline preload="metadata" poster="assets/claakecode-icon.png">
-              <source src="assets/presentation.mov" type="video/mp4" />
-              <source src="assets/presentation.mov" type="video/quicktime" />
+            <video id="hero-video" loop muted playsinline preload="none" poster="assets/poster.jpg" data-src="assets/presentation.mp4">
+              <!-- src chargée par IntersectionObserver — évite 22 MB au démarrage -->
             </video>
           </div>
         </figure>
@@ -331,7 +336,10 @@
     <div class="glass foot-card">
       <div class="foot">
         <div>
-          <a class="brand" href="#top"><img src="assets/claakecode-icon.png" alt="" /><strong>claake <em>code</em></strong></a>
+          <a class="brand" href="#top"><picture>
+              <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+              <img src="assets/claakecode-icon.png" alt="" />
+            </picture><strong>claake <em>code</em></strong></a>
           <small>The best tools are the ones you can read all the way down to the metal.</small>
         </div>
         <div class="foot-cols">
@@ -401,15 +409,31 @@
     rev.observe(el);
   });
 
-  document.querySelectorAll('video').forEach((v) => {
-    v.muted = true;
-    v.setAttribute('muted', '');
-    v.setAttribute('playsinline', '');
-    const tryPlay = () => v.play().catch(() => {});
-    if (v.readyState >= 2) tryPlay();
-    v.addEventListener('loadeddata', tryPlay, { once: true });
-    v.addEventListener('canplay', tryPlay, { once: true });
-  });
+  /* Lazy-load vidéo : ne télécharge que quand l'élément est visible ── */
+  const heroVideo = document.getElementById('hero-video');
+  if (heroVideo) {
+    heroVideo.muted = true;
+    heroVideo.setAttribute('muted', '');
+    const playVideo = () => {
+      heroVideo.play().catch(() => {});
+    };
+    const loadAndPlay = () => {
+      const src = heroVideo.dataset.src;
+      if (!src || heroVideo.src) return; // déjà chargé
+      heroVideo.src = src;
+      heroVideo.addEventListener('canplay', playVideo, { once: true });
+      heroVideo.load();
+    };
+    const videoObserver = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          loadAndPlay();
+          videoObserver.unobserve(en.target);
+        }
+      });
+    }, { rootMargin: '200px', threshold: 0 }); // préchargement 200px avant
+    videoObserver.observe(heroVideo);
+  }
 })();
 </script>
 
