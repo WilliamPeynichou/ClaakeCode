@@ -21,6 +21,15 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="loader" role="status" aria-label="Loading Claake Code">
+  <div class="loader-inner">
+    <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    <span class="loader-wordmark">claake <em>code</em></span>
+  </div>
+</div>
+
 <div class="bgfallback"></div>
 <canvas id="bg" aria-hidden="true"></canvas>
 <div class="veil"></div>
@@ -401,6 +410,34 @@
     v.addEventListener('loadeddata', tryPlay, { once: true });
     v.addEventListener('canplay', tryPlay, { once: true });
   });
+})();
+</script>
+
+<script>
+/* ── Loader dismiss ─────────────────────────────────────────────────
+   Waits for window.load (all assets incl. fonts & video poster) +
+   a minimum display of 650 ms so there's no jarring flash.         */
+(function () {
+  const loader = document.getElementById('loader');
+  const t0 = Date.now();
+  const MIN_MS = 650;
+
+  function dismiss() {
+    const elapsed = Date.now() - t0;
+    const delay   = Math.max(0, MIN_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add('loader--done');
+      loader.addEventListener('transitionend', function () {
+        loader.remove();
+      }, { once: true });
+    }, delay);
+  }
+
+  if (document.readyState === 'complete') {
+    dismiss();
+  } else {
+    window.addEventListener('load', dismiss, { once: true });
+  }
 })();
 </script>
 </body>
