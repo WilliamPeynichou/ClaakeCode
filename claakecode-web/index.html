@@ -2,23 +2,104 @@
 <html lang="en" data-theme="forest">
 <head>
 <meta charset="utf-8" />
-<title>Claake Code — the AI coding harness you control</title>
+<title>Claake Code — Open-Source AI Coding IDE You Can Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Claake Code is an open-source desktop AI IDE and coding harness: editable tools, skills, MCP, database sources, OAuth/API-key providers, sub-agents, teams, rollback and context cleaning. Latest version v0.1.45." />
+<meta name="description" content="Claake Code is an open-source desktop AI coding IDE for developers who want control: editable tools, skills, MCP servers, model providers, database sources, sub-agents, rollback and no telemetry. Download for macOS, Windows and Linux." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="keywords" content="Claake Code, open-source AI coding IDE, AI coding agent, desktop AI IDE, MCP coding agent, Claude Code alternative, Cursor alternative open source, editable AI tools, multi-provider AI coding assistant, database-aware coding agent, no telemetry AI IDE" />
+<meta name="author" content="Claake Code" />
 <meta name="theme-color" content="#0c1f17" />
+<link rel="canonical" href="https://claakecode-web-sigma.vercel.app/" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Claake Code — the open AI IDE you can actually control" />
-<meta property="og:description" content="Native desktop AI IDE with an agent, terminal, editor, editable tools, skills, MCP, database sources, multi-provider models, swarms, rollback and context cleaning." />
-<meta property="og:image" content="assets/claakecode-icon.png" />
+<meta property="og:site_name" content="Claake Code" />
+<meta property="og:url" content="https://claakecode-web-sigma.vercel.app/" />
+<meta property="og:title" content="Claake Code — Open-Source AI Coding IDE You Can Control" />
+<meta property="og:description" content="A forkable desktop AI IDE with a visible agent harness: editable tools, skills, MCP servers, providers, database sources, sub-agents, rollback and no telemetry." />
+<meta property="og:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta property="og:image:alt" content="Claake Code — open-source AI coding IDE with a controllable agent harness" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Claake Code — the open AI IDE you can actually control" />
-<meta name="twitter:description" content="A forkable, open-source AI coding harness with every tool, skill, provider and database source under your control." />
-<meta name="twitter:image" content="assets/claakecode-icon.png" />
+<meta name="twitter:title" content="Claake Code — Open-Source AI Coding IDE You Can Control" />
+<meta name="twitter:description" content="Desktop AI coding IDE for developers who want editable tools, MCP, providers, database safeguards, no telemetry and a forkable agent harness." />
+<meta name="twitter:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta name="twitter:image:alt" content="Claake Code — open-source AI coding IDE" />
 <link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
+<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Hanken+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://claakecode-web-sigma.vercel.app/#organization",
+      "name": "Claake Code",
+      "url": "https://claakecode-web-sigma.vercel.app/",
+      "logo": "https://claakecode-web-sigma.vercel.app/assets/claakecode-icon.png",
+      "sameAs": ["https://github.com/WilliamPeynichou/ClaakeCode"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://claakecode-web-sigma.vercel.app/#website",
+      "url": "https://claakecode-web-sigma.vercel.app/",
+      "name": "Claake Code",
+      "description": "Open-source desktop AI coding IDE with a developer-controlled agent harness.",
+      "publisher": { "@id": "https://claakecode-web-sigma.vercel.app/#organization" },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://claakecode-web-sigma.vercel.app/#software",
+      "name": "Claake Code",
+      "alternateName": "ClaakeCode",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Windows, Linux",
+      "softwareVersion": "0.1.45",
+      "license": "https://opensource.org/license/mit/",
+      "isAccessibleForFree": true,
+      "url": "https://claakecode-web-sigma.vercel.app/",
+      "downloadUrl": "https://github.com/WilliamPeynichou/ClaakeCode/releases/latest",
+      "codeRepository": "https://github.com/WilliamPeynichou/ClaakeCode",
+      "image": "https://claakecode-web-sigma.vercel.app/assets/social-preview.png",
+      "description": "Claake Code is an open-source desktop AI coding IDE that lets developers control the full agent harness, including tools, skills, MCP servers, model providers, database sources and workspace context.",
+      "featureList": [
+        "Native desktop AI IDE",
+        "AI coding agent with visible tools",
+        "Editable tool descriptions and permissions",
+        "Skills as Markdown playbooks",
+        "MCP server support",
+        "Multi-provider AI models",
+        "Database source inspection with safeguards",
+        "Sub-agents and team workflows",
+        "Rollback and context cleaning",
+        "No telemetry"
+      ],
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@id": "https://claakecode-web-sigma.vercel.app/#organization" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://claakecode-web-sigma.vercel.app/#faq",
+      "mainEntity": [
+        { "@type": "Question", "name": "What is Claake Code?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is an open-source desktop AI coding IDE that gives developers a visible, editable agent harness with tools, skills, MCP servers, model providers, database sources and workspace context." } },
+        { "@type": "Question", "name": "Is Claake Code open source?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code is MIT licensed and forkable, with source code available on GitHub." } },
+        { "@type": "Question", "name": "Is Claake Code an alternative to Claude Code, Cursor or other AI coding tools?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is an open-source alternative for developers who want a transparent desktop AI coding IDE instead of a black-box coding agent or closed AI IDE." } },
+        { "@type": "Question", "name": "Which AI providers does Claake Code support?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code supports multiple model providers including Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers through subscriptions or API keys where available." } },
+        { "@type": "Question", "name": "Does Claake Code support MCP?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code supports workspace-scoped Model Context Protocol servers so external MCP tools can become part of the visible agent surface." } },
+        { "@type": "Question", "name": "Can Claake Code access databases?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code can list, describe and query approved database sources with safeguards such as read-only mode, row limits and destructive-operation confirmations." } },
+        { "@type": "Question", "name": "Does Claake Code send telemetry?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is designed with no telemetry and no training on transcripts. Provider credentials and workspace controls remain local to the user machine." } },
+        { "@type": "Question", "name": "Which platforms does Claake Code support?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code provides downloads for macOS, Windows and Linux." } },
+        { "@type": "Question", "name": "Can I use my own API keys?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code can use API keys and supported subscription/OAuth flows so developers can choose the providers and billing paths they already use." } },
+        { "@type": "Question", "name": "Can I customize the agent tools and skills?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Built-in tools can be enabled, disabled or described differently, and repeatable expertise can be saved as local Markdown skills." } }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -40,42 +121,43 @@
 <nav class="nav glass" id="nav" aria-label="Primary navigation">
   <a class="brand" href="#top" aria-label="Claake Code home">
     <picture>
-              <source srcset="assets/claakecode-icon.webp" type="image/webp" />
-              <img src="assets/claakecode-icon.png" alt="" />
-            </picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
+    </picture>
     <strong>claake <em>code</em></strong>
     <span class="version">v0.1.45</span>
   </a>
   <div class="nav-links" id="navlinks">
-    <a href="#showcase">IDE</a>
-    <a href="#control">Control</a>
+    <a href="#what">What</a>
+    <a href="#features">Features</a>
     <a href="#settings">Settings</a>
     <a href="#agent">Agent</a>
-    <a href="#release">v0.1.45</a>
-    <a href="#open">Open</a>
+    <a href="#alternative">Alternative</a>
+    <a href="#faq">FAQ</a>
   </div>
-  <a class="nav-cta" href="#download">Download</a>
+  <a class="nav-cta" href="#download" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
 </nav>
 
 <header class="hero" id="top">
   <div class="wrap reveal in">
-    <span class="eyebrow">Open source · desktop AI IDE · MIT</span>
-    <h1>The coding harness<br>you can <em>reshape</em>.</h1>
+    <span class="eyebrow">Open-source AI coding IDE · desktop app · MIT</span>
+    <h1>Claake Code is an open-source AI coding IDE you can <em>fully control</em>.</h1>
     <p class="lede">
-      Claake Code is a native AI IDE where the agent, terminal, editor, tools, skills, MCP servers, database sources and model providers stay visible and editable. No hidden harness. No vendor lock-in. You decide what the agent can see and do.
+      Claake Code is a desktop AI IDE and AI coding agent for macOS, Windows and Linux. It keeps tools, skills, MCP servers, model providers, database sources and workspace context visible, editable and auditable — with no telemetry and no vendor lock-in.
     </p>
-    <div class="hero-cta">
-      <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg">Download for macOS ↓</a>
-      <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe">Windows ↓</a>
-      <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage">Linux ↓</a>
-      <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub ↗</a>
+    <p class="citation glass"><strong>Citation-ready:</strong> Claake Code is an open-source desktop AI coding IDE that lets developers control the full agent harness, including tools, skills, MCP servers, model providers, database sources and workspace context.</p>
+    <div class="hero-cta" aria-label="Primary downloads">
+      <a class="btn btn-primary" aria-label="Download Claake Code for macOS universal DMG" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg">Download for macOS ↓</a>
+      <a class="btn btn-ghost" aria-label="Download Claake Code for Windows x64 setup" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe">Download for Windows ↓</a>
+      <a class="btn btn-ghost" aria-label="Download Claake Code for Linux AppImage" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage">Download for Linux ↓</a>
+      <a class="btn btn-ghost" aria-label="Open Claake Code source code on GitHub" href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub source ↗</a>
     </div>
     <p class="meta">Latest <span>v0.1.45</span> · bring your own keys or subscriptions · no telemetry · macOS · Windows · Linux</p>
 
-    <div class="hero-stats glass">
+    <div class="hero-stats glass" aria-label="Claake Code key product facts">
       <div class="stat"><div class="num">19</div><div class="lbl">core tools the agent can use, toggle or describe differently.</div></div>
-      <div class="stat"><div class="num">5<em>+</em></div><div class="lbl">providers: Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral in the app.</div></div>
-      <div class="stat"><div class="num">∞</div><div class="lbl">skills and MCP servers, owned by your workspace.</div></div>
+      <div class="stat"><div class="num">5<em>+</em></div><div class="lbl">providers: Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style models.</div></div>
+      <div class="stat"><div class="num">MCP</div><div class="lbl">servers, skills and workspace instructions stay editable.</div></div>
       <div class="stat"><div class="num">DB</div><div class="lbl">database sources with limits, read-only mode and confirmations.</div></div>
     </div>
   </div>
@@ -83,15 +165,33 @@
 </header>
 
 <main>
+  <section class="pad-lg" id="what">
+    <div class="wrap">
+      <div class="shead reveal">
+        <span class="eyebrow">§ 01 — what is Claake Code?</span>
+        <h2>A desktop AI IDE for developers who want <em>control</em>.</h2>
+        <p>Claake Code is an open-source desktop AI coding IDE. It combines an editor, terminal, file tree, chat, AI coding agent, tools, skills, MCP servers, model providers and database sources in one native workspace.</p>
+      </div>
+      <div class="answer-grid">
+        <article class="glass answer-card reveal"><h3>What is Claake Code?</h3><p>Claake Code is an open-source AI coding IDE that exposes the full agent harness instead of hiding it behind a prompt box.</p></article>
+        <article class="glass answer-card reveal"><h3>Who is it for?</h3><p>Claake Code is for developers and technical teams that want a powerful AI coding agent while keeping permissions, providers, tools and context auditable.</p></article>
+        <article class="glass answer-card reveal"><h3>What makes it different?</h3><p>Unlike black-box AI coding tools, Claake Code exposes the agent’s operating surface so developers can inspect, edit and restrict what the agent can do.</p></article>
+        <article class="glass answer-card reveal"><h3>Is it open-source?</h3><p>Yes. Claake Code is MIT licensed, forkable and available on GitHub, with native downloads for macOS, Windows and Linux.</p></article>
+        <article class="glass answer-card reveal"><h3>Does it support MCP?</h3><p>Yes. Workspace-scoped MCP servers can be configured so external tools become part of the same visible agent surface.</p></article>
+        <article class="glass answer-card reveal"><h3>Does it support multiple providers?</h3><p>Yes. Claake Code supports Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers through supported subscriptions or API keys.</p></article>
+      </div>
+    </div>
+  </section>
+
   <section class="pad-lg" id="showcase">
     <div class="wrap">
       <div class="shead reveal">
-        <span class="eyebrow">§ 01 — not a prompt box</span>
+        <span class="eyebrow">§ 02 — product proof</span>
         <h2>A real IDE with an <em>agentic core</em>.</h2>
         <p>Open a repo, pick a provider, decide which tools are allowed, then let the agent plan, edit, run, inspect databases and coordinate sub-agents — with every move visible.</p>
       </div>
       <div class="split">
-        <figure class="glass media reveal" aria-label="Claake Code product video">
+        <figure class="glass media reveal" aria-label="Claake Code product video showing the desktop AI IDE">
           <div class="video-frame">
             <video id="hero-video" loop muted playsinline preload="none" poster="assets/poster.jpg" data-src="assets/presentation.mp4">
               <!-- src chargée par IntersectionObserver — évite 22 MB au démarrage -->
@@ -110,18 +210,22 @@
     </div>
   </section>
 
-  <section class="pad-lg" id="control">
+  <section class="pad-lg" id="features">
     <div class="wrap">
       <div class="shead reveal">
-        <span class="eyebrow">§ 02 — grow the harness yourself</span>
-        <h2>Every tool, skill, provider and source is <em>cultivated</em> by you.</h2>
-        <p>No CLI gymnastics, no plugin store, no opaque system prompt. Settings are the control surface: toggle, rewrite, add, remove, approve.</p>
+        <span class="eyebrow">§ 03 — core features</span>
+        <h2>Core features for an <em>auditable AI coding agent</em>.</h2>
+        <p>Claake Code is built around explicit controls, visible permissions and portable workflows rather than hidden prompts or opaque automation.</p>
       </div>
       <div class="grid g4">
-        <article class="glass card reveal"><div class="dot">◴</div><span class="ix">tools</span><h3>Toggle and rewrite</h3><p>Read, glob, grep, edit_file, write_file, bash, web, question, todo, clean_context, skills, MCP, database, sub-agents and teams: the agent only receives what you enable.</p></article>
-        <article class="glass card reveal"><div class="dot">❀</div><span class="ix">skills</span><h3>Markdown playbooks</h3><p>Long-form skills live on disk in <strong>~/.claakecode/skills</strong>. Create, edit and delete them from the UI; the agent loads them when needed.</p></article>
-        <article class="glass card reveal"><div class="dot">⇄</div><span class="ix">providers</span><h3>Subscriptions or keys</h3><p>Connect Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers, then choose models per mode, sub-agent or teammate.</p></article>
-        <article class="glass card reveal"><div class="dot">⬡</div><span class="ix">data</span><h3>Database sources</h3><p>Add Postgres, MySQL, SQLite, MSSQL or Supabase REST sources. The agent can list, describe and query only sources you explicitly enable.</p></article>
+        <article class="glass card reveal"><div class="dot">IDE</div><span class="ix">desktop AI IDE</span><h3>Native workspace</h3><p>Claake Code combines editor, terminal, file tree, chat and settings in a native desktop app for macOS, Windows and Linux.</p></article>
+        <article class="glass card reveal"><div class="dot">AI</div><span class="ix">visible agent</span><h3>AI coding agent</h3><p>The agent can plan, edit files, run commands, inspect outputs, ask questions and coordinate work while keeping every action visible.</p></article>
+        <article class="glass card reveal"><div class="dot">◴</div><span class="ix">editable tools</span><h3>Tools you control</h3><p>Read, glob, grep, edit_file, write_file, bash, web, question, todo, database, MCP, skills, sub-agents and teams can be toggled or described differently.</p></article>
+        <article class="glass card reveal"><div class="dot">❀</div><span class="ix">skills</span><h3>Markdown playbooks</h3><p>Skills are local Markdown instructions in <strong>~/.claakecode/skills</strong> that save repeatable expertise without a plugin store.</p></article>
+        <article class="glass card reveal"><div class="dot">MCP</div><span class="ix">MCP support</span><h3>MCP servers</h3><p>Workspace-scoped Model Context Protocol servers attach external capabilities while remaining part of the visible agent surface.</p></article>
+        <article class="glass card reveal"><div class="dot">⇄</div><span class="ix">providers</span><h3>Multi-provider models</h3><p>Connect Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers, then choose models for chats, sub-agents or teams.</p></article>
+        <article class="glass card reveal"><div class="dot">DB</div><span class="ix">database-aware</span><h3>Database safeguards</h3><p>Approved Postgres, MySQL, SQLite, MSSQL or Supabase REST sources can be listed, described and queried with row limits and confirmations.</p></article>
+        <article class="glass card reveal"><div class="dot">↺</div><span class="ix">rollback</span><h3>Rollback and cleanup</h3><p>Rollback checkpoints, context cleaning, conversation compaction and todo boards help long AI coding sessions stay reversible and readable.</p></article>
       </div>
     </div>
   </section>
@@ -129,99 +233,20 @@
   <section class="pad-lg" id="settings">
     <div class="wrap">
       <div class="shead reveal">
-        <span class="eyebrow">§ 03 — settings are the harness</span>
+        <span class="eyebrow">§ 04 — settings are the harness</span>
         <h2>Every setting is a <em>control surface</em>, not a hidden config file.</h2>
-        <p>Claake Code turns the parts that are usually buried in JSON, CLI flags or vendor dashboards into editable panels inside the app. You can shape the agent per workspace before it ever touches your code.</p>
+        <p>Claake Code turns the parts usually buried in JSON, CLI flags or vendor dashboards into editable panels inside the app. You can shape the agent per workspace before it touches your code.</p>
       </div>
 
       <div class="settings-map">
-        <article class="glass setting-card setting-card--wide reveal">
-          <span class="ix">01 · providers & models</span>
-          <h3>Connect the brains you already use.</h3>
-          <p>Settings centralize Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers. Use OAuth/subscription flows where supported, API keys where you prefer explicit billing, then choose the model and context behavior per conversation.</p>
-          <ul>
-            <li>Provider credentials stay local to your machine.</li>
-            <li>Switch models without rebuilding the workspace.</li>
-            <li>Use different models for main chat, sub-agents or teams.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">02 · tools</span>
-          <h3>Decide what the agent can do.</h3>
-          <p>Every built-in tool is visible: read, glob, grep, edit_file, write_file, bash, web, image, todo, question, clean_context, database, MCP, skills, sub-agents and teams.</p>
-          <ul>
-            <li>Toggle tools on or off.</li>
-            <li>Rewrite descriptions to change behavior.</li>
-            <li>Keep risky capabilities disabled until needed.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">03 · skills</span>
-          <h3>Save repeatable expertise as Markdown.</h3>
-          <p>Skills are long-form playbooks the agent can load on demand. They live on disk in <strong>~/.claakecode/skills</strong>, so your workflow is portable, editable and reviewable.</p>
-          <ul>
-            <li>Create, edit and delete from the UI.</li>
-            <li>Document release processes, design rules or QA flows.</li>
-            <li>No plugin store, SDK or approval queue.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">04 · MCP servers</span>
-          <h3>Attach external capabilities safely.</h3>
-          <p>The Model Context Protocol panel lets you add workspace-scoped servers without spelunking through JSON. Once configured, MCP tools become part of the same visible agent surface.</p>
-          <ul>
-            <li>Add command, args, env and working directory.</li>
-            <li>Enable only the servers relevant to the repo.</li>
-            <li>Hot-reload so the agent can pick them up quickly.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">05 · databases</span>
-          <h3>Let the agent inspect only approved data.</h3>
-          <p>Add Postgres, MySQL, SQLite, MSSQL or Supabase REST sources from Settings. The agent can list sources, describe schemas and query data only when that source is enabled.</p>
-          <ul>
-            <li>Read-only mode and row limits by source.</li>
-            <li>Destructive operations require confirmation.</li>
-            <li>Import candidates from environment files, then approve manually.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">06 · embeddings & context</span>
-          <h3>Control memory, retrieval and cleanup.</h3>
-          <p>Embedding settings and context controls help long sessions stay useful. The agent can clean noisy tool results, compact conversations, and keep the important project instructions from AGENTS.md and DESIGN.md in view.</p>
-          <ul>
-            <li>Tune retrieval behavior for your workspace.</li>
-            <li>Use compaction when conversations get long.</li>
-            <li>Keep prompts auditable instead of invisible.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card reveal">
-          <span class="ix">07 · prod</span>
-          <h3>Wire deployment providers without leaving the IDE.</h3>
-          <p>The Prod panel groups deployment-provider credentials, CLI checks and project actions. It is designed for release work where the agent needs context but you still control authentication and destructive steps.</p>
-          <ul>
-            <li>Check provider CLI and auth status.</li>
-            <li>Store tokens intentionally, not in prompts.</li>
-            <li>Keep deployment actions visible before execution.</li>
-          </ul>
-        </article>
-
-        <article class="glass setting-card setting-card--accent reveal">
-          <span class="ix">08 · safety defaults</span>
-          <h3>Make autonomy reversible.</h3>
-          <p>Rollback checkpoints, confirmation prompts, todo boards and explicit questions let the agent move fast without pretending it owns the repo. Settings decide how much autonomy you want for each workspace.</p>
-          <ul>
-            <li>Restore files after a bad branch of work.</li>
-            <li>Ask before ambiguous or destructive operations.</li>
-            <li>Give teams and sub-agents bounded task boards.</li>
-          </ul>
-        </article>
+        <article class="glass setting-card setting-card--wide reveal"><span class="ix">01 · providers & models</span><h3>Connect the brains you already use.</h3><p>Settings centralize Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers. Use OAuth/subscription flows where supported, API keys where you prefer explicit billing, then choose the model and context behavior per conversation.</p><ul><li>Provider credentials stay local to your machine.</li><li>Switch models without rebuilding the workspace.</li><li>Use different models for main chat, sub-agents or teams.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">02 · tools</span><h3>Decide what the agent can do.</h3><p>Every built-in tool is visible: read, glob, grep, edit_file, write_file, bash, web, image, todo, question, clean_context, database, MCP, skills, sub-agents and teams.</p><ul><li>Toggle tools on or off.</li><li>Rewrite descriptions to change behavior.</li><li>Keep risky capabilities disabled until needed.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">03 · skills</span><h3>Save repeatable expertise as Markdown.</h3><p>Skills are long-form playbooks the agent can load on demand. They live on disk in <strong>~/.claakecode/skills</strong>, so your workflow is portable, editable and reviewable.</p><ul><li>Create, edit and delete from the UI.</li><li>Document release processes, design rules or QA flows.</li><li>No plugin store, SDK or approval queue.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">04 · MCP servers</span><h3>Attach external capabilities safely.</h3><p>The Model Context Protocol panel lets you add workspace-scoped servers without spelunking through JSON. Once configured, MCP tools become part of the same visible agent surface.</p><ul><li>Add command, args, env and working directory.</li><li>Enable only the servers relevant to the repo.</li><li>Hot-reload so the agent can pick them up quickly.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">05 · databases</span><h3>Let the agent inspect only approved data.</h3><p>Add Postgres, MySQL, SQLite, MSSQL or Supabase REST sources from Settings. The agent can list sources, describe schemas and query data only when that source is enabled.</p><ul><li>Read-only mode and row limits by source.</li><li>Destructive operations require confirmation.</li><li>Import candidates from environment files, then approve manually.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">06 · embeddings & context</span><h3>Control memory, retrieval and cleanup.</h3><p>Embedding settings and context controls help long sessions stay useful. The agent can clean noisy tool results, compact conversations, and keep important AGENTS.md and DESIGN.md instructions in view.</p><ul><li>Tune retrieval behavior for your workspace.</li><li>Use compaction when conversations get long.</li><li>Keep prompts auditable instead of invisible.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">07 · prod</span><h3>Wire deployment providers without leaving the IDE.</h3><p>The Prod panel groups deployment-provider credentials, CLI checks and project actions for release work where the agent needs context but you still control authentication and destructive steps.</p><ul><li>Check provider CLI and auth status.</li><li>Store tokens intentionally, not in prompts.</li><li>Keep deployment actions visible before execution.</li></ul></article>
+        <article class="glass setting-card setting-card--accent reveal"><span class="ix">08 · safety defaults</span><h3>Make autonomy reversible.</h3><p>Rollback checkpoints, confirmation prompts, todo boards and explicit questions let the agent move fast without pretending it owns the repo.</p><ul><li>Restore files after a bad branch of work.</li><li>Ask before ambiguous or destructive operations.</li><li>Give teams and sub-agents bounded task boards.</li></ul></article>
       </div>
     </div>
   </section>
@@ -230,13 +255,10 @@
     <div class="wrap">
       <div class="release-panel">
         <div class="glass release-main reveal">
-          <span class="eyebrow">§ 04 — latest version</span>
+          <span class="eyebrow">§ 05 — latest version</span>
           <h3>Updated for <em>v0.1.45</em>.</h3>
-          <p class="lede" style="font-size:17px;margin-top:0">The page now reflects the current app: provider expansion, database tooling, editable harness settings, context hygiene, rollback and agent teams.</p>
-          <div class="hero-cta">
-            <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">Release notes ↗</a>
-            <a class="btn btn-ghost" href="#download">Download v0.1.45</a>
-          </div>
+          <p class="lede" style="font-size:17px;margin-top:0">The page reflects the current app: provider expansion, database tooling, editable harness settings, context hygiene, rollback and agent teams.</p>
+          <div class="hero-cta"><a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">Release notes ↗</a><a class="btn btn-ghost" href="#download">Download v0.1.45</a></div>
         </div>
         <div>
           <article class="glass card release-note reveal"><span class="ix">I · smarter context</span><h3>Context cleaning and compaction</h3><p>The model can clean useless tool results from its own current turn, while conversation compaction keeps long Goal sessions usable.</p></article>
@@ -249,48 +271,41 @@
 
   <section class="pad-lg" id="agent">
     <div class="wrap">
-      <div class="shead reveal">
-        <span class="eyebrow">§ 05 — how the agent works</span>
-        <h2>Plan. Act. Observe.<br><em>Reflect.</em> Repeat.</h2>
-        <p>The same loop runs across providers. After each tool call, the agent re-reads the world, scores progress against the plan, and decides whether to continue, branch, ask or stop.</p>
+      <div class="shead reveal"><span class="eyebrow">§ 06 — how the agent works</span><h2>Plan. Act. Observe.<br><em>Reflect.</em> Repeat.</h2><p>The same loop runs across providers. After each tool call, the agent re-reads the world, scores progress against the plan, and decides whether to continue, branch, ask or stop.</p></div>
+      <div class="loop reveal"><div class="glass node"><div class="k">01</div><h4>Plan</h4><p>Break the objective into understandable steps — or enter Plan mode for a functional plan first.</p></div><div class="arr">→</div><div class="glass node"><div class="k">02</div><h4>Act</h4><p>Use only approved tools: edit files, run tests, query data, call MCP or delegate.</p></div><div class="arr">→</div><div class="glass node"><div class="k">03</div><h4>Observe</h4><p>Read file diffs, shell output, schema metadata, web pages or teammate updates.</p></div><div class="arr">→</div><div class="glass node"><div class="k">04</div><h4>Reflect</h4><p>Update the task board, clean context if useful, then loop until done.</p></div></div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="why">
+    <div class="wrap">
+      <div class="shead reveal"><span class="eyebrow">§ 07 — why Claake Code exists</span><h2>AI coding tools should not be <em>black boxes</em>.</h2><p>Many AI coding assistants hide tools, permissions, system prompts and provider choices. Claake Code exists for developers and teams that want a controllable, reversible and auditable AI coding workflow.</p></div>
+      <div class="grid g2">
+        <article class="glass card reveal"><span class="ix">the problem</span><h3>Opaque agents are hard to trust.</h3><p>When a coding agent hides what it can see, what it can run or which context it is using, developers cannot reliably review risk or reproduce behavior.</p></article>
+        <article class="glass card reveal"><span class="ix">the response</span><h3>The harness stays editable.</h3><p>Claake Code makes tools visible, settings modifiable, skills local, MCP configurable, database access bounded, providers interchangeable and the codebase forkable.</p></article>
       </div>
-      <div class="loop reveal">
-        <div class="glass node"><div class="k">01</div><h4>Plan</h4><p>Break the objective into understandable steps — or enter Plan mode for a functional plan first.</p></div>
-        <div class="arr">→</div>
-        <div class="glass node"><div class="k">02</div><h4>Act</h4><p>Use only approved tools: edit files, run tests, query data, call MCP or delegate.</p></div>
-        <div class="arr">→</div>
-        <div class="glass node"><div class="k">03</div><h4>Observe</h4><p>Read file diffs, shell output, schema metadata, web pages or teammate updates.</p></div>
-        <div class="arr">→</div>
-        <div class="glass node"><div class="k">04</div><h4>Reflect</h4><p>Update the task board, clean context if useful, then loop until done.</p></div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="best-for">
+    <div class="wrap">
+      <div class="shead reveal"><span class="eyebrow">§ 08 — best for</span><h2>Built for developers who need <em>control, not lock-in</em>.</h2><p>Claake Code targets practical development workflows where transparency matters as much as automation.</p></div>
+      <div class="grid g3">
+        <article class="glass card reveal"><h3>Open-source AI IDE seekers</h3><p>For developers who want an open-source alternative to closed AI coding IDEs and black-box coding agents.</p></article>
+        <article class="glass card reveal"><h3>Permission-conscious teams</h3><p>For teams that need to decide which tools, shells, databases and external sources an AI agent can access.</p></article>
+        <article class="glass card reveal"><h3>MCP users</h3><p>For workflows that rely on Model Context Protocol servers and want them configured per workspace.</p></article>
+        <article class="glass card reveal"><h3>Multi-provider developers</h3><p>For developers who use several AI providers and want model choice without rebuilding their workspace.</p></article>
+        <article class="glass card reveal"><h3>Full workspace tasks</h3><p>For projects that need editor, terminal, agent, repo instructions, database context and team workflows together.</p></article>
+        <article class="glass card reveal"><h3>No-telemetry users</h3><p>For users who want to avoid telemetry, hidden training flows and unnecessary vendor lock-in.</p></article>
       </div>
     </div>
   </section>
 
   <section class="pad-lg" id="open">
     <div class="wrap">
-      <div class="shead reveal">
-        <span class="eyebrow">§ 06 — built for people who distrust black boxes</span>
-        <h2>The contract is simple:<br>you <em>own</em> the tools you build with.</h2>
-        <p>MIT licensed, Rust + React + Tauri 2, forkable down to the agent loop. No telemetry, no training on transcripts, no enterprise tier hiding the useful parts.</p>
-      </div>
-      <div class="split">
-        <div class="reveal">
-          <ul class="feat-list">
-            <li><span class="tick">✓</span><span>All tool descriptions are editable and all tools are individually toggleable.</span></li>
-            <li><span class="tick">✓</span><span>AGENTS.md and DESIGN.md let each repo carry its own operating manual and design system.</span></li>
-            <li><span class="tick">✓</span><span>MCP servers are configured per workspace and picked up by the agent without hidden wiring.</span></li>
-            <li><span class="tick">✓</span><span>The downloaded binary is the same open-source app maintainers use.</span></li>
-          </ul>
-          <div class="hero-cta">
-            <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode">Read the source ↗</a>
-            <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a>
-          </div>
-        </div>
-        <div class="glass code reveal">
-          <div class="bar"><i></i><i></i><i></i><span class="f">AGENTS.md · project memory</span></div>
-<pre><span class="c"># House rules</span>
+      <div class="shead reveal"><span class="eyebrow">§ 09 — open-source ownership</span><h2>The contract is simple:<br>you <em>own</em> the tools you build with.</h2><p>MIT licensed, Rust + React + Tauri 2, forkable down to the agent loop. No telemetry, no training on transcripts, no enterprise tier hiding the useful parts.</p></div>
+      <div class="split"><div class="reveal"><ul class="feat-list"><li><span class="tick">✓</span><span>All tool descriptions are editable and all tools are individually toggleable.</span></li><li><span class="tick">✓</span><span>AGENTS.md and DESIGN.md let each repo carry its own operating manual and design system.</span></li><li><span class="tick">✓</span><span>MCP servers are configured per workspace and picked up by the agent without hidden wiring.</span></li><li><span class="tick">✓</span><span>The downloaded binary is the same open-source app maintainers use.</span></li></ul><div class="hero-cta"><a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode">Read the source ↗</a><a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a></div></div><div class="glass code reveal"><div class="bar"><i></i><i></i><i></i><span class="f">AGENTS.md · project memory</span></div><pre><span class="c"># House rules</span>
 
-- Prefer the dedicated tool over <span class="b">bash</span>.
+- Prefer dedicated tools over <span class="b">bash</span>.
 - Keep the surface editable: every tool
   description lives in settings, every tool
   has an on/off toggle.
@@ -300,8 +315,31 @@
 <span class="b">mcp.*</span>      : per workspace, hot-reloaded
 <span class="b">skill</span>      : markdown in ~/.claakecode/skills
 <span class="b">team_run</span>   : parallel agent workstreams
-<span class="b">rollback</span>   : restore safe checkpoints</pre>
-        </div>
+<span class="b">rollback</span>   : restore safe checkpoints</pre></div></div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="alternative">
+    <div class="wrap">
+      <div class="shead reveal"><span class="eyebrow">§ 10 — open-source alternative</span><h2>Claake Code as an <em>open-source alternative</em>.</h2><p>Claake Code is not trying to hide the agent behind a polished prompt box. It exposes the harness: tools, skills, providers, MCP servers, database sources and workspace instructions remain visible and editable.</p></div>
+      <div class="glass alt-panel reveal"><p>Claake Code can be considered an open-source alternative for developers comparing AI coding IDEs, Claude Code-style coding agents, Cursor-style AI editing workflows or other closed developer tools. Its distinction is not a claim to be the fastest or most powerful tool; it is the ability to inspect, edit and restrict the agent surface.</p><ul><li>Alternative to closed AI coding IDEs.</li><li>Alternative to black-box coding agents.</li><li>Alternative for developers who want editable tools and providers.</li><li>Alternative for teams that need transparency and control.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="faq">
+    <div class="wrap">
+      <div class="shead reveal"><span class="eyebrow">§ 11 — FAQ</span><h2>Answers for developers, crawlers and <em>AI search</em>.</h2><p>Short factual answers help people and generative search engines understand when Claake Code is the right tool.</p></div>
+      <div class="faq-list">
+        <details class="glass faq-item reveal" open><summary>What is Claake Code?</summary><p>Claake Code is an open-source desktop AI coding IDE that gives developers a visible, editable agent harness with tools, skills, MCP servers, model providers, database sources and workspace context.</p></details>
+        <details class="glass faq-item reveal"><summary>Is Claake Code open source?</summary><p>Yes. Claake Code is MIT licensed and forkable, with source code available on GitHub.</p></details>
+        <details class="glass faq-item reveal"><summary>Is Claake Code an alternative to Claude Code, Cursor or other AI coding tools?</summary><p>Claake Code is an open-source alternative for developers who want a transparent desktop AI coding IDE instead of a black-box coding agent or closed AI IDE.</p></details>
+        <details class="glass faq-item reveal"><summary>Which AI providers does Claake Code support?</summary><p>Claake Code supports multiple model providers including Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers through subscriptions or API keys where available.</p></details>
+        <details class="glass faq-item reveal"><summary>Does Claake Code support MCP?</summary><p>Yes. Claake Code supports workspace-scoped Model Context Protocol servers so external MCP tools can become part of the visible agent surface.</p></details>
+        <details class="glass faq-item reveal"><summary>Can Claake Code access databases?</summary><p>Yes. Claake Code can list, describe and query approved database sources with safeguards such as read-only mode, row limits and destructive-operation confirmations.</p></details>
+        <details class="glass faq-item reveal"><summary>Does Claake Code send telemetry?</summary><p>Claake Code is designed with no telemetry and no training on transcripts. Provider credentials and workspace controls remain local to the user machine.</p></details>
+        <details class="glass faq-item reveal"><summary>Which platforms does Claake Code support?</summary><p>Claake Code provides downloads for macOS, Windows and Linux.</p></details>
+        <details class="glass faq-item reveal"><summary>Can I use my own API keys?</summary><p>Yes. Claake Code can use API keys and supported subscription/OAuth flows so developers can choose the providers and billing paths they already use.</p></details>
+        <details class="glass faq-item reveal"><summary>Can I customize the agent tools and skills?</summary><p>Yes. Built-in tools can be enabled, disabled or described differently, and repeatable expertise can be saved as local Markdown skills.</p></details>
       </div>
     </div>
   </section>
@@ -310,22 +348,22 @@
     <div class="wrap">
       <div class="glass final reveal">
         <div class="inner">
-          <span class="eyebrow" style="justify-content:center">§ 07 — one download, your own harness</span>
+          <span class="eyebrow" style="justify-content:center">§ 12 — download the open-source AI coding IDE</span>
           <h2>Install Claake Code.<br>Then make the agent <em>yours</em>.</h2>
-          <p>Open the native app, connect providers or subscriptions, approve tools and database sources, add skills, then let the harness work exactly the way you shaped it.</p>
+          <p>Open the native desktop app, connect providers or subscriptions, approve tools and database sources, add skills, configure MCP servers, then let the AI coding harness work exactly the way you shaped it.</p>
           <div class="hero-cta">
-            <a class="btn btn-primary" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg">macOS · .dmg ↓</a>
-            <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe">Windows · .exe ↓</a>
-            <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage">Linux · AppImage ↓</a>
+            <a class="btn btn-primary" aria-label="Download Claake Code macOS universal DMG" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg">macOS · .dmg ↓</a>
+            <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe">Windows · .exe ↓</a>
+            <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage">Linux · AppImage ↓</a>
           </div>
-          <p class="meta" style="text-align:center">Latest v0.1.45 · native desktop · bring your own keys · open source</p>
+          <p class="meta" style="text-align:center">Latest v0.1.45 · native desktop · bring your own keys · open source · MIT</p>
         </div>
       </div>
       <div class="download-grid" style="margin-top:18px">
-        <a class="glass download-card reveal" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg"><span class="os">macOS</span><strong>Universal DMG</strong><span>Apple Silicon + Intel build.</span><em>download ↓</em></a>
-        <a class="glass download-card reveal" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe"><span class="os">Windows</span><strong>x64 setup</strong><span>Windows 10/11 installer.</span><em>download ↓</em></a>
-        <a class="glass download-card reveal" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage"><span class="os">Linux</span><strong>AppImage</strong><span>Portable AMD64 build.</span><em>download ↓</em></a>
-        <a class="glass download-card reveal" href="https://github.com/WilliamPeynichou/ClaakeCode"><span class="os">Source</span><strong>GitHub</strong><span>MIT licensed Rust + React + Tauri.</span><em>open ↗</em></a>
+        <a class="glass download-card reveal" aria-label="Download Claake Code Universal DMG for macOS" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg"><span class="os">macOS</span><strong>Universal DMG</strong><span>Apple Silicon + Intel build.</span><em>download ↓</em></a>
+        <a class="glass download-card reveal" aria-label="Download Claake Code x64 setup for Windows" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe"><span class="os">Windows</span><strong>x64 setup</strong><span>Windows 10/11 installer.</span><em>download ↓</em></a>
+        <a class="glass download-card reveal" aria-label="Download Claake Code AppImage for Linux" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage"><span class="os">Linux</span><strong>AppImage</strong><span>Portable AMD64 build.</span><em>download ↓</em></a>
+        <a class="glass download-card reveal" aria-label="Open Claake Code source repository on GitHub" href="https://github.com/WilliamPeynichou/ClaakeCode"><span class="os">Source</span><strong>GitHub</strong><span>MIT licensed Rust + React + Tauri.</span><em>open ↗</em></a>
       </div>
     </div>
   </section>
@@ -336,28 +374,25 @@
     <div class="glass foot-card">
       <div class="foot">
         <div>
-          <a class="brand" href="#top"><picture>
-              <source srcset="assets/claakecode-icon.webp" type="image/webp" />
-              <img src="assets/claakecode-icon.png" alt="" />
-            </picture><strong>claake <em>code</em></strong></a>
-          <small>The best tools are the ones you can read all the way down to the metal.</small>
+          <a class="brand" href="#top" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
+          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
         </div>
         <div class="foot-cols">
-          <div class="foot-col"><h5>Product</h5><a href="#showcase">IDE</a><a href="#control">Control</a><a href="#settings">Settings</a><a href="#agent">Agent loop</a><a href="#download">Download</a></div>
-          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a></div>
+          <div class="foot-col"><h5>Product</h5><a href="#what">What is it?</a><a href="#features">Features</a><a href="#settings">Settings</a><a href="#alternative">Alternative</a><a href="#download">Download</a></div>
+          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
           <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
         </div>
       </div>
-      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>fork it, shape it, ship it</span></div>
+      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
     </div>
   </div>
 </footer>
 
 <div class="switcher glass" role="group" aria-label="Visual palette">
   <span class="lab">Palette</span>
-  <button class="sw" data-t="forest" aria-pressed="true" title="Forest"></button>
-  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk"></button>
-  <button class="sw" data-t="tide" aria-pressed="false" title="Tide"></button>
+  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
+  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
+  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
 </div>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -409,59 +444,41 @@
     rev.observe(el);
   });
 
-  /* Lazy-load vidéo : ne télécharge que quand l'élément est visible ── */
   const heroVideo = document.getElementById('hero-video');
   if (heroVideo) {
     heroVideo.muted = true;
     heroVideo.setAttribute('muted', '');
-    const playVideo = () => {
-      heroVideo.play().catch(() => {});
-    };
+    const playVideo = () => { heroVideo.play().catch(() => {}); };
     const loadAndPlay = () => {
       const src = heroVideo.dataset.src;
-      if (!src || heroVideo.src) return; // déjà chargé
+      if (!src || heroVideo.src) return;
       heroVideo.src = src;
       heroVideo.addEventListener('canplay', playVideo, { once: true });
       heroVideo.load();
     };
     const videoObserver = new IntersectionObserver((entries) => {
-      entries.forEach(en => {
-        if (en.isIntersecting) {
-          loadAndPlay();
-          videoObserver.unobserve(en.target);
-        }
-      });
-    }, { rootMargin: '200px', threshold: 0 }); // préchargement 200px avant
+      entries.forEach(en => { if (en.isIntersecting) { loadAndPlay(); videoObserver.unobserve(en.target); } });
+    }, { rootMargin: '200px', threshold: 0 });
     videoObserver.observe(heroVideo);
   }
 })();
 </script>
 
 <script>
-/* ── Loader dismiss ─────────────────────────────────────────────────
-   Waits for window.load (all assets incl. fonts & video poster) +
-   a minimum display of 650 ms so there's no jarring flash.         */
 (function () {
   const loader = document.getElementById('loader');
   const t0 = Date.now();
   const MIN_MS = 650;
-
   function dismiss() {
     const elapsed = Date.now() - t0;
-    const delay   = Math.max(0, MIN_MS - elapsed);
+    const delay = Math.max(0, MIN_MS - elapsed);
     setTimeout(function () {
       loader.classList.add('loader--done');
-      loader.addEventListener('transitionend', function () {
-        loader.remove();
-      }, { once: true });
+      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
     }, delay);
   }
-
-  if (document.readyState === 'complete') {
-    dismiss();
-  } else {
-    window.addEventListener('load', dismiss, { once: true });
-  }
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
 })();
 </script>
 </body>
