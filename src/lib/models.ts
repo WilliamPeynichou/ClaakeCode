@@ -8,7 +8,7 @@ import type {
 } from "../types";
 
 export type ModelId = string;
-export type ProviderId = "anthropic" | "openai" | "google" | "kimi" | "mistral" | "openrouter";
+export type ProviderId = "anthropic" | "openai" | "google" | "xai" | "kimi" | "mistral" | "openrouter";
 export type ModeModelSelection = {
   model: ModelId;
   thinking: ThinkingLevel;
@@ -65,6 +65,11 @@ export const PROVIDERS: {
     value: "google",
     label: "Google",
     icon: "simple-icons:google",
+  },
+  {
+    value: "xai",
+    label: "xAI Composer",
+    icon: "simple-icons:x",
   },
   {
     value: "kimi",
@@ -204,6 +209,13 @@ export const MODELS: ModelEntry[] = [
     label: "Gemini 3.5 Flash",
     thinking: ["minimal", "low", "medium", "high"],
     defaultThinking: "high",
+  },
+  {
+    value: "xai:composer-2.5",
+    provider: "xai",
+    label: "Composer 2.5",
+    thinking: ["off"],
+    defaultThinking: "off",
   },
   {
     value: "kimi:kimi-for-coding",
@@ -356,7 +368,7 @@ export function thinkingFromRef(
     if (model.effort === "none") return "off";
     return "high";
   }
-  if (model?.provider === "mistral") {
+  if (model?.provider === "mistral" || model?.provider === "xai") {
     return "off";
   }
   if (model?.provider === "openrouter") {
@@ -416,7 +428,7 @@ export function modelRefWithThinking(
   }
   if (thinking === "off") return { ...model, effort: "none" };
   if (model.provider === "kimi") return { ...model, effort: "high" };
-  if (model.provider === "mistral") return { ...model, effort: "none" };
+  if (model.provider === "mistral" || model.provider === "xai") return { ...model, effort: "none" };
   if (model.provider === "openrouter" && (thinking === "xhigh" || thinking === "max")) {
     return { ...model, effort: "high" };
   }

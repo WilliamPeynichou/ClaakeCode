@@ -7,6 +7,7 @@ members = [
     "crates/claakecode-kimi",
     "crates/claakecode-mistral",
     "crates/claakecode-openai",
+    "crates/claakecode-xai",
     "crates/claakecode-openrouter",
     "crates/claakecode-app",
     "src-tauri",
@@ -28,6 +29,7 @@ claakecode-google = { path = "crates/claakecode-google" }
 claakecode-kimi = { path = "crates/claakecode-kimi" }
 claakecode-mistral = { path = "crates/claakecode-mistral" }
 claakecode-openai = { path = "crates/claakecode-openai" }
+claakecode-xai = { path = "crates/claakecode-xai" }
 claakecode-openrouter = { path = "crates/claakecode-openrouter" }
 claakecode-app = { path = "crates/claakecode-app" }
 

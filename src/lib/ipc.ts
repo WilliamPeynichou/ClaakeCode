@@ -33,6 +33,7 @@ import type {
   OpenRouterModel,
   OpenRouterModelSearchResult,
   OpenRouterProviderStatus,
+  XAiProviderStatus,
   PlanControl,
   ProdProviderDefinition,
   ProdProviderRuntimeStatus,
@@ -46,6 +47,7 @@ import type {
   StartKimiLoginOutput,
   StartMistralLoginOutput,
   StartOpenAiLoginOutput,
+  StartXAiLoginOutput,
   SubAgentSettings,
   TerminalCommandResult,
   TerminalPathResolution,
@@ -493,6 +495,18 @@ export const api = {
   },
   disconnectGoogleProvider() {
     return invoke<GoogleProviderStatus>("disconnect_google_provider");
+  },
+  getXAiProviderStatus() {
+    return invoke<XAiProviderStatus>("get_xai_provider_status");
+  },
+  startXAiOAuthLogin() {
+    return invoke<StartXAiLoginOutput>("start_xai_oauth_login");
+  },
+  cancelXAiOAuthLogin() {
+    return invoke<XAiProviderStatus>("cancel_xai_oauth_login");
+  },
+  disconnectXAiProvider() {
+    return invoke<XAiProviderStatus>("disconnect_xai_provider");
   },
   getKimiProviderStatus() {
     return invoke<KimiProviderStatus>("get_kimi_provider_status");

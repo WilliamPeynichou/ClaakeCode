@@ -72,6 +72,17 @@ pub(super) fn install_openai_provider(
     Ok(())
 }
 
+pub(super) fn install_xai_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+) -> std::result::Result<(), String> {
+    let provider = XaiProvider::from_default_sources().map_err(error_to_string)?;
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .insert(XAI_PROVIDER_ID.into(), Arc::new(provider) as Arc<dyn Provider>);
+    Ok(())
+}
+
 pub(super) fn install_anthropic_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
 ) -> std::result::Result<(), String> {
@@ -186,6 +197,16 @@ pub(super) fn remove_openai_provider(
     Ok(())
 }
 
+pub(super) fn remove_xai_provider(
+    providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+) -> std::result::Result<(), String> {
+    providers
+        .lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?
+        .remove(XAI_PROVIDER_ID);
+    Ok(())
+}
+
 pub(super) fn remove_anthropic_provider(
     providers: &Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
 ) -> std::result::Result<(), String> {
@@ -243,6 +264,25 @@ pub(super) fn openai_provider_status_from_auth(
     error: Option<String>,
 ) -> OpenAiProviderStatus {
     OpenAiProviderStatus {
+        connected: auth.connected,
+        connection_state: connection_state.to_string(),
+        email: auth.email,
+        account_id: auth.account_id,
+        plan_type: auth.plan_type,
+        expires_at_ms: auth.expires_at_ms,
+        last_refresh_ms: auth.last_refresh_ms,
+        login_id,
+        error,
+    }
+}
+
+pub(super) fn xai_provider_status_from_auth(
+    auth: XaiAuthStatus,
+    connection_state: &str,
+    login_id: Option<String>,
+    error: Option<String>,
+) -> XaiProviderStatus {
+    XaiProviderStatus {
         connected: auth.connected,
         connection_state: connection_state.to_string(),
         email: auth.email,
@@ -452,6 +492,128 @@ pub(super) async fn handle_openai_oauth_request(
             };
 
             match exchange_oauth_code(http, code, redirect_uri, pkce).await {
+                Ok(_) => {
+                    write_html_response(stream, 200, openai_login_success_html()).await?;
+                    Ok(Some(Ok(())))
+                }
+                Err(err) => {
+                    let message = err.to_string();
+                    write_html_response(stream, 500, openai_login_error_html(&message)).await?;
+                    Ok(Some(Err(anyhow::anyhow!(message))))
+                }
+            }
+        }
+        "/cancel" => {
+            write_http_response(stream, 200, "OK", "Login canceled").await?;
+            Ok(Some(Err(anyhow::anyhow!("Login canceled"))))
+        }
+        _ => {
+            write_http_response(stream, 404, "Not Found", "Not Found").await?;
+            Ok(None)
+        }
+    }
+}
+
+pub(super) async fn bind_xai_oauth_listener() -> Result<tokio::net::TcpListener> {
+    const CALLBACK_PORT: u16 = 56121;
+    tokio::net::TcpListener::bind(("127.0.0.1", CALLBACK_PORT))
+        .await
+        .context("unable to bind xAI OAuth callback port 56121")
+}
+
+pub(super) async fn run_xai_oauth_server(
+    listener: tokio::net::TcpListener,
+    redirect_uri: String,
+    expected_state: String,
+    pkce: XaiPkceCodes,
+    cancel: Arc<Notify>,
+) -> Result<()> {
+    let http = reqwest::Client::builder()
+        .user_agent("ClaakeCode/0.1")
+        .build()
+        .context("unable to build OAuth client")?;
+
+    loop {
+        tokio::select! {
+            _ = cancel.notified() => {
+                anyhow::bail!("Login canceled");
+            }
+            accepted = listener.accept() => {
+                let (mut stream, _) = accepted.context("OAuth callback accept failed")?;
+                if let Some(result) = handle_xai_oauth_request(
+                    &http,
+                    &mut stream,
+                    &redirect_uri,
+                    &expected_state,
+                    &pkce,
+                ).await? {
+                    return result;
+                }
+            }
+        }
+    }
+}
+
+pub(super) async fn handle_xai_oauth_request(
+    http: &reqwest::Client,
+    stream: &mut tokio::net::TcpStream,
+    redirect_uri: &str,
+    expected_state: &str,
+    pkce: &XaiPkceCodes,
+) -> Result<Option<Result<()>>> {
+    let mut buffer = [0u8; 8192];
+    let read = stream
+        .read(&mut buffer)
+        .await
+        .context("OAuth callback read failed")?;
+    if read == 0 {
+        return Ok(None);
+    }
+
+    let request = String::from_utf8_lossy(&buffer[..read]);
+    let Some(first_line) = request.lines().next() else {
+        write_http_response(stream, 400, "Bad Request", "Bad Request").await?;
+        return Ok(None);
+    };
+    let mut parts = first_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let target = parts.next().unwrap_or_default();
+    if method != "GET" {
+        write_http_response(stream, 405, "Method Not Allowed", "Method Not Allowed").await?;
+        return Ok(None);
+    }
+
+    let parsed = parse_local_oauth_url(target)?;
+    match parsed.path() {
+        "/auth/callback" | "/oauth/callback" | "/callback" => {
+            let params = parsed
+                .query_pairs()
+                .into_owned()
+                .collect::<HashMap<String, String>>();
+            if params.get("state").map(String::as_str) != Some(expected_state) {
+                write_html_response(stream, 400, openai_login_error_html("State mismatch")).await?;
+                return Ok(Some(Err(anyhow::anyhow!("State mismatch"))));
+            }
+            if let Some(error) = params.get("error") {
+                let message = params
+                    .get("error_description")
+                    .filter(|value| !value.trim().is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| error.clone());
+                write_html_response(stream, 400, openai_login_error_html(&message)).await?;
+                return Ok(Some(Err(anyhow::anyhow!(message))));
+            }
+            let Some(code) = params.get("code").filter(|value| !value.is_empty()) else {
+                write_html_response(
+                    stream,
+                    400,
+                    openai_login_error_html("Missing authorization code"),
+                )
+                .await?;
+                return Ok(Some(Err(anyhow::anyhow!("Missing authorization code"))));
+            };
+
+            match exchange_xai_oauth_code(http, code, redirect_uri, pkce).await {
                 Ok(_) => {
                     write_html_response(stream, 200, openai_login_success_html()).await?;
                     Ok(Some(Ok(())))
@@ -989,6 +1151,115 @@ pub(super) async fn disconnect_openai_provider(
     }
     Ok(openai_provider_status_from_auth(
         OpenAiAuthStatus::disconnected(),
+        "disconnected",
+        None,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(super) async fn get_xai_provider_status(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<XaiProviderStatus, String> {
+    let mut active_login = state.xai_login.lock().await;
+    let attempt = active_login.clone();
+    if let Some(attempt) = attempt {
+        let outcome = attempt
+            .outcome
+            .lock()
+            .map_err(|_| "login state is unavailable".to_string())?
+            .clone();
+
+        if let Some(outcome) = outcome {
+            *active_login = None;
+            let auth = load_default_xai_auth_status().map_err(error_to_string)?;
+            if outcome.success {
+                return Ok(xai_provider_status_from_auth(auth, "connected", None, None));
+            }
+            return Ok(xai_provider_status_from_auth(auth, "error", None, outcome.error));
+        }
+
+        let auth = load_default_xai_auth_status().map_err(error_to_string)?;
+        return Ok(xai_provider_status_from_auth(
+            auth,
+            "connecting",
+            Some(attempt.id),
+            None,
+        ));
+    }
+
+    let auth = load_default_xai_auth_status().map_err(error_to_string)?;
+    let state = if auth.connected { "connected" } else { "disconnected" };
+    Ok(xai_provider_status_from_auth(auth, state, None, None))
+}
+
+#[tauri::command]
+pub(super) async fn start_xai_oauth_login(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<StartXaiLoginOutput, String> {
+    if let Some(existing) = state.xai_login.lock().await.take() {
+        existing.cancel.notify_one();
+    }
+
+    let listener = bind_xai_oauth_listener().await.map_err(error_to_string)?;
+    let redirect_uri = "http://127.0.0.1:56121/auth/callback".to_string();
+    let pkce = generate_xai_pkce();
+    let oauth_state = generate_xai_state();
+    let auth_url = xai_oauth_authorize_url(&redirect_uri, &pkce, &oauth_state);
+    let login_id = generate_xai_state();
+    let cancel = Arc::new(Notify::new());
+    let outcome = Arc::new(StdMutex::new(None));
+
+    {
+        let mut active_login = state.xai_login.lock().await;
+        *active_login = Some(XaiLoginAttempt {
+            id: login_id.clone(),
+            cancel: cancel.clone(),
+            outcome: outcome.clone(),
+        });
+    }
+
+    let providers = state.providers.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = run_xai_oauth_server(listener, redirect_uri, oauth_state, pkce, cancel).await;
+        let login_outcome = match result {
+            Ok(()) => match install_xai_provider(&providers) {
+                Ok(()) => XaiLoginOutcome { success: true, error: None },
+                Err(err) => XaiLoginOutcome { success: false, error: Some(err) },
+            },
+            Err(err) => XaiLoginOutcome { success: false, error: Some(err.to_string()) },
+        };
+        if let Ok(mut slot) = outcome.lock() {
+            *slot = Some(login_outcome);
+        }
+    });
+
+    Ok(StartXaiLoginOutput { login_id, auth_url })
+}
+
+#[tauri::command]
+pub(super) async fn cancel_xai_oauth_login(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<XaiProviderStatus, String> {
+    if let Some(attempt) = state.xai_login.lock().await.take() {
+        attempt.cancel.notify_one();
+    }
+    let auth = load_default_xai_auth_status().map_err(error_to_string)?;
+    let state = if auth.connected { "connected" } else { "disconnected" };
+    Ok(xai_provider_status_from_auth(auth, state, None, None))
+}
+
+#[tauri::command]
+pub(super) async fn disconnect_xai_provider(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<XaiProviderStatus, String> {
+    if let Some(attempt) = state.xai_login.lock().await.take() {
+        attempt.cancel.notify_one();
+    }
+    delete_default_xai_auth().map_err(error_to_string)?;
+    remove_xai_provider(&state.providers)?;
+    Ok(xai_provider_status_from_auth(
+        XaiAuthStatus::disconnected(),
         "disconnected",
         None,
         None,

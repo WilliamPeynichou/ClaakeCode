@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://claakecode-web-sigma.vercel.app/sitemap.xml
+
+# AI and generative search crawlers are welcome to index the public marketing page.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /

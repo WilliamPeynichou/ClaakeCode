@@ -79,6 +79,7 @@ import type {
   OpenRouterModelSearchResult,
   OpenRouterProviderStatus,
   ProdProviderAction,
+  XAiProviderStatus,
   ProdProviderDefinition,
   ProdSettings,
   SkillSettings,
@@ -201,6 +202,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const [openAiStatus, setOpenAiStatus] = useState<OpenAiProviderStatus | null>(null);
   const [anthropicStatus, setAnthropicStatus] = useState<AnthropicProviderStatus | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleProviderStatus | null>(null);
+  const [xAiStatus, setXAiStatus] = useState<XAiProviderStatus | null>(null);
   const [kimiStatus, setKimiStatus] = useState<KimiProviderStatus | null>(null);
   const [mistralStatus, setMistralStatus] = useState<MistralProviderStatus | null>(null);
   const [openRouterStatus, setOpenRouterStatus] = useState<OpenRouterProviderStatus | null>(null);
@@ -1106,6 +1108,23 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [loadConfiguredProviders]);
 
+  const loadXAiStatus = useCallback(async () => {
+    setProvidersLoading(true);
+    try {
+      const status = await api.getXAiProviderStatus();
+      setXAiStatus(status);
+      setProvidersMessage(status.error ?? null);
+      if (status.connectionState !== "connecting") {
+        void loadConfiguredProviders();
+        window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+      }
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [loadConfiguredProviders]);
+
   const loadKimiStatus = useCallback(async () => {
     setProvidersLoading(true);
     try {
@@ -1165,6 +1184,7 @@ export function SettingsPane({ workspacePath }: Props) {
     if (section !== "providers") return;
     if (anthropicStatus === null) void loadAnthropicStatus();
     if (googleStatus === null) void loadGoogleStatus();
+    if (xAiStatus === null) void loadXAiStatus();
     if (kimiStatus === null) void loadKimiStatus();
     if (mistralStatus === null) void loadMistralStatus();
     if (openRouterStatus === null) void loadOpenRouterStatus();
@@ -1173,12 +1193,14 @@ export function SettingsPane({ workspacePath }: Props) {
     openAiStatus,
     anthropicStatus,
     googleStatus,
+    xAiStatus,
     kimiStatus,
     mistralStatus,
     openRouterStatus,
     loadOpenAiStatus,
     loadAnthropicStatus,
     loadGoogleStatus,
+    loadXAiStatus,
     loadKimiStatus,
     loadMistralStatus,
     loadOpenRouterStatus,
@@ -1196,12 +1218,14 @@ export function SettingsPane({ workspacePath }: Props) {
     const openAiConnecting = openAiStatus?.connectionState === "connecting";
     const anthropicConnecting = anthropicStatus?.connectionState === "connecting";
     const googleConnecting = googleStatus?.connectionState === "connecting";
+    const xAiConnecting = xAiStatus?.connectionState === "connecting";
     const kimiConnecting = kimiStatus?.connectionState === "connecting";
     const mistralConnecting = mistralStatus?.connectionState === "connecting";
     if (
       !openAiConnecting &&
       !anthropicConnecting &&
       !googleConnecting &&
+      !xAiConnecting &&
       !kimiConnecting &&
       !mistralConnecting
     )
@@ -1210,6 +1234,7 @@ export function SettingsPane({ workspacePath }: Props) {
       if (openAiConnecting) void loadOpenAiStatus();
       if (anthropicConnecting) void loadAnthropicStatus();
       if (googleConnecting) void loadGoogleStatus();
+      if (xAiConnecting) void loadXAiStatus();
       if (kimiConnecting) void loadKimiStatus();
       if (mistralConnecting) void loadMistralStatus();
     }, 1200);
@@ -1218,11 +1243,13 @@ export function SettingsPane({ workspacePath }: Props) {
     openAiStatus?.connectionState,
     anthropicStatus?.connectionState,
     googleStatus?.connectionState,
+    xAiStatus?.connectionState,
     kimiStatus?.connectionState,
     mistralStatus?.connectionState,
     loadOpenAiStatus,
     loadAnthropicStatus,
     loadGoogleStatus,
+    loadXAiStatus,
     loadKimiStatus,
     loadMistralStatus,
   ]);
@@ -1361,6 +1388,54 @@ export function SettingsPane({ workspacePath }: Props) {
     setProvidersMessage(null);
     try {
       setGoogleStatus(await api.disconnectGoogleProvider());
+      setProvidersMessage("Disconnected");
+      void loadConfiguredProviders();
+      window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, [loadConfiguredProviders]);
+
+  const connectXAi = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      const login = await api.startXAiOAuthLogin();
+      const connecting: XAiProviderStatus = {
+        connected: false,
+        connectionState: "connecting",
+        loginId: login.loginId,
+      };
+      setXAiStatus(connecting);
+      await api.openExternalUrl(login.authUrl);
+      setProvidersMessage("Waiting for xAI / Grok browser confirmation...");
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+      void loadXAiStatus();
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, [loadXAiStatus]);
+
+  const cancelXAi = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      setXAiStatus(await api.cancelXAiOAuthLogin());
+    } catch (err) {
+      setProvidersMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProvidersBusy(false);
+    }
+  }, []);
+
+  const disconnectXAi = useCallback(async () => {
+    setProvidersBusy(true);
+    setProvidersMessage(null);
+    try {
+      setXAiStatus(await api.disconnectXAiProvider());
       setProvidersMessage("Disconnected");
       void loadConfiguredProviders();
       window.dispatchEvent(new CustomEvent(PROVIDERS_CHANGED_EVENT));
@@ -2004,6 +2079,7 @@ export function SettingsPane({ workspacePath }: Props) {
             openAiStatus={openAiStatus}
             anthropicStatus={anthropicStatus}
             googleStatus={googleStatus}
+            xAiStatus={xAiStatus}
             kimiStatus={kimiStatus}
             mistralStatus={mistralStatus}
             mistralModels={mistralModels}
@@ -2016,6 +2092,7 @@ export function SettingsPane({ workspacePath }: Props) {
               void loadOpenAiStatus();
               void loadAnthropicStatus();
               void loadGoogleStatus();
+              void loadXAiStatus();
               void loadKimiStatus();
               void loadMistralStatus();
               void loadOpenRouterStatus();
@@ -2029,6 +2106,9 @@ export function SettingsPane({ workspacePath }: Props) {
             onConnectGoogle={() => void connectGoogle()}
             onCancelGoogle={() => void cancelGoogle()}
             onDisconnectGoogle={() => void disconnectGoogle()}
+            onConnectXAi={() => void connectXAi()}
+            onCancelXAi={() => void cancelXAi()}
+            onDisconnectXAi={() => void disconnectXAi()}
             onConnectKimi={() => void connectKimi()}
             onCancelKimi={() => void cancelKimi()}
             onDisconnectKimi={() => void disconnectKimi()}
@@ -2249,6 +2329,7 @@ type ProvidersSectionProps = {
   openAiStatus: OpenAiProviderStatus | null;
   anthropicStatus: AnthropicProviderStatus | null;
   googleStatus: GoogleProviderStatus | null;
+  xAiStatus: XAiProviderStatus | null;
   kimiStatus: KimiProviderStatus | null;
   mistralStatus: MistralProviderStatus | null;
   mistralModels: MistralModel[];
@@ -2267,6 +2348,9 @@ type ProvidersSectionProps = {
   onConnectGoogle: () => void;
   onCancelGoogle: () => void;
   onDisconnectGoogle: () => void;
+  onConnectXAi: () => void;
+  onCancelXAi: () => void;
+  onDisconnectXAi: () => void;
   onConnectKimi: () => void;
   onCancelKimi: () => void;
   onDisconnectKimi: () => void;
@@ -2283,6 +2367,7 @@ function ProvidersSection({
   openAiStatus,
   anthropicStatus,
   googleStatus,
+  xAiStatus,
   kimiStatus,
   mistralStatus,
   mistralModels,
@@ -2301,6 +2386,9 @@ function ProvidersSection({
   onConnectGoogle,
   onCancelGoogle,
   onDisconnectGoogle,
+  onConnectXAi,
+  onCancelXAi,
+  onDisconnectXAi,
   onConnectKimi,
   onCancelKimi,
   onDisconnectKimi,
@@ -2389,6 +2477,22 @@ function ProvidersSection({
           onDisconnect={onDisconnectGoogle}
         />
         <ProviderCard
+          name="xAI Composer"
+          icon="simple-icons:x"
+          description="Connect your xAI / Grok account to use Composer 2.5 via your subscription, not a classic xAI API key."
+          status={xAiStatus}
+          connectedMeta={[
+            xAiStatus?.email || "xAI / Grok signed in",
+            xAiStatus?.subscriptionType ?? null,
+            "Composer 2.5",
+          ]}
+          loading={loading}
+          busy={busy}
+          onConnect={onConnectXAi}
+          onCancel={onCancelXAi}
+          onDisconnect={onDisconnectXAi}
+        />
+        <ProviderCard
           name="Kimi"
           icon="local:kimi"
           description="Use OAuth to connect your Kimi account for Kimi 2.6."
@@ -2428,6 +2532,7 @@ type ProviderCardStatus =
   | OpenAiProviderStatus
   | AnthropicProviderStatus
   | GoogleProviderStatus
+  | XAiProviderStatus
   | KimiProviderStatus
   | MistralProviderStatus
   | null;

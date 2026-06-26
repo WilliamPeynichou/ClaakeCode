@@ -450,6 +450,23 @@ export type StartGoogleLoginOutput = {
   authUrl: string;
 };
 
+export type XAiProviderStatus = {
+  connected: boolean;
+  connectionState: ProviderConnectionState;
+  email?: string | null;
+  accountId?: string | null;
+  subscriptionType?: string | null;
+  expiresAtMs?: number | null;
+  lastRefreshMs?: number | null;
+  loginId?: string | null;
+  error?: string | null;
+};
+
+export type StartXAiLoginOutput = {
+  loginId: string;
+  authUrl: string;
+};
+
 export type KimiProviderStatus = {
   connected: boolean;
   connectionState: ProviderConnectionState;
