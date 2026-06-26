@@ -23,6 +23,7 @@ claakecode-kimi = { workspace = true }
 claakecode-mistral = { workspace = true }
 claakecode-openai = { workspace = true }
 claakecode-openrouter = { workspace = true }
+claakecode-xai = { workspace = true }
 
 anyhow = { workspace = true }
 base64 = { workspace = true }

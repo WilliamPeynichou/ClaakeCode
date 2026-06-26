@@ -90,6 +90,18 @@ use claakecode_openrouter::{
     validate_api_key as validate_openrouter_api_key_remote, OpenRouterAuthStatus,
     OpenRouterCatalogModel, OpenRouterProvider, PROVIDER_ID as OPENROUTER_PROVIDER_ID,
 };
+use claakecode_xai::{
+    delete_default_auth as delete_default_xai_auth,
+    exchange_oauth_code as exchange_xai_oauth_code,
+    generate_pkce as generate_xai_pkce,
+    generate_state as generate_xai_state,
+    load_default_auth_status as load_default_xai_auth_status,
+    oauth_authorize_url as xai_oauth_authorize_url,
+    PkceCodes as XaiPkceCodes,
+    XaiAuthStatus, XaiProvider,
+    MODEL_ID as XAI_MODEL_ID,
+    PROVIDER_ID as XAI_PROVIDER_ID,
+};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 #[cfg(target_os = "macos")]
 use objc2::{
@@ -175,6 +187,9 @@ pub fn run() {
             Arc::new(provider) as Arc<dyn Provider>,
         );
     }
+    if let Ok(provider) = XaiProvider::from_default_sources() {
+        providers.insert(XAI_PROVIDER_ID.into(), Arc::new(provider) as Arc<dyn Provider>);
+    }
 
     let default_model = if providers.contains_key("anthropic") {
         ModelRef::new("anthropic", ANTHROPIC_MODEL_ID).with_effort(Effort::Max)
@@ -184,6 +199,8 @@ pub fn run() {
         ModelRef::new("kimi", KIMI_MODEL_ID).with_effort(Effort::High)
     } else if providers.contains_key("mistral") {
         ModelRef::new("mistral", MISTRAL_MODEL_ID).with_effort(Effort::None)
+    } else if providers.contains_key(XAI_PROVIDER_ID) {
+        ModelRef::new(XAI_PROVIDER_ID, XAI_MODEL_ID).with_effort(Effort::High)
     } else if providers.contains_key(OPENROUTER_PROVIDER_ID) {
         openrouter_models
             .first()
@@ -209,6 +226,7 @@ pub fn run() {
         google_login: Arc::new(Mutex::new(None)),
         kimi_login: Arc::new(Mutex::new(None)),
         mistral_login: Arc::new(Mutex::new(None)),
+        xai_login: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -340,6 +358,10 @@ pub fn run() {
             providers::start_openai_oauth_login,
             providers::cancel_openai_oauth_login,
             providers::disconnect_openai_provider,
+            providers::get_xai_provider_status,
+            providers::start_xai_oauth_login,
+            providers::cancel_xai_oauth_login,
+            providers::disconnect_xai_provider,
             providers::get_anthropic_provider_status,
             providers::start_anthropic_oauth_login,
             providers::cancel_anthropic_oauth_login,

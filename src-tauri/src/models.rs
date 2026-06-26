@@ -23,6 +23,26 @@ pub(super) struct StartOpenAiLoginOutput {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct XaiProviderStatus {
+    pub(super) connected: bool,
+    pub(super) connection_state: String,
+    pub(super) email: Option<String>,
+    pub(super) account_id: Option<String>,
+    pub(super) plan_type: Option<String>,
+    pub(super) expires_at_ms: Option<i64>,
+    pub(super) last_refresh_ms: Option<i64>,
+    pub(super) login_id: Option<String>,
+    pub(super) error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StartXaiLoginOutput {
+    pub(super) login_id: String,
+    pub(super) auth_url: String,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct AnthropicProviderStatus {
     pub(super) connected: bool,
     pub(super) connection_state: String,

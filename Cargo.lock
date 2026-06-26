@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -411,6 +411,7 @@ dependencies = [
  "claakecode-mistral",
  "claakecode-openai",
  "claakecode-openrouter",
+ "claakecode-xai",
  "notify",
  "objc2",
  "objc2-app-kit",
@@ -431,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-anthropic"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -453,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-app"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -485,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-core"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "futures",
@@ -496,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-google"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -518,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-kimi"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -537,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-mistral"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -558,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-openai"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -580,7 +581,7 @@ dependencies = [
 
 [[package]]
 name = "claakecode-openrouter"
-version = "0.1.41"
+version = "0.1.45"
 dependencies = [
  "async-trait",
  "bytes",
@@ -593,6 +594,28 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "claakecode-xai"
+version = "0.1.45"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "claakecode-core",
+ "directories",
+ "eventsource-stream",
+ "futures",
+ "rand 0.9.4",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "url",
 ]
 
 [[package]]
