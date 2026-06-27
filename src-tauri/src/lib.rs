@@ -28,18 +28,21 @@ use claakecode_app::{
     shell_system_prompt, snapshot_workspace_for_checkpoint, subagent_system_prompt,
     system_prompt_for_mode_with_plan_prompt, system_prompt_with_todo,
     test_database_source_connection, todo_list_from_history, tool_settings_view,
-    trash_workspace_entry, validate_turn_checkpoints_restorable, write_workspace_file, AgentEvent,
+    trash_workspace_entry, validate_turn_checkpoints_restorable, write_workspace_file,
+    delete_mcp_oauth, discover_mcp_oauth, exchange_mcp_oauth_code,
+    mcp_oauth_connected, start_mcp_oauth_login, AgentEvent,
     AgentMode, AppStore, BashTool, ConversationEvent, ConversationSummary, CreateImageTool,
     DatabaseActivityEntry, DatabaseConnectionStatus, DatabaseConnectionTestResult,
     DatabaseSettings, DatabaseSourceConfig, DatabaseTool, EditFileTool, GlobTool,
-    GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpSettings, McpToolRegistry,
+    GoalWorkflowState, GrepTool, ImportedEntry, InstalledSkill, McpOAuthLoginPlan, McpOAuthOutcome,
+    McpOAuthStatus, McpSettings, McpToolRegistry, StartMcpOAuthLoginOutput,
     ModeModelSettings, OpenRouterModelRecord, MistralModelRecord, PlanArtifactState, PlanWorkflowState,
     ProdProviderCachedStatus, ProdProviderConnectionState, ProdProviderSettings, QuestionTool,
     ReadTool, SavedConversation, SkillSettings, SkillTool, SubAgentConfig, SubAgentSettings,
     SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
     ToolSettings, ToolSettingsView, TurnCancel, TurnContext, WebFetchTool, WebSearchTool,
     WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry, WorkspaceFileChangeEvent,
-    WorkspaceSearchResult, WriteFileTool,
+    WorkspaceSearchResult, WriteFileTool, MCP_OAUTH_CALLBACK_PATH, MCP_OAUTH_REDIRECT_PORT,
 };
 use claakecode_core::{
     ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest, Role,
@@ -130,6 +133,7 @@ mod models;
 mod platform;
 mod prod;
 mod providers;
+mod remote;
 mod state;
 mod swarm;
 mod terminal;
@@ -144,6 +148,7 @@ use context::*;
 use models::*;
 use platform::*;
 use providers::*;
+use remote::*;
 use state::*;
 use swarm::*;
 use turns::*;
@@ -210,15 +215,18 @@ pub fn run() {
         ModelRef::new("google", GOOGLE_MODEL_ID).with_effort(Effort::Medium)
     };
 
+    let remote = RemoteRuntime::from_store(&store);
+
     let state = DesktopState {
         providers: Arc::new(StdMutex::new(providers)),
         store,
         default_model,
         system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
-        max_tool_rounds: 200,
+        max_tool_rounds: 2000,
         active_turns: Arc::new(Mutex::new(HashMap::new())),
         active_turn_details: Arc::new(StdMutex::new(HashMap::new())),
         team_runtime: Arc::new(RwLock::new(TeamRuntime::default())),
+        remote,
         file_watchers: Arc::new(Mutex::new(HashMap::new())),
         terminal_sessions: Arc::new(Mutex::new(HashMap::new())),
         openai_login: Arc::new(Mutex::new(None)),
@@ -227,6 +235,7 @@ pub fn run() {
         kimi_login: Arc::new(Mutex::new(None)),
         mistral_login: Arc::new(Mutex::new(None)),
         xai_login: Arc::new(Mutex::new(None)),
+        mcp_login: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -268,7 +277,17 @@ pub fn run() {
             {
                 install_desktop_menu(app.handle())?;
             }
+            start_remote_if_enabled(app.handle());
             Ok(())
+        })
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Destroyed => {
+                remove_window_workspace(&window.app_handle(), window.label().to_string());
+            }
+            tauri::WindowEvent::Focused(true) => {
+                focus_window_workspace(&window.app_handle(), window.label().to_string());
+            }
+            _ => {}
         })
         .on_menu_event(|app, event| {
             if event.id() == CLOSE_ACTIVE_TAB_MENU_ID {
@@ -353,6 +372,11 @@ pub fn run() {
             prod::prod_connect,
             prod::prod_disconnect,
             prod::prod_install_cli,
+            remote::remote_get_status,
+            remote::remote_set_enabled,
+            remote::remote_start_pairing,
+            remote::remote_stop_pairing,
+            remote::remote_revoke_device,
             providers::list_configured_model_providers,
             providers::get_openai_provider_status,
             providers::start_openai_oauth_login,
@@ -389,6 +413,10 @@ pub fn run() {
             providers::add_openrouter_model,
             providers::remove_openrouter_model,
             conversations::probe_mcp_tools,
+            conversations::get_mcp_oauth_status,
+            conversations::start_mcp_oauth_login_command,
+            conversations::cancel_mcp_oauth_login,
+            conversations::disconnect_mcp_oauth,
             conversations::list_installed_skills_command,
             conversations::save_skill_settings,
             turns::check_rewrite_workspace_restore,

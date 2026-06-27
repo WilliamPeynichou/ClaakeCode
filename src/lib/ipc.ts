@@ -13,6 +13,7 @@ import type {
   DatabaseConnectionTestResult,
   DatabaseSettings,
   DatabaseSourceConfig,
+  RemoteStatus,
   RewriteWorkspaceRestoreCheck,
   FileDocument,
   GitCreateWorktreeOutput,
@@ -25,6 +26,7 @@ import type {
   MistralProviderStatus,
   MistralModel,
   MessageVisibility,
+  McpOAuthStatus,
   McpServerProbe,
   McpSettings,
   ModeModelSettings,
@@ -46,6 +48,7 @@ import type {
   StartGoogleLoginOutput,
   StartKimiLoginOutput,
   StartMistralLoginOutput,
+  StartMcpOAuthLoginOutput,
   StartOpenAiLoginOutput,
   StartXAiLoginOutput,
   SubAgentSettings,
@@ -575,6 +578,26 @@ export const api = {
   probeMcpTools() {
     return invoke<McpServerProbe[]>("probe_mcp_tools");
   },
+  getMcpOAuthStatus(serverId: string) {
+    return invoke<McpOAuthStatus>("get_mcp_oauth_status", {
+      input: { serverId },
+    });
+  },
+  startMcpOAuthLogin(serverId: string) {
+    return invoke<StartMcpOAuthLoginOutput>("start_mcp_oauth_login_command", {
+      input: { serverId },
+    });
+  },
+  cancelMcpOAuthLogin(serverId: string) {
+    return invoke<McpOAuthStatus>("cancel_mcp_oauth_login", {
+      input: { serverId },
+    });
+  },
+  disconnectMcpOAuth(serverId: string) {
+    return invoke<McpOAuthStatus>("disconnect_mcp_oauth", {
+      input: { serverId },
+    });
+  },
   listInstalledSkills(workspacePath: string) {
     return invoke<InstalledSkill[]>("list_installed_skills_command", {
       input: { workspacePath },
@@ -807,5 +830,24 @@ export const api = {
   },
   currentAppVersion() {
     return invoke<string>("updater_current_version");
+  },
+  remoteGetStatus() {
+    return invoke<RemoteStatus>("remote_get_status");
+  },
+  remoteSetEnabled(enabled: boolean, relayUrl?: string | null) {
+    return invoke<RemoteStatus>("remote_set_enabled", {
+      input: { enabled, relayUrl },
+    });
+  },
+  remoteStartPairing() {
+    return invoke<RemoteStatus>("remote_start_pairing");
+  },
+  remoteStopPairing() {
+    return invoke<RemoteStatus>("remote_stop_pairing");
+  },
+  remoteRevokeDevice(deviceId: string) {
+    return invoke<RemoteStatus>("remote_revoke_device", {
+      input: { deviceId },
+    });
   },
 };

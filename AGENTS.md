@@ -7,6 +7,7 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── EDIT_FILE_HARNESS_COMPARISON.md
+├── EDIT_TOOL_COMPARISON.md
 ├── FEATURES.md
 ├── GLOB_HARNESS_COMPARISON.md
 ├── GREP_HARNESS_COMPARISON.md
@@ -15,8 +16,35 @@ Code map:
 ├── package-lock.json
 ├── package.json
 ├── README.md
+├── remote
+│   ├── README.md
+│   ├── server.mjs
+│   ├── package.json
+│   └── public
+│       ├── app.js
+│       ├── index.html
+│       ├── manifest.webmanifest
+│       ├── styles.css
+│       ├── sw.js
+│       └── icons
+│           └── icon.svg
+├── refero-heroes
+│   ├── errors.json
+│   ├── metadata.json
+│   └── screenshots
+│       ├── 001-auros.png
+│       ├── 002-gsap.png
+│       ├── 003-your-workplace-has-the-answer-just-ask-dala-for-it.png
+│       ├── 004-structured.png
+│       ├── 005-jeton.png
+│       ├── 006-air.png
+│       ├── 007-reflect-notes.png
+│       ├── 008-ditto.png
+│       ├── 009-linear.png
+│       └── 010-apple.png
 ├── test-stop.md
 ├── scripts
+│   ├── capture-refero-heroes.mjs
 │   └── prepare-sidecars.mjs
 ├── tsconfig.json
 ├── tsconfig.node.json
@@ -233,6 +261,7 @@ Code map:
 │       ├── models.rs
 │       ├── platform.rs
 │       ├── providers.rs
+│       ├── remote.rs
 │       ├── state.rs
 │       ├── swarm.rs
 │       ├── terminal.rs
@@ -252,6 +281,7 @@ Code map:
     │   ├── EditorPane.tsx
     │   ├── FileTree.tsx
     │   ├── GitPanel.tsx
+    │   ├── RemotePanel.tsx
     │   ├── SearchPane.tsx
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx

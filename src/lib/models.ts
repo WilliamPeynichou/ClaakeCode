@@ -218,9 +218,16 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "off",
   },
   {
+    value: "kimi:kimi-k2.7-code",
+    provider: "kimi",
+    label: "Kimi K2.7 Code",
+    thinking: ["high"],
+    defaultThinking: "high",
+  },
+  {
     value: "kimi:kimi-for-coding",
     provider: "kimi",
-    label: "Kimi 2.6",
+    label: "Kimi K2.6",
     thinking: ["off", "high"],
     defaultThinking: "high",
   },
@@ -258,7 +265,7 @@ const MISTRAL_FALLBACK_MODELS: ModelEntry[] = [
   },
 ];
 
-const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high"];
+const OPENROUTER_THINKING: readonly ThinkingLevel[] = ["off", "low", "medium", "high", "xhigh"];
 const OPENROUTER_NO_THINKING: readonly ThinkingLevel[] = ["off"];
 
 export function sanitizeOpenRouterName(name: string | null | undefined): string {
@@ -365,6 +372,7 @@ export function thinkingFromRef(
     return "high";
   }
   if (model?.provider === "kimi") {
+    if (model.name === "kimi-k2.7-code") return "high";
     if (model.effort === "none") return "off";
     return "high";
   }
@@ -376,9 +384,13 @@ export function thinkingFromRef(
     if (
       model.effort === "low" ||
       model.effort === "medium" ||
-      model.effort === "high"
+      model.effort === "high" ||
+      model.effort === "xhigh"
     ) {
       return model.effort;
+    }
+    if (model.effort === "max") {
+      return "xhigh";
     }
     return "medium";
   }
@@ -419,6 +431,9 @@ export function modelRefWithThinking(
     if (thinking === "xhigh" || thinking === "max") return { ...model, name, effort: "high" };
     return { ...model, name, effort: thinking };
   }
+  if (model.provider === "kimi" && model.name === "kimi-k2.7-code") {
+    return { ...model, effort: "high" };
+  }
   if (
     model.provider === "openai" &&
     model.name === "gpt-5.3-codex-spark" &&
@@ -429,7 +444,10 @@ export function modelRefWithThinking(
   if (thinking === "off") return { ...model, effort: "none" };
   if (model.provider === "kimi") return { ...model, effort: "high" };
   if (model.provider === "mistral" || model.provider === "xai") return { ...model, effort: "none" };
-  if (model.provider === "openrouter" && (thinking === "xhigh" || thinking === "max")) {
+  if (model.provider === "openrouter" && thinking === "max") {
+    return { ...model, effort: "xhigh" };
+  }
+  if (model.provider === "openrouter" && thinking === "xhigh") {
     return { ...model, effort: "high" };
   }
   // `minimal` is Gemini-only on the backend. The Google branch above already
