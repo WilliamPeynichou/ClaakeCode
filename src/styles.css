@@ -4545,6 +4545,7 @@ textarea {
   .settings-pane__database-file-row {
     grid-template-columns: 1fr;
   }
+}
 
 .settings-pane__mcp-auth-row .settings-pane__btn {
   flex: 0 0 auto;
