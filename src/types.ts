@@ -158,6 +158,7 @@ export type SubAgentConfig = {
   description: string;
   prompt: string;
   model: ModelRef;
+  hideForSameModel: boolean;
   enabled: boolean;
 };
 
@@ -538,12 +539,29 @@ export type McpEnvVar = {
   value: string;
 };
 
+export type McpHeader = {
+  key: string;
+  value: string;
+};
+
+export type McpAuthConfig = {
+  // Mirrors the Rust `auth_type` field, serialized as `type`.
+  type: string;
+  token?: string;
+  scopes: string[];
+};
+
 export type McpServerConfig = {
   id: string;
   name: string;
+  // `command` drives stdio servers; `url` drives HTTP/streamable servers.
+  // Exactly one transport is expected per server.
   command: string;
+  url?: string | null;
   args: string[];
   env: McpEnvVar[];
+  headers: McpHeader[];
+  auth?: McpAuthConfig | null;
   cwd?: string | null;
   enabled: boolean;
 };
@@ -567,7 +585,32 @@ export type McpServerProbe = {
   enabled: boolean;
   ok: boolean;
   tools: McpToolInfo[];
+  // "stdio" for command servers, "http" for URL-based servers.
+  transport: string;
+  // The probe failed because the server demands OAuth authentication.
+  authRequired: boolean;
+  // The server already has usable credentials (OAuth token, bearer, headers).
+  authenticated: boolean;
   error?: string | null;
+};
+
+// Mirrors `McpOAuthStatus` in crates/sinew-app/src/mcp.rs.
+export type McpOAuthConnectionState =
+  | "connected"
+  | "connecting"
+  | "disconnected"
+  | "error";
+
+export type McpOAuthStatus = {
+  connected: boolean;
+  connectionState: McpOAuthConnectionState | string;
+  loginId?: string | null;
+  error?: string | null;
+};
+
+export type StartMcpOAuthLoginOutput = {
+  loginId: string;
+  authUrl: string;
 };
 
 export type SkillSource = "workspace" | "global";
@@ -703,6 +746,34 @@ export type WorkspaceBootstrap = {
   conversations: ConversationSummary[];
   activeConversation: SavedConversation;
   modeModelSettings: ModeModelSettings;
+};
+
+export type RemotePairingStatus = {
+  code: string;
+  expiresAtMs: number;
+  qrUrl: string;
+  attemptsRemaining: number;
+  lockedUntilMs?: number | null;
+};
+
+export type RemoteDevice = {
+  id: string;
+  name: string;
+  pairedAtMs: number;
+  lastSeenAtMs?: number | null;
+  revokedAtMs?: number | null;
+  connected: boolean;
+  pushEnabled: boolean;
+};
+
+export type RemoteStatus = {
+  enabled: boolean;
+  relayUrl: string;
+  pcId: string;
+  relayConnected: boolean;
+  reachable: boolean;
+  pairing?: RemotePairingStatus | null;
+  devices: RemoteDevice[];
 };
 
 export type WorkspaceEntry = {

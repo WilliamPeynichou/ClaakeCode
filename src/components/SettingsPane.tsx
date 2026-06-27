@@ -69,7 +69,10 @@ import type {
   InstalledSkill,
   KimiProviderStatus,
   MistralProviderStatus,
+  McpAuthConfig,
   McpEnvVar,
+  McpHeader,
+  McpOAuthStatus,
   McpServerConfig,
   McpServerProbe,
   McpSettings,
@@ -141,6 +144,14 @@ export function SettingsPane({ workspacePath }: Props) {
   const [knownToolCounts, setKnownToolCounts] = useState<Record<string, number>>({});
 
   const [probing, setProbing] = useState(false);
+
+  // Per-server MCP OAuth status, keyed by server id. Populated lazily as the
+  // user connects/disconnects URL-based servers. `oauthBusyId` marks the
+  // server with an in-flight start/disconnect request so its buttons disable.
+  const [oauthStatuses, setOauthStatuses] = useState<
+    Record<string, McpOAuthStatus>
+  >({});
+  const [oauthBusyId, setOauthBusyId] = useState<string | null>(null);
 
   const [skills, setSkills] = useState<InstalledSkill[] | null>(null);
   const [skillsLoading, setSkillsLoading] = useState(false);
@@ -1612,6 +1623,7 @@ export function SettingsPane({ workspacePath }: Props) {
       command: "",
       args: [],
       env: [],
+      headers: [],
       cwd: null,
       enabled: false,
     };
@@ -1649,6 +1661,129 @@ export function SettingsPane({ workspacePath }: Props) {
     },
     [parseError, settings],
   );
+
+  // ---- MCP OAuth --------------------------------------------------------
+  // Re-probe after auth changes so tool counts / errors reflect the new
+  // credentials. Kept dependency-free so the polling effect can rely on it.
+  const refreshProbes = useCallback(async () => {
+    setProbing(true);
+    try {
+      const nextProbes = await api.probeMcpTools();
+      setProbes(nextProbes);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProbing(false);
+    }
+  }, []);
+
+  const connectMcpOAuth = useCallback(async (serverId: string) => {
+    setOauthBusyId(serverId);
+    try {
+      const login = await api.startMcpOAuthLogin(serverId);
+      setOauthStatuses((prev) => ({
+        ...prev,
+        [serverId]: {
+          connected: false,
+          connectionState: "connecting",
+          loginId: login.loginId,
+        },
+      }));
+      await api.openExternalUrl(login.authUrl);
+    } catch (err) {
+      setOauthStatuses((prev) => ({
+        ...prev,
+        [serverId]: {
+          connected: false,
+          connectionState: "error",
+          error: err instanceof Error ? err.message : String(err),
+        },
+      }));
+    } finally {
+      setOauthBusyId((current) => (current === serverId ? null : current));
+    }
+  }, []);
+
+  const cancelMcpOAuth = useCallback(async (serverId: string) => {
+    try {
+      const status = await api.cancelMcpOAuthLogin(serverId);
+      setOauthStatuses((prev) => ({ ...prev, [serverId]: status }));
+    } catch (err) {
+      setOauthStatuses((prev) => ({
+        ...prev,
+        [serverId]: {
+          connected: false,
+          connectionState: "error",
+          error: err instanceof Error ? err.message : String(err),
+        },
+      }));
+    }
+  }, []);
+
+  const disconnectMcpOAuth = useCallback(
+    async (serverId: string) => {
+      setOauthBusyId(serverId);
+      try {
+        const status = await api.disconnectMcpOAuth(serverId);
+        setOauthStatuses((prev) => ({ ...prev, [serverId]: status }));
+        await refreshProbes();
+      } catch (err) {
+        setOauthStatuses((prev) => ({
+          ...prev,
+          [serverId]: {
+            connected: false,
+            connectionState: "error",
+            error: err instanceof Error ? err.message : String(err),
+          },
+        }));
+      } finally {
+        setOauthBusyId((current) => (current === serverId ? null : current));
+      }
+    },
+    [refreshProbes],
+  );
+
+  // While any server is mid-login, poll its status. When it leaves the
+  // "connecting" state we refresh probes once so the catalog updates. The
+  // dependency is a stable key of connecting ids so the interval is not torn
+  // down on every status tick.
+  const connectingKey = useMemo(
+    () =>
+      Object.entries(oauthStatuses)
+        .filter(([, status]) => status.connectionState === "connecting")
+        .map(([id]) => id)
+        .sort()
+        .join(","),
+    [oauthStatuses],
+  );
+
+  useEffect(() => {
+    if (!connectingKey) return;
+    const ids = connectingKey.split(",");
+    const timer = window.setInterval(() => {
+      for (const id of ids) {
+        void (async () => {
+          try {
+            const status = await api.getMcpOAuthStatus(id);
+            setOauthStatuses((prev) => ({ ...prev, [id]: status }));
+            if (status.connectionState !== "connecting") {
+              void refreshProbes();
+            }
+          } catch (err) {
+            setOauthStatuses((prev) => ({
+              ...prev,
+              [id]: {
+                connected: false,
+                connectionState: "error",
+                error: err instanceof Error ? err.message : String(err),
+              },
+            }));
+          }
+        })();
+      }
+    }, 1300);
+    return () => window.clearInterval(timer);
+  }, [connectingKey, refreshProbes]);
 
   // ---- Skills load ------------------------------------------------------
   const loadSkills = useCallback(async () => {
@@ -2207,6 +2342,11 @@ export function SettingsPane({ workspacePath }: Props) {
             onAddServer={addNewServer}
             onUpdateServer={updateServer}
             onDeleteServer={deleteServer}
+            oauthStatuses={oauthStatuses}
+            oauthBusyId={oauthBusyId}
+            onConnectOAuth={(id) => void connectMcpOAuth(id)}
+            onCancelOAuth={(id) => void cancelMcpOAuth(id)}
+            onDisconnectOAuth={(id) => void disconnectMcpOAuth(id)}
             onMount={handleEditorMount}
           />
         ) : section === "skills" ? (
@@ -2495,7 +2635,7 @@ function ProvidersSection({
         <ProviderCard
           name="Kimi"
           icon="local:kimi"
-          description="Use OAuth to connect your Kimi account for Kimi 2.6."
+          description="Use OAuth to connect your Kimi account for Kimi K2.7 Code."
           status={kimiStatus}
           connectedMeta={["Kimi OAuth"]}
           loading={loading}
@@ -3581,6 +3721,11 @@ type McpSectionProps = {
   onAddServer: () => void;
   onUpdateServer: (id: string, patch: Partial<McpServerConfig>) => void;
   onDeleteServer: (id: string) => void;
+  oauthStatuses: Record<string, McpOAuthStatus>;
+  oauthBusyId: string | null;
+  onConnectOAuth: (id: string) => void;
+  onCancelOAuth: (id: string) => void;
+  onDisconnectOAuth: (id: string) => void;
   onMount: OnMount;
 };
 
@@ -3606,6 +3751,11 @@ function McpSection({
   onAddServer,
   onUpdateServer,
   onDeleteServer,
+  oauthStatuses,
+  oauthBusyId,
+  onConnectOAuth,
+  onCancelOAuth,
+  onDisconnectOAuth,
   onMount,
 }: McpSectionProps) {
   const enabledCount = servers.filter((server) => server.enabled).length;
@@ -3818,6 +3968,7 @@ function McpSection({
             </div>
           ) : selectedServer ? (
             <ServerDetail
+              key={selectedServer.id}
               server={selectedServer}
               probe={selectedProbe}
               probing={probing}
@@ -3826,6 +3977,11 @@ function McpSection({
               onChange={(patch) => onUpdateServer(selectedServer.id, patch)}
               onDelete={() => onDeleteServer(selectedServer.id)}
               onToggleEnabled={() => onToggleEnabled(selectedServer.id)}
+              oauthStatus={oauthStatuses[selectedServer.id]}
+              oauthBusy={oauthBusyId === selectedServer.id}
+              onConnectOAuth={onConnectOAuth}
+              onCancelOAuth={onCancelOAuth}
+              onDisconnectOAuth={onDisconnectOAuth}
             />
           ) : (
             <div className="settings-pane__empty-state">
@@ -3851,6 +4007,11 @@ type ServerDetailProps = {
   onChange: (patch: Partial<McpServerConfig>) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
+  oauthStatus: McpOAuthStatus | undefined;
+  oauthBusy: boolean;
+  onConnectOAuth: (id: string) => void;
+  onCancelOAuth: (id: string) => void;
+  onDisconnectOAuth: (id: string) => void;
 };
 
 function ServerDetail({
@@ -3862,6 +4023,11 @@ function ServerDetail({
   onChange,
   onDelete,
   onToggleEnabled,
+  oauthStatus,
+  oauthBusy,
+  onConnectOAuth,
+  onCancelOAuth,
+  onDisconnectOAuth,
 }: ServerDetailProps) {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(
     () => new Set<string>(),
@@ -3903,6 +4069,26 @@ function ServerDetail({
         ? "failed"
         : `${probe.tools.length} tool${probe.tools.length === 1 ? "" : "s"}`;
   const argsText = server.args.join(" ");
+
+  const serverUrl = server.url?.trim() ?? "";
+  const isUrlBased = serverUrl.length > 0;
+  // OAuth only applies to URL-based servers; surface it when the probe demands
+  // authentication or simply because a URL server is able to authenticate.
+  const canAuthenticate = isUrlBased || Boolean(probe?.authRequired);
+  const connecting = oauthStatus?.connectionState === "connecting";
+  const authenticated = connecting
+    ? false
+    : oauthStatus
+      ? oauthStatus.connected
+      : Boolean(probe?.authenticated);
+  const oauthError =
+    oauthStatus?.connectionState === "error" ? oauthStatus.error : null;
+  const authLabel = connecting
+    ? "Connecting\u2026"
+    : authenticated
+      ? "Connected"
+      : "Not connected";
+  const authTone = connecting ? "pending" : authenticated ? "ok" : "off";
 
   return (
     <div className="settings-pane__detail">
@@ -4088,6 +4274,73 @@ function ServerDetail({
             </button>
           )}
         </div>
+
+        {canAuthenticate && (
+          <div className="settings-pane__mcp-auth">
+            <div className="settings-pane__mcp-auth-head">
+              <span className="settings-pane__detail-section">
+                Authentication
+              </span>
+              <span className="settings-pane__chip" data-tone={authTone}>
+                <span className="settings-pane__chip-dot" />
+                {authLabel}
+              </span>
+            </div>
+            <div className="settings-pane__mcp-auth-row">
+              <span className="settings-pane__mcp-auth-hint">
+                {authenticated
+                  ? "Connected over OAuth. Disconnect to remove the stored token."
+                  : "Authenticate in your browser to load this server's tools."}
+              </span>
+              {connecting ? (
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  onClick={() => onCancelOAuth(server.id)}
+                >
+                  <Icon
+                    icon="solar:close-circle-linear"
+                    width={13}
+                    height={13}
+                  />
+                  <span>Cancel</span>
+                </button>
+              ) : authenticated ? (
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  onClick={() => onDisconnectOAuth(server.id)}
+                  disabled={oauthBusy}
+                >
+                  <Icon icon="solar:logout-2-linear" width={13} height={13} />
+                  <span>{oauthBusy ? "Disconnecting\u2026" : "Disconnect"}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="settings-pane__btn"
+                  data-primary="true"
+                  onClick={() => onConnectOAuth(server.id)}
+                  disabled={oauthBusy}
+                >
+                  <Icon
+                    icon={
+                      oauthBusy
+                        ? "solar:refresh-linear"
+                        : "solar:login-2-linear"
+                    }
+                    width={13}
+                    height={13}
+                  />
+                  <span>{oauthBusy ? "Opening\u2026" : "Connect"}</span>
+                </button>
+              )}
+            </div>
+            {oauthError && (
+              <div className="settings-pane__mcp-auth-error">{oauthError}</div>
+            )}
+          </div>
+        )}
 
         {probe?.error && (
           <div className="settings-pane__tools-error">{probe.error}</div>
@@ -4511,6 +4764,26 @@ function SubAgentEditor({
               onSelect={(value) => updateThinking(value as ThinkingLevel)}
             />
           </label>
+          <div className="settings-pane__field settings-pane__field--toggle">
+            <span>Visibility</span>
+            <button
+              type="button"
+              className="settings-pane__inline-toggle"
+              role="switch"
+              aria-checked={agent.hideForSameModel}
+              aria-label="Hide this sub-agent from the main agent when it uses the same model"
+              title="Hide this sub-agent from the main agent when it uses the same model"
+              data-on={agent.hideForSameModel ? "true" : "false"}
+              onClick={() => onUpdate({ hideForSameModel: !agent.hideForSameModel })}
+            >
+              <span className="settings-pane__inline-toggle-text">
+                Hide for same model
+              </span>
+              <span className="settings-pane__inline-toggle-track" aria-hidden="true">
+                <span className="settings-pane__inline-toggle-thumb" />
+              </span>
+            </button>
+          </div>
         </div>
 
         <label className="settings-pane__field settings-pane__field--grow settings-pane__field--code">
@@ -4944,6 +5217,7 @@ function createSubAgent(
     description: "Use this agent for focused research or implementation tasks.",
     prompt: "",
     model: modelRefWithThinking(modelRefFromId(model.value), model.defaultThinking),
+    hideForSameModel: false,
     enabled: true,
   };
 }
@@ -4958,6 +5232,7 @@ function normalizeSubAgentSettings(settings: SubAgentSettings): SubAgentSettings
       model:
         agent.model ??
         modelRefWithThinking(modelRefFromId(MODELS[0].value), MODELS[0].defaultThinking),
+      hideForSameModel: agent.hideForSameModel === true,
       enabled: agent.enabled !== false,
     })),
   };
@@ -5075,13 +5350,20 @@ function serverFromUnknown(value: unknown, fallbackName: string): McpServerConfi
   // the user can't ship a half-filled config, but the live re-parse must
   // not throw or every field locks behind `disabled={parseError}`.
   const command = stringValue(value.command);
+  const url = stringValue(value.url);
+  if (!command && !url) {
+    throw new Error(`Missing command or url for ${name}`);
+  }
 
   return {
     id: stringValue(value.id) || deterministicId(name),
     name,
     command,
+    url: url || null,
     args: arrayOfStrings(value.args),
     env: envFromUnknown(value.env),
+    headers: headersFromUnknown(value.headers),
+    auth: authFromUnknown(value.auth),
     cwd: stringValue(value.cwd) || null,
     enabled: value.enabled === false || value.disabled === true ? false : true,
   };
@@ -5096,12 +5378,19 @@ function normalizeSettings(settings: McpSettings): McpSettings {
       const count = seen.get(baseId) ?? 0;
       seen.set(baseId, count + 1);
       const id = count ? `${baseId}-${count + 1}` : baseId;
+      const url =
+        typeof server.url === "string" && server.url.trim()
+          ? server.url.trim()
+          : null;
       return {
         id,
         name,
         command: server.command ?? "",
+        url,
         args: server.args ?? [],
         env: server.env ?? [],
+        headers: server.headers ?? [],
+        auth: server.auth ?? null,
         cwd: server.cwd ?? null,
         enabled: server.enabled ?? true,
       };
@@ -5112,9 +5401,13 @@ function normalizeSettings(settings: McpSettings): McpSettings {
 function settingsToJson(settings: McpSettings): string {
   const mcpServers: Record<string, unknown> = {};
   for (const server of settings.servers) {
-    const entry: Record<string, unknown> = {
-      command: server.command,
-    };
+    const entry: Record<string, unknown> = {};
+    const url = server.url?.trim();
+    if (url) {
+      entry.url = url;
+    } else {
+      entry.command = server.command;
+    }
     // Persist the id explicitly so the parse → serialize → parse round-trip
     // is stable. Without it, parseMcpJson would re-derive the id from the
     // name slug on every keystroke, which dropped focus from form inputs.
@@ -5122,6 +5415,9 @@ function settingsToJson(settings: McpSettings): string {
     if (server.args.length) entry.args = server.args;
     if (server.cwd) entry.cwd = server.cwd;
     if (server.env.length) entry.env = envToObject(server.env);
+    if (server.headers.length) entry.headers = headersToObject(server.headers);
+    const auth = server.auth ? authToJson(server.auth) : null;
+    if (auth) entry.auth = auth;
     if (!server.enabled) entry.disabled = true;
     mcpServers[server.name || server.id] = entry;
   }
@@ -5169,6 +5465,52 @@ function envFromUnknown(value: unknown): McpEnvVar[] {
 
 function envToObject(env: McpEnvVar[]): Record<string, string> {
   return Object.fromEntries(env.map((item) => [item.key, item.value]));
+}
+
+// Headers accept either the array form ([{key,value}]) used internally or the
+// object form ({ "Authorization": "Bearer …" }) typical of mcp.json snippets.
+function headersFromUnknown(value: unknown): McpHeader[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .filter(isRecord)
+      .map((item) => ({ key: stringValue(item.key), value: stringValue(item.value) }))
+      .filter((item) => item.key);
+  }
+  if (isRecord(value)) {
+    return Object.entries(value).map(([key, item]) => ({
+      key,
+      value: typeof item === "string" ? item : JSON.stringify(item),
+    }));
+  }
+  return [];
+}
+
+function headersToObject(headers: McpHeader[]): Record<string, string> {
+  return Object.fromEntries(headers.map((item) => [item.key, item.value]));
+}
+
+function authFromUnknown(value: unknown): McpAuthConfig | null {
+  if (!isRecord(value)) return null;
+  const type = stringValue(value.type);
+  const token = stringValue(value.token);
+  const scopes = arrayOfStrings(value.scopes);
+  if (!type && !token && scopes.length === 0) return null;
+  return {
+    type: type || "bearer",
+    token: token || undefined,
+    scopes,
+  };
+}
+
+function authToJson(auth: McpAuthConfig): Record<string, unknown> | null {
+  const entry: Record<string, unknown> = {};
+  const type = auth.type?.trim();
+  if (type) entry.type = type;
+  const token = auth.token?.trim();
+  if (token) entry.token = token;
+  if (auth.scopes.length) entry.scopes = auth.scopes;
+  return Object.keys(entry).length ? entry : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

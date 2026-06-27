@@ -43,6 +43,7 @@ pub(super) struct DesktopState {
     pub(super) active_turns: Arc<Mutex<HashMap<String, TurnCancel>>>,
     pub(super) active_turn_details: Arc<StdMutex<HashMap<String, ActiveTurnRecord>>>,
     pub(super) team_runtime: Arc<RwLock<TeamRuntime>>,
+    pub(super) remote: RemoteRuntime,
     pub(super) file_watchers: Arc<Mutex<HashMap<String, RecommendedWatcher>>>,
     pub(super) terminal_sessions: Arc<Mutex<HashMap<String, TerminalProcess>>>,
     pub(super) openai_login: Arc<Mutex<Option<OpenAiLoginAttempt>>>,
@@ -51,6 +52,7 @@ pub(super) struct DesktopState {
     pub(super) kimi_login: Arc<Mutex<Option<KimiLoginAttempt>>>,
     pub(super) mistral_login: Arc<Mutex<Option<MistralLoginAttempt>>>,
     pub(super) xai_login: Arc<Mutex<Option<XaiLoginAttempt>>>,
+    pub(super) mcp_login: Arc<Mutex<Option<McpLoginAttempt>>>,
 }
 
 #[derive(Clone)]
@@ -152,4 +154,12 @@ pub(super) struct XaiLoginAttempt {
 pub(super) struct XaiLoginOutcome {
     pub(super) success: bool,
     pub(super) error: Option<String>,
+}
+
+#[derive(Clone)]
+pub(super) struct McpLoginAttempt {
+    pub(super) id: String,
+    pub(super) server_id: String,
+    pub(super) cancel: Arc<Notify>,
+    pub(super) outcome: Arc<StdMutex<Option<McpOAuthOutcome>>>,
 }
