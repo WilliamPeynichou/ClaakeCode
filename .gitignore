@@ -1,20 +1,21 @@
-/target
-/dist
-/node_modules
-/FEATURES.md
-/EDIT_FILE_HARNESS_COMPARISON.md
-/GLOB_HARNESS_COMPARISON.md
-/GREP_HARNESS_COMPARISON.md
-/src-tauri/binaries/rg-*
-/.history
-/.claakecode/
-.DS_Store
+
+# Tauri updater signing keys — NEVER commit private keys
+*.key
 *.log
+.DS_Store
 .env
 .env.*
 .idea/
+.tauri-keys/
 .vscode/
-
-# Tauri updater signing keys — NEVER commit private keys
+/.claakecode/
+/.history
 /.tauri-keys/
-*.key
+/EDIT_FILE_HARNESS_COMPARISON.md
+/FEATURES.md
+/GLOB_HARNESS_COMPARISON.md
+/GREP_HARNESS_COMPARISON.md
+/dist
+/node_modules
+/src-tauri/binaries/rg-*
+/target
