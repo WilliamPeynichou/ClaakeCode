@@ -1,6 +1,8 @@
 {
   "bundle": {
-    "createUpdaterArtifacts": true,
-    "externalBin": ["binaries/rg"]
+    "createUpdaterArtifacts": false,
+    "externalBin": [
+      "binaries/rg"
+    ]
   }
 }
