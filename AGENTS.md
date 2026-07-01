@@ -286,6 +286,8 @@ Code map:
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx
     │   ├── SettingsPane.tsx
+    │   ├── SinewDesignDialog.tsx
+    │   ├── SinewMark.tsx
     │   ├── Splitter.tsx
     │   ├── TerminalPanel.tsx
     │   ├── UpdateBadge.tsx
