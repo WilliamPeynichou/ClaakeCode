@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en" data-theme="forest">
+<head>
+<meta charset="utf-8" />
+<title>How the Agent Works — Claake Code</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Claake Code's AI coding agent runs a Plan, Act, Observe, Reflect loop across providers, using only approved tools while keeping every action visible." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="author" content="Claake Code" />
+<meta name="theme-color" content="#0c1f17" />
+<link rel="canonical" href="https://claakecode-web-sigma.vercel.app/agent.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Claake Code" />
+<meta property="og:url" content="https://claakecode-web-sigma.vercel.app/agent.html" />
+<meta property="og:title" content="How the Agent Works — Claake Code" />
+<meta property="og:description" content="Claake Code's AI coding agent runs a Plan, Act, Observe, Reflect loop across providers, using only approved tools while keeping every action visible." />
+<meta property="og:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="How the Agent Works — Claake Code" />
+<meta name="twitter:description" content="Claake Code's AI coding agent runs a Plan, Act, Observe, Reflect loop across providers, using only approved tools while keeping every action visible." />
+<meta name="twitter:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
+<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Hanken+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+
+</head>
+<body>
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="loader" role="status" aria-label="Loading Claake Code">
+  <div class="loader-inner">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    </picture>
+    <span class="loader-wordmark">claake <em>code</em></span>
+  </div>
+</div>
+
+<div class="bgfallback"></div>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<nav class="nav glass" id="nav" aria-label="Primary navigation">
+  <a class="brand" href="index.html#top" aria-label="Claake Code home">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
+    </picture>
+    <strong>claake <em>code</em></strong>
+    <span class="version">v0.1.50</span>
+  </a>
+  <div class="nav-links" id="navlinks">
+    <a href="features.html">Features</a>
+    <a href="settings.html">Settings</a>
+    <a href="agent.html" class="active">Agent</a>
+    <a href="why.html">Why</a>
+    <a href="faq.html">FAQ</a>
+  </div>
+  <a class="nav-cta" href="index.html#top" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
+</nav>
+<header class="page-hero" id="top">
+  <div class="wrap reveal in">
+    <span class="eyebrow">§ 01 — how the agent works</span>
+    <h1>Plan. Act. Observe.<br><em>Reflect.</em> Repeat.</h1>
+    <p>The same loop runs across providers. After each tool call, the agent re-reads the world, scores progress against the plan, and decides whether to continue, branch, ask or stop.</p>
+  </div>
+</header>
+<main>
+  <section class="pad-lg" id="agent">
+    <div class="wrap">
+      <div class="loop reveal"><div class="glass node"><div class="k">01</div><h4>Plan</h4><p>Break the objective into understandable steps — or enter Plan mode for a functional plan first.</p></div><div class="arr">→</div><div class="glass node"><div class="k">02</div><h4>Act</h4><p>Use only approved tools: edit files, run tests, query data, call MCP or delegate.</p></div><div class="arr">→</div><div class="glass node"><div class="k">03</div><h4>Observe</h4><p>Read file diffs, shell output, schema metadata, web pages or teammate updates.</p></div><div class="arr">→</div><div class="glass node"><div class="k">04</div><h4>Reflect</h4><p>Update the task board, clean context if useful, then loop until done.</p></div></div>
+    </div>
+  </section>
+
+  <section class="pad-sm" id="release">
+    <div class="wrap">
+      <div class="glass release-slim reveal">
+        <div class="release-slim-text">
+          <span class="eyebrow">latest version</span>
+          <h3>Updated for <em>v0.1.50</em>: more providers, remote &amp; SSH, a fixed auto-updater.</h3>
+        </div>
+        <div class="release-slim-tags">
+          <span class="tag-chip">Claude Sonnet 5 · Kimi K2.7 · xAI OAuth</span>
+          <span class="tag-chip">Remote PWA · MCP over remote · SSH sessions</span>
+          <span class="tag-chip">Signed, working auto-updater</span>
+        </div>
+        <a class="btn btn-ghost" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">Release notes ↗</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="glass foot-card">
+      <div class="foot">
+        <div>
+          <a class="brand" href="index.html#top" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
+          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
+        </div>
+        <div class="foot-cols">
+          <div class="foot-col"><h5>Product</h5><a href="features.html">Features</a><a href="settings.html">Settings</a><a href="agent.html">Agent</a><a href="why.html">Why</a><a href="faq.html">FAQ</a></div>
+          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
+          <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
+        </div>
+      </div>
+      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
+    </div>
+  </div>
+</footer>
+
+<div class="switcher glass" role="group" aria-label="Visual palette">
+  <span class="lab">Palette</span>
+  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
+  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
+  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
+</div>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="liquidglass.js"></script>
+<script>
+(function(){
+  const THEMES = {
+    forest:{ deep:'#0c1f17', mid:'#1f6b48', light:'#cfe9b0', accent:'#e8c87a' },
+    dusk:  { deep:'#2a1320', mid:'#b5563a', light:'#f0b07a', accent:'#e88a9a' },
+    tide:  { deep:'#07202a', mid:'#16808f', light:'#7fdcc9', accent:'#f0936f' },
+  };
+  const root = document.documentElement;
+  const SAVE = 'claakecode-web-theme';
+  function applyTheme(t){
+    root.setAttribute('data-theme', t);
+    if(window.setLiquidTheme) window.setLiquidTheme(THEMES[t]);
+    document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    try { localStorage.setItem(SAVE, t); } catch(e) {}
+  }
+  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.t)));
+  let saved = 'forest';
+  try { saved = localStorage.getItem(SAVE) || 'forest'; } catch(e) {}
+  if(!THEMES[saved]) saved = 'forest';
+  function initTheme(){ if(window.setLiquidTheme) applyTheme(saved); else setTimeout(initTheme, 80); }
+  initTheme();
+
+  const nav = document.getElementById('nav');
+  function navState(){ nav.classList.toggle('shrunk', window.scrollY > 60); }
+  window.addEventListener('scroll', navState, { passive:true }); navState();
+
+  const rev = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.12 });
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (Math.min(i % 4, 3) * 70) + 'ms';
+    rev.observe(el);
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const loader = document.getElementById('loader');
+  const t0 = Date.now();
+  const MIN_MS = 650;
+  function dismiss() {
+    const elapsed = Date.now() - t0;
+    const delay = Math.max(0, MIN_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add('loader--done');
+      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
+    }, delay);
+  }
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
+})();
+</script>
+</body>
+</html>

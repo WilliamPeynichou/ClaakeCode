@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" data-theme="forest">
+<head>
+<meta charset="utf-8" />
+<title>FAQ — Claake Code AI Coding IDE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Frequently asked questions about Claake Code: open source license, supported providers, MCP support, database access, telemetry and platform support." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="author" content="Claake Code" />
+<meta name="theme-color" content="#0c1f17" />
+<link rel="canonical" href="https://claakecode-web-sigma.vercel.app/faq.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Claake Code" />
+<meta property="og:url" content="https://claakecode-web-sigma.vercel.app/faq.html" />
+<meta property="og:title" content="FAQ — Claake Code AI Coding IDE" />
+<meta property="og:description" content="Frequently asked questions about Claake Code: open source license, supported providers, MCP support, database access, telemetry and platform support." />
+<meta property="og:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="FAQ — Claake Code AI Coding IDE" />
+<meta name="twitter:description" content="Frequently asked questions about Claake Code: open source license, supported providers, MCP support, database access, telemetry and platform support." />
+<meta name="twitter:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
+<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Hanken+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "What is Claake Code?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is an open-source desktop AI coding IDE that gives developers a visible, editable agent harness with tools, skills, MCP servers, model providers, database sources and workspace context." } },
+    { "@type": "Question", "name": "Is Claake Code open source?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code is MIT licensed and forkable, with source code available on GitHub." } },
+    { "@type": "Question", "name": "Is Claake Code an alternative to Claude Code, Cursor or other AI coding tools?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is an open-source alternative for developers who want a transparent desktop AI coding IDE instead of a black-box coding agent or closed AI IDE." } },
+    { "@type": "Question", "name": "Which AI providers does Claake Code support?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code supports multiple model providers including Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers through subscriptions or API keys where available." } },
+    { "@type": "Question", "name": "Does Claake Code support MCP?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code supports workspace-scoped Model Context Protocol servers so external MCP tools can become part of the visible agent surface." } },
+    { "@type": "Question", "name": "Can Claake Code access databases?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code can list, describe and query approved database sources with safeguards such as read-only mode, row limits and destructive-operation confirmations." } },
+    { "@type": "Question", "name": "Does Claake Code send telemetry?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code is designed with no telemetry and no training on transcripts. Provider credentials and workspace controls remain local to the user machine." } },
+    { "@type": "Question", "name": "Which platforms does Claake Code support?", "acceptedAnswer": { "@type": "Answer", "text": "Claake Code provides downloads for macOS, Windows and Linux." } },
+    { "@type": "Question", "name": "Can I use my own API keys?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Claake Code can use API keys and supported subscription/OAuth flows so developers can choose the providers and billing paths they already use." } },
+    { "@type": "Question", "name": "Can I customize the agent tools and skills?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Built-in tools can be enabled, disabled or described differently, and repeatable expertise can be saved as local Markdown skills." } }
+  ]
+}
+</script>
+</head>
+<body>
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="loader" role="status" aria-label="Loading Claake Code">
+  <div class="loader-inner">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    </picture>
+    <span class="loader-wordmark">claake <em>code</em></span>
+  </div>
+</div>
+
+<div class="bgfallback"></div>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<nav class="nav glass" id="nav" aria-label="Primary navigation">
+  <a class="brand" href="index.html#top" aria-label="Claake Code home">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
+    </picture>
+    <strong>claake <em>code</em></strong>
+    <span class="version">v0.1.50</span>
+  </a>
+  <div class="nav-links" id="navlinks">
+    <a href="features.html">Features</a>
+    <a href="settings.html">Settings</a>
+    <a href="agent.html">Agent</a>
+    <a href="why.html">Why</a>
+    <a href="faq.html" class="active">FAQ</a>
+  </div>
+  <a class="nav-cta" href="index.html#top" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
+</nav>
+<header class="page-hero" id="top">
+  <div class="wrap reveal in">
+    <span class="eyebrow">§ 01 — FAQ</span>
+    <h1>Answers for developers, crawlers and <em>AI search</em>.</h1>
+    <p>Short factual answers help people and generative search engines understand when Claake Code is the right tool.</p>
+  </div>
+</header>
+<main>
+  <section class="pad-lg" id="faq">
+    <div class="wrap">
+      <div class="faq-list">
+        <details class="glass faq-item reveal" open><summary>What is Claake Code?</summary><p>Claake Code is an open-source desktop AI coding IDE that gives developers a visible, editable agent harness with tools, skills, MCP servers, model providers, database sources and workspace context.</p></details>
+        <details class="glass faq-item reveal"><summary>Is Claake Code open source?</summary><p>Yes. Claake Code is MIT licensed and forkable, with source code available on GitHub.</p></details>
+        <details class="glass faq-item reveal"><summary>Is Claake Code an alternative to Claude Code, Cursor or other AI coding tools?</summary><p>Claake Code is an open-source alternative for developers who want a transparent desktop AI coding IDE instead of a black-box coding agent or closed AI IDE.</p></details>
+        <details class="glass faq-item reveal"><summary>Which AI providers does Claake Code support?</summary><p>Claake Code supports multiple model providers including Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers through subscriptions or API keys where available.</p></details>
+        <details class="glass faq-item reveal"><summary>Does Claake Code support MCP?</summary><p>Yes. Claake Code supports workspace-scoped Model Context Protocol servers so external MCP tools can become part of the visible agent surface.</p></details>
+        <details class="glass faq-item reveal"><summary>Can Claake Code access databases?</summary><p>Yes. Claake Code can list, describe and query approved database sources with safeguards such as read-only mode, row limits and destructive-operation confirmations.</p></details>
+        <details class="glass faq-item reveal"><summary>Does Claake Code send telemetry?</summary><p>Claake Code is designed with no telemetry and no training on transcripts. Provider credentials and workspace controls remain local to the user machine.</p></details>
+        <details class="glass faq-item reveal"><summary>Which platforms does Claake Code support?</summary><p>Claake Code provides downloads for macOS, Windows and Linux.</p></details>
+        <details class="glass faq-item reveal"><summary>Can I use my own API keys?</summary><p>Yes. Claake Code can use API keys and supported subscription/OAuth flows so developers can choose the providers and billing paths they already use.</p></details>
+        <details class="glass faq-item reveal"><summary>Can I customize the agent tools and skills?</summary><p>Yes. Built-in tools can be enabled, disabled or described differently, and repeatable expertise can be saved as local Markdown skills.</p></details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="glass foot-card">
+      <div class="foot">
+        <div>
+          <a class="brand" href="index.html#top" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
+          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
+        </div>
+        <div class="foot-cols">
+          <div class="foot-col"><h5>Product</h5><a href="features.html">Features</a><a href="settings.html">Settings</a><a href="agent.html">Agent</a><a href="why.html">Why</a><a href="faq.html">FAQ</a></div>
+          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
+          <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
+        </div>
+      </div>
+      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
+    </div>
+  </div>
+</footer>
+
+<div class="switcher glass" role="group" aria-label="Visual palette">
+  <span class="lab">Palette</span>
+  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
+  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
+  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
+</div>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="liquidglass.js"></script>
+<script>
+(function(){
+  const THEMES = {
+    forest:{ deep:'#0c1f17', mid:'#1f6b48', light:'#cfe9b0', accent:'#e8c87a' },
+    dusk:  { deep:'#2a1320', mid:'#b5563a', light:'#f0b07a', accent:'#e88a9a' },
+    tide:  { deep:'#07202a', mid:'#16808f', light:'#7fdcc9', accent:'#f0936f' },
+  };
+  const root = document.documentElement;
+  const SAVE = 'claakecode-web-theme';
+  function applyTheme(t){
+    root.setAttribute('data-theme', t);
+    if(window.setLiquidTheme) window.setLiquidTheme(THEMES[t]);
+    document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    try { localStorage.setItem(SAVE, t); } catch(e) {}
+  }
+  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.t)));
+  let saved = 'forest';
+  try { saved = localStorage.getItem(SAVE) || 'forest'; } catch(e) {}
+  if(!THEMES[saved]) saved = 'forest';
+  function initTheme(){ if(window.setLiquidTheme) applyTheme(saved); else setTimeout(initTheme, 80); }
+  initTheme();
+
+  const nav = document.getElementById('nav');
+  function navState(){ nav.classList.toggle('shrunk', window.scrollY > 60); }
+  window.addEventListener('scroll', navState, { passive:true }); navState();
+
+  const rev = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.12 });
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (Math.min(i % 4, 3) * 70) + 'ms';
+    rev.observe(el);
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const loader = document.getElementById('loader');
+  const t0 = Date.now();
+  const MIN_MS = 650;
+  function dismiss() {
+    const elapsed = Date.now() - t0;
+    const delay = Math.max(0, MIN_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add('loader--done');
+      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
+    }, delay);
+  }
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
+})();
+</script>
+</body>
+</html>

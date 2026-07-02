@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en" data-theme="forest">
+<head>
+<meta charset="utf-8" />
+<title>Settings — Claake Code AI Coding IDE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Every Claake Code setting is a visible control surface: providers, tools, skills, MCP servers, databases, context and safety defaults, all editable inside the app." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="author" content="Claake Code" />
+<meta name="theme-color" content="#0c1f17" />
+<link rel="canonical" href="https://claakecode-web-sigma.vercel.app/settings.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Claake Code" />
+<meta property="og:url" content="https://claakecode-web-sigma.vercel.app/settings.html" />
+<meta property="og:title" content="Settings — Claake Code AI Coding IDE" />
+<meta property="og:description" content="Every Claake Code setting is a visible control surface: providers, tools, skills, MCP servers, databases, context and safety defaults, all editable inside the app." />
+<meta property="og:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Settings — Claake Code AI Coding IDE" />
+<meta name="twitter:description" content="Every Claake Code setting is a visible control surface: providers, tools, skills, MCP servers, databases, context and safety defaults, all editable inside the app." />
+<meta name="twitter:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
+<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Hanken+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+
+</head>
+<body>
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="loader" role="status" aria-label="Loading Claake Code">
+  <div class="loader-inner">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    </picture>
+    <span class="loader-wordmark">claake <em>code</em></span>
+  </div>
+</div>
+
+<div class="bgfallback"></div>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<nav class="nav glass" id="nav" aria-label="Primary navigation">
+  <a class="brand" href="index.html#top" aria-label="Claake Code home">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
+    </picture>
+    <strong>claake <em>code</em></strong>
+    <span class="version">v0.1.50</span>
+  </a>
+  <div class="nav-links" id="navlinks">
+    <a href="features.html">Features</a>
+    <a href="settings.html" class="active">Settings</a>
+    <a href="agent.html">Agent</a>
+    <a href="why.html">Why</a>
+    <a href="faq.html">FAQ</a>
+  </div>
+  <a class="nav-cta" href="index.html#top" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
+</nav>
+<header class="page-hero" id="top">
+  <div class="wrap reveal in">
+    <span class="eyebrow">§ 01 — settings are the harness</span>
+    <h1>Every setting is a <em>control surface</em>, not a hidden config file.</h1>
+    <p>Claake Code turns the parts usually buried in JSON, CLI flags or vendor dashboards into editable panels inside the app. You can shape the agent per workspace before it touches your code.</p>
+  </div>
+</header>
+<main>
+  <section class="pad-lg" id="settings">
+    <div class="wrap">
+      <div class="settings-map">
+        <article class="glass setting-card setting-card--wide reveal"><span class="ix">01 · providers & models</span><h3>Connect the brains you already use.</h3><p>Settings centralize Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers. Use OAuth/subscription flows where supported, API keys where you prefer explicit billing, then choose the model and context behavior per conversation.</p><ul><li>Provider credentials stay local to your machine.</li><li>Switch models without rebuilding the workspace.</li><li>Use different models for main chat, sub-agents or teams.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">02 · tools</span><h3>Decide what the agent can do.</h3><p>Every built-in tool is visible: read, glob, grep, edit_file, write_file, bash, web, image, todo, question, clean_context, database, MCP, skills, sub-agents and teams.</p><ul><li>Toggle tools on or off.</li><li>Rewrite descriptions to change behavior.</li><li>Keep risky capabilities disabled until needed.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">03 · skills</span><h3>Save repeatable expertise as Markdown.</h3><p>Skills are long-form playbooks the agent can load on demand. They live on disk in <strong>~/.claakecode/skills</strong>, so your workflow is portable, editable and reviewable.</p><ul><li>Create, edit and delete from the UI.</li><li>Document release processes, design rules or QA flows.</li><li>No plugin store, SDK or approval queue.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">04 · MCP servers</span><h3>Attach external capabilities safely.</h3><p>The Model Context Protocol panel lets you add workspace-scoped servers without spelunking through JSON. Once configured, MCP tools become part of the same visible agent surface.</p><ul><li>Add command, args, env and working directory.</li><li>Enable only the servers relevant to the repo.</li><li>Hot-reload so the agent can pick them up quickly.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">05 · databases</span><h3>Let the agent inspect only approved data.</h3><p>Add Postgres, MySQL, SQLite, MSSQL or Supabase REST sources from Settings. The agent can list sources, describe schemas and query data only when that source is enabled.</p><ul><li>Read-only mode and row limits by source.</li><li>Destructive operations require confirmation.</li><li>Import candidates from environment files, then approve manually.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">06 · embeddings & context</span><h3>Control memory, retrieval and cleanup.</h3><p>Embedding settings and context controls help long sessions stay useful. The agent can clean noisy tool results, compact conversations, and keep important AGENTS.md and DESIGN.md instructions in view.</p><ul><li>Tune retrieval behavior for your workspace.</li><li>Use compaction when conversations get long.</li><li>Keep prompts auditable instead of invisible.</li></ul></article>
+        <article class="glass setting-card reveal"><span class="ix">07 · prod</span><h3>Wire deployment providers without leaving the IDE.</h3><p>The Prod panel groups deployment-provider credentials, CLI checks and project actions for release work where the agent needs context but you still control authentication and destructive steps.</p><ul><li>Check provider CLI and auth status.</li><li>Store tokens intentionally, not in prompts.</li><li>Keep deployment actions visible before execution.</li></ul></article>
+        <article class="glass setting-card setting-card--accent reveal"><span class="ix">08 · safety defaults</span><h3>Make autonomy reversible.</h3><p>Rollback checkpoints, confirmation prompts, todo boards and explicit questions let the agent move fast without pretending it owns the repo.</p><ul><li>Restore files after a bad branch of work.</li><li>Ask before ambiguous or destructive operations.</li><li>Give teams and sub-agents bounded task boards.</li></ul></article>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="glass foot-card">
+      <div class="foot">
+        <div>
+          <a class="brand" href="index.html#top" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
+          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
+        </div>
+        <div class="foot-cols">
+          <div class="foot-col"><h5>Product</h5><a href="features.html">Features</a><a href="settings.html">Settings</a><a href="agent.html">Agent</a><a href="why.html">Why</a><a href="faq.html">FAQ</a></div>
+          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
+          <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
+        </div>
+      </div>
+      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
+    </div>
+  </div>
+</footer>
+
+<div class="switcher glass" role="group" aria-label="Visual palette">
+  <span class="lab">Palette</span>
+  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
+  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
+  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
+</div>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="liquidglass.js"></script>
+<script>
+(function(){
+  const THEMES = {
+    forest:{ deep:'#0c1f17', mid:'#1f6b48', light:'#cfe9b0', accent:'#e8c87a' },
+    dusk:  { deep:'#2a1320', mid:'#b5563a', light:'#f0b07a', accent:'#e88a9a' },
+    tide:  { deep:'#07202a', mid:'#16808f', light:'#7fdcc9', accent:'#f0936f' },
+  };
+  const root = document.documentElement;
+  const SAVE = 'claakecode-web-theme';
+  function applyTheme(t){
+    root.setAttribute('data-theme', t);
+    if(window.setLiquidTheme) window.setLiquidTheme(THEMES[t]);
+    document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    try { localStorage.setItem(SAVE, t); } catch(e) {}
+  }
+  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.t)));
+  let saved = 'forest';
+  try { saved = localStorage.getItem(SAVE) || 'forest'; } catch(e) {}
+  if(!THEMES[saved]) saved = 'forest';
+  function initTheme(){ if(window.setLiquidTheme) applyTheme(saved); else setTimeout(initTheme, 80); }
+  initTheme();
+
+  const nav = document.getElementById('nav');
+  function navState(){ nav.classList.toggle('shrunk', window.scrollY > 60); }
+  window.addEventListener('scroll', navState, { passive:true }); navState();
+
+  const rev = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.12 });
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (Math.min(i % 4, 3) * 70) + 'ms';
+    rev.observe(el);
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const loader = document.getElementById('loader');
+  const t0 = Date.now();
+  const MIN_MS = 650;
+  function dismiss() {
+    const elapsed = Date.now() - t0;
+    const delay = Math.max(0, MIN_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add('loader--done');
+      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
+    }, delay);
+  }
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
+})();
+</script>
+</body>
+</html>

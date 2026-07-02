@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" data-theme="forest">
+<head>
+<meta charset="utf-8" />
+<title>Features — Claake Code AI Coding IDE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Explore Claake Code's core features: native desktop IDE, visible AI coding agent, editable tools, MCP servers, multi-provider models and database safeguards." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="author" content="Claake Code" />
+<meta name="theme-color" content="#0c1f17" />
+<link rel="canonical" href="https://claakecode-web-sigma.vercel.app/features.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Claake Code" />
+<meta property="og:url" content="https://claakecode-web-sigma.vercel.app/features.html" />
+<meta property="og:title" content="Features — Claake Code AI Coding IDE" />
+<meta property="og:description" content="Explore Claake Code's core features: native desktop IDE, visible AI coding agent, editable tools, MCP servers, multi-provider models and database safeguards." />
+<meta property="og:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Features — Claake Code AI Coding IDE" />
+<meta name="twitter:description" content="Explore Claake Code's core features: native desktop IDE, visible AI coding agent, editable tools, MCP servers, multi-provider models and database safeguards." />
+<meta name="twitter:image" content="https://claakecode-web-sigma.vercel.app/assets/social-preview.png" />
+<link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
+<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Hanken+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+
+</head>
+<body>
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="loader" role="status" aria-label="Loading Claake Code">
+  <div class="loader-inner">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
+    </picture>
+    <span class="loader-wordmark">claake <em>code</em></span>
+  </div>
+</div>
+
+<div class="bgfallback"></div>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<nav class="nav glass" id="nav" aria-label="Primary navigation">
+  <a class="brand" href="index.html#top" aria-label="Claake Code home">
+    <picture>
+      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
+      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
+    </picture>
+    <strong>claake <em>code</em></strong>
+    <span class="version">v0.1.50</span>
+  </a>
+  <div class="nav-links" id="navlinks">
+    <a href="features.html" class="active">Features</a>
+    <a href="settings.html">Settings</a>
+    <a href="agent.html">Agent</a>
+    <a href="why.html">Why</a>
+    <a href="faq.html">FAQ</a>
+  </div>
+  <a class="nav-cta" href="index.html#top" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
+</nav>
+<header class="page-hero" id="top">
+  <div class="wrap reveal in">
+    <span class="eyebrow">§ 01 — what it is, what it does</span>
+    <h1>A desktop AI IDE for developers who want <em>control</em>.</h1>
+    <p>Claake Code combines an editor, terminal, file tree, chat and AI coding agent in one native workspace — with every tool, skill, MCP server and provider visible and editable.</p>
+  </div>
+</header>
+<main>
+  <section class="pad-lg" id="what">
+    <div class="wrap">
+      <div class="answer-grid">
+        <article class="glass answer-card reveal"><h3>What is it?</h3><p>An open-source AI coding IDE that exposes the full agent harness instead of hiding it behind a prompt box: tools, skills, MCP, providers, database sources and workspace context all stay visible.</p></article>
+        <article class="glass answer-card reveal"><h3>Who is it for?</h3><p>Developers and technical teams who want a powerful AI coding agent while keeping permissions, providers, tools and context fully auditable.</p></article>
+        <article class="glass answer-card reveal"><h3>What makes it different?</h3><p>Unlike black-box AI coding tools, every part of the operating surface can be inspected, edited and restricted before the agent touches your code.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="features">
+    <div class="wrap">
+      <div class="shead reveal">
+        <span class="eyebrow">§ 02 — core features</span>
+        <h2>Core features for an <em>auditable AI coding agent</em>.</h2>
+        <p>Claake Code is built around explicit controls, visible permissions and portable workflows rather than hidden prompts or opaque automation.</p>
+      </div>
+      <div class="grid g4">
+        <article class="glass card reveal"><div class="dot">IDE</div><span class="ix">desktop AI IDE</span><h3>Native workspace</h3><p>Claake Code combines editor, terminal, file tree, chat and settings in a native desktop app for macOS, Windows and Linux.</p></article>
+        <article class="glass card reveal"><div class="dot">AI</div><span class="ix">visible agent</span><h3>AI coding agent</h3><p>The agent can plan, edit files, run commands, inspect outputs, ask questions and coordinate work while keeping every action visible.</p></article>
+        <article class="glass card reveal"><div class="dot">◴</div><span class="ix">editable tools</span><h3>Tools you control</h3><p>Read, glob, grep, edit_file, write_file, bash, web, question, todo, database, MCP, skills, sub-agents and teams can be toggled or described differently.</p></article>
+        <article class="glass card reveal"><div class="dot">❀</div><span class="ix">skills</span><h3>Markdown playbooks</h3><p>Skills are local Markdown instructions in <strong>~/.claakecode/skills</strong> that save repeatable expertise without a plugin store.</p></article>
+        <article class="glass card reveal"><div class="dot">MCP</div><span class="ix">MCP support</span><h3>MCP servers</h3><p>Workspace-scoped Model Context Protocol servers attach external capabilities while remaining part of the visible agent surface.</p></article>
+        <article class="glass card reveal"><div class="dot">⇄</div><span class="ix">providers</span><h3>Multi-provider models</h3><p>Connect Anthropic, OpenAI, Google, Kimi, OpenRouter and Mistral-style providers, then choose models for chats, sub-agents or teams.</p></article>
+        <article class="glass card reveal"><div class="dot">DB</div><span class="ix">database-aware</span><h3>Database safeguards</h3><p>Approved Postgres, MySQL, SQLite, MSSQL or Supabase REST sources can be listed, described and queried with row limits and confirmations.</p></article>
+        <article class="glass card reveal"><div class="dot">↺</div><span class="ix">rollback</span><h3>Rollback and cleanup</h3><p>Rollback checkpoints, context cleaning, conversation compaction and todo boards help long AI coding sessions stay reversible and readable.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="pad-lg" id="showcase">
+    <div class="wrap">
+      <div class="shead reveal">
+        <span class="eyebrow">§ 03 — product proof</span>
+        <h2>A real IDE with an <em>agentic core</em>.</h2>
+        <p>Open a repo, pick a provider, decide which tools are allowed, then let the agent plan, edit, run, inspect databases and coordinate sub-agents — with every move visible.</p>
+      </div>
+      <div class="split">
+        <figure class="glass media reveal" aria-label="Claake Code product video showing the desktop AI IDE">
+          <div class="video-frame">
+            <video id="hero-video" loop muted playsinline preload="none" poster="assets/poster.jpg" data-src="assets/presentation.mp4"></video>
+          </div>
+        </figure>
+        <div class="reveal">
+          <ul class="feat-list">
+            <li><span class="tick">↳</span><span><strong>Native desktop workspace.</strong> Monaco editor, xterm terminal, file tree, chat and settings live together.</span></li>
+            <li><span class="tick">↳</span><span><strong>Provider freedom.</strong> Use OAuth subscriptions where available or API keys/OpenRouter when you want fully sanctioned routing.</span></li>
+            <li><span class="tick">↳</span><span><strong>Workspace memory.</strong> AGENTS.md and DESIGN.md are injected as project instructions, so the assistant respects how you build.</span></li>
+            <li><span class="tick">↳</span><span><strong>Safety rails.</strong> Database row limits, read-only flags, destructive-action confirmation and rollback checkpoints keep you in control.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="glass foot-card">
+      <div class="foot">
+        <div>
+          <a class="brand" href="index.html#top" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
+          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
+        </div>
+        <div class="foot-cols">
+          <div class="foot-col"><h5>Product</h5><a href="features.html">Features</a><a href="settings.html">Settings</a><a href="agent.html">Agent</a><a href="why.html">Why</a><a href="faq.html">FAQ</a></div>
+          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
+          <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
+        </div>
+      </div>
+      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
+    </div>
+  </div>
+</footer>
+
+<div class="switcher glass" role="group" aria-label="Visual palette">
+  <span class="lab">Palette</span>
+  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
+  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
+  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
+</div>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="liquidglass.js"></script>
+<script>
+(function(){
+  const THEMES = {
+    forest:{ deep:'#0c1f17', mid:'#1f6b48', light:'#cfe9b0', accent:'#e8c87a' },
+    dusk:  { deep:'#2a1320', mid:'#b5563a', light:'#f0b07a', accent:'#e88a9a' },
+    tide:  { deep:'#07202a', mid:'#16808f', light:'#7fdcc9', accent:'#f0936f' },
+  };
+  const root = document.documentElement;
+  const SAVE = 'claakecode-web-theme';
+  function applyTheme(t){
+    root.setAttribute('data-theme', t);
+    if(window.setLiquidTheme) window.setLiquidTheme(THEMES[t]);
+    document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    try { localStorage.setItem(SAVE, t); } catch(e) {}
+  }
+  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.t)));
+  let saved = 'forest';
+  try { saved = localStorage.getItem(SAVE) || 'forest'; } catch(e) {}
+  if(!THEMES[saved]) saved = 'forest';
+  function initTheme(){ if(window.setLiquidTheme) applyTheme(saved); else setTimeout(initTheme, 80); }
+  initTheme();
+
+  const nav = document.getElementById('nav');
+  function navState(){ nav.classList.toggle('shrunk', window.scrollY > 60); }
+  window.addEventListener('scroll', navState, { passive:true }); navState();
+
+  const rev = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:.12 });
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (Math.min(i % 4, 3) * 70) + 'ms';
+    rev.observe(el);
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const loader = document.getElementById('loader');
+  const t0 = Date.now();
+  const MIN_MS = 650;
+  function dismiss() {
+    const elapsed = Date.now() - t0;
+    const delay = Math.max(0, MIN_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add('loader--done');
+      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
+    }, delay);
+  }
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
+})();
+</script>
+</body>
+</html>
