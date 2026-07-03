@@ -1,6 +1,5 @@
 pub mod agent;
 pub mod bash;
-pub mod caveman;
 pub mod compact;
 pub mod database;
 pub mod database_tool;
@@ -33,10 +32,6 @@ pub use agent::{
     ConversationEvent, EngineCommand, QuestionReply, TurnCancel, TurnContext,
 };
 pub use bash::{active_shell_display_name, shell_system_prompt, BashTool};
-pub use caveman::{
-    probe_caveman, run_caveman_for_task, CavemanActivationInput, CavemanAvailability,
-    CavemanRunOutcome, CavemanSettings, CAVEMAN_SETTINGS_KEY,
-};
 pub use compact::{compact_conversation_history, CompactConversationOutput};
 pub use database::{
     classify_sql_operation, sanitize_query_preview, test_database_source_connection,

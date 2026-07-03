@@ -322,8 +322,6 @@ pub(super) struct SendMessageInput {
     pub(super) plan_control: Option<PlanControlInput>,
     pub(super) message_visibility: Option<MessageVisibilityInput>,
     #[serde(default)]
-    pub(super) caveman: Option<CavemanActivationInput>,
-    #[serde(default)]
     pub(super) rewrite_from_history_index: Option<usize>,
     #[serde(default)]
     pub(super) revert_workspace_changes: bool,
@@ -474,12 +472,6 @@ pub(super) struct SaveToolSettingsInput {
 #[serde(rename_all = "camelCase")]
 pub(super) struct SaveDatabaseSettingsInput {
     pub(super) settings: DatabaseSettings,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct SaveCavemanSettingsInput {
-    pub(super) settings: CavemanSettings,
 }
 
 #[derive(Debug, Deserialize)]

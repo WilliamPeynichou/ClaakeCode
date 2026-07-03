@@ -174,8 +174,6 @@ type Props = {
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
     revertWorkspaceChanges?: boolean,
-    use1mContext?: boolean,
-    caveman?: { enabled: boolean } | null,
   ) => Promise<void>;
   onCompact: (
     model: ModelRef,
@@ -491,9 +489,6 @@ export function ChatPane({
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
   const [mistralModels, setMistralModels] = useState<MistralModel[]>([]);
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
-  const [cavemanEnabledForNextTurn, setCavemanEnabledForNextTurn] = useState(false);
-  const [cavemanSettingsEnabled, setCavemanSettingsEnabled] = useState(false);
-  const [cavemanStatus, setCavemanStatus] = useState<string | null>(null);
   const modelRef = useRef<HTMLDivElement | null>(null);
   const thinkingRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<HTMLDivElement | null>(null);
@@ -667,35 +662,6 @@ export function ChatPane({
     window.addEventListener(TOOL_SETTINGS_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(TOOL_SETTINGS_CHANGED_EVENT, refresh);
   }, [loadAgentTeamsEnabled]);
-
-  const loadCavemanSettings = useCallback(async () => {
-    try {
-      const settings = await api.listCavemanSettings();
-      setCavemanSettingsEnabled(Boolean(settings.enabled));
-      if (!settings.enabled) setCavemanEnabledForNextTurn(false);
-      setCavemanStatus(null);
-    } catch (err) {
-      setCavemanSettingsEnabled(false);
-      setCavemanEnabledForNextTurn(false);
-      setCavemanStatus(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCavemanSettings();
-  }, [loadCavemanSettings]);
-
-  useEffect(() => {
-    const refresh = () => void loadCavemanSettings();
-    window.addEventListener("claakecode:caveman-settings-changed", refresh);
-    return () => window.removeEventListener("claakecode:caveman-settings-changed", refresh);
-  }, [loadCavemanSettings]);
-
-  const toggleCavemanForNextTurn = useCallback(() => {
-    if (!cavemanSettingsEnabled || isStreaming || view.status === "streaming") return;
-    setCavemanEnabledForNextTurn((enabled) => !enabled);
-    setCavemanStatus(null);
-  }, [cavemanSettingsEnabled, isStreaming, view.status]);
 
   const allModels = useMemo(
     () => modelsWithMistralAndOpenRouter(mistralModels, openRouterModels),
@@ -1875,7 +1841,6 @@ export function ChatPane({
     setAttachments([]);
     setInlineMentions([]);
     setSkillMention(null);
-    setCavemanEnabledForNextTurn(false);
     setRewriteState(null);
     setSendTick((t) => t + 1);
     try {
@@ -1890,8 +1855,6 @@ export function ChatPane({
         undefined,
         undefined,
         revertWorkspaceChanges,
-        undefined,
-        cavemanEnabledForNextTurn ? { enabled: true } : null,
       );
     } catch (err) {
       setView((prev) => ({
@@ -1903,7 +1866,6 @@ export function ChatPane({
       }));
     }
   }, [
-    cavemanEnabledForNextTurn,
     text,
     view.status,
     isStreaming,
@@ -3955,29 +3917,6 @@ export function ChatPane({
               )}
             </div>
             <div className="composer__actions-right">
-              {cavemanSettingsEnabled && (
-                <button
-                  type="button"
-                  className="composer__iconbtn"
-                  data-active={cavemanEnabledForNextTurn ? "true" : "false"}
-                  disabled={selectorLocked}
-                  onClick={toggleCavemanForNextTurn}
-                  aria-pressed={cavemanEnabledForNextTurn}
-                  title={
-                    cavemanEnabledForNextTurn
-                      ? "Caveman will run for the next task only"
-                      : "Manually run Caveman for the next task only"
-                  }
-                >
-                  <Icon icon="solar:test-tube-minimalistic-bold-duotone" width={15} height={15} />
-                  <span className="composer__iconbtn-tip" role="tooltip" aria-hidden="true">
-                    {cavemanEnabledForNextTurn ? "Caveman for next task" : "Use Caveman once"}
-                  </span>
-                </button>
-              )}
-              {cavemanStatus && !cavemanSettingsEnabled && (
-                <span className="composer__picker-label" title={cavemanStatus}>Caveman off</span>
-              )}
               <button
                 type="button"
                 className="composer__iconbtn composer__compact"

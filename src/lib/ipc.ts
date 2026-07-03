@@ -5,9 +5,6 @@ import type {
   ActiveTurnSummary,
   AgentMode,
   AnthropicProviderStatus,
-  CavemanActivationInput,
-  CavemanAvailability,
-  CavemanSettings,
   ChatMessage,
   ClipboardImageAttachment,
   ContextEstimate,
@@ -396,15 +393,6 @@ export const api = {
       input: { workspacePath, settings },
     });
   },
-  listCavemanSettings() {
-    return invoke<CavemanSettings>("list_caveman_settings");
-  },
-  saveCavemanSettings(settings: CavemanSettings) {
-    return invoke<CavemanSettings>("save_caveman_settings", { input: { settings } });
-  },
-  probeCavemanSettings() {
-    return invoke<CavemanAvailability>("probe_caveman_settings");
-  },
   listDatabaseSettings() {
     return invoke<DatabaseSettings>("list_database_settings");
   },
@@ -643,7 +631,6 @@ export const api = {
     messageVisibility?: MessageVisibility,
     revertWorkspaceChanges?: boolean,
     use1mContext?: boolean,
-    caveman?: CavemanActivationInput | null,
   ) {
     return invoke<void>("send_message", {
       input: {
@@ -659,7 +646,6 @@ export const api = {
         rewriteFromHistoryIndex,
         planControl,
         messageVisibility,
-        caveman,
         revertWorkspaceChanges,
       },
     });

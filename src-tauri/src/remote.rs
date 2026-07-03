@@ -819,7 +819,6 @@ impl RemoteRuntime {
                         rewrite_from_history_index: None,
                         revert_workspace_changes: false,
                         use_1m_context: None,
-                        caveman: None,
                     },
                 )
                 .await

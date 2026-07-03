@@ -176,18 +176,6 @@ pub(super) async fn send_message(
         plan_control,
         message_visibility,
     ));
-
-    if input
-        .caveman
-        .as_ref()
-        .map(|activation| activation.enabled)
-        .unwrap_or(false)
-    {
-        let caveman_settings = state.store.load_caveman_settings().unwrap_or_default();
-        let outcome = claakecode_app::run_caveman_for_task(&caveman_settings, text).await;
-        append_caveman_outcome(&mut conversation.history, &outcome);
-    }
-
     state
         .store
         .save_conversation(&conversation)
@@ -494,47 +482,6 @@ pub(super) async fn send_message(
     });
 
     Ok(())
-}
-
-fn append_caveman_outcome(history: &mut Vec<ChatMessage>, outcome: &claakecode_app::CavemanRunOutcome) {
-    let mut message = format!(
-        "Caveman was manually activated for this task. {}",
-        outcome.message
-    );
-    if let Some(output) = outcome.output.as_deref().filter(|output| !output.trim().is_empty()) {
-        message.push_str("\n\nCaveman output:\n");
-        message.push_str(output.trim());
-    }
-    history.push(ChatMessage {
-        role: Role::Assistant,
-        parts: vec![Part::Text {
-            text: message,
-            meta: Some(json!({
-                "caveman": true,
-                "manual_activation": true,
-                "ok": outcome.ok,
-            })),
-        }],
-    });
-
-    if outcome.ok {
-        if let Some(output) = outcome.output.as_deref().filter(|output| !output.trim().is_empty()) {
-            history.push(ChatMessage {
-                role: Role::User,
-                parts: vec![Part::Text {
-                    text: format!(
-                        "<caveman_manual_result>\nCaveman was manually activated for this task. Use this result as optional context only; ClaakeCode standard mode remains active and responsible for the final response.\n\n{}\n</caveman_manual_result>",
-                        output.trim()
-                    ),
-                    meta: Some(json!({
-                        "system_reminder": true,
-                        "caveman": true,
-                        "manual_activation": true,
-                    })),
-                }],
-            });
-        }
-    }
 }
 
 #[tauri::command]
