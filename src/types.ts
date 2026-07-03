@@ -189,6 +189,25 @@ export type ToolSettings = {
   linkupApiKey: string;
 };
 
+export type CavemanSettings = {
+  enabled: boolean;
+  manualActivationOnly: boolean;
+  executable: string;
+  repoPath: string;
+  extraArgs: string[];
+  timeoutMs: number;
+};
+
+export type CavemanAvailability = {
+  configured: boolean;
+  available: boolean;
+  message: string;
+};
+
+export type CavemanActivationInput = {
+  enabled: boolean;
+};
+
 export type DatabaseEngine =
   | "postgres"
   | "mysql"

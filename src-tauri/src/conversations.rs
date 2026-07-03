@@ -244,6 +244,35 @@ pub(super) async fn save_tool_settings(
 }
 
 #[tauri::command]
+pub(super) async fn list_caveman_settings(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<CavemanSettings, String> {
+    state
+        .store
+        .load_caveman_settings()
+        .map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn save_caveman_settings(
+    state: State<'_, DesktopState>,
+    input: SaveCavemanSettingsInput,
+) -> std::result::Result<CavemanSettings, String> {
+    state
+        .store
+        .save_caveman_settings(&input.settings)
+        .map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn probe_caveman_settings(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<CavemanAvailability, String> {
+    let settings = state.store.load_caveman_settings().map_err(error_to_string)?;
+    Ok(probe_caveman(&settings).await)
+}
+
+#[tauri::command]
 pub(super) async fn list_database_settings(
     state: State<'_, DesktopState>,
 ) -> std::result::Result<DatabaseSettings, String> {

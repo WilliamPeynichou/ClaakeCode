@@ -12,6 +12,7 @@ use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::caveman::{CavemanSettings, CAVEMAN_SETTINGS_KEY};
 use crate::agent::AgentMode;
 use crate::bash::active_shell_display_name;
 use crate::database::{DatabaseActivityEntry, DatabaseSettings};
@@ -1234,6 +1235,19 @@ impl AppStore {
         Ok(())
     }
 
+    pub fn load_caveman_settings(&self) -> Result<CavemanSettings> {
+        Ok(self
+            .load_json_setting::<CavemanSettings>(CAVEMAN_SETTINGS_KEY)?
+            .unwrap_or_default()
+            .normalized())
+    }
+
+    pub fn save_caveman_settings(&self, settings: &CavemanSettings) -> Result<CavemanSettings> {
+        let normalized = settings.clone().normalized();
+        self.save_json_setting(CAVEMAN_SETTINGS_KEY, &normalized)?;
+        Ok(normalized)
+    }
+
     pub fn load_mcp_settings(&self) -> Result<McpSettings> {
         let conn = self.connection()?;
         let stored = conn
@@ -2426,6 +2440,33 @@ mod tests {
             settings.apply_to_descriptors(vec![descriptor("edit_file", "new code default")]);
 
         assert_eq!(tools[0].description, "custom edit instructions");
+    }
+
+    #[test]
+    fn caveman_settings_default_disabled_and_round_trip() {
+        let store = AppStore::in_memory().expect("in-memory store");
+        let default = store.load_caveman_settings().expect("load default caveman settings");
+        assert!(!default.enabled);
+        assert!(default.manual_activation_only);
+
+        let saved = store
+            .save_caveman_settings(&CavemanSettings {
+                enabled: true,
+                manual_activation_only: false,
+                executable: " caveman ".into(),
+                repo_path: String::new(),
+                extra_args: vec![" run ".into()],
+                timeout_ms: 2_000,
+            })
+            .expect("save caveman settings");
+        assert!(saved.enabled);
+        assert!(saved.manual_activation_only);
+        assert_eq!(saved.extra_args, vec!["run"]);
+
+        let loaded = store.load_caveman_settings().expect("reload caveman settings");
+        assert!(loaded.enabled);
+        assert!(loaded.manual_activation_only);
+        assert_eq!(loaded.executable, "caveman");
     }
 
     #[test]

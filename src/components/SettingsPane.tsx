@@ -58,6 +58,8 @@ import {
 } from "../lib/models";
 import type {
   AnthropicProviderStatus,
+  CavemanAvailability,
+  CavemanSettings,
   DatabaseActivityEntry,
   DatabaseConnectionStatusState,
   DatabaseEngine,
@@ -107,6 +109,15 @@ const FALLBACK_TOOL_SETTINGS: ToolSettings = {
   webSearchProvider: "classic",
   linkupApiKey: "",
 };
+const EMPTY_CAVEMAN_SETTINGS: CavemanSettings = {
+  enabled: false,
+  manualActivationOnly: true,
+  executable: "",
+  repoPath: "",
+  extraArgs: [],
+  timeoutMs: 120_000,
+};
+const CAVEMAN_SETTINGS_CHANGED_EVENT = "claakecode:caveman-settings-changed";
 const PROVIDERS_CHANGED_EVENT = "claakecode:providers-changed";
 const TOOL_SETTINGS_CHANGED_EVENT = "claakecode:tool-settings-changed";
 const DATABASE_SOURCES_CHANGED_EVENT = "claakecode:database-sources-changed";
@@ -120,6 +131,7 @@ type Section =
   | "about"
   | "providers"
   | "tools"
+  | "caveman"
   | "database"
   | "prod"
   | "mcp"
@@ -178,6 +190,14 @@ export function SettingsPane({ workspacePath }: Props) {
   const [toolsSaving, setToolsSaving] = useState(false);
   const [toolsStatus, setToolsStatus] = useState<string | null>(null);
 
+  const [cavemanSettings, setCavemanSettings] = useState<CavemanSettings>(EMPTY_CAVEMAN_SETTINGS);
+  const [savedCavemanJson, setSavedCavemanJson] = useState("");
+  const [cavemanLoading, setCavemanLoading] = useState(false);
+  const [cavemanSaving, setCavemanSaving] = useState(false);
+  const [cavemanProbing, setCavemanProbing] = useState(false);
+  const [cavemanStatus, setCavemanStatus] = useState<string | null>(null);
+  const [cavemanAvailability, setCavemanAvailability] = useState<CavemanAvailability | null>(null);
+
   const [databaseSettings, setDatabaseSettings] = useState<DatabaseSettings>(
     EMPTY_DATABASE_SETTINGS,
   );
@@ -228,6 +248,8 @@ export function SettingsPane({ workspacePath }: Props) {
     setToolSettings(null);
     setSavedToolSettingsJson("");
     setToolsStatus(null);
+    setCavemanStatus(null);
+    setCavemanAvailability(null);
     setSkills(null);
     setSavedSkillsJson("");
     setSkillsStatus(null);
@@ -377,6 +399,28 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [workspacePath]);
 
+  const loadCavemanSettings = useCallback(async () => {
+    setCavemanLoading(true);
+    setCavemanStatus(null);
+    try {
+      const loaded = normalizeCavemanSettings(await api.listCavemanSettings());
+      setCavemanSettings(loaded);
+      setSavedCavemanJson(cavemanSettingsFingerprint(loaded));
+    } catch (err) {
+      const fallback = normalizeCavemanSettings(EMPTY_CAVEMAN_SETTINGS);
+      setCavemanSettings(fallback);
+      setSavedCavemanJson(cavemanSettingsFingerprint(fallback));
+      setCavemanStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCavemanLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (savedCavemanJson) return;
+    void loadCavemanSettings();
+  }, [savedCavemanJson, loadCavemanSettings]);
+
   useEffect(() => {
     if (toolSettings !== null) return;
     void loadToolSettings();
@@ -418,6 +462,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const toolsDirty =
     toolSettings !== null &&
     toolSettingsFingerprint(toolSettings) !== savedToolSettingsJson;
+  const cavemanDirty = cavemanSettingsFingerprint(cavemanSettings) !== savedCavemanJson;
 
   const databaseDirty =
     databaseSettingsFingerprint(databaseSettings) !== savedDatabaseJson;
@@ -615,6 +660,42 @@ export function SettingsPane({ workspacePath }: Props) {
       setToolsSaving(false);
     }
   }, [toolSettings, workspacePath]);
+
+  const saveCavemanSettings = useCallback(async () => {
+    setCavemanSaving(true);
+    setCavemanStatus(null);
+    try {
+      const saved = normalizeCavemanSettings(await api.saveCavemanSettings(cavemanSettings));
+      setCavemanSettings(saved);
+      setSavedCavemanJson(cavemanSettingsFingerprint(saved));
+      setCavemanStatus("Saved. Caveman remains manual-only and per-task.");
+      window.dispatchEvent(new CustomEvent(CAVEMAN_SETTINGS_CHANGED_EVENT));
+    } catch (err) {
+      setCavemanStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCavemanSaving(false);
+    }
+  }, [cavemanSettings]);
+
+  const probeCaveman = useCallback(async () => {
+    setCavemanProbing(true);
+    setCavemanStatus(null);
+    try {
+      if (cavemanDirty) {
+        const saved = normalizeCavemanSettings(await api.saveCavemanSettings(cavemanSettings));
+        setCavemanSettings(saved);
+        setSavedCavemanJson(cavemanSettingsFingerprint(saved));
+        window.dispatchEvent(new CustomEvent(CAVEMAN_SETTINGS_CHANGED_EVENT));
+      }
+      const result = await api.probeCavemanSettings();
+      setCavemanAvailability(result);
+      setCavemanStatus(result.message);
+    } catch (err) {
+      setCavemanStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCavemanProbing(false);
+    }
+  }, [cavemanDirty, cavemanSettings]);
 
   const loadDatabaseActivity = useCallback(async (sourceId: string) => {
     setDatabaseActivityLoading(true);
@@ -2109,6 +2190,23 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "caveman" ? "true" : "false"}
+          onClick={() => setSection("caveman")}
+        >
+          <Icon
+            icon="solar:test-tube-minimalistic-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">Caveman</span>
+          <span className="settings-pane__nav-count">
+            {cavemanLoading ? "·" : cavemanSettings.enabled ? "on" : "off"}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "database" ? "true" : "false"}
           onClick={() => setSection("database")}
         >
@@ -2273,6 +2371,22 @@ export function SettingsPane({ workspacePath }: Props) {
             onLinkupApiKeyChange={updateLinkupApiKey}
             openAiStatus={openAiStatus}
           />
+        ) : section === "caveman" ? (
+          <CavemanSection
+            settings={cavemanSettings}
+            loading={cavemanLoading}
+            saving={cavemanSaving}
+            probing={cavemanProbing}
+            dirty={cavemanDirty}
+            status={cavemanStatus}
+            availability={cavemanAvailability}
+            onUpdate={(patch) => {
+              setCavemanSettings((current) => normalizeCavemanSettings({ ...current, ...patch }));
+              setCavemanAvailability(null);
+            }}
+            onSave={() => void saveCavemanSettings()}
+            onProbe={() => void probeCaveman()}
+          />
         ) : section === "database" ? (
           <DatabaseSection
             settings={databaseSettings}
@@ -2413,6 +2527,143 @@ export function SettingsPane({ workspacePath }: Props) {
       </section>
     </div>
   );
+}
+
+// ---- Caveman section ----------------------------------------------------
+
+function CavemanSection({
+  settings,
+  loading,
+  saving,
+  probing,
+  dirty,
+  status,
+  availability,
+  onUpdate,
+  onSave,
+  onProbe,
+}: {
+  settings: CavemanSettings;
+  loading: boolean;
+  saving: boolean;
+  probing: boolean;
+  dirty: boolean;
+  status: string | null;
+  availability: CavemanAvailability | null;
+  onUpdate: (patch: Partial<CavemanSettings>) => void;
+  onSave: () => void;
+  onProbe: () => void;
+}) {
+  return (
+    <div className="settings-section settings-section--tools">
+      <div className="settings-section__head">
+        <div>
+          <h2>Caveman</h2>
+          <p>
+            Experimental optional integration. Caveman is disabled by default and can only run when you manually enable it for one task in the chat composer.
+          </p>
+        </div>
+        <div className="settings-section__actions">
+          {status && <span className="settings-section__status">{status}</span>}
+          <button type="button" className="settings-section__button" onClick={onProbe} disabled={loading || probing}>
+            {probing ? "Checking…" : "Check availability"}
+          </button>
+          <button type="button" className="settings-section__button" onClick={onSave} disabled={loading || saving || !dirty}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__row">
+          <div>
+            <strong>Allow manual Caveman activation</strong>
+            <p>
+              Off by default. When on, the chat composer shows a Caveman button. The button applies to the next send only and then resets.
+            </p>
+          </div>
+          <label className="settings-switch">
+            <input
+              type="checkbox"
+              checked={settings.enabled}
+              onChange={(event) => onUpdate({ enabled: event.target.checked })}
+            />
+            <span />
+          </label>
+        </div>
+        <div className="settings-card__row">
+          <div>
+            <strong>Manual activation only</strong>
+            <p>This guard is enforced by ClaakeCode and cannot be disabled.</p>
+          </div>
+          <span className="settings-pill">Locked on</span>
+        </div>
+        <label className="settings-field">
+          <span>Caveman executable</span>
+          <input
+            value={settings.executable}
+            onChange={(event) => onUpdate({ executable: event.target.value })}
+            placeholder="caveman"
+          />
+        </label>
+        <label className="settings-field">
+          <span>Repository / working directory (optional)</span>
+          <input
+            value={settings.repoPath}
+            onChange={(event) => onUpdate({ repoPath: event.target.value })}
+            placeholder="/path/to/caveman"
+          />
+        </label>
+        <label className="settings-field">
+          <span>Extra arguments (optional, space-separated)</span>
+          <input
+            value={settings.extraArgs.join(" ")}
+            onChange={(event) => onUpdate({ extraArgs: splitArgs(event.target.value) })}
+            placeholder="run"
+          />
+        </label>
+        <label className="settings-field">
+          <span>Timeout (ms)</span>
+          <input
+            type="number"
+            min={1000}
+            max={600000}
+            value={settings.timeoutMs}
+            onChange={(event) => onUpdate({ timeoutMs: Number(event.target.value) || 120000 })}
+          />
+        </label>
+        {availability && (
+          <div className="settings-card__note" data-tone={availability.available ? "ok" : "warn"}>
+            {availability.available ? "Available" : "Unavailable"}: {availability.message}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function normalizeCavemanSettings(value: Partial<CavemanSettings>): CavemanSettings {
+  return {
+    enabled: Boolean(value.enabled),
+    manualActivationOnly: true,
+    executable: (value.executable ?? "").trim(),
+    repoPath: (value.repoPath ?? "").trim(),
+    extraArgs: Array.isArray(value.extraArgs)
+      ? value.extraArgs.map((arg) => String(arg).trim()).filter(Boolean)
+      : [],
+    timeoutMs: Math.max(1000, Math.min(600000, Number(value.timeoutMs) || 120000)),
+  };
+}
+
+function cavemanSettingsFingerprint(settings: CavemanSettings): string {
+  return JSON.stringify(normalizeCavemanSettings(settings));
+}
+
+function splitArgs(value: string): string[] {
+  return value
+    .split(/\s+/)
+    .map((arg) => arg.trim())
+    .filter(Boolean);
 }
 
 // ---- About section -----------------------------------------------------

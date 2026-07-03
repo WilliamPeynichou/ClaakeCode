@@ -1410,6 +1410,8 @@ export function Workspace({
       planControl?: PlanControl,
       messageVisibility?: MessageVisibility,
       revertWorkspaceChanges?: boolean,
+      use1mContext?: boolean,
+      caveman?: { enabled: boolean } | null,
     ) => {
       const conversationId = activeConv.id;
       const workspaceAtRequest = workspacePath;
@@ -1440,6 +1442,8 @@ export function Workspace({
           planControl,
           messageVisibility,
           revertWorkspaceChanges,
+          undefined,
+          caveman,
         );
       } catch (err) {
         markConversationStreaming(conversationId, false);
