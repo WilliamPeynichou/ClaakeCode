@@ -55,6 +55,27 @@ const MODELS: &[OpenAiModelInfo] = &[
         max_output_tokens: 128_000,
         supports_images: true,
     },
+    OpenAiModelInfo {
+        id: "gpt-5.6-sol",
+        context_window: 272_000,
+        preferred_window: 240_000,
+        max_output_tokens: 128_000,
+        supports_images: true,
+    },
+    OpenAiModelInfo {
+        id: "gpt-5.6-terra",
+        context_window: 272_000,
+        preferred_window: 240_000,
+        max_output_tokens: 128_000,
+        supports_images: true,
+    },
+    OpenAiModelInfo {
+        id: "gpt-5.6-luna",
+        context_window: 272_000,
+        preferred_window: 240_000,
+        max_output_tokens: 128_000,
+        supports_images: true,
+    },
 ];
 
 fn model_info(model_id: &str) -> &'static OpenAiModelInfo {
