@@ -3758,7 +3758,7 @@ export function ChatPane({
                 </button>
                 {modelOpen && !selectorLocked && (
                   <div
-                    className="composer__popover"
+                    className="composer__popover composer__popover--models"
                     role="menu"
                     aria-label="Model"
                   >
