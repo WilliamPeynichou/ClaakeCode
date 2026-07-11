@@ -9237,6 +9237,25 @@ textarea {
   display: flex;
   flex-direction: column;
 }
+/* The model catalog can grow beyond the viewport. Keep this popover anchored
+   above the composer while allowing its option list to scroll independently. */
+.composer__popover--models {
+  max-height: min(420px, calc(100dvh - 132px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.composer__popover--models::-webkit-scrollbar {
+  width: 8px;
+}
+.composer__popover--models::-webkit-scrollbar-thumb {
+  background: var(--bg-5);
+  border: 2px solid var(--bg-3);
+  border-radius: 999px;
+}
+.composer__popover--models::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
 .composer__popover-row {
   display: flex;
   align-items: center;
