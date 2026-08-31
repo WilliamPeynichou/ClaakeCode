@@ -100,6 +100,20 @@ export const THINKING_LEVELS: { value: ThinkingLevel; label: string }[] = [
 
 export const MODELS: ModelEntry[] = [
   {
+    value: "anthropic:claude-opus-5",
+    provider: "anthropic",
+    label: "Opus 5",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+  },
+  {
+    value: "anthropic:claude-sonnet-5",
+    provider: "anthropic",
+    label: "Sonnet 5",
+    thinking: ["off", "low", "medium", "high", "max"],
+    defaultThinking: "medium",
+  },
+  {
     value: "anthropic:claude-fable-5",
     provider: "anthropic",
     label: "Fable 5",
@@ -124,13 +138,6 @@ export const MODELS: ModelEntry[] = [
     value: "anthropic:claude-opus-4-6",
     provider: "anthropic",
     label: "Opus 4.6",
-    thinking: ["off", "low", "medium", "high", "max"],
-    defaultThinking: "medium",
-  },
-  {
-    value: "anthropic:claude-sonnet-5",
-    provider: "anthropic",
-    label: "Sonnet 5",
     thinking: ["off", "low", "medium", "high", "max"],
     defaultThinking: "medium",
   },
