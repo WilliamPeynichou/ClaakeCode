@@ -15,7 +15,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Platforms: macOS, Windows, Linux
 - License: MIT
 - Source code: https://github.com/WilliamPeynichou/ClaakeCode
-- Latest release: v0.1.54
+- Latest release: v0.1.55
 - Website: https://claakecode-web-sigma.vercel.app/
 - Downloads: https://github.com/WilliamPeynichou/ClaakeCode/releases/latest
 - Telemetry: no telemetry; no training on transcripts
