@@ -98,6 +98,7 @@ Code map:
 │   │       ├── lib.rs
 │   │       ├── mcp.rs
 │   │       ├── powershell.rs
+│   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
 │   │       ├── skill.rs

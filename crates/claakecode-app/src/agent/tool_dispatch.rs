@@ -5,9 +5,9 @@ use tokio::sync::mpsc;
 
 use crate::{
     tool_names, BashTool, CreateImageTool, DatabaseTool, EditFileTool, GlobTool, GrepTool,
-    McpToolRegistry, QuestionTool, ReadFingerprint, ReadTool, SkillTool, SubAgentTool, TeamTool,
-    ToDoListTool, TodoListState, ToolRunResult, ToolSettings, WebFetchTool, WebSearchTool,
-    WriteFileTool,
+    McpToolRegistry, PythonTool, QuestionTool, ReadFingerprint, ReadTool, SkillTool, SubAgentTool,
+    TeamTool, ToDoListTool, TodoListState, ToolRunResult, ToolSettings, WebFetchTool,
+    WebSearchTool, WriteFileTool,
 };
 
 use super::{cancel::TurnCancel, context::AgentMode, events::AgentEvent};
@@ -28,6 +28,7 @@ pub(super) fn should_wait_for_cooperative_cancel(
 
 pub(super) async fn run_tool(
     bash: &BashTool,
+    python: &PythonTool,
     glob: &GlobTool,
     grep: &GrepTool,
     read: &ReadTool,
@@ -54,6 +55,12 @@ pub(super) async fn run_tool(
     input: Value,
 ) -> ToolRunResult {
     let canonical_name = tool_names::canonical_tool_name(name);
+    if mode == AgentMode::Ask && !ask_mode_tool_allowed(canonical_name) {
+        return ToolRunResult::err(
+            format!("{canonical_name} is unavailable in Ask mode"),
+            Vec::new(),
+        );
+    }
     if !tool_settings.is_enabled(canonical_name) {
         return ToolRunResult::err(
             format!("{canonical_name} is disabled in Settings"),
@@ -64,6 +71,8 @@ pub(super) async fn run_tool(
         bash.run(input).await
     } else if canonical_name == tool_names::BASH_INPUT {
         bash.run_input(input).await
+    } else if canonical_name == tool_names::PYTHON {
+        python.run(input).await
     } else if canonical_name == tool_names::GLOB {
         glob.run(input).await
     } else if canonical_name == tool_names::GREP {
@@ -126,5 +135,47 @@ pub(super) async fn run_tool(
         result
     } else {
         ToolRunResult::err(format!("unknown tool: {name}"), Vec::new())
+    }
+}
+
+fn ask_mode_tool_allowed(name: &str) -> bool {
+    matches!(
+        name,
+        tool_names::GLOB
+            | tool_names::GREP
+            | tool_names::READ
+            | tool_names::WEB_SEARCH
+            | tool_names::WEB_FETCH
+            | tool_names::CLEAN_CONTEXT
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ask_mode_tool_allowed;
+    use crate::tool_names;
+
+    #[test]
+    fn ask_mode_allows_only_read_and_research_tools() {
+        for name in [
+            tool_names::GLOB,
+            tool_names::GREP,
+            tool_names::READ,
+            tool_names::WEB_SEARCH,
+            tool_names::WEB_FETCH,
+            tool_names::CLEAN_CONTEXT,
+        ] {
+            assert!(ask_mode_tool_allowed(name), "{name} should be allowed");
+        }
+        for name in [
+            tool_names::BASH,
+            tool_names::PYTHON,
+            tool_names::EDIT_FILE,
+            tool_names::WRITE_FILE,
+            tool_names::CREATE_IMAGE,
+            tool_names::TODO_LIST,
+        ] {
+            assert!(!ask_mode_tool_allowed(name), "{name} should be blocked");
+        }
     }
 }

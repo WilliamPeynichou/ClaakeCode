@@ -5,6 +5,7 @@
 /// in saved settings/history, but expose and store the snake_case names below.
 pub const BASH: &str = "bash";
 pub const BASH_INPUT: &str = "bash_input";
+pub const PYTHON: &str = "python";
 pub const READ: &str = "read";
 pub const GLOB: &str = "glob";
 pub const GREP: &str = "grep";

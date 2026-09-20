@@ -11,6 +11,7 @@ pub mod mcp;
 #[cfg(windows)]
 mod powershell;
 pub mod prod;
+pub mod python;
 pub mod question;
 pub mod read;
 mod ripgrep;
@@ -64,6 +65,7 @@ pub use prod::{
     ProdProviderConnectionState, ProdProviderSecretState, ProdProviderSettings,
     ProdSecretStorageInfo, ProdSettings, PROD_PROVIDER_IDS, PROD_TOKEN_ENV_KEYS,
 };
+pub use python::PythonTool;
 pub use question::QuestionTool;
 pub use read::{ReadFingerprint, ReadTool};
 pub use skill::{
@@ -71,10 +73,10 @@ pub use skill::{
     SkillSource, SkillTool,
 };
 pub use store::{
-    tool_settings_view, AppStore, ConversationSummary, GoalWorkflowState, ModeModelSettings,
-    OpenRouterModelRecord, MistralModelRecord, PlanArtifactState, PlanWorkflowState, SavedConversation, ToolConfig,
-    ToolConfigView, ToolSettings, ToolSettingsView, TurnCheckpointRecord, WebSearchProvider,
-    WorkspaceBootstrap, DEFAULT_PLAN_MODE_PROMPT,
+    tool_settings_view, AppStore, ConversationSummary, GoalWorkflowState, MistralModelRecord,
+    ModeModelSettings, OpenRouterModelRecord, PlanArtifactState, PlanWorkflowState,
+    SavedConversation, ToolConfig, ToolConfigView, ToolSettings, ToolSettingsView,
+    TurnCheckpointRecord, WebSearchProvider, WorkspaceBootstrap, DEFAULT_PLAN_MODE_PROMPT,
 };
 pub use subagent::{
     is_subagent_tool_name, subagent_system_prompt, SubAgentConfig, SubAgentSettings, SubAgentTool,

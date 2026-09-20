@@ -211,6 +211,7 @@ pub(super) async fn send_message(
         todo_list: conversation.todo_list.clone(),
         goal_workflow: conversation.goal_workflow.clone(),
         bash: Arc::new(BashTool::new(workspace_root.clone())),
+        python: Arc::new(PythonTool::new(workspace_root.clone())),
         glob: Arc::new(GlobTool::new(workspace_root.clone())),
         grep: Arc::new(GrepTool::new(workspace_root.clone())),
         read: Arc::new(ReadTool::new(workspace_root.clone())),
@@ -1528,27 +1529,41 @@ pub(super) fn tool_descriptors_for_workspace(
     mode: AgentMode,
     skill_settings: &SkillSettings,
 ) -> Vec<ToolDescriptor> {
-    let bash = BashTool::new(workspace_root);
-    let mut tools = vec![
-        bash.descriptor(),
-        bash.input_descriptor(),
-        GlobTool::new(workspace_root).descriptor(),
-        GrepTool::new(workspace_root).descriptor(),
-        ReadTool::new(workspace_root).descriptor(),
-        clean_context_descriptor(),
-        ToDoListTool::new().descriptor(),
-        QuestionTool::new().descriptor(),
-        WebSearchTool::new().descriptor(),
-        WebFetchTool::new().descriptor(),
-    ];
-    if let Some(descriptor) =
-        SkillTool::with_settings(workspace_root, skill_settings.clone()).descriptor()
-    {
-        tools.push(descriptor);
+    let mut tools = if mode == AgentMode::Ask {
+        vec![
+            GlobTool::new(workspace_root).descriptor(),
+            GrepTool::new(workspace_root).descriptor(),
+            ReadTool::new(workspace_root).descriptor(),
+            clean_context_descriptor(),
+            WebSearchTool::new().descriptor(),
+            WebFetchTool::new().descriptor(),
+        ]
+    } else {
+        let bash = BashTool::new(workspace_root);
+        vec![
+            bash.descriptor(),
+            bash.input_descriptor(),
+            PythonTool::new(workspace_root).descriptor(),
+            GlobTool::new(workspace_root).descriptor(),
+            GrepTool::new(workspace_root).descriptor(),
+            ReadTool::new(workspace_root).descriptor(),
+            clean_context_descriptor(),
+            ToDoListTool::new().descriptor(),
+            QuestionTool::new().descriptor(),
+            WebSearchTool::new().descriptor(),
+            WebFetchTool::new().descriptor(),
+        ]
+    };
+    if mode != AgentMode::Ask {
+        if let Some(descriptor) =
+            SkillTool::with_settings(workspace_root, skill_settings.clone()).descriptor()
+        {
+            tools.push(descriptor);
+        }
     }
-    if mode != AgentMode::Plan {
-        tools.insert(4, EditFileTool::new(workspace_root).descriptor());
-        tools.insert(5, WriteFileTool::new(workspace_root).descriptor());
+    if !matches!(mode, AgentMode::Plan | AgentMode::Ask) {
+        tools.insert(5, EditFileTool::new(workspace_root).descriptor());
+        tools.insert(6, WriteFileTool::new(workspace_root).descriptor());
         tools.push(CreateImageTool::new(workspace_root).descriptor());
     }
     tools

@@ -54,6 +54,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         mut todo_list,
         mut goal_workflow,
         bash,
+        python,
         glob,
         grep,
         read,
@@ -106,27 +107,41 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             }
         }
 
-        let mut tool_descriptors = vec![
-            bash.descriptor(),
-            bash.input_descriptor(),
-            glob.descriptor(),
-            grep.descriptor(),
-            read.descriptor(),
-            clean_context_descriptor(),
-            web_search.descriptor(),
-            web_fetch.descriptor(),
-        ];
-        if let Some(question) = &question {
-            tool_descriptors.insert(6, question.descriptor());
+        let mut tool_descriptors = if mode == AgentMode::Ask {
+            vec![
+                glob.descriptor(),
+                grep.descriptor(),
+                read.descriptor(),
+                clean_context_descriptor(),
+                web_search.descriptor(),
+                web_fetch.descriptor(),
+            ]
+        } else {
+            vec![
+                bash.descriptor(),
+                bash.input_descriptor(),
+                python.descriptor(),
+                glob.descriptor(),
+                grep.descriptor(),
+                read.descriptor(),
+                clean_context_descriptor(),
+                web_search.descriptor(),
+                web_fetch.descriptor(),
+            ]
+        };
+        if mode != AgentMode::Ask {
+            if let Some(question) = &question {
+                tool_descriptors.insert(7, question.descriptor());
+            }
+            if let Some(todo_list_tool) = &todo_list_tool {
+                tool_descriptors.insert(7, todo_list_tool.descriptor());
+            }
+            if let Some(descriptor) = skill.descriptor() {
+                tool_descriptors.push(descriptor);
+            }
+            tool_descriptors.extend(database.descriptors());
         }
-        if let Some(todo_list_tool) = &todo_list_tool {
-            tool_descriptors.insert(6, todo_list_tool.descriptor());
-        }
-        if let Some(descriptor) = skill.descriptor() {
-            tool_descriptors.push(descriptor);
-        }
-        tool_descriptors.extend(database.descriptors());
-        if mode != AgentMode::Plan {
+        if !matches!(mode, AgentMode::Plan | AgentMode::Ask) {
             tool_descriptors.insert(4, edit_file.descriptor());
             tool_descriptors.insert(5, write_file.descriptor());
             tool_descriptors.push(create_image.descriptor());
@@ -134,12 +149,14 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         if mode == AgentMode::Goal {
             tool_descriptors.push(update_goal_descriptor());
         }
-        tool_descriptors.extend(mcp.descriptors().await);
-        if let Some(subagents) = &subagents {
-            tool_descriptors.extend(subagents.descriptors());
-        }
-        if let Some(teams) = &teams {
-            tool_descriptors.extend(teams.descriptors());
+        if mode != AgentMode::Ask {
+            tool_descriptors.extend(mcp.descriptors().await);
+            if let Some(subagents) = &subagents {
+                tool_descriptors.extend(subagents.descriptors());
+            }
+            if let Some(teams) = &teams {
+                tool_descriptors.extend(teams.descriptors());
+            }
         }
         let tool_descriptors = tool_settings.apply_to_descriptors(tool_descriptors);
         let question_enabled = question.is_some() && tool_settings.is_enabled(tool_names::QUESTION);
@@ -621,6 +638,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 ) {
                     let result = run_tool(
                         &bash,
+                        &python,
                         &glob,
                         &grep,
                         &read,
@@ -666,6 +684,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         }
                         result = run_tool(
                             &bash,
+                            &python,
                             &glob,
                             &grep,
                             &read,

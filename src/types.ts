@@ -146,7 +146,7 @@ export type ModelRef = {
   use1mContext?: boolean | null;
 };
 
-export type AgentMode = "act" | "plan" | "goal";
+export type AgentMode = "act" | "ask" | "plan" | "goal";
 
 export type ServiceTier = "fast";
 

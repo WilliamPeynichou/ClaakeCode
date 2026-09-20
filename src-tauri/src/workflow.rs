@@ -65,7 +65,7 @@ pub(super) fn plan_turn_policy(
                 attach_plan: false,
             }),
             None => Ok(PlanTurnPolicy {
-                mode: AgentMode::Act,
+                mode: requested_mode,
                 stop_questions: false,
                 next_workflow: PlanWorkflowState::Idle,
                 attach_plan: false,

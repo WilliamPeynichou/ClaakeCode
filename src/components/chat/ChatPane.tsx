@@ -129,6 +129,7 @@ const MODES: {
   icon: string;
 }[] = [
   { value: "act", label: "Act", icon: "solar:bolt-circle-linear" },
+  { value: "ask", label: "Ask", icon: "solar:chat-round-dots-linear" },
   { value: "plan", label: "Plan", icon: "solar:clipboard-list-linear" },
   { value: "goal", label: "Goal", icon: "solar:flag-2-linear" },
 ];
@@ -355,6 +356,7 @@ function mergeModeSelections(
   if (!override) return base;
   return {
     act: override.act ?? base.act,
+    ask: override.ask ?? base.ask,
     plan: override.plan ?? base.plan,
     goal: override.goal ?? base.goal,
   };

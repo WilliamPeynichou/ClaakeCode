@@ -121,7 +121,7 @@ pub(super) async fn set_conversation_mode(
     let mode = AgentMode::from(input.mode);
     let current_plan_workflow = std::mem::take(&mut conversation.plan_workflow);
     conversation.plan_workflow = match mode {
-        AgentMode::Act => PlanWorkflowState::Idle,
+        AgentMode::Act | AgentMode::Ask => PlanWorkflowState::Idle,
         AgentMode::Plan => match current_plan_workflow {
             PlanWorkflowState::Idle => PlanWorkflowState::PlanningQuestions,
             current => current,
@@ -130,7 +130,7 @@ pub(super) async fn set_conversation_mode(
     };
     conversation.goal_workflow = match mode {
         AgentMode::Goal => resume_goal_workflow(std::mem::take(&mut conversation.goal_workflow)),
-        AgentMode::Act | AgentMode::Plan => {
+        AgentMode::Act | AgentMode::Ask | AgentMode::Plan => {
             pause_goal_workflow(std::mem::take(&mut conversation.goal_workflow))
         }
     };

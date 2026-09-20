@@ -342,6 +342,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
         todo_list: conversation.todo_list.clone(),
         goal_workflow: conversation.goal_workflow.clone(),
         bash: Arc::new(BashTool::new(workspace_root.clone())),
+        python: Arc::new(PythonTool::new(workspace_root.clone())),
         glob: Arc::new(GlobTool::new(workspace_root.clone())),
         grep: Arc::new(GrepTool::new(workspace_root.clone())),
         read: Arc::new(ReadTool::new(workspace_root.clone())),

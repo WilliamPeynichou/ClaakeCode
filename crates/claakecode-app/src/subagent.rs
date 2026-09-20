@@ -1,14 +1,14 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use claakecode_core::{ChatMessage, ModelRef, Part, Provider, Role, ServiceTier, ToolDescriptor};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use claakecode_core::{ChatMessage, ModelRef, Part, Provider, Role, ServiceTier, ToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::tool_run::FileChange;
 use crate::{
     run_turn, AgentEvent, AgentEventScope, AgentMode, BashTool, CreateImageTool, DatabaseTool,
-    EditFileTool, GlobTool, GoalWorkflowState, GrepTool, McpSettings, McpToolRegistry,
+    EditFileTool, GlobTool, GoalWorkflowState, GrepTool, McpSettings, McpToolRegistry, PythonTool,
     QuestionTool, ReadTool, SkillSettings, SkillTool, ToDoListTool, TodoListState, ToolRunResult,
     ToolSettings, TurnCancel, TurnContext, WebFetchTool, WebSearchTool, WriteFileTool,
 };
@@ -224,6 +224,7 @@ impl SubAgentTool {
             todo_list: TodoListState::default(),
             goal_workflow: GoalWorkflowState::Idle,
             bash: Arc::new(BashTool::new(self.workspace_root.clone())),
+            python: Arc::new(PythonTool::new(self.workspace_root.clone())),
             glob: Arc::new(GlobTool::new(self.workspace_root.clone())),
             grep: Arc::new(GrepTool::new(self.workspace_root.clone())),
             read: Arc::new(ReadTool::new(self.workspace_root.clone())),

@@ -6,8 +6,8 @@ use claakecode_core::{ChatMessage, Provider, ServiceTier};
 
 use crate::{
     BashTool, CreateImageTool, DatabaseTool, EditFileTool, GlobTool, GoalWorkflowState, GrepTool,
-    McpToolRegistry, QuestionTool, ReadTool, SkillTool, SubAgentTool, TeamTool, ToDoListTool,
-    TodoListState, ToolSettings, WebFetchTool, WebSearchTool, WriteFileTool,
+    McpToolRegistry, PythonTool, QuestionTool, ReadTool, SkillTool, SubAgentTool, TeamTool,
+    ToDoListTool, TodoListState, ToolSettings, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 
 use super::{
@@ -19,6 +19,7 @@ use super::{
 pub enum AgentMode {
     #[default]
     Act,
+    Ask,
     Plan,
     Goal,
 }
@@ -37,6 +38,7 @@ pub struct TurnContext {
     pub todo_list: TodoListState,
     pub goal_workflow: GoalWorkflowState,
     pub bash: Arc<BashTool>,
+    pub python: Arc<PythonTool>,
     pub glob: Arc<GlobTool>,
     pub grep: Arc<GrepTool>,
     pub read: Arc<ReadTool>,

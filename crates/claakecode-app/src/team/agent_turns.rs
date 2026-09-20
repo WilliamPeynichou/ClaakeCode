@@ -1,4 +1,5 @@
 use super::*;
+use crate::PythonTool;
 
 impl TeamTool {
     pub(super) async fn run_agent_turn(
@@ -69,6 +70,7 @@ impl TeamTool {
             todo_list: TodoListState::default(),
             goal_workflow: GoalWorkflowState::Idle,
             bash: Arc::new(BashTool::new(self.workspace_root.clone())),
+            python: Arc::new(PythonTool::new(self.workspace_root.clone())),
             glob: Arc::new(GlobTool::new(self.workspace_root.clone())),
             grep: Arc::new(GrepTool::new(self.workspace_root.clone())),
             read: Arc::new(ReadTool::new(self.workspace_root.clone())),

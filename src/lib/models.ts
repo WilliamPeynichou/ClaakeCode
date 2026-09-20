@@ -535,6 +535,7 @@ export function selectionsFromSettings(
 ): ModeModelSelections {
   return {
     act: selectionFromRef(settings?.act ?? fallback),
+    ask: selectionFromRef(settings?.ask ?? settings?.act ?? fallback),
     plan: selectionFromRef(settings?.plan ?? fallback),
     goal: selectionFromRef(settings?.goal ?? settings?.act ?? fallback),
   };

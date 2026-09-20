@@ -95,6 +95,7 @@ pub struct SavedConversation {
 #[serde(rename_all = "camelCase")]
 pub struct ModeModelSettings {
     pub act: ModelRef,
+    pub ask: ModelRef,
     pub plan: ModelRef,
     pub goal: ModelRef,
 }
@@ -103,6 +104,7 @@ impl ModeModelSettings {
     pub fn new(default_model: &ModelRef) -> Self {
         Self {
             act: default_model.clone(),
+            ask: default_model.clone(),
             plan: default_model.clone(),
             goal: default_model.clone(),
         }
@@ -111,6 +113,7 @@ impl ModeModelSettings {
     pub fn get(&self, mode: AgentMode) -> &ModelRef {
         match mode {
             AgentMode::Act => &self.act,
+            AgentMode::Ask => &self.ask,
             AgentMode::Plan => &self.plan,
             AgentMode::Goal => &self.goal,
         }
@@ -119,6 +122,7 @@ impl ModeModelSettings {
     pub fn set(&mut self, mode: AgentMode, model: ModelRef) {
         match mode {
             AgentMode::Act => self.act = model,
+            AgentMode::Ask => self.ask = model,
             AgentMode::Plan => self.plan = model,
             AgentMode::Goal => self.goal = model,
         }
@@ -129,6 +133,8 @@ impl ModeModelSettings {
 #[serde(rename_all = "camelCase")]
 struct RawModeModelSettings {
     act: ModelRef,
+    #[serde(default)]
+    ask: Option<ModelRef>,
     plan: ModelRef,
     #[serde(default)]
     goal: Option<ModelRef>,
@@ -141,6 +147,7 @@ impl<'de> Deserialize<'de> for ModeModelSettings {
     {
         let raw = RawModeModelSettings::deserialize(deserializer)?;
         Ok(Self {
+            ask: raw.ask.unwrap_or_else(|| raw.act.clone()),
             goal: raw.goal.unwrap_or_else(|| raw.act.clone()),
             act: raw.act,
             plan: raw.plan,
@@ -529,6 +536,7 @@ fn tool_display_name(name: &str) -> String {
     match name {
         "bash" => active_shell_display_name().to_string(),
         "bash_input" => format!("{} input", active_shell_display_name()),
+        "python" => "Python".to_string(),
         _ => default_tool_display_name(name),
     }
 }
@@ -536,6 +544,7 @@ fn tool_display_name(name: &str) -> String {
 fn default_tool_display_name(name: &str) -> String {
     match name {
         "read" => "Read".to_string(),
+        "python" => "Python".to_string(),
         "edit_file" => "Edit file".to_string(),
         "write_file" => "Write file".to_string(),
         "glob" => "Glob".to_string(),

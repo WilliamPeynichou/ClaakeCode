@@ -1000,6 +1000,14 @@ export function SettingsPane({ workspacePath }: Props) {
     });
   }, []);
 
+  const setAllToolsEnabled = useCallback((enabled: boolean) => {
+    setToolSettings((current) =>
+      current
+        ? { ...current, tools: current.tools.map((tool) => ({ ...tool, enabled })) }
+        : current,
+    );
+  }, []);
+
   const updatePlanModePrompt = useCallback((planModePrompt: string) => {
     setToolSettings((current) =>
       current ? { ...current, planModePrompt } : current,
@@ -2264,6 +2272,7 @@ export function SettingsPane({ workspacePath }: Props) {
             status={toolsStatus}
             onSave={() => void saveToolSettings()}
             onUpdate={updateTool}
+            onSetAllEnabled={setAllToolsEnabled}
             onPlanModePromptChange={updatePlanModePrompt}
             onImageProviderChange={updateImageProvider}
             onOpenAiImageUseSubscriptionChange={updateOpenAiImageUseSubscription}
@@ -3318,6 +3327,7 @@ type ToolsSectionProps = {
   status: string | null;
   onSave: () => void;
   onUpdate: (name: string, patch: Partial<ToolConfig>) => void;
+  onSetAllEnabled: (enabled: boolean) => void;
   onPlanModePromptChange: (value: string) => void;
   onImageProviderChange: (value: ImageProvider) => void;
   onOpenAiImageUseSubscriptionChange: (value: boolean) => void;
@@ -3348,6 +3358,7 @@ function ToolsSection({
   status,
   onSave,
   onUpdate,
+  onSetAllEnabled,
   onPlanModePromptChange,
   onImageProviderChange,
   onOpenAiImageUseSubscriptionChange,
@@ -3403,6 +3414,15 @@ function ToolsSection({
               {status}
             </span>
           )}
+          <button
+            type="button"
+            className="settings-pane__btn"
+            onClick={() => onSetAllEnabled(enabledCount === 0)}
+            disabled={loading || saving || tools.length === 0}
+          >
+            <Icon icon={enabledCount === 0 ? "solar:check-square-linear" : "solar:minus-square-linear"} width={13} height={13} />
+            <span>{enabledCount === 0 ? "Select all" : "Deselect all"}</span>
+          </button>
           <button
             type="button"
             className="settings-pane__btn"
@@ -5771,6 +5791,7 @@ function DatabaseGlyph() {
 const TOOL_LABEL: Record<string, string> = {
   bash: "Shell",
   bash_input: "Shell input",
+  python: "Python",
   read: "Read",
   edit_file: "Edit file",
   write_file: "Write file",
@@ -5796,6 +5817,7 @@ const TOOL_LABEL: Record<string, string> = {
 };
 
 const TOOL_ICON: Record<string, string> = {
+  python: "solar:code-square-linear",
   read: "solar:document-text-linear",
   edit_file: "solar:pen-2-linear",
   write_file: "solar:file-text-linear",

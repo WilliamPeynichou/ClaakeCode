@@ -765,6 +765,7 @@ pub(super) struct TerminalExitEvent {
 #[serde(rename_all = "lowercase")]
 pub(super) enum AgentModeInput {
     Act,
+    Ask,
     Plan,
     Goal,
 }
@@ -773,6 +774,7 @@ impl From<AgentModeInput> for AgentMode {
     fn from(value: AgentModeInput) -> Self {
         match value {
             AgentModeInput::Act => AgentMode::Act,
+            AgentModeInput::Ask => AgentMode::Ask,
             AgentModeInput::Plan => AgentMode::Plan,
             AgentModeInput::Goal => AgentMode::Goal,
         }

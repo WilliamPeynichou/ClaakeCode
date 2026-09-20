@@ -60,37 +60,41 @@ pub(super) async fn estimate_context(
     let tool_settings = state.store.load_tool_settings().map_err(error_to_string)?;
     let skill_settings = state.store.load_skill_settings().map_err(error_to_string)?;
     let mut tools = tool_descriptors_for_workspace(&workspace_root, mode, &skill_settings);
-    let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;
-    let mcp = McpToolRegistry::new(mcp_settings.clone());
-    let mcp_tools = mcp.refresh_catalog(&conversation.history).await;
-    let mcp_tool_names = tool_name_set(&mcp_tools);
-    tools.extend(mcp_tools);
-    let sub_agent_settings = state
-        .store
-        .load_sub_agent_settings()
-        .map_err(error_to_string)?;
-    let sub_agent_tools = SubAgentTool::new(
-        workspace_root.clone(),
-        effective_system_prompt.clone(),
-        provider_registry_snapshot(&state)?,
-        conversation.model.clone(),
-        sub_agent_settings,
-        mcp_settings,
-        tool_settings.clone(),
-        skill_settings,
-        DatabaseTool::new(state.store.clone()),
-        state.max_tool_rounds,
-        None,
-        TurnCancel::empty(),
-    )
-    .descriptors();
-    let team_tools = TeamTool::descriptors_static();
-    let database_tools = DatabaseTool::descriptors_static();
-    let mut sub_agent_tool_names = tool_name_set(&sub_agent_tools);
-    sub_agent_tool_names.extend(tool_name_set(&team_tools));
-    tools.extend(sub_agent_tools);
-    tools.extend(team_tools);
-    tools.extend(database_tools);
+    let mut mcp_tool_names = HashSet::new();
+    let mut sub_agent_tool_names = HashSet::new();
+    if mode != AgentMode::Ask {
+        let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;
+        let mcp = McpToolRegistry::new(mcp_settings.clone());
+        let mcp_tools = mcp.refresh_catalog(&conversation.history).await;
+        mcp_tool_names = tool_name_set(&mcp_tools);
+        tools.extend(mcp_tools);
+        let sub_agent_settings = state
+            .store
+            .load_sub_agent_settings()
+            .map_err(error_to_string)?;
+        let sub_agent_tools = SubAgentTool::new(
+            workspace_root.clone(),
+            effective_system_prompt.clone(),
+            provider_registry_snapshot(&state)?,
+            conversation.model.clone(),
+            sub_agent_settings,
+            mcp_settings,
+            tool_settings.clone(),
+            skill_settings,
+            DatabaseTool::new(state.store.clone()),
+            state.max_tool_rounds,
+            None,
+            TurnCancel::empty(),
+        )
+        .descriptors();
+        let team_tools = TeamTool::descriptors_static();
+        let database_tools = DatabaseTool::descriptors_static();
+        sub_agent_tool_names = tool_name_set(&sub_agent_tools);
+        sub_agent_tool_names.extend(tool_name_set(&team_tools));
+        tools.extend(sub_agent_tools);
+        tools.extend(team_tools);
+        tools.extend(database_tools);
+    }
     let tools = tool_settings.apply_to_descriptors(tools);
     let system = system_prompt_with_todo(&effective_system_prompt, &conversation.todo_list);
     let system_prompt =
@@ -151,14 +155,17 @@ pub(super) async fn estimate_sub_agent_context(
     let tool_settings = state.store.load_tool_settings().map_err(error_to_string)?;
     let skill_settings = state.store.load_skill_settings().map_err(error_to_string)?;
     let mut tools = tool_descriptors_for_workspace(&workspace_root, mode, &skill_settings);
-    let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;
-    let mcp = McpToolRegistry::new(mcp_settings);
-    let mcp_tools = mcp.refresh_catalog(&input.history).await;
-    let mcp_tool_names = tool_name_set(&mcp_tools);
-    tools.extend(mcp_tools);
-    if team_agent.is_some() {
-        tools.retain(|tool| tool.name != "ToDoList" && tool.name != "Question");
-        tools.extend(TeamTool::agent_descriptors_static());
+    let mut mcp_tool_names = HashSet::new();
+    if mode != AgentMode::Ask {
+        let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;
+        let mcp = McpToolRegistry::new(mcp_settings);
+        let mcp_tools = mcp.refresh_catalog(&input.history).await;
+        mcp_tool_names = tool_name_set(&mcp_tools);
+        tools.extend(mcp_tools);
+        if team_agent.is_some() {
+            tools.retain(|tool| tool.name != "ToDoList" && tool.name != "Question");
+            tools.extend(TeamTool::agent_descriptors_static());
+        }
     }
     let tools = tool_settings.apply_to_descriptors(tools);
     let agent_system_prompt = if let Some(agent) = configured_agent {

@@ -8,6 +8,14 @@ use crate::{store::DEFAULT_PLAN_MODE_PROMPT, GoalWorkflowState, ToolRunResult};
 
 use super::context::AgentMode;
 
+const ASK_MODE_PROMPT: &str = r#"You are in Ask mode.
+
+Rules:
+- Analyze, explain, compare, and reason about the workspace without changing it.
+- You may inspect any workspace code and use web search or web fetch for external research.
+- Do not implement changes, edit or create files, run shell commands, execute Python, delegate to agents, call MCP tools, or access databases.
+- If the user asks you to implement something, provide guidance or an implementation approach only and clearly state that Ask mode does not modify code."#;
+
 const GOAL_MODE_PROMPT: &str = r#"You are in Goal mode.
 
 Rules:
@@ -121,6 +129,7 @@ pub fn system_prompt_for_mode_with_plan_prompt(
 ) -> String {
     match mode {
         AgentMode::Act => base.to_string(),
+        AgentMode::Ask => format!("{base}\n\n<ask_mode>\n{ASK_MODE_PROMPT}\n</ask_mode>"),
         AgentMode::Plan => format!(
             "{base}\n\n<plan_mode>\n{}\n</plan_mode>",
             effective_plan_mode_prompt(plan_mode_prompt)
