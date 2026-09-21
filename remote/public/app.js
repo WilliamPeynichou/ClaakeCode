@@ -17,12 +17,19 @@ const THINKING_LABELS = { off: "Off", low: "Low", medium: "Medium", high: "High"
 // Static catalog mirrored from the desktop (src/lib/models.ts). "minimal" is
 // desktop-only; the remote protocol clamps it to "low".
 const MODEL_CATALOG = [
+  { value: "anthropic:claude-fable-5-1", provider: "anthropic", label: "Fable 5.1", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
+  { value: "anthropic:claude-opus-5", provider: "anthropic", label: "Opus 5", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
+  { value: "anthropic:claude-sonnet-5", provider: "anthropic", label: "Sonnet 5", thinking: ["off", "low", "medium", "high", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-fable-5", provider: "anthropic", label: "Fable 5", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-opus-4-8", provider: "anthropic", label: "Opus 4.8", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-opus-4-7", provider: "anthropic", label: "Opus 4.7", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-opus-4-6", provider: "anthropic", label: "Opus 4.6", thinking: ["off", "low", "medium", "high", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-sonnet-4-6", provider: "anthropic", label: "Sonnet 4.6", thinking: ["off", "low", "medium", "high", "max"], defaultThinking: "medium" },
   { value: "anthropic:claude-haiku-4-5", provider: "anthropic", label: "Haiku 4.5", thinking: ["off", "low", "medium", "high"], defaultThinking: "medium" },
+  { value: "openai:gpt-6-astra", provider: "openai", label: "GPT-6 Astra", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
+  { value: "openai:gpt-5.6-sol", provider: "openai", label: "GPT-5.6 Sol", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
+  { value: "openai:gpt-5.6-terra", provider: "openai", label: "GPT-5.6 Terra", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
+  { value: "openai:gpt-5.6-luna", provider: "openai", label: "GPT-5.6 Luna", thinking: ["off", "low", "medium", "high", "xhigh", "max"], defaultThinking: "medium" },
   { value: "openai:gpt-5.5", provider: "openai", label: "GPT-5.5", thinking: ["off", "low", "medium", "high", "xhigh"], defaultThinking: "medium" },
   { value: "openai:gpt-5.4", provider: "openai", label: "GPT-5.4", thinking: ["off", "low", "medium", "high", "xhigh"], defaultThinking: "medium" },
   { value: "openai:gpt-5.4-mini", provider: "openai", label: "GPT-5.4 Mini", thinking: ["off", "low", "medium", "high", "xhigh"], defaultThinking: "medium" },

@@ -39,6 +39,14 @@ const MODELS: &[AnthropicModelInfo] = &[
         beta_1m_preferred_window: None,
     },
     AnthropicModelInfo {
+        id: "claude-fable-5-1",
+        context_window: 1_000_000,
+        preferred_window: 900_000,
+        max_output_tokens: 128_000,
+        beta_1m_context_window: None,
+        beta_1m_preferred_window: None,
+    },
+    AnthropicModelInfo {
         id: "claude-fable-5",
         context_window: 1_000_000,
         preferred_window: 900_000,
@@ -97,7 +105,8 @@ pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
     let (context_window, preferred_window) = if use_1m {
         (
             info.beta_1m_context_window.unwrap_or(info.context_window),
-            info.beta_1m_preferred_window.unwrap_or(info.preferred_window),
+            info.beta_1m_preferred_window
+                .unwrap_or(info.preferred_window),
         )
     } else {
         (info.context_window, info.preferred_window)
