@@ -122,6 +122,7 @@ Code map:
 │   │       ├── todo.rs
 │   │       ├── tool_names.rs
 │   │       ├── tool_run.rs
+│   │       ├── typesafe.rs
 │   │       ├── web.rs
 │   │       ├── write.rs
 │   │       └── workspace.rs
@@ -266,6 +267,7 @@ Code map:
 │       ├── state.rs
 │       ├── swarm.rs
 │       ├── terminal.rs
+│       ├── typesafe.rs
 │       ├── tests.rs
 │       ├── turns.rs
 │       ├── updater.rs
@@ -287,6 +289,7 @@ Code map:
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx
     │   ├── SettingsPane.tsx
+    │   ├── TypeSafeSettingsSection.tsx
     │   ├── SinewDesignDialog.tsx
     │   ├── SinewMark.tsx
     │   ├── Splitter.tsx

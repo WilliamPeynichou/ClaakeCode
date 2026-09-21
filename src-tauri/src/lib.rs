@@ -40,7 +40,8 @@ use claakecode_app::{
     ProdProviderCachedStatus, ProdProviderConnectionState, ProdProviderSettings, PythonTool,
     QuestionTool, ReadTool, SavedConversation, SkillSettings, SkillTool, SubAgentConfig, SubAgentSettings,
     SubAgentTool, TeamRuntime, TeamTool, TerminalPathResolution, ToDoListTool, TodoListState,
-    ToolSettings, ToolSettingsView, TurnCancel, TurnContext, WebFetchTool, WebSearchTool,
+    ToolSettings, ToolSettingsView, TurnCancel, TurnContext, TypeSafeSettings, WebFetchTool,
+    WebSearchTool,
     WorkspaceBootstrap, WorkspaceCopyOperation, WorkspaceDeletedEntry, WorkspaceFileChangeEvent,
     WorkspaceSearchResult, WriteFileTool, MCP_OAUTH_CALLBACK_PATH, MCP_OAUTH_REDIRECT_PORT,
 };
@@ -140,6 +141,7 @@ mod terminal;
 #[cfg(test)]
 mod tests;
 mod turns;
+mod typesafe;
 mod updater;
 mod workflow;
 mod workspace;
@@ -372,6 +374,9 @@ pub fn run() {
             prod::prod_connect,
             prod::prod_disconnect,
             prod::prod_install_cli,
+            typesafe::typesafe_get_settings,
+            typesafe::typesafe_save_token,
+            typesafe::typesafe_clear_token,
             remote::remote_get_status,
             remote::remote_set_enabled,
             remote::remote_start_pairing,

@@ -23,6 +23,7 @@ import { Markdown } from "./chat/Markdown";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { DatabaseSection } from "./DatabaseSettingsSection";
 import { ProdSection } from "./ProdSettingsSection";
+import { TypeSafeSection } from "./TypeSafeSettingsSection";
 import { EmbeddingSection } from "./EmbeddingSettingsSection";
 import {
   EMPTY_PROD_SETTINGS,
@@ -85,6 +86,7 @@ import type {
   XAiProviderStatus,
   ProdProviderDefinition,
   ProdSettings,
+  TypeSafeSettings,
   SkillSettings,
   SubAgentConfig,
   SubAgentSettings,
@@ -122,6 +124,7 @@ type Section =
   | "tools"
   | "database"
   | "prod"
+  | "typesafe"
   | "mcp"
   | "skills"
   | "subagents"
@@ -196,6 +199,11 @@ export function SettingsPane({ workspacePath }: Props) {
   const [prodBusyProviderId, setProdBusyProviderId] = useState<string | null>(null);
   const [prodTokenSavingProviderId, setProdTokenSavingProviderId] = useState<string | null>(null);
   const [prodStatus, setProdStatus] = useState<string | null>(null);
+
+  const [typeSafeSettings, setTypeSafeSettings] = useState<TypeSafeSettings | null>(null);
+  const [typeSafeLoading, setTypeSafeLoading] = useState(false);
+  const [typeSafeSaving, setTypeSafeSaving] = useState(false);
+  const [typeSafeStatus, setTypeSafeStatus] = useState<string | null>(null);
 
   // Embedding
   const _initialEmbeddingSettings = normalizeEmbeddingSettings(EMPTY_EMBEDDING_SETTINGS);
@@ -766,6 +774,43 @@ export function SettingsPane({ workspacePath }: Props) {
     }
   }, [databaseSettings]);
 
+  const loadTypeSafeSettings = useCallback(async () => {
+    setTypeSafeLoading(true);
+    try {
+      setTypeSafeSettings(await api.typesafeGetSettings());
+    } catch (err) {
+      setTypeSafeStatus(errorMessage(err));
+    } finally {
+      setTypeSafeLoading(false);
+    }
+  }, []);
+
+  const saveTypeSafeToken = useCallback(async (token: string) => {
+    setTypeSafeSaving(true);
+    setTypeSafeStatus(null);
+    try {
+      setTypeSafeSettings(await api.typesafeSaveToken(token));
+      setTypeSafeStatus("API key saved");
+    } catch (err) {
+      setTypeSafeStatus(errorMessage(err));
+    } finally {
+      setTypeSafeSaving(false);
+    }
+  }, []);
+
+  const clearTypeSafeToken = useCallback(async () => {
+    setTypeSafeSaving(true);
+    setTypeSafeStatus(null);
+    try {
+      setTypeSafeSettings(await api.typesafeClearToken());
+      setTypeSafeStatus("API key removed");
+    } catch (err) {
+      setTypeSafeStatus(errorMessage(err));
+    } finally {
+      setTypeSafeSaving(false);
+    }
+  }, []);
+
   const loadProdSettings = useCallback(
     async (refreshStatus = false) => {
       setProdLoading(true);
@@ -798,6 +843,15 @@ export function SettingsPane({ workspacePath }: Props) {
     },
     [],
   );
+
+  useEffect(() => {
+    void loadTypeSafeSettings();
+  }, [loadTypeSafeSettings]);
+
+  useEffect(() => {
+    if (section !== "typesafe") return;
+    void loadTypeSafeSettings();
+  }, [loadTypeSafeSettings, section]);
 
   useEffect(() => {
     void loadProdSettings(false);
@@ -2151,6 +2205,16 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "typesafe" ? "true" : "false"}
+          onClick={() => setSection("typesafe")}
+        >
+          <Icon icon="solar:bolt-circle-linear" width={15} height={15} className="settings-pane__nav-icon" />
+          <span className="settings-pane__nav-label">TypeSafe</span>
+          <span className="settings-pane__nav-count">{typeSafeLoading ? "·" : typeSafeSettings?.hasToken ? 1 : 0}</span>
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "mcp" ? "true" : "false"}
           onClick={() => setSection("mcp")}
         >
@@ -2324,6 +2388,16 @@ export function SettingsPane({ workspacePath }: Props) {
             onClearToken={(providerId) => void clearProdToken(providerId)}
             onRunAction={runProdAction}
             onOpenInstallUrl={openProdInstallUrl}
+          />
+        ) : section === "typesafe" ? (
+          <TypeSafeSection
+            settings={typeSafeSettings}
+            loading={typeSafeLoading}
+            saving={typeSafeSaving}
+            status={typeSafeStatus}
+            onRefresh={() => void loadTypeSafeSettings()}
+            onSave={(token) => void saveTypeSafeToken(token)}
+            onClear={() => void clearTypeSafeToken()}
           />
         ) : section === "mcp" ? (
           <McpSection

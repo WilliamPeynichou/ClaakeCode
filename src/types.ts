@@ -342,6 +342,29 @@ export type ProdSettings = {
   providers: ProdProviderRuntimeStatus[];
 };
 
+// ─── TypeSafe (Jev) ────────────────────────────────────────────────────────
+
+export type TypeSafeSecretStorageInfo = {
+  kind: string;
+  encrypted: boolean;
+  description: string;
+};
+
+/**
+ * Secret-free view of the TypeSafe provider. The raw API key is never part of
+ * this payload — only `hasToken` and the masked `tokenPreview`.
+ */
+export type TypeSafeSettings = {
+  providerId: string;
+  hasToken: boolean;
+  tokenPreview?: string | null;
+  updatedAtMs?: number | null;
+  tokenEnvVar: string;
+  docsUrl: string;
+  consoleUrl: string;
+  secretStorage: TypeSafeSecretStorageInfo;
+};
+
 // ─── Embedding providers ───────────────────────────────────────────────────
 
 export type EmbeddingProviderId =

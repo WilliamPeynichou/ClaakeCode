@@ -24,6 +24,9 @@ use crate::skill::SkillSettings;
 use crate::subagent::SubAgentSettings;
 use crate::todo::TodoListState;
 use crate::tool_names;
+use crate::typesafe::{
+    redact_typesafe_secret_text, validate_typesafe_token, TypeSafeSettings,
+};
 use crate::tool_run::TurnCheckpoint;
 use crate::workspace::{workspace_info, WorkspaceInfo};
 
@@ -613,6 +616,16 @@ struct StoredProdSecrets {
     auth_mode: String,
     #[serde(default)]
     tokens: HashMap<String, StoredProdProviderToken>,
+}
+
+/// On-disk shape of `typesafe-auth.json`. Never leaves the store as-is.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredTypeSafeSecrets {
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    updated_at_ms: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1466,6 +1479,91 @@ impl AppStore {
         } else {
             self.path.with_extension("prod-auth.json")
         }
+    }
+
+    /// Public, secret-free view of the TypeSafe provider.
+    pub fn load_typesafe_settings(&self) -> Result<TypeSafeSettings> {
+        let secrets = self.load_typesafe_secrets()?;
+        Ok(match secrets.token.trim() {
+            "" => TypeSafeSettings::absent(),
+            token => TypeSafeSettings::from_token(token, secrets.updated_at_ms),
+        })
+    }
+
+    /// Raw key, for callers that actually need to reach the TypeSafe API.
+    pub fn load_typesafe_token(&self) -> Result<Option<String>> {
+        let secrets = self.load_typesafe_secrets()?;
+        let token = secrets.token.trim().to_string();
+        Ok((!token.is_empty()).then_some(token))
+    }
+
+    pub fn save_typesafe_token(&self, token: &str) -> Result<TypeSafeSettings> {
+        let token = validate_typesafe_token(token)?;
+        let updated_at_ms = now_ms();
+        self.save_typesafe_secrets(&StoredTypeSafeSecrets {
+            token: token.clone(),
+            updated_at_ms,
+        })?;
+        Ok(TypeSafeSettings::from_token(&token, updated_at_ms))
+    }
+
+    pub fn clear_typesafe_token(&self) -> Result<TypeSafeSettings> {
+        self.save_typesafe_secrets(&StoredTypeSafeSecrets::default())?;
+        Ok(TypeSafeSettings::absent())
+    }
+
+    pub fn typesafe_secret_values(&self) -> Result<Vec<String>> {
+        Ok(self
+            .load_typesafe_token()?
+            .into_iter()
+            .collect::<Vec<String>>())
+    }
+
+    pub fn redact_typesafe_message(&self, message: impl AsRef<str>) -> String {
+        let secrets = self.typesafe_secret_values().unwrap_or_default();
+        redact_typesafe_secret_text(message.as_ref(), &secrets)
+    }
+
+    fn typesafe_secrets_path(&self) -> PathBuf {
+        if self.path.file_name().and_then(|name| name.to_str()) == Some("desktop-state.sqlite3") {
+            self.path.with_file_name("typesafe-auth.json")
+        } else {
+            self.path.with_extension("typesafe-auth.json")
+        }
+    }
+
+    fn load_typesafe_secrets(&self) -> Result<StoredTypeSafeSecrets> {
+        let path = self.typesafe_secrets_path();
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(StoredTypeSafeSecrets::default())
+            }
+            Err(err) => return Err(err).context("unable to read TypeSafe token store"),
+        };
+        serde_json::from_slice::<StoredTypeSafeSecrets>(&bytes)
+            .context("invalid TypeSafe token store")
+    }
+
+    fn save_typesafe_secrets(&self, secrets: &StoredTypeSafeSecrets) -> Result<()> {
+        let path = self.typesafe_secrets_path();
+        if secrets.token.trim().is_empty() {
+            match std::fs::remove_file(&path) {
+                Ok(()) => return Ok(()),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(err) => return Err(err).context("unable to delete TypeSafe token store"),
+            }
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).context("unable to create TypeSafe token directory")?;
+        }
+        let temp = path.with_extension("json.tmp");
+        let pretty =
+            serde_json::to_vec_pretty(secrets).context("unable to serialize TypeSafe token")?;
+        std::fs::write(&temp, pretty).context("unable to write TypeSafe token temp file")?;
+        apply_private_file_permissions(&temp)?;
+        std::fs::rename(&temp, &path).context("unable to replace TypeSafe token store")?;
+        Ok(())
     }
 
     fn load_prod_secrets(&self) -> Result<StoredProdSecrets> {

@@ -23,6 +23,7 @@ mod text;
 pub mod todo;
 pub mod tool_names;
 pub mod tool_run;
+pub mod typesafe;
 pub mod web;
 pub mod workspace;
 pub mod write;
@@ -71,6 +72,11 @@ pub use read::{ReadFingerprint, ReadTool};
 pub use skill::{
     create_installed_skill, list_installed_skills, InstalledSkill, SkillConfig, SkillSettings,
     SkillSource, SkillTool,
+};
+pub use typesafe::{
+    redact_typesafe_secret_text, typesafe_token_preview, validate_typesafe_token,
+    TypeSafeSecretStorageInfo, TypeSafeSettings, TYPESAFE_CONSOLE_URL, TYPESAFE_DOCS_URL,
+    TYPESAFE_PROVIDER_ID, TYPESAFE_TOKEN_ENV_VAR,
 };
 pub use store::{
     tool_settings_view, AppStore, ConversationSummary, GoalWorkflowState, MistralModelRecord,

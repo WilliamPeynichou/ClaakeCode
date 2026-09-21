@@ -57,6 +57,7 @@ import type {
   TerminalSpawnResult,
   ThinkingLevel,
   ToolSettings,
+  TypeSafeSettings,
   UpdateInfo,
   WorkspaceBootstrap,
   WorkspaceDeletedEntry,
@@ -421,6 +422,17 @@ export const api = {
   },
   prodGetSettings() {
     return invoke<ProdSettings>("prod_get_settings");
+  },
+  typesafeGetSettings() {
+    return invoke<TypeSafeSettings>("typesafe_get_settings");
+  },
+  typesafeSaveToken(token: string) {
+    return invoke<TypeSafeSettings>("typesafe_save_token", {
+      input: { token },
+    });
+  },
+  typesafeClearToken() {
+    return invoke<TypeSafeSettings>("typesafe_clear_token");
   },
   prodSaveToken(providerId: string, token: string) {
     return invoke<ProdProviderRuntimeStatus>("prod_save_token", {

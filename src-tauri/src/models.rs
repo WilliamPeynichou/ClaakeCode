@@ -598,6 +598,12 @@ pub(super) struct ProdSettingsOutput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct TypeSafeTokenInput {
+    pub(super) token: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct ProdTokenInput {
     pub(super) provider_id: String,
     pub(super) token: String,
