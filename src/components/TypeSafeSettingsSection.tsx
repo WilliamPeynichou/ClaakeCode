@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { TypeSafeSettings } from "../types";
 
@@ -10,11 +10,40 @@ type Props = {
   onRefresh: () => void;
   onSave: (token: string) => void;
   onClear: () => void;
+  workspacePath: string;
 };
 
-export function TypeSafeSection({ settings, loading, saving, status, onRefresh, onSave, onClear }: Props) {
+export function TypeSafeSection({ settings, loading, saving, status, onRefresh, onSave, onClear, workspacePath }: Props) {
   const [token, setToken] = useState("");
+  const activationKey = `claakecode:typesafe:enabled:${workspacePath}`;
+  const [enabled, setEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem(activationKey) === "true";
+    } catch {
+      return false;
+    }
+  });
   const configured = settings?.hasToken ?? false;
+
+  useEffect(() => {
+    if (configured) return;
+    setEnabled(false);
+    try {
+      window.localStorage.removeItem(activationKey);
+    } catch {
+      // Settings UI remains usable when localStorage is unavailable.
+    }
+  }, [activationKey, configured]);
+
+  const toggleEnabled = () => {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      window.localStorage.setItem(activationKey, String(next));
+    } catch {
+      // Settings UI remains usable when localStorage is unavailable.
+    }
+  };
 
   return (
     <div className="settings-pane__body settings-pane__body--prod">
@@ -71,6 +100,22 @@ export function TypeSafeSection({ settings, loading, saving, status, onRefresh, 
             <a className="settings-pane__btn" href={settings?.docsUrl ?? "https://docs.typesafe.ai"} target="_blank" rel="noreferrer">Documentation</a>
           </div>
         </div>
+
+        {configured ? (
+          <div className="settings-pane__database-block">
+            <div className="settings-pane__detail-head">
+              <div>
+                <div className="settings-pane__detail-title">Jev for this project</div>
+                <p className="settings-pane__database-help">
+                  {enabled ? "Enabled for the current project." : "Enable Jev when you want to use TypeSafe in this project."}
+                </p>
+              </div>
+              <button type="button" className="settings-pane__btn settings-pane__btn--primary" onClick={toggleEnabled}>
+                {enabled ? "Disable Jev" : "Enable Jev for this project"}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <p className="settings-pane__database-help">
           Stored in a separate local file with Unix 0600 permissions. It is not encrypted at rest and is not injected into terminals, tools, or agent runs.

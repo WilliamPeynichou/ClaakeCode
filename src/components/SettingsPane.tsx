@@ -2395,6 +2395,7 @@ export function SettingsPane({ workspacePath }: Props) {
             loading={typeSafeLoading}
             saving={typeSafeSaving}
             status={typeSafeStatus}
+            workspacePath={workspacePath}
             onRefresh={() => void loadTypeSafeSettings()}
             onSave={(token) => void saveTypeSafeToken(token)}
             onClear={() => void clearTypeSafeToken()}
