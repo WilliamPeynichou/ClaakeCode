@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use claakecode_core::{AppError, ProviderStream, Result};
 use futures::{stream, SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
-use claakecode_core::{AppError, ProviderStream, Result};
 use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot, Mutex},
@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::{
     auth::BearerToken,
-    client::{OpenAiConfig, USER_AGENT},
+    client::{OpenAiConfig, OAUTH_ORIGINATOR, USER_AGENT},
     responses_stream::{event_provider_stream, is_terminal_response_event, STREAM_IDLE_TIMEOUT},
 };
 
@@ -166,6 +166,7 @@ impl ResponsesWebsocketConnection {
             HeaderValue::from_static(RESPONSES_WEBSOCKET_BETA),
         );
         if bearer.is_oauth {
+            headers.insert("originator", HeaderValue::from_static(OAUTH_ORIGINATOR));
             if let Some(account_id) = bearer.account_id.as_deref() {
                 headers.insert(
                     "chatgpt-account-id",

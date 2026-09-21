@@ -100,6 +100,13 @@ export const THINKING_LEVELS: { value: ThinkingLevel; label: string }[] = [
 
 export const MODELS: ModelEntry[] = [
   {
+    value: "anthropic:claude-fable-5-1",
+    provider: "anthropic",
+    label: "Fable 5.1",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+  },
+  {
     value: "anthropic:claude-opus-5",
     provider: "anthropic",
     label: "Opus 5",
@@ -156,27 +163,35 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "medium",
   },
   {
+    value: "openai:gpt-6-astra",
+    provider: "openai",
+    label: "GPT-6 Astra",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+    supportsFast: true,
+  },
+  {
     value: "openai:gpt-5.6-sol",
     provider: "openai",
     label: "GPT-5.6 Sol",
-    thinking: ["low", "medium", "high", "xhigh"],
-    defaultThinking: "low",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
     supportsFast: true,
   },
   {
     value: "openai:gpt-5.6-terra",
     provider: "openai",
     label: "GPT-5.6 Terra",
-    thinking: ["low", "medium", "high", "xhigh"],
-    defaultThinking: "low",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
     supportsFast: true,
   },
   {
     value: "openai:gpt-5.6-luna",
     provider: "openai",
     label: "GPT-5.6 Luna",
-    thinking: ["low", "medium", "high", "xhigh"],
-    defaultThinking: "low",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
     supportsFast: true,
   },
   {
@@ -441,7 +456,13 @@ export function thinkingFromRef(
   }
   if (model?.effort === "none") return "off";
   if (model?.effort === "xhigh") return "xhigh";
-  if (model?.provider === "openai" && model.effort === "max") return "xhigh";
+  if (
+    model?.provider === "openai" &&
+    model.effort === "max" &&
+    !supportsOpenAiMaxEffort(model.name)
+  ) {
+    return "xhigh";
+  }
   if (
     model?.effort === "low" ||
     model?.effort === "medium" ||
@@ -506,6 +527,15 @@ export function selectionFromRef(
 
 function modelId(provider: string, name: string): ModelId {
   return `${provider}:${name}`;
+}
+
+function supportsOpenAiMaxEffort(modelName: string): boolean {
+  return (
+    modelName === "gpt-6" ||
+    modelName.startsWith("gpt-6-") ||
+    modelName === "gpt-5.6" ||
+    modelName.startsWith("gpt-5.6-")
+  );
 }
 
 function normalizedModelName(provider: string, name: string): string {

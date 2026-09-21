@@ -4,11 +4,11 @@ use std::{
 };
 
 use async_trait::async_trait;
-use serde_json::Value;
 use claakecode_core::{
     AppError, ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest,
     ProviderStream, Result, Role, ServiceTier, TokenEstimate, ToolDescriptor,
 };
+use serde_json::Value;
 
 use crate::{
     auth::Credential,
@@ -20,6 +20,7 @@ use crate::{
 const API_BASE_URL: &str = "https://api.openai.com/v1";
 const CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 pub(crate) const USER_AGENT: &str = "ClaakeCode/0.1";
+pub(crate) const OAUTH_ORIGINATOR: &str = "claakecode_desktop";
 const FALLBACK_INSTRUCTIONS: &str = "You are Claake Code, a concise coding assistant.";
 
 #[derive(Clone)]
@@ -88,7 +89,9 @@ impl OpenAiProvider {
             .header("authorization", format!("Bearer {}", bearer.token));
 
         if bearer.is_oauth {
-            request = request.header("openai-beta", "responses=experimental");
+            request = request
+                .header("openai-beta", "responses=experimental")
+                .header("originator", OAUTH_ORIGINATOR);
             if let Some(account_id) = bearer.account_id {
                 request = request.header("chatgpt-account-id", account_id);
             }
@@ -251,7 +254,9 @@ async fn stream_sse_request_with_bearer(
         .header("authorization", format!("Bearer {}", bearer.token));
 
     if bearer.is_oauth {
-        builder = builder.header("openai-beta", "responses=experimental");
+        builder = builder
+            .header("openai-beta", "responses=experimental")
+            .header("originator", OAUTH_ORIGINATOR);
         if let Some(account_id) = bearer.account_id {
             builder = builder.header("chatgpt-account-id", account_id);
         }
@@ -324,7 +329,7 @@ fn build_responses_request<'a>(
             .then_some(request.cache_key.as_deref())
             .flatten(),
         max_output_tokens: (!is_oauth).then_some(request.output_token_budget(&caps)),
-        reasoning: effort_to_reasoning(request.effective_effort()),
+        reasoning: effort_to_reasoning(&request.model.name, request.effective_effort()),
         temperature: request.temperature,
         store,
         stream,
@@ -345,17 +350,26 @@ fn response_instructions(request: &ProviderRequest, is_oauth: bool) -> Option<&s
     }
 }
 
-fn effort_to_reasoning(effort: Option<Effort>) -> Option<wire::ReasoningConfig> {
+fn effort_to_reasoning(model_id: &str, effort: Option<Effort>) -> Option<wire::ReasoningConfig> {
     Some(wire::ReasoningConfig {
         effort: match effort.unwrap_or(Effort::Medium) {
             Effort::None => "none",
             Effort::Low => "low",
             Effort::Medium => "medium",
             Effort::High => "high",
-            Effort::Xhigh | Effort::Max => "xhigh",
+            Effort::Xhigh => "xhigh",
+            Effort::Max if supports_max_reasoning_effort(model_id) => "max",
+            Effort::Max => "xhigh",
         },
         summary: "auto",
     })
+}
+
+fn supports_max_reasoning_effort(model_id: &str) -> bool {
+    model_id == "gpt-6"
+        || model_id.starts_with("gpt-6-")
+        || model_id == "gpt-5.6"
+        || model_id.starts_with("gpt-5.6-")
 }
 
 fn service_tier_param(service_tier: Option<ServiceTier>) -> Option<&'static str> {
@@ -632,10 +646,10 @@ fn is_transient_http_status(status: reqwest::StatusCode) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
     use claakecode_core::{
-        ChatMessage, ModelRef, Part, ProviderRequest, Role, ServiceTier, ToolResultImage,
+        ChatMessage, Effort, ModelRef, Part, ProviderRequest, Role, ServiceTier, ToolResultImage,
     };
+    use serde_json::json;
 
     use super::{build_responses_request, to_input_items};
 
@@ -723,5 +737,61 @@ mod tests {
         let value = serde_json::to_value(&body).expect("body should be json");
 
         assert_eq!(value["service_tier"], "priority");
+    }
+
+    #[test]
+    fn latest_models_serialize_all_supported_reasoning_efforts() {
+        let efforts = [
+            (Effort::None, "none"),
+            (Effort::Low, "low"),
+            (Effort::Medium, "medium"),
+            (Effort::High, "high"),
+            (Effort::Xhigh, "xhigh"),
+            (Effort::Max, "max"),
+        ];
+
+        for model_id in [
+            "gpt-6-astra",
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+        ] {
+            for (effort, expected) in efforts {
+                let request = ProviderRequest::new(
+                    ModelRef::new("openai", model_id).with_effort(effort),
+                    vec![ChatMessage::user_text("hello")],
+                );
+                let body = build_responses_request(
+                    &request,
+                    &request.transcript,
+                    false,
+                    Some(false),
+                    Some(true),
+                )
+                .expect("body should serialize");
+                let value = serde_json::to_value(&body).expect("body should be json");
+
+                assert_eq!(value["reasoning"]["effort"], expected, "{model_id}");
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_openai_request_body_clamps_max_reasoning_effort_to_xhigh() {
+        let request = ProviderRequest::new(
+            ModelRef::new("openai", "gpt-5.5").with_effort(Effort::Max),
+            vec![ChatMessage::user_text("hello")],
+        );
+        let body = build_responses_request(
+            &request,
+            &request.transcript,
+            false,
+            Some(false),
+            Some(true),
+        )
+        .expect("body should serialize");
+        let value = serde_json::to_value(&body).expect("body should be json");
+
+        assert_eq!(value["reasoning"]["effort"], "xhigh");
     }
 }
