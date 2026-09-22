@@ -1,6 +1,6 @@
 use claakecode_core::{EffortMode, ModelCapabilities, ModelRef};
 
-pub const MODEL_ID: &str = "claude-opus-4-7";
+pub const MODEL_ID: &str = "claude-opus-5-5";
 pub const MODEL_WINDOW: u32 = 1_000_000;
 pub const MODEL_MAX_OUTPUT: u32 = 128_000;
 
@@ -15,15 +15,15 @@ struct AnthropicModelInfo {
 
 const MODELS: &[AnthropicModelInfo] = &[
     AnthropicModelInfo {
-        id: "claude-opus-5",
-        context_window: 1_000_000,
-        preferred_window: 900_000,
+        id: "claude-opus-5-5",
+        context_window: 200_000,
+        preferred_window: 180_000,
         max_output_tokens: 128_000,
-        beta_1m_context_window: None,
-        beta_1m_preferred_window: None,
+        beta_1m_context_window: Some(1_000_000),
+        beta_1m_preferred_window: Some(900_000),
     },
     AnthropicModelInfo {
-        id: "claude-opus-4-7",
+        id: "claude-opus-5",
         context_window: 1_000_000,
         preferred_window: 900_000,
         max_output_tokens: 128_000,
@@ -55,28 +55,12 @@ const MODELS: &[AnthropicModelInfo] = &[
         beta_1m_preferred_window: None,
     },
     AnthropicModelInfo {
-        id: "claude-opus-4-6",
-        context_window: 1_000_000,
-        preferred_window: 900_000,
-        max_output_tokens: 128_000,
-        beta_1m_context_window: None,
-        beta_1m_preferred_window: None,
-    },
-    AnthropicModelInfo {
         id: "claude-sonnet-5",
         context_window: 1_000_000,
         preferred_window: 900_000,
         max_output_tokens: 128_000,
         beta_1m_context_window: None,
         beta_1m_preferred_window: None,
-    },
-    AnthropicModelInfo {
-        id: "claude-sonnet-4-6",
-        context_window: 200_000,
-        preferred_window: 180_000,
-        max_output_tokens: 128_000,
-        beta_1m_context_window: Some(1_000_000),
-        beta_1m_preferred_window: Some(900_000),
     },
     AnthropicModelInfo {
         id: "claude-haiku-4-5",

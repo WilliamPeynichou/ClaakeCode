@@ -21,20 +21,6 @@ const MODELS: &[OpenAiModelInfo] = &[
         supports_images: true,
     },
     OpenAiModelInfo {
-        id: "gpt-5.4",
-        context_window: 1_050_000,
-        preferred_window: 950_000,
-        max_output_tokens: 128_000,
-        supports_images: true,
-    },
-    OpenAiModelInfo {
-        id: "gpt-5.4-mini",
-        context_window: 400_000,
-        preferred_window: 360_000,
-        max_output_tokens: 128_000,
-        supports_images: true,
-    },
-    OpenAiModelInfo {
         id: "gpt-5.3-codex",
         context_window: 400_000,
         preferred_window: 360_000,

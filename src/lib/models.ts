@@ -17,7 +17,7 @@ export type ModeModelSelection = {
 export type ModeModelSelections = Record<AgentMode, ModeModelSelection>;
 
 export function modelSupports1mContextBeta(model: ModelId): boolean {
-  return model === "anthropic:claude-sonnet-4-6";
+  return model === "anthropic:claude-opus-5-5";
 }
 
 export function use1mContextFromRef(
@@ -100,6 +100,13 @@ export const THINKING_LEVELS: { value: ThinkingLevel; label: string }[] = [
 
 export const MODELS: ModelEntry[] = [
   {
+    value: "anthropic:claude-opus-5-5",
+    provider: "anthropic",
+    label: "Opus 5.5",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+  },
+  {
     value: "anthropic:claude-fable-5-1",
     provider: "anthropic",
     label: "Fable 5.1",
@@ -132,27 +139,6 @@ export const MODELS: ModelEntry[] = [
     provider: "anthropic",
     label: "Opus 4.8",
     thinking: ["off", "low", "medium", "high", "xhigh", "max"],
-    defaultThinking: "medium",
-  },
-  {
-    value: "anthropic:claude-opus-4-7",
-    provider: "anthropic",
-    label: "Opus 4.7",
-    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
-    defaultThinking: "medium",
-  },
-  {
-    value: "anthropic:claude-opus-4-6",
-    provider: "anthropic",
-    label: "Opus 4.6",
-    thinking: ["off", "low", "medium", "high", "max"],
-    defaultThinking: "medium",
-  },
-  {
-    value: "anthropic:claude-sonnet-4-6",
-    provider: "anthropic",
-    label: "Sonnet 4.6",
-    thinking: ["off", "low", "medium", "high", "max"],
     defaultThinking: "medium",
   },
   {
@@ -198,22 +184,6 @@ export const MODELS: ModelEntry[] = [
     value: "openai:gpt-5.5",
     provider: "openai",
     label: "GPT-5.5",
-    thinking: ["off", "low", "medium", "high", "xhigh"],
-    defaultThinking: "medium",
-    supportsFast: true,
-  },
-  {
-    value: "openai:gpt-5.4",
-    provider: "openai",
-    label: "GPT-5.4",
-    thinking: ["off", "low", "medium", "high", "xhigh"],
-    defaultThinking: "medium",
-    supportsFast: true,
-  },
-  {
-    value: "openai:gpt-5.4-mini",
-    provider: "openai",
-    label: "GPT-5.4 Mini",
     thinking: ["off", "low", "medium", "high", "xhigh"],
     defaultThinking: "medium",
     supportsFast: true,
