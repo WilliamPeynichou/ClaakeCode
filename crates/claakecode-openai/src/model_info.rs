@@ -42,6 +42,13 @@ const MODELS: &[OpenAiModelInfo] = &[
         supports_images: true,
     },
     OpenAiModelInfo {
+        id: "gpt-6-sol",
+        context_window: 1_050_000,
+        preferred_window: 950_000,
+        max_output_tokens: 128_000,
+        supports_images: true,
+    },
+    OpenAiModelInfo {
         id: "gpt-6-astra",
         context_window: 272_000,
         preferred_window: 240_000,
