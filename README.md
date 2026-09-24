@@ -45,7 +45,8 @@ Claake Code flips that. The harness is the surface area you control.
 
 - **Every tool description is editable.** Rephrase it, scope it down, change the contract.
 - **Every tool is toggleable.** Run minimal like Pi, or unlock the full set.
-- **Every provider is pluggable.** Same agent loop across Anthropic, OpenAI, Google, Kimi, OpenRouter.
+- **Every provider is pluggable.** Same agent loop across Anthropic, OpenAI, Google, Kimi, Mistral, xAI and OpenRouter.
+- **Four modes.** Act, Ask (read-only), Goal and Plan — each with its own model and editable prompt.
 - **Agents can run in swarms.** Multiple sub-agents, one shared task board, message passing.
 - **It's a real IDE.** Monaco editor and xterm terminal, not a chat box with a file picker.
 
@@ -53,34 +54,41 @@ Claake Code flips that. The harness is the surface area you control.
 
 ## Contents
 
-- [The three modes](#the-three-modes) — Act, Goal, Plan
+- [The four modes](#the-four-modes) — Act, Ask, Goal, Plan
 - [`AGENTS.md` & `DESIGN.md`](#agentsmd--designmd) — system prompt injection
-- [Multi-provider, one harness](#multi-provider-one-harness) — Anthropic, OpenAI, Google, Kimi, OpenRouter
+- [Multi-provider, one harness](#multi-provider-one-harness) — Anthropic, OpenAI, Google, Kimi, Mistral, xAI, OpenRouter
 - [Tools](#tools) — the agent's toolset
   - [`clean_context`](#clean_context) — the model cleans its own context
   - [`bash` / `bash_input`](#bash--bash_input) — PTY-backed shell sessions
+  - [`python`](#python) — sandboxed Python snippets in the workspace
   - [Why dedicated `read`, `glob`, `grep`](#why-dedicated-tools-for-read-glob-and-grep)
   - [`read`](#read) · [`glob`](#glob) · [`grep`](#grep) · [`edit_file`](#edit_file) · [`write_file`](#write_file)
   - [`web_search`](#web_search) · [`web_fetch`](#web_fetch) · [`create_image`](#create_image)
   - [`question`](#question) · [`todo_list`](#todo_list)
   - [`load_mcp_tool`](#load_mcp_tool) · [`skill`](#skill)
+  - [Database tools](#database-tools) — query your configured databases
 - [Sub-agents](#sub-agents) — configurable specialised agents
 - [Agent swarm](#agent-swarm) — peer-to-peer team of 2–8 agents
 - [Compaction](#compaction) — auto and manual
 - [Rollback](#rollback) — checkpointed conversation
+- [Settings integrations](#settings-integrations) — databases, embeddings, deploy CLIs, TypeSafe
 - [Architecture](#architecture) · [Install](#install) · [Build from source](#build-from-source)
 
 ---
 
-## The three modes
+## The four modes
 
 <p align="center">
-  <img src=".github/assets/modes.png" alt="Three modes — Act, Goal, Plan" width="100%" />
+  <img src=".github/assets/modes.png" alt="Modes — Act, Goal, Plan" width="100%" />
 </p>
 
 ### Act
 
 The normal mode: the agent runs a classic single-turn loop. You prompt, it acts, control comes back to you.
+
+### Ask
+
+A **read-only** mode for questions about the codebase. The agent can only explore and research — `read`, `glob`, `grep`, `web_search`, `web_fetch` and `clean_context`. Any other tool call is refused, so nothing in your workspace can change. Perfect for "how does X work?" or reviewing code before you let an agent touch it.
 
 ### Goal
 
@@ -106,7 +114,7 @@ Claake Code supports two reference files at the root of the workspace, and **inj
 
 **`AGENTS.md`** — general instructions for the agent: project conventions, constraints, things to avoid, etc. It's the equivalent of a README you write for the model rather than for a human. Open convention popularised by Codex and shared with a whole ecosystem of other tools — one file works everywhere. For comparison, `CLAUDE.md` (Anthropic's own convention) is **explicitly ignored** in favour of this common standard.
 
-**`DESIGN.md`** — the project's design system: colours, typography, components, UI rules, etc. Convention introduced by Google. Sinew injects it with a dedicated header so that your product, UX, visual and frontend decisions respect the design system you use, whatever it is.
+**`DESIGN.md`** — the project's design system: colours, typography, components, UI rules, etc. Convention introduced by Google. Claake Code injects it with a dedicated header so that your product, UX, visual and frontend decisions respect the design system you use, whatever it is.
 
 Both files get a dedicated icon in the file tree.
 
@@ -114,29 +122,31 @@ Both files get a dedicated icon in the file tree.
 
 ## Multi-provider, one harness
 
-Sinew supports five model providers, each with its own connection method:
+Claake Code supports seven model providers, each with its own connection method:
 
 | Provider | Method |
 |---|---|
-| **Anthropic** | subscription |
-| **OpenAI** | subscription |
-| **Google** | subscription |
+| **Anthropic** | subscription (Claude Code OAuth) or API key |
+| **OpenAI** | subscription (Codex OAuth) or API key |
+| **Google** | subscription (Antigravity OAuth) |
 | **Kimi** | subscription |
+| **Mistral** | OAuth or API key (live model catalog) |
+| **xAI** | OAuth (Composer) |
 | **OpenRouter** | API key |
 
 ### OAuth mode — the real differentiator
 
-When you connect to Anthropic, OpenAI, Google or Kimi via OAuth, Sinew uses **your existing subscription directly** (Claude Max, ChatGPT Plus / Pro, etc.) with its own harness. No API key to provide, no metered billing — you're already paying the subscription anyway, you might as well use it.
+When you connect to Anthropic, OpenAI, Google, Kimi, Mistral or xAI via OAuth, Claake Code uses **your existing subscription directly** (Claude Max, ChatGPT Plus / Pro, etc.) with its own harness. No API key to provide, no metered billing — you're already paying the subscription anyway, you might as well use it.
 
 ### No ecosystem lock-in
 
-Claude Code is limited to Anthropic models. Codex to OpenAI models. Sinew isn't locked anywhere: you can connect several providers in parallel and pick the right model for the right task.
+Claude Code is limited to Anthropic models. Codex to OpenAI models. Claake Code isn't locked anywhere: you can connect several providers in parallel and pick the right model for the right task.
 
 ### Mix models by capability
 
 Model selection happens at three levels:
 
-- **Per mode.** Act, Plan and Goal can each have their own dedicated model in Settings. Typically: a large model for Plan (reasoning), a solid one for Act (execution), a fast one for Goal (long loop).
+- **Per mode.** Act, Ask, Plan and Goal can each have their own dedicated model in Settings. Typically: a large model for Plan (reasoning), a solid one for Act (execution), a fast one for Goal (long loop).
 - **Per sub-agent.** Each configured sub-agent has its own model (see the sub-agents section).
 - **Per teammate** in an Agent Team, through sub-agent profiles.
 
@@ -150,6 +160,7 @@ The agent has access to a full set of tools:
 |------|------|
 | `bash` | Run shell commands |
 | `bash_input` | Send input to an interactive shell session |
+| `python` | Run Python code in the workspace (calculations, data processing, automation) |
 | `read` | Read files |
 | `glob` | Find files by pattern |
 | `grep` | Search text / regex in files |
@@ -163,6 +174,9 @@ The agent has access to a full set of tools:
 | `clean_context` | Clean useless tool results out of the context |
 | `load_mcp_tool` | Load an external MCP tool |
 | `skill` | Load a skill on demand (active when skills are present) |
+| `database_list_sources` | List the database sources configured in Settings |
+| `database_describe_schema` | Inspect tables, columns, keys and indexes |
+| `database_execute_query` | Run SQL with row limits, timeouts and read-only / destructive-op guardrails |
 | `subagent_*` | Delegate a task to a configured sub-agent (one tool per enabled sub-agent) |
 | `team_run` | Launch an agent team |
 | `team_status` | Inspect the team's state |
@@ -179,7 +193,7 @@ Each tool can be **individually disabled** in Settings, which lets you go from a
 
 ### `clean_context`
 
-Sinew is the only coding agent where the model can **clean its own context**. None of the others — Cursor, Claude Code, Codex, Cline — offers this.
+Claake Code is the only coding agent where the model can **clean its own context**. None of the others — Cursor, Claude Code, Codex, Cline — offers this.
 
 The tool takes a list of `tool_call_id`s from the current turn. For each one, the content of the result is replaced in history by an ultra-short placeholder (`[Tool result cleaned by you: irrelevant to future context.]`). The agent does its own mental housekeeping, by itself.
 
@@ -202,15 +216,23 @@ Why this is game-changing: tool results blow up the context very fast. A `glob` 
 
 On macOS / Linux: Bash. On Windows: PowerShell (the system prompt warns the model about the syntax difference).
 
-The interesting bit: if a command doesn't finish right away, Sinew returns a `session_id` and lets the process keep running. The agent can then send input, poll the output, or kill the session. PTY-backed, so `vim`, `top`, a REPL or a dev server actually work.
+The interesting bit: if a command doesn't finish right away, Claake Code returns a `session_id` and lets the process keep running. The agent can then send input, poll the output, or kill the session. PTY-backed, so `vim`, `top`, a REPL or a dev server actually work.
 
 On the UI side, each command shows up in a card that displays the exact input and the raw shell output, untransformed.
 
 ---
 
+### `python`
+
+Runs a Python snippet with the workspace as working directory. Three parameters: `code`, an optional `cwd` (must stay inside the workspace) and `timeout_secs` (default 30 s, max 120 s).
+
+Handy when a shell one-liner gets awkward: quick calculations, parsing JSON/CSV, bulk file transforms, or scripting a small automation without leaving the conversation.
+
+---
+
 #### Why dedicated tools for `read`, `glob` and `grep`?
 
-Some agents like Codex rely on the terminal for most everyday operations — reading a file, searching text, listing paths. The agent has to compose the right shell command every time. Sinew does the opposite: these operations get their own dedicated tools.
+Some agents like Codex rely on the terminal for most everyday operations — reading a file, searching text, listing paths. The agent has to compose the right shell command every time. Claake Code does the opposite: these operations get their own dedicated tools.
 
 The idea: a shell command returns everything raw, with no way to force a limit, and the output is often noisy. A dedicated tool lets us **control exactly what comes out** — clean response, readable, no redundancy. And since it covers the same flexibility as the equivalent shell command, you don't lose any expressivity.
 
@@ -220,7 +242,7 @@ The idea: a shell command returns everything raw, with no way to force a limit, 
 
 Reads a file. Three parameters: `path`, `limit` and `offset`.
 
-The twist: **`limit` is required**. Unlike other coding agents that leave it optional, Sinew forces the model to declare how many lines it wants. That preserves the agent's context and pushes it to target what's actually useful rather than vacuum everything up. If it needs to see more, it widens the limit and asks again. And the smarter models get, the better they exploit constraints like this in their favour.
+The twist: **`limit` is required**. Unlike other coding agents that leave it optional, Claake Code forces the model to declare how many lines it wants. That preserves the agent's context and pushes it to target what's actually useful rather than vacuum everything up. If it needs to see more, it widens the limit and asks again. And the smarter models get, the better they exploit constraints like this in their favour.
 
 Here's what the agent receives after a `read` on a React component:
 
@@ -237,7 +259,7 @@ total: 124
 
 A header with the path and the total line count, then the requested lines, numbered.
 
-And that's Sinew's whole philosophy: give the **minimum useful information**, no repetition. Just the path, the total line count (so the agent knows where it is and can paginate), and each line numbered. Nothing more. The model figures out the rest — target, cross-reference, widen if needed.
+And that's Claake Code's whole philosophy: give the **minimum useful information**, no repetition. Just the path, the total line count (so the agent knows where it is and can paginate), and each line numbered. Nothing more. The model figures out the rest — target, cross-reference, widen if needed.
 
 ---
 
@@ -375,13 +397,13 @@ The agent's todo list. A single tool does everything: add, modify, mark as done,
 
 The difference with Cursor, Claude Code, Codex and the rest: in their tools the todo is just another tool call. When the agent invokes it, the result stays in the conversation and eventually drowns under the tool calls that follow.
 
-Sinew **re-injects the full state at every turn into the system reminder**. The model therefore always sees the up-to-date version in front of its eyes, no matter what happened since. That's what changes everything on long tasks — typically in Goal mode, where without it the agent would lose the thread.
+Claake Code **re-injects the full state at every turn into the system reminder**. The model therefore always sees the up-to-date version in front of its eyes, no matter what happened since. That's what changes everything on long tasks — typically in Goal mode, where without it the agent would lose the thread.
 
 ---
 
 ### `load_mcp_tool`
 
-Sinew supports the MCP protocol. Servers are configured in Settings.
+Claake Code supports the MCP protocol. Servers are configured in Settings.
 
 But, unlike what you might expect, **MCP tools are not exposed directly** to the agent. What lives in the system prompt is just a **compact catalog** inside the `load_mcp_tool` description:
 
@@ -416,28 +438,40 @@ Load one skill by name before using it. Available skills:
 ...
 ```
 
-The agent calls `skill` with a `name`, Sinew reads the `SKILL.md` of the requested skill and injects its content into the conversation. Same benefit as MCP: no skill takes up prompt space until it's explicitly loaded.
+The agent calls `skill` with a `name`, Claake Code reads the `SKILL.md` of the requested skill and injects its content into the conversation. Same benefit as MCP: no skill takes up prompt space until it's explicitly loaded.
 
 **Four discovery locations**, from highest priority to lowest:
 
 1. `<workspace>/.agents/skills/`
-2. `<workspace>/.sinew/skills/`
+2. `<workspace>/.claakecode/skills/`
 3. `~/.agents/skills/` *(global, follows the user)*
-4. `~/.sinew/skills/`
+4. `~/.claakecode/skills/`
 
 Each skill is a directory containing a `SKILL.md` file.
 
-The `.agents/skills/` format is deliberately aligned with the **Claude Agent Skills convention**: a skill written for Claude works in Sinew as-is, and vice-versa. The `.sinew/skills/` namespace stays available for project-specific skills.
+The `.agents/skills/` format is deliberately aligned with the **Claude Agent Skills convention**: a skill written for Claude works in Claake Code as-is, and vice-versa. The `.claakecode/skills/` namespace stays available for project-specific skills.
 
 Skills can be individually enabled or disabled in Settings.
 
 ---
 
+### Database tools
+
+Configure database sources once in **Settings → Database Sources** (SQLite, PostgreSQL, MySQL, SQL Server, or Supabase REST), then the agent gets three tools:
+
+- `database_list_sources` — enabled sources, engine, defaults and read-only flags. **Credentials are never returned.**
+- `database_describe_schema` — tables, views, columns, primary / foreign keys and indexes, optionally narrowed to a schema or table.
+- `database_execute_query` — runs SQL (or a Supabase REST request) with per-source row limits, timeouts and an activity log.
+
+Guardrails are per source: a source can be marked **read-only**, and destructive writes / DDL require your **explicit confirmation** before they run.
+
+---
+
 ## Sub-agents
 
-Sinew lets you configure as many **sub-agents** as you want in Settings, each with its own `name`, `description`, system `prompt`, `model`, and an `enabled` flag. Every enabled sub-agent is exposed to the main agent as a tool named `subagent_<id>` (e.g. `subagent_security-reviewer`, `subagent_doc-writer`). The tool description reuses the one you set in Settings, and the schema reduces to a single free-form `prompt`.
+Claake Code lets you configure as many **sub-agents** as you want in Settings, each with its own `name`, `description`, system `prompt`, `model`, and an `enabled` flag. Every enabled sub-agent is exposed to the main agent as a tool named `subagent_<id>` (e.g. `subagent_security-reviewer`, `subagent_doc-writer`). The tool description reuses the one you set in Settings, and the schema reduces to a single free-form `prompt`.
 
-When the main agent calls a sub-agent, Sinew launches a **full real turn** with the sub-agent's model and prompt, and the whole harness stays active: standard tools, `clean_context`, `todo_list`, MCP, skills, all of it. The sub-agent works in isolation, then returns a result to the main agent.
+When the main agent calls a sub-agent, Claake Code launches a **full real turn** with the sub-agent's model and prompt, and the whole harness stays active: standard tools, `clean_context`, `todo_list`, MCP, skills, all of it. The sub-agent works in isolation, then returns a result to the main agent.
 
 Two ways to use it:
 
@@ -460,13 +494,13 @@ Each teammate can inherit a **sub-agent profile** pre-configured in Settings (wi
 
 Claude Code follows a **lead / sub-agents** model: a main agent dispatches work to specialised sub-agents that execute their task and report back. It's effective for short orchestration, but it stays hierarchical.
 
-Sinew follows a **peer-to-peer** model: no lead, the teammates collaborate autonomously. More powerful for long, parallel tasks, where each agent needs to make progress without waiting for a conductor.
+Claake Code follows a **peer-to-peer** model: no lead, the teammates collaborate autonomously. More powerful for long, parallel tasks, where each agent needs to make progress without waiting for a conductor.
 
-The obvious risk of a flat team with no lead is drift — agents going in diverging directions, or stepping on each other. Sinew defuses that with the mechanisms below.
+The obvious risk of a flat team with no lead is drift — agents going in diverging directions, or stepping on each other. Claake Code defuses that with the mechanisms below.
 
 ### Coordination — everything flows through the system reminder
 
-At every turn of every teammate, Sinew injects into its system reminder:
+At every turn of every teammate, Claake Code injects into its system reminder:
 
 - **The full team state** (`<agent_team_state>`): who is who, each teammate's status (`running`, `idle`, `error`…), the whole task board, and the most recent file changes. Each agent therefore sees, at all times, what the others are doing, without having to dig through its own context.
 - **Messages received from other teammates** (`<queued_peer_messages>`): when a teammate sends a `send_message`, the recipient receives it at the start of its next turn via the reminder. No message lost in the conversation, no risk of being buried under further tool calls.
@@ -525,8 +559,9 @@ Claake Code handles two modes of conversation compaction.
 
 **Manual** — triggered from a button in the UI. The twist: you can attach an **optional directive** to steer compaction towards a specific topic ("keep mostly what concerns X", etc.). The cleanup is then more aggressive on everything outside the requested topic.
 
-For Anthropic, a per-session toggle enables Sonnet 4.6's **1M context (beta)**
-window — without burning the beta header on accounts that don't have access.
+For Anthropic, a per-session toggle enables the **1M context (beta)** window on
+Claude models that support it (e.g. Opus 5.5) — without burning the beta header on
+accounts that don't have access.
 
 ---
 
@@ -545,22 +580,30 @@ Under the hood, each turn records a *checkpoint* that captures the before / afte
 
 ---
 
+## Settings integrations
+
+Beyond models and tools, Settings hosts a few optional integrations:
+
+- **Database Sources** — connection profiles used by the [database tools](#database-tools), with read-only and confirmation flags per source.
+- **Embedding** — pick and configure one of seven embedding providers.
+- **Prod** — connect deploy platforms (Vercel, Railway, Netlify, Render, Fly, Heroku, Cloudflare, Supabase): install their CLI and log in from a visible terminal, tokens stored locally.
+- **TypeSafe (Jev)** — store a TypeSafe API key and toggle it per project. The raw key never leaves the Rust side; the UI only sees a masked preview.
+
+---
+
 ## Architecture
 
 <p align="center">
   <img src=".github/assets/architecture.png" alt="Claake Code architecture" width="100%" />
 </p>
 
-- **`src/`** — React UI (Monaco, xterm, chat, settings, file tree).
-- **`src-tauri/`** — Tauri 2 shell, IPC commands, workspace I/O, conversation store.
-- **`crates/claakecode-core`** — Provider-agnostic types: messages, tools, streams.
-- **`crates/claakecode-app`** — Agent loop, tool implementations, swarm, MCP, compaction.
-- **`crates/claakecode-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
 - **`src/`** — React UI (Monaco editor, xterm terminal, chat, settings, file tree).
 - **`src-tauri/`** — Tauri 2 shell, IPC commands, workspace I/O, conversation store, checkpoint store.
 - **`crates/claakecode-core`** — Provider-agnostic types: messages, tools, streams, model definitions.
-- **`crates/claakecode-app`** — Agent loop (Act / Goal / Plan), tool implementations, swarm, MCP, compaction, rollback.
-- **`crates/claakecode-{anthropic,openai,google,kimi,openrouter}`** — Provider adapters (auth, wire, streaming).
+- **`crates/claakecode-app`** — Agent loop (Act / Ask / Goal / Plan), tool implementations, swarm, MCP, skills, databases, compaction, rollback.
+- **`crates/claakecode-{anthropic,openai,google,kimi,mistral,xai,openrouter}`** — Provider adapters (auth, wire, streaming).
+- **`claakecode-web/`** — Static marketing & download site, deployed on Vercel.
+- **`remote/`** — Node PWA server to drive a session from your phone.
 
 ---
 
@@ -581,7 +624,7 @@ Under the hood, each turn records a *checkpoint* that captures the before / afte
 | Toggle individual tools | ✓ | partial | — | — | — |
 | MCP server CRUD UI | ✓ | partial | partial | — | — |
 | Skills CRUD UI | ✓ | — | — | — | — |
-| 1M context beta toggle (Sonnet) | ✓ | — | partial | — | — |
+| 1M context beta toggle (Claude) | ✓ | — | partial | — | — |
 | Agent swarm + task board | ✓ | — | — | — | — |
 | MCP servers | ✓ | ✓ | ✓ | — | partial |
 | Embedded terminal | ✓ | ✓ | n/a | n/a | ✓ |
@@ -590,14 +633,13 @@ Under the hood, each turn records a *checkpoint* that captures the before / afte
 
 ## Install
 
-Grab the latest build for your OS from the
-[releases page](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest).
+Download the latest build from **[claakecode-web.vercel.app](https://claakecode-web.vercel.app/)** or directly:
 
-- **macOS** — `.dmg`
-- **Windows** — `.msi` / `.exe`
-- **Linux** — `.AppImage` / `.deb`
+- **macOS** (universal) — [`Claake_Code_universal.dmg`](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg)
+- **Windows** (x64) — [`Claake_Code_x64-setup.exe`](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe) (`.msi` also on the [releases page](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest))
+- **Linux** (amd64) — [`Claake_Code_amd64.AppImage`](https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage) (`.deb` on the releases page)
 
-The app self-updates from GitHub releases.
+The app self-updates from GitHub releases. macOS builds may be unsigned: on first launch, right-click → **Open** to get past Gatekeeper.
 
 ---
 
@@ -626,6 +668,7 @@ Provider OAuth client IDs (and Google's client secret) are embedded in the sourc
 
 - [Issues](https://github.com/WilliamPeynichou/ClaakeCode/issues) — bugs and feature requests
 - [Discussions](https://github.com/WilliamPeynichou/ClaakeCode/discussions) — design, providers, MCP
+- [Website](https://claakecode-web.vercel.app/) — features, FAQ and downloads
 
 ---
 
