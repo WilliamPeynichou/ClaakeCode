@@ -19,3 +19,4 @@
 /node_modules
 /src-tauri/binaries/rg-*
 /target
+.vercel

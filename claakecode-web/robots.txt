@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://claakecode-web-sigma.vercel.app/sitemap.xml
+Sitemap: https://claakecode-web.vercel.app/sitemap.xml
 
 # AI and generative search crawlers are welcome to index the public marketing page.
 User-agent: GPTBot
