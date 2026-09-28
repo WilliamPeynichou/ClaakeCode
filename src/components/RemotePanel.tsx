@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Icon } from "@iconify/react";
+import QRCodeLib from "qrcode";
 import { api } from "../lib/ipc";
 import type { RemoteDevice, RemoteStatus } from "../types";
 
@@ -328,10 +329,18 @@ function DeviceRow({
 }
 
 function QrCode({ value }: { value: string }) {
-  const src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(value)}`;
+  // Generated locally: the pairing URL contains a secret and must never reach a third-party service.
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    QRCodeLib.toDataURL(value, { width: 200, margin: 0 })
+      .then((url) => { if (!cancelled) setSrc(url); })
+      .catch(() => { if (!cancelled) setSrc(null); });
+    return () => { cancelled = true; };
+  }, [value]);
   return (
     <div className="remote-panel__qr">
-      <img src={src} alt="Pairing QR code" width={112} height={112} />
+      {src && <img src={src} alt="Pairing QR code" width={112} height={112} />}
     </div>
   );
 }
