@@ -164,6 +164,14 @@ export const MODELS: ModelEntry[] = [
     supportsFast: true,
   },
   {
+    value: "openai:gpt-6.1-sol",
+    provider: "openai",
+    label: "GPT-6.1 Sol",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+    supportsFast: true,
+  },
+  {
     value: "openai:gpt-6-sol",
     provider: "openai",
     label: "GPT-6 Sol",
