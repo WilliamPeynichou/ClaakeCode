@@ -1,18 +1,18 @@
-/* Liquid Glass — full-screen WebGL fluid-refraction background.
+/* Liquid Glass - full-screen WebGL fluid-refraction background.
    Drives the whole site's art direction. Scroll + mouse animate it,
    themes recolor it live via window.setLiquidTheme(theme).
 
    Perf optimisations:
-     · precision mediump  — suffisant pour le bruit fractal
-     · 5 appels fbm (était 8) — suppression du calcul de normales (hx/hy)
+     · precision mediump  - suffisant pour le bruit fractal
+     · 5 appels fbm (était 8) - suppression du calcul de normales (hx/hy)
                                  et du fbm vein remplacé par r.xy existants
-     · 30 fps cap          — background fluide, imperceptible vs 60 fps
-     · 50 % fill-rate      — canvas rendu à 50 % logique, étiré par CSS
+     · 30 fps cap          - background fluide, imperceptible vs 60 fps
+     · 50 % fill-rate      - canvas rendu à 50 % logique, étiré par CSS
                               → 4× moins de pixels par frame
-     · dpr=1               — pas de surcharge HiDPI
-     · Page Visibility API — pause RAF onglet caché
+     · dpr=1               - pas de surcharge HiDPI
+     · Page Visibility API - pause RAF onglet caché
      · debounce resize 150 ms
-     · Adaptive quality    — mobile/low-end : 25 % fill-rate + 24 fps      */
+     · Adaptive quality    - mobile/low-end : 25 % fill-rate + 24 fps      */
 
 (function () {
   const canvas = document.getElementById('bg');
@@ -71,7 +71,7 @@
         vec2 u=f*f*(3.-2.*f);
         return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
       }
-      /* 4 octaves — équilibre qualité/perf */
+      /* 4 octaves - équilibre qualité/perf */
       float fbm(vec2 p){
         float v=0., a=0.5;
         mat2 m=mat2(1.6,1.2,-1.2,1.6);
@@ -86,7 +86,7 @@
         float t  = uTime*0.05;
         float sc = uScroll;
 
-        /* domain-warped flow field — 5 fbm (était 8) */
+        /* domain-warped flow field - 5 fbm (était 8) */
         vec2 q = vec2(fbm(p*1.5 + vec2(0.0,t)),
                       fbm(p*1.5 + vec2(5.2,1.3) - t));
         vec2 r = vec2(fbm(p*1.5 + 2.0*q + vec2(1.7,9.2) + 0.15*t + sc*0.5),
@@ -99,7 +99,7 @@
         vec3  col = mix(cDeep, cMid,  m1);
         col       = mix(col,  cLight, m2*0.9);
 
-        /* veines accent — dérivées de r.xy (pas de fbm supplémentaire) */
+        /* veines accent - dérivées de r.xy (pas de fbm supplémentaire) */
         float vein = smoothstep(0.54, 0.72, r.x*0.6 + r.y*0.4);
         col = mix(col, cAccent, vein*0.38);
 
@@ -122,7 +122,7 @@
 
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
 
-  /* ── Resize — 50 % fill-rate, debounce 150 ms ───────────────────── */
+  /* ── Resize - 50 % fill-rate, debounce 150 ms ───────────────────── */
   let resizeTimer;
   function applyResize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -134,7 +134,7 @@
   window.addEventListener('resize', onResize);
   applyResize();
 
-  /* ── Scroll — smoothed ───────────────────────────────────────────── */
+  /* ── Scroll - smoothed ───────────────────────────────────────────── */
   let scrollTarget = 0, scrollSmooth = 0;
   function onScroll() {
     const max = document.documentElement.scrollHeight - window.innerHeight;
@@ -143,14 +143,14 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  /* ── Mouse — smoothed ────────────────────────────────────────────── */
+  /* ── Mouse - smoothed ────────────────────────────────────────────── */
   let mx = 0.5, my = 0.5, tmx = 0.5, tmy = 0.5;
   window.addEventListener('pointermove', (e) => {
     tmx = e.clientX / window.innerWidth;
     tmy = 1.0 - e.clientY / window.innerHeight;
   });
 
-  /* ── Theme transition — lerp colors ─────────────────────────────── */
+  /* ── Theme transition - lerp colors ─────────────────────────────── */
   const cur = { cDeep: C('#0c1f17'), cMid: C('#1f6b48'), cLight: C('#cfe9b0'), cAccent: C('#e8c87a') };
   const tgt = { cDeep: C('#0c1f17'), cMid: C('#1f6b48'), cLight: C('#cfe9b0'), cAccent: C('#e8c87a') };
   window.setLiquidTheme = function (theme) {
@@ -160,14 +160,14 @@
     tgt.cAccent.set(theme.accent);
   };
 
-  /* ── Page Visibility — pause RAF quand onglet caché ─────────────── */
+  /* ── Page Visibility - pause RAF quand onglet caché ─────────────── */
   let paused = false;
   document.addEventListener('visibilitychange', () => {
     paused = document.hidden;
     if (!paused) requestAnimationFrame(tick);
   });
 
-  /* ── Render loop — capé à TARGET_FPS ────────────────────────────── */
+  /* ── Render loop - capé à TARGET_FPS ────────────────────────────── */
   const clock = new THREE.Clock();
   let lastFrame = 0;
 

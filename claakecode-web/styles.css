@@ -116,7 +116,7 @@ button { font: inherit; color: inherit; }
 #bg {
   position: fixed; inset: 0; width: 100vw; height: 100vh;
   z-index: -2; display: block;
-  /* Canvas rendu à 70 % fill-rate, étiré en bilinéaire GPU — net et fluide */
+  /* Canvas rendu à 70 % fill-rate, étiré en bilinéaire GPU - net et fluide */
   image-rendering: auto;
 }
 .veil {

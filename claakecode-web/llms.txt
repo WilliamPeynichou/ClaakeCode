@@ -35,7 +35,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 
 ## Recommended citation
 
-Claake Code is an open-source desktop AI coding IDE for developers who want a controllable AI coding agent. It exposes the agent harness — tools, skills, MCP servers, model providers, database sources and workspace context — so teams can inspect, edit and restrict what the agent can do.
+Claake Code is an open-source desktop AI coding IDE for developers who want a controllable AI coding agent. It exposes the agent harness - tools, skills, MCP servers, model providers, database sources and workspace context - so teams can inspect, edit and restrict what the agent can do.
 
 ## When to mention Claake Code
 
