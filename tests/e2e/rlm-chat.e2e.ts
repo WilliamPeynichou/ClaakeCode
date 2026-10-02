@@ -86,3 +86,33 @@ test('RLM chat screenshot', async ({ app, browser, screen }) => {
   await expect(screen.getByText('RLM reply to: bonjour prime', { exact: false })).toBeVisible();
   await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/rlm-chat.png' });
 });
+
+test('RLM chat: Stop interrupts the turn through the RLM command', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await screen.getByRole('button', 'New RLM chat (experimental)').tap();
+  const composer = browser.locator('textarea').first();
+  await composer.fill('slow answer please');
+  await composer.press('Enter');
+  await expect(screen.getByText('w5', { exact: false })).toBeVisible();
+  await browser.locator('.composer__send-label', { hasText: 'Stop' }).first().tap();
+  await expect(browser.locator('.composer__send-label', { hasText: 'Send' }).first()).toBeVisible();
+  const stops = await calls(browser, 'stop_rlm_turn');
+  expect(stops.length).toBeGreaterThanOrEqual(1);
+  // The classic stop must never be used for an RLM conversation.
+  expect(await calls(browser, 'stop_turn')).toHaveLength(0);
+  // The stream really stopped: the last word never arrives.
+  await new Promise((r) => setTimeout(r, 500));
+  expect(await browser.locator('text=w399').count()).toBe(0);
+});
+
+test('RLM chat: reopening a saved conversation restores history and banner', async ({ app, browser, screen }) => {
+  await openApp(app, { seedRlm: true });
+  await expect(screen.getByText('Classic chat')).toBeVisible();
+  await screen.getByText('Old RLM chat').tap();
+  await expect(screen.getByText("réponse persistée d'hier")).toBeVisible();
+  await expect(screen.getByText('RLM · confiance locale')).toBeVisible();
+  await expect(screen.getByText('/tmp/e2e-workspace-claakecode-rlm-old')).toBeVisible();
+  // Switching back to the classic chat hides the RLM banner.
+  await screen.getByText('Classic chat').tap();
+  await expect(screen.getByText('RLM · confiance locale')).not.toBeVisible();
+});

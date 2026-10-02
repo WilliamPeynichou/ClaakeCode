@@ -9,6 +9,8 @@
 export type MockOptions = {
   /** When true, create_rlm_conversation fails like a non-git workspace. */
   rlmCreateFails?: boolean;
+  /** Seeds an existing RLM conversation with history, as after an app restart. */
+  seedRlm?: boolean;
 };
 
 export function installTauriMock(options: MockOptions) {
@@ -32,6 +34,16 @@ export function installTauriMock(options: MockOptions) {
   });
   const conversations = [conv("c-classic", "Classic chat", "classic")];
   const bindings: Record<string, { worktreePath: string; sessionPath: string | null }> = {};
+  if (options.seedRlm) {
+    const seeded = conv("c-rlm-old", "Old RLM chat", "rlm");
+    seeded.saved.history.push(
+      { role: "user", parts: [{ type: "text", text: "question d'hier" }] },
+      { role: "assistant", parts: [{ type: "text", text: "réponse persistée d'hier" }] },
+    );
+    conversations.push(seeded);
+    bindings["c-rlm-old"] = { worktreePath: "/tmp/e2e-workspace-claakecode-rlm-old", sessionPath: "/data/s.jsonl" };
+  }
+  let stopRequested = false;
   const callbacks = new Map<number, (payload: unknown) => void>();
   const listeners = new Map<string, number[]>();
   let nextId = 1;
@@ -83,10 +95,18 @@ export function installTauriMock(options: MockOptions) {
       const c = conversations.find((x) => x.summary.id === input.conversationId)!;
       c.saved.history.push({ role: "user", parts: [{ type: "text", text: input.text }] });
       const reply = `RLM reply to: ${input.text}`;
+      // "slow" in the prompt streams long enough for the user to press Stop.
+      const words = input.text.includes("slow") ? Array.from({ length: 400 }, (_, i) => `w${i}`) : reply.split(" ");
+      stopRequested = false;
       agentEvent(input.conversationId, { type: "turn_started" });
       agentEvent(input.conversationId, { type: "text_started" });
-      for (const word of reply.split(" ")) {
+      for (const word of words) {
         await new Promise((r) => setTimeout(r, 20));
+        if (stopRequested) {
+          agentEvent(input.conversationId, { type: "text_finished" });
+          agentEvent(input.conversationId, { type: "interrupted" });
+          return null;
+        }
         agentEvent(input.conversationId, { type: "text_chunk", delta: `${word} ` });
       }
       agentEvent(input.conversationId, { type: "text_finished" });
@@ -94,7 +114,10 @@ export function installTauriMock(options: MockOptions) {
       c.saved.history.push({ role: "assistant", parts: [{ type: "text", text: reply }] });
       return null;
     },
-    stop_rlm_turn: () => null,
+    stop_rlm_turn: () => {
+      stopRequested = true;
+      return null;
+    },
     get_python_runtime_status: () => ({
       env: {
         venvPath: "/data/claakecode/prime/kernel-venv",
