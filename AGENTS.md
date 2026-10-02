@@ -15,6 +15,7 @@ Code map:
 ├── LICENSE
 ├── package-lock.json
 ├── package.json
+├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
 ├── README.md
 ├── remote
 │   ├── README.md
@@ -45,7 +46,13 @@ Code map:
 ├── test-stop.md
 ├── scripts
 │   ├── capture-refero-heroes.mjs
-│   └── prepare-sidecars.mjs
+│   ├── prepare-sidecars.mjs
+│   └── prepare-prime-sidecar.mjs — moteur du chat RLM : compile prime-agent au SHA épinglé + uv épinglé (SHA-256 vérifié), lipo universel ; opt-in CLAAKECODE_BUNDLE_PRIME=1 ou `npm run prepare-prime`
+├── spikes
+│   └── prime-acp — spike P0 jetable : pilotage de prime-agent en sidecar (ACP et protocole daemon v7) et ADR
+│       ├── README.md — résultats, pièges, ADR P0
+│       ├── acp_spike.py — client ACP stdio, 8 scénarios (in-process et daemon)
+│       └── daemon_spike.py — client direct du protocole daemon v7 : récursion RLM, collect, kill, vérification des orphelins
 ├── tsconfig.json
 ├── tsconfig.node.json
 ├── vite.config.ts
@@ -98,11 +105,12 @@ Code map:
 │   │       ├── lib.rs
 │   │       ├── mcp.rs
 │   │       ├── powershell.rs
+│   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
 │   │       ├── skill.rs
-│   │       ├── store.rs
+│   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10)
 │   │       ├── subagent.rs
 │   │       ├── team.rs
 │   │       ├── team
@@ -180,6 +188,7 @@ Code map:
 │   │   └── .gitkeep
 │   ├── build.rs
 │   ├── tauri.sidecars.conf.json
+│   ├── tauri.prime.conf.json — sidecars macOS/Linux : rg + prime-agent + uv (chat RLM)
 │   ├── tauri.conf.json
 │   ├── tauri.windows.conf.json
 │   ├── capabilities
@@ -264,6 +273,8 @@ Code map:
 │       ├── platform.rs
 │       ├── providers.rs
 │       ├── remote.rs
+│       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM, `npm run test:e2e`)
+│       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath, Stop, get_rlm_binding
 │       ├── state.rs
 │       ├── swarm.rs
 │       ├── terminal.rs
@@ -302,6 +313,8 @@ Code map:
     │   └── chat
     │       ├── AIThinkingBlock.tsx
     │       ├── ChatPane.tsx
+    │       ├── RlmBanner.tsx — bandeau « confiance locale » du chat RLM (worktree isolé, pas de sandbox)
+    │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)
     │       ├── DotmSquare2.tsx
     │       ├── DotmSquare5.tsx
     │       ├── FileChangeBlock.tsx

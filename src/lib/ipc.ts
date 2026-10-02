@@ -65,7 +65,26 @@ import type {
   WorkspaceSearchResult,
 } from "../types";
 
+export type PythonRuntimeStatus = {
+  env: {
+    venvPath: string;
+    installed: boolean;
+    pythonVersion: string | null;
+    packages: { name: string; version: string }[];
+    sizeBytes: number;
+  };
+  running: boolean;
+  activeSessions: number;
+  connectedProviders: string[];
+};
+
 export const api = {
+  getPythonRuntimeStatus() {
+    return invoke<PythonRuntimeStatus>("get_python_runtime_status");
+  },
+  restartPythonRuntime() {
+    return invoke<void>("restart_python_runtime");
+  },
   openWorkspace(workspacePath: string) {
     return invoke<WorkspaceBootstrap>("open_workspace", {
       input: { workspacePath },
@@ -328,6 +347,37 @@ export const api = {
     return invoke<WorkspaceBootstrap>("create_conversation", {
       input: { workspacePath },
     });
+  },
+  createRlmConversation(workspacePath: string) {
+    return invoke<WorkspaceBootstrap>("create_rlm_conversation", {
+      input: { workspacePath },
+    });
+  },
+  sendRlmMessage(
+    workspacePath: string,
+    conversationId: string,
+    text: string,
+    model?: { provider: string; name: string },
+  ) {
+    return invoke<void>("send_rlm_message", {
+      input: {
+        workspacePath,
+        conversationId,
+        text,
+        model: model ? { provider: model.provider, name: model.name } : null,
+      },
+    });
+  },
+  stopRlmTurn(workspacePath: string, conversationId: string) {
+    return invoke<void>("stop_rlm_turn", {
+      input: { workspacePath, conversationId },
+    });
+  },
+  getRlmBinding(workspacePath: string, conversationId: string) {
+    return invoke<{ worktreePath: string; sessionPath: string | null } | null>(
+      "get_rlm_binding",
+      { input: { workspacePath, conversationId } },
+    );
   },
   loadConversation(workspacePath: string, conversationId: string) {
     return invoke<SavedConversation>("load_conversation", {

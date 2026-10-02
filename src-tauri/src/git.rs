@@ -1214,6 +1214,23 @@ fn remote_branch_for(repo_root: &Path, branch: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Creates the isolated worktree an RLM conversation runs in, on a fresh branch from HEAD.
+/// The user's checkout is never touched; a non-git workspace is refused rather than
+/// letting Prime write straight into it.
+pub(super) fn create_rlm_worktree(workspace_root: &Path, tag: &str) -> Result<PathBuf> {
+    let repo_root = require_repo_root(workspace_root)
+        .map_err(|_| anyhow::anyhow!("RLM chat needs a git repository: it works in an isolated worktree"))?;
+    validate_revision_exists(&repo_root, "HEAD")
+        .map_err(|_| anyhow::anyhow!("RLM chat needs at least one commit to create its worktree"))?;
+    let branch = format!("claakecode/rlm-{tag}");
+    let path = next_worktree_path(&repo_root, &branch)?;
+    git_checked_owned(
+        &repo_root,
+        &["worktree".into(), "add".into(), "-b".into(), branch, path.display().to_string(), "HEAD".into()],
+    )?;
+    Ok(canonical_or_original(&path))
+}
+
 fn next_worktree_path(repo_root: &Path, branch: &str) -> Result<PathBuf> {
     let records = list_worktree_records(repo_root)?;
     let main_path = records
@@ -1541,6 +1558,23 @@ mod tests {
         assert!(!local_branch_exists(&repo, "old").expect("old branch missing"));
         assert!(local_branch_exists(&repo, "new").expect("new branch exists"));
         fs::remove_dir_all(repo).ok();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn rlm_worktree_is_isolated_and_non_git_is_refused() {
+        let repo = init_test_repo("rlm-wt");
+        let worktree = create_rlm_worktree(&repo, "abc").expect("worktree");
+        assert_ne!(worktree, repo);
+        assert!(worktree.join("README.md").is_file());
+        let branch = git_checked(&worktree, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap();
+        assert_eq!(branch.stdout.trim(), "claakecode/rlm-abc");
+        let plain = unique_temp_dir("rlm-plain");
+        fs::create_dir_all(&plain).unwrap();
+        assert!(create_rlm_worktree(&plain, "x").is_err());
+        git_checked(&repo, &["worktree", "remove", "--force", &worktree.display().to_string()]).ok();
+        fs::remove_dir_all(&repo).ok();
+        fs::remove_dir_all(&plain).ok();
     }
 
     fn init_test_repo(name: &str) -> PathBuf {

@@ -839,3 +839,14 @@ impl ThinkingLevelInput {
         }
     }
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct RlmMessageInput {
+    pub(super) workspace_path: String,
+    pub(super) conversation_id: String,
+    pub(super) text: String,
+    /// Same model picker as the classic chat; `None` keeps Prime's session model.
+    #[serde(default)]
+    pub(super) model: Option<ModelInput>,
+}

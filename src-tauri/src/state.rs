@@ -53,6 +53,7 @@ pub(super) struct DesktopState {
     pub(super) mistral_login: Arc<Mutex<Option<MistralLoginAttempt>>>,
     pub(super) xai_login: Arc<Mutex<Option<XaiLoginAttempt>>>,
     pub(super) mcp_login: Arc<Mutex<Option<McpLoginAttempt>>>,
+    pub(super) rlm: crate::rlm::SharedRlm,
 }
 
 #[derive(Clone)]

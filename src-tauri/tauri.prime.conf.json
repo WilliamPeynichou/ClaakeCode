@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/rg",
+      "binaries/prime-agent",
+      "binaries/uv"
+    ]
+  }
+}

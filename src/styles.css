@@ -1728,6 +1728,9 @@ textarea {
   border-radius: var(--r-med);
   transition: background 150ms ease, color 150ms ease;
 }
+.conv-row:has(.conv-row__badge) {
+  grid-template-columns: auto 1fr auto auto;
+}
 .conv-row:hover {
   background: var(--bg-2);
 }
@@ -10457,3 +10460,44 @@ textarea {
   .remote-panel__pairing { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .remote-panel__pairing-copy { align-items: center; }
 }
+
+.conv-row__badge {
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 15px;
+  opacity: 0.7;
+}
+
+.rlm-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  background: rgba(214, 160, 40, 0.1);
+}
+.rlm-banner code {
+  word-break: break-all;
+}
+.rlm-banner + .chat-col {
+  height: auto;
+  min-height: 0;
+}
+
+.python-runtime { display: flex; flex-direction: column; gap: 14px; padding: 16px 20px; overflow: auto; }
+.python-runtime__grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin: 0; font-size: 12.5px; }
+.python-runtime__grid dt { color: var(--fg-2, #888); }
+.python-runtime__grid dd { margin: 0; display: flex; align-items: center; gap: 6px; word-break: break-all; }
+.python-runtime__dot { width: 7px; height: 7px; border-radius: 50%; background: #888; flex: none; }
+.python-runtime__dot[data-on="true"] { background: #3fb950; }
+.python-runtime__muted { color: var(--fg-2, #888); font-size: 12px; margin: 0; }
+.python-runtime__error { color: #f85149; font-size: 12px; margin: 0; }
+.python-runtime__packages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.python-runtime__packages h2 { font-size: 13px; margin: 0; }
+.python-runtime__packages ul { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; }
+.python-runtime__packages li { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border, rgba(127,127,127,.15)); }

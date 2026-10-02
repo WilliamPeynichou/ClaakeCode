@@ -71,6 +71,19 @@ pub struct ConversationSummary {
     pub id: String,
     pub title: String,
     pub updated_at_ms: i64,
+    /// `classic` (default for every pre-existing conversation) or `rlm`.
+    pub harness: String,
+}
+
+pub const HARNESS_CLASSIC: &str = "classic";
+pub const HARNESS_RLM: &str = "rlm";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RlmBinding {
+    pub worktree_path: String,
+    /// Prime session file, used to reopen the transcript after a daemon restart.
+    pub session_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -716,11 +729,15 @@ impl AppStore {
     /// Build an in-memory store backed by a unique temporary SQLite file.
     /// Intended for tests only.
     pub fn in_memory() -> Result<Self> {
+        // A counter, not just the clock: parallel tests in the same millisecond shared a file
+        // and raced on migrations.
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let dir = std::env::temp_dir();
         let unique = format!(
-            "claakecode-test-{}-{}.sqlite3",
+            "claakecode-test-{}-{}-{}.sqlite3",
             std::process::id(),
-            now_ms()
+            now_ms(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         );
         let store = Self {
             path: dir.join(unique),
@@ -811,11 +828,70 @@ impl AppStore {
         })
     }
 
+    /// Harness is immutable after creation: no conversion between classic and RLM.
+    pub fn create_rlm_conversation(
+        &self,
+        workspace_id: &str,
+        default_model: &ModelRef,
+        default_system: &str,
+    ) -> Result<SavedConversation> {
+        let conversation = self.create_conversation(workspace_id, default_model, default_system)?;
+        self.connection()?
+            .execute(
+                "update conversations set harness = ?1 where id = ?2",
+                params![HARNESS_RLM, &conversation.id],
+            )
+            .context("unable to mark conversation as rlm")?;
+        Ok(conversation)
+    }
+
+    /// Binds an RLM conversation to its isolated worktree. Set once, at creation.
+    pub fn set_rlm_worktree(&self, conversation_id: &str, worktree_path: &str) -> Result<()> {
+        self.connection()?
+            .execute(
+                "insert into rlm_bindings (conversation_id, worktree_path) values (?1, ?2)
+                 on conflict(conversation_id) do update set worktree_path = excluded.worktree_path",
+                params![conversation_id, worktree_path],
+            )
+            .context("unable to bind rlm worktree")?;
+        Ok(())
+    }
+
+    /// Persists the Prime session file so a reopened conversation resumes the same session.
+    pub fn set_rlm_session(&self, conversation_id: &str, session_path: Option<&str>) -> Result<()> {
+        self.connection()?
+            .execute(
+                "update rlm_bindings set session_path = ?2 where conversation_id = ?1",
+                params![conversation_id, session_path],
+            )
+            .context("unable to bind rlm session")?;
+        Ok(())
+    }
+
+    pub fn rlm_binding(&self, conversation_id: &str) -> Result<Option<RlmBinding>> {
+        self.connection()?
+            .query_row(
+                "select worktree_path, session_path from rlm_bindings where conversation_id = ?1",
+                params![conversation_id],
+                |row| Ok(RlmBinding { worktree_path: row.get(0)?, session_path: row.get(1)? }),
+            )
+            .optional()
+            .context("unable to load rlm binding")
+    }
+
+    /// Unknown conversations are `None`; callers must not assume classic for them.
+    pub fn conversation_harness(&self, id: &str) -> Result<Option<String>> {
+        self.connection()?
+            .query_row("select harness from conversations where id = ?1", params![id], |row| row.get(0))
+            .optional()
+            .context("unable to load conversation harness")
+    }
+
     pub fn list_conversations(&self, workspace_id: &str) -> Result<Vec<ConversationSummary>> {
         let conn = self.connection()?;
         let mut statement = conn
             .prepare(
-                "select id, title, updated_at_ms from conversations
+                "select id, title, updated_at_ms, harness from conversations
                  where workspace_id = ?1
                  order by updated_at_ms desc",
             )
@@ -827,6 +903,7 @@ impl AppStore {
                     id: row.get(0)?,
                     title: row.get(1)?,
                     updated_at_ms: row.get(2)?,
+                    harness: row.get(3)?,
                 })
             })
             .context("unable to read conversation list")?;
@@ -1914,7 +1991,7 @@ impl AppStore {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap_or(0);
 
-        if version >= 9 {
+        if version >= 11 {
             return Ok(());
         }
 
@@ -1967,7 +2044,9 @@ impl AppStore {
             conn.execute("delete from turn_checkpoints", [])
                 .context("unable to clear legacy turn checkpoints")?;
         }
-        conn.pragma_update(None, "user_version", 9)
+        ensure_conversations_harness_column(&conn)?;
+        ensure_rlm_bindings_table(&conn)?;
+        conn.pragma_update(None, "user_version", 11)
             .context("unable to set sqlite schema version")?;
         Ok(())
     }
@@ -2055,6 +2134,27 @@ fn ensure_conversations_title_initialized_column(conn: &Connection) -> Result<()
         "#,
     )
     .context("unable to add conversation title initialization column")?;
+    Ok(())
+}
+
+fn ensure_conversations_harness_column(conn: &Connection) -> Result<()> {
+    if conversation_has_column(conn, "harness")? {
+        return Ok(());
+    }
+    conn.execute_batch("alter table conversations add column harness text not null default 'classic';")
+        .context("unable to add conversation harness column")?;
+    Ok(())
+}
+
+fn ensure_rlm_bindings_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "create table if not exists rlm_bindings (
+            conversation_id text primary key references conversations(id) on delete cascade,
+            worktree_path text not null,
+            session_path text
+        );",
+    )
+    .context("unable to create rlm bindings table")?;
     Ok(())
 }
 
@@ -2302,6 +2402,39 @@ mod tests {
                 meta,
             }],
         }
+    }
+
+    #[test]
+    fn harness_defaults_to_classic_and_rlm_persists_and_migrates_legacy_db() -> Result<()> {
+        let path = std::env::temp_dir().join(format!("claakecode-harness-{}.sqlite3", Uuid::new_v4()));
+        let store = AppStore { path: path.clone() };
+        let result = (|| -> Result<()> {
+            store.migrate()?;
+            let model = ModelRef::new("test", "model");
+            let classic = store.create_conversation("w", &model, "system")?;
+            let rlm = store.create_rlm_conversation("w", &model, "system")?;
+            assert_eq!(store.conversation_harness(&classic.id)?.as_deref(), Some(HARNESS_CLASSIC));
+            assert_eq!(store.conversation_harness(&rlm.id)?.as_deref(), Some(HARNESS_RLM));
+            assert_eq!(store.conversation_harness("missing")?, None);
+            let listed = store.list_conversations("w")?;
+            assert_eq!(listed.iter().find(|c| c.id == rlm.id).unwrap().harness, HARNESS_RLM);
+            assert_eq!(store.rlm_binding(&rlm.id)?, None);
+            store.set_rlm_worktree(&rlm.id, "/tmp/wt")?;
+            store.set_rlm_session(&rlm.id, Some("s1"))?;
+            assert_eq!(
+                store.rlm_binding(&rlm.id)?,
+                Some(RlmBinding { worktree_path: "/tmp/wt".into(), session_path: Some("s1".into()) })
+            );
+            // Simulate a v9 database: column absent, rows must become classic.
+            let conn = Connection::open(&path)?;
+            conn.execute_batch("alter table conversations drop column harness; pragma user_version = 9;")?;
+            drop(conn);
+            store.migrate()?;
+            assert_eq!(store.conversation_harness(&rlm.id)?.as_deref(), Some(HARNESS_CLASSIC));
+            Ok(())
+        })();
+        let _ = fs::remove_file(path);
+        result
     }
 
     #[test]

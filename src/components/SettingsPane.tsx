@@ -24,6 +24,7 @@ import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { DatabaseSection } from "./DatabaseSettingsSection";
 import { ProdSection } from "./ProdSettingsSection";
 import { TypeSafeSection } from "./TypeSafeSettingsSection";
+import { PythonRuntimeSection } from "./PythonRuntimeSection";
 import { EmbeddingSection } from "./EmbeddingSettingsSection";
 import {
   EMPTY_PROD_SETTINGS,
@@ -128,7 +129,8 @@ type Section =
   | "mcp"
   | "skills"
   | "subagents"
-  | "embedding";
+  | "embedding"
+  | "python";
 
 export function SettingsPane({ workspacePath }: Props) {
   const [section, setSection] = useState<Section>("about");
@@ -2244,6 +2246,21 @@ export function SettingsPane({ workspacePath }: Props) {
         </button>
         <button
           type="button"
+          className="settings-pane__nav-item"
+          data-active={section === "python" ? "true" : "false"}
+          onClick={() => setSection("python")}
+        >
+          <Icon
+            icon="solar:code-square-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">Python persistant</span>
+          <span className="settings-pane__nav-count" />
+        </button>
+        <button
+          type="button"
           className="settings-pane__nav-item settings-pane__nav-item--embedding"
           data-active={section === "embedding" ? "true" : "false"}
           onClick={() => setSection("embedding")}
@@ -2457,6 +2474,8 @@ export function SettingsPane({ workspacePath }: Props) {
               void updateSkillContent(skill, content)
             }
           />
+        ) : section === "python" ? (
+          <PythonRuntimeSection />
         ) : section === "embedding" ? (
           <EmbeddingSection
             settings={embeddingSettings}

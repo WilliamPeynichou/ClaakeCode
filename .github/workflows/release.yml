@@ -99,7 +99,9 @@ jobs:
           - name: macos-universal
             os: macos-latest
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
-            tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
+            # tauri.prime.conf.json = ripgrep + prime-agent + uv (RLM chat engine).
+            tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.prime.conf.json --ignore-version-mismatches"
+            bundle_prime: "1"
           # Windows x64 installer bundles — MSI + NSIS.
           - name: windows-x64
             os: windows-2022
@@ -109,7 +111,8 @@ jobs:
           - name: linux-x64
             os: ubuntu-22.04
             rust_targets: "x86_64-unknown-linux-gnu"
-            tauri_args: "--target x86_64-unknown-linux-gnu --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
+            tauri_args: "--target x86_64-unknown-linux-gnu --config src-tauri/tauri.prime.conf.json --ignore-version-mismatches"
+            bundle_prime: "1"
     runs-on: ${{ matrix.platform.os }}
     steps:
       - uses: actions/checkout@v4
@@ -186,6 +189,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: "true"
+          # Windows stays without the RLM engine until the daemon transport is ported.
+          CLAAKECODE_BUNDLE_PRIME: ${{ matrix.platform.bundle_prime || '0' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:

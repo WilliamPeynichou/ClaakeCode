@@ -22,6 +22,7 @@ import { TerminalPanel } from "./TerminalPanel";
 import { RemotePanel } from "./RemotePanel";
 import { SearchPane } from "./SearchPane";
 import { ChatPane, type ExternalDropFeed } from "./chat/ChatPane";
+import { RlmBanner } from "./chat/RlmBanner";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { useTheme } from "../lib/theme";
 import { UpdateBadge } from "./UpdateBadge";
@@ -218,6 +219,23 @@ export function Workspace({
       setGlobalModeModelSettings(next.modeModelSettings);
     } catch (err) {
       console.error(err);
+    }
+  }, [workspacePath]);
+
+  const createRlmConversation = useCallback(async () => {
+    const seq = ++navigationSeqRef.current;
+    try {
+      const next = await api.createRlmConversation(workspacePath);
+      if (seq !== navigationSeqRef.current) return;
+      if (next.workspace.path !== workspacePath) return;
+      activeConvIdRef.current = next.activeConversation.id;
+      setConversations(next.conversations);
+      setActiveConv(next.activeConversation);
+      setGlobalModeModelSettings(next.modeModelSettings);
+    } catch (err) {
+      console.error(err);
+      // Isolation failures (non-git workspace, no commit) must be visible, not silent.
+      window.alert(String(err));
     }
   }, [workspacePath]);
 
@@ -1427,6 +1445,13 @@ export function Workspace({
       markConversationStreamingModel(conversationId, model, thinking);
       markConversationStreaming(conversationId, true);
       try {
+        if (
+          conversations.find((c) => c.id === conversationId)?.harness === "rlm"
+        ) {
+          // RLM turns go to the Prime sidecar; the backend refuses other harnesses.
+          await api.sendRlmMessage(workspaceAtRequest, conversationId, text, model);
+          return;
+        }
         await sendMessageWithBusyRetry(
           workspaceAtRequest,
           conversationId,
@@ -1665,11 +1690,15 @@ export function Workspace({
 
   const stopTurn = useCallback(async () => {
     try {
+      if (conversations.find((c) => c.id === activeConv.id)?.harness === "rlm") {
+        await api.stopRlmTurn(workspacePath, activeConv.id);
+        return;
+      }
       await api.cancelTurn(workspacePath, activeConv.id);
     } catch (err) {
       console.error(err);
     }
-  }, [workspacePath, activeConv.id]);
+  }, [workspacePath, activeConv.id, conversations]);
 
   // Switch this window to another workspace path. Used by the Git
   // panel when the user clicks a worktree row or creates a new one.
@@ -2070,6 +2099,15 @@ export function Workspace({
                       height={15}
                     />
                   </button>
+                  <button
+                    type="button"
+                    className="sidebar__head-btn"
+                    onClick={createRlmConversation}
+                    title="New RLM chat (experimental, Prime Agent)"
+                    aria-label="New RLM chat (experimental)"
+                  >
+                    <span aria-hidden="true">RLM</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -2217,8 +2255,12 @@ export function Workspace({
             flex: `0 0 ${rightWidth}px`,
             minWidth: 0,
             display: "flex",
+            flexDirection: "column",
           }}
         >
+          {conversations.find((c) => c.id === activeConv.id)?.harness === "rlm" && (
+            <RlmBanner workspacePath={workspacePath} conversationId={activeConv.id} />
+          )}
           <ChatPane
             workspacePath={workspacePath}
             conversationId={activeConv.id}

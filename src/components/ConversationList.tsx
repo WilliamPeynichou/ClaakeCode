@@ -86,6 +86,14 @@ export function ConversationList({
               >
                 {conv.title || "Untitled"}
               </span>
+              {conv.harness === "rlm" && (
+                <span
+                  className="conv-row__badge"
+                  title="RLM chat (experimental, Prime Agent)"
+                >
+                  RLM
+                </span>
+              )}
               <span className="conv-row__actions">
                 <button
                   className="conv-row__btn"

@@ -135,6 +135,7 @@ mod platform;
 mod prod;
 mod providers;
 mod remote;
+mod rlm;
 mod state;
 mod swarm;
 mod terminal;
@@ -238,6 +239,7 @@ pub fn run() {
         mistral_login: Arc::new(Mutex::new(None)),
         xai_login: Arc::new(Mutex::new(None)),
         mcp_login: Arc::new(Mutex::new(None)),
+        rlm: Arc::new(Mutex::new(rlm::RlmRuntime::default())),
     };
 
     tauri::Builder::default()
@@ -426,6 +428,12 @@ pub fn run() {
             conversations::save_skill_settings,
             turns::check_rewrite_workspace_restore,
             turns::send_message,
+            rlm::create_rlm_conversation,
+            rlm::send_rlm_message,
+            rlm::stop_rlm_turn,
+            rlm::get_rlm_binding,
+            rlm::get_python_runtime_status,
+            rlm::restart_python_runtime,
             turns::answer_question,
             turns::reject_question,
             turns::compact_conversation,
@@ -459,6 +467,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building claakecode desktop")
         .run(|app, event| {
+            // No Prime daemon may outlive the app.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<DesktopState>() {
+                    let rlm = state.rlm.clone();
+                    tauri::async_runtime::block_on(rlm::shutdown_rlm(&rlm));
+                }
+            }
             #[cfg(not(target_os = "macos"))]
             let _ = (&app, &event);
 

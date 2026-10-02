@@ -110,6 +110,8 @@ export type ConversationSummary = {
   id: string;
   title: string;
   updatedAtMs: number;
+  /** Absent on payloads from older backends: treat as classic. */
+  harness?: "classic" | "rlm";
 };
 
 export type SavedConversation = {
