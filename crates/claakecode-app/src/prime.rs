@@ -615,6 +615,37 @@ impl Sidecar {
     }
 }
 
+/// True when a daemon answers on `socket` (liveness probe, no command sent).
+#[cfg(unix)]
+pub async fn daemon_alive(socket: &std::path::Path) -> bool {
+    tokio::net::UnixStream::connect(socket).await.is_ok()
+}
+
+/// Non-Unix builds: the daemon transport is a Unix socket, so the RLM engine is unavailable.
+/// These keep the app compiling and fail every entry point with a clear message.
+#[cfg(not(unix))]
+mod unsupported {
+    use super::*;
+    const UNSUPPORTED: &str = "RLM chat is not available on this platform yet (Prime daemon needs Unix sockets)";
+
+    pub struct Sidecar { pub socket: std::path::PathBuf }
+    impl Sidecar {
+        pub async fn start(_: &SidecarConfig) -> Result<Self> { bail!(UNSUPPORTED) }
+        pub async fn stop(self) -> Result<()> { Ok(()) }
+    }
+    pub async fn daemon_alive(_: &std::path::Path) -> bool { false }
+    pub async fn create_session_with(
+        _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&std::path::Path>, _: Option<&str>,
+    ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
+    pub async fn abort_session(_: &std::path::Path, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
+    pub async fn set_model(_: &std::path::Path, _: &str, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
+    pub async fn run_prompt(
+        _: &std::path::Path, _: &str, _: &str, _: Duration, _: impl FnMut(crate::AgentEvent),
+    ) -> Result<()> { bail!(UNSUPPORTED) }
+}
+#[cfg(not(unix))]
+pub use unsupported::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -124,7 +124,7 @@ async fn ensure_sidecar(
     prime::write_auth_file(&prime_dir.join("agent"), &credentials).map_err(error_to_string)?;
     let providers = provider_set(&credentials);
     if let Some(sidecar) = &runtime.sidecar {
-        let alive = tokio::net::UnixStream::connect(&sidecar.socket).await.is_ok();
+        let alive = prime::daemon_alive(&sidecar.socket).await;
         if alive && runtime.providers == providers {
             return Ok((sidecar.socket.clone(), credentials));
         }
@@ -329,7 +329,7 @@ pub(super) async fn get_python_runtime_status(
         .map_err(|err| err.to_string())?;
     let runtime = state.rlm.lock().await;
     let running = match &runtime.sidecar {
-        Some(sidecar) => tokio::net::UnixStream::connect(&sidecar.socket).await.is_ok(),
+        Some(sidecar) => prime::daemon_alive(&sidecar.socket).await,
         None => false,
     };
     Ok(PythonRuntimeStatus {

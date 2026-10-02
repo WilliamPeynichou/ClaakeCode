@@ -184,6 +184,17 @@ jobs:
             echo "APPLE_PROVIDER_SHORT_NAME=$APPLE_PROVIDER_SHORT_NAME_SECRET" >> "$GITHUB_ENV"
           fi
 
+      # prime-agent takes ~10 min per architecture to compile: reuse binaries while the
+      # pinned SHA / uv version (both in the script) are unchanged.
+      - name: Cache Prime sidecar binaries
+        if: matrix.platform.bundle_prime == '1'
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/binaries/prime-agent-*
+            src-tauri/binaries/uv-*
+          key: prime-sidecar-${{ matrix.platform.name }}-${{ hashFiles('scripts/prepare-prime-sidecar.mjs') }}
+
       - name: Build & publish via tauri-action
         uses: tauri-apps/tauri-action@v0
         env:
