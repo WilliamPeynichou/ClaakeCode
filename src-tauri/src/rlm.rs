@@ -22,6 +22,14 @@ separate memory store. Only report an entry as saved after a successful native p
 operation. Learning here means persisted harness entries, not fine-tuning model weights.
 "#;
 
+/// Claake base rules (the CLAAKE.md skill) first, then the memory policy.
+fn rlm_append_prompt(workspace_root: &std::path::Path) -> String {
+    match claakecode_app::skill::priority_skill_section(workspace_root) {
+        Some(rules) => format!("{rules}\n\n{RLM_MEMORY_POLICY}"),
+        None => RLM_MEMORY_POLICY.to_string(),
+    }
+}
+
 #[derive(Default)]
 pub(super) struct RlmRuntime {
     sidecar: Option<Sidecar>,
@@ -233,7 +241,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    RLM_MEMORY_POLICY,
+                    &rlm_append_prompt(&root),
                 )
                 .await
                 .map_err(error_to_string)?;

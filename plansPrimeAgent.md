@@ -1203,6 +1203,8 @@ Reste pour clore P1, dans cet ordre (les points 1 et 2 bloquent toute exposition
 - [x] Validation par agents : 18 tests unitaires, 2 tests contre le vrai daemon ; mémoire locale/globale relue et recherchée dans un second processus Python. Aucun appel distant au modèle pour vérifier une consolidation autonome de bout en bout.
 - Limites : reviews natives soumises aux gates (25 tours, compaction, cooldown de 20 minutes) ; aucune garantie de sauvegarde à chaque message. Le refus initial du daemon n’a pas été reproduit : amélioration du diagnostic, pas résolution démontrée de cet incident.
 
+- [x] **Skill « CLAAKE.md » = règles de base de tous les agents** : `priority_skill_section` (skill.rs) lit le skill nommé `CLAAKE.md` (workspace puis home, `.agents/skills` / `.claakecode/skills`) et l'injecte en première section du prompt système (`system_prompt_for_workspace` : agent principal, sous-agents/teams, estimation de contexte) et dans `appendSystemPrompt` du chat RLM, avant `AGENTS.md`. Cap 20 000 caractères. Limites : le contenu est dans chaque prompt (coût en tokens, ~1,3 k pour le skill actuel) ; le réglage on/off des skills ne le désactive pas (supprimer ou renommer le skill) ; skill absent = comportement inchangé.
+
 **Exigences produit (confirmées par l'utilisateur) :**
 
 - **Mêmes providers et modèles que le chat classique** : le chat RLM utilise le sélecteur de modèle et les credentials existants de Claake Code (clés API et OAuth), sans configuration séparée. Les points 5 et 6 deviennent donc obligatoires pour P1.

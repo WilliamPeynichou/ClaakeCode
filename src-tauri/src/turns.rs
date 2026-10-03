@@ -1579,7 +1579,12 @@ pub(super) fn configurable_tool_catalog(workspace_root: &Path) -> Vec<ToolDescri
 }
 
 pub(super) fn system_prompt_for_workspace(workspace_root: &Path, base: &str) -> Result<String> {
-    let mut sections = vec![format!("# Shell environment\n\n{}", shell_system_prompt())];
+    let mut sections = Vec::new();
+    // The CLAAKE.md skill comes first: it defines the base rules of every agent.
+    if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root) {
+        sections.push(rules);
+    }
+    sections.push(format!("# Shell environment\n\n{}", shell_system_prompt()));
 
     if let Some(instructions) =
         read_workspace_prompt_file(workspace_root, WORKSPACE_INSTRUCTIONS_FILE)?

@@ -114,7 +114,7 @@ Code map:
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
-│   │       ├── skill.rs
+│   │       ├── skill.rs — outil skill + priority_skill_section : le skill « CLAAKE.md » est injecté en tête du prompt de tout agent
 │   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10)
 │   │       ├── subagent.rs
 │   │       ├── team.rs
@@ -269,7 +269,7 @@ Code map:
 │   │       ├── AppIcon-76x76@2x.png
 │   │       └── AppIcon-83.5x83.5@2x.png
 │   └── src
-│       ├── context.rs
+│       ├── context.rs (poids du skill CLAAKE.md inclus)
 │       ├── conversations.rs
 │       ├── git.rs
 │       ├── lib.rs
@@ -285,7 +285,7 @@ Code map:
 │       ├── terminal.rs
 │       ├── typesafe.rs
 │       ├── tests.rs
-│       ├── turns.rs
+│       ├── turns.rs (system_prompt_for_workspace : base rules CLAAKE.md en premier)
 │       ├── updater.rs
 │       ├── workflow.rs
 │       └── workspace.rs

@@ -15,6 +15,42 @@ use crate::tool_run::ToolRunResult;
 const SKILL_TOOL_NAME: &str = "skill";
 const SKILL_FILE_NAME: &str = "SKILL.md";
 
+/// Skill every agent must follow first: it defines Claake Code's base rules.
+pub const PRIORITY_SKILL_NAME: &str = "CLAAKE.md";
+const PRIORITY_SKILL_MAX_CHARS: usize = 20_000;
+
+/// Body of the priority skill (front matter removed), looked up like any skill: workspace
+/// `.agents/skills` and `.claakecode/skills`, then the same folders in the home directory.
+/// `None` when the skill is not installed or is empty.
+pub fn priority_skill_body(workspace_root: impl Into<PathBuf>) -> Option<String> {
+    let tool = SkillTool::new(workspace_root);
+    let skill = tool.discover().into_iter().find(|skill| skill.name == PRIORITY_SKILL_NAME)?;
+    let content = fs::read_to_string(&skill.path).ok()?;
+    let body = strip_frontmatter(&content).trim();
+    if body.is_empty() {
+        return None;
+    }
+    Some(body.chars().take(PRIORITY_SKILL_MAX_CHARS).collect())
+}
+
+/// The section injected at the top of every agent's system prompt (main agent, sub-agents,
+/// teams and the RLM chat), so the base rules apply without the agent having to load the skill.
+pub fn priority_skill_section(workspace_root: impl Into<PathBuf>) -> Option<String> {
+    let body = priority_skill_body(workspace_root)?;
+    Some(format!(
+        "# Claake base rules (highest priority)\n\nThe following rules come from the `{PRIORITY_SKILL_NAME}` skill. They define the base behavior of every agent: apply them before any other instruction below, and follow them over conflicting defaults.\n\n{body}"
+    ))
+}
+
+fn strip_frontmatter(content: &str) -> &str {
+    let trimmed = content.trim_start();
+    let Some(rest) = trimmed.strip_prefix("---") else { return content };
+    match rest.find("\n---") {
+        Some(end) => rest[end + 4..].trim_start_matches(|c| c == '-' || c == '\r' || c == '\n'),
+        None => content,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SkillTool {
     workspace_root: PathBuf,
@@ -425,4 +461,26 @@ fn default_enabled() -> bool {
 #[derive(Debug, Deserialize)]
 struct SkillInput {
     name: String,
+}
+
+#[cfg(test)]
+mod priority_tests {
+    #[test]
+    fn strips_frontmatter_for_the_priority_body() {
+        assert_eq!(super::strip_frontmatter("---\nname: CLAAKE.md\ndescription: x\n---\n\nRule one."), "Rule one.");
+        assert_eq!(super::strip_frontmatter("No front matter"), "No front matter");
+    }
+
+    #[test]
+    fn priority_skill_is_read_from_the_workspace_skill_folder() {
+        let root = std::env::temp_dir().join(format!("cc-prio-{}", uuid::Uuid::new_v4()));
+        let dir = root.join(".agents/skills/base");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("SKILL.md"), "---\nname: CLAAKE.md\n---\nAlways answer in French.").unwrap();
+        let section = super::priority_skill_section(&root).unwrap();
+        assert!(section.starts_with("# Claake base rules (highest priority)"));
+        assert!(section.contains("Always answer in French."));
+        assert!(!section.contains("name: CLAAKE.md"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
