@@ -17,6 +17,7 @@ export function ClaakySettingsSection() {
   const enabled = useClaakyEnabled();
   const [error, setError] = useState<string | null>(null);
   const [fallback, setFallback] = useState(false);
+  const [preview, setPreview] = useState<ClaakyState>("idle");
 
   const toggle = async () => {
     try {
@@ -48,19 +49,30 @@ export function ClaakySettingsSection() {
           Désactivé : les anciens indicateurs de chargement reviennent et l'agent n'adopte plus le
           nom Claaky. Ses règles, ses outils et sa langue ne changent pas dans les deux cas.
         </p>
+        <p className="python-runtime__muted">
+          Cliquez sur une pose pour la voir en 3D. Cliquez sur Claaky pour le faire sauter, maintenez
+          pour l'écraser : il rebondit comme un doudou.
+        </p>
         <div className="claaky-settings__preview">
           {fallback ? (
-            <Claaky state="idle" size={120} />
+            <Claaky state={preview} size={120} />
           ) : (
-            <ClaakyScene size={168} onUnavailable={() => setFallback(true)} />
+            <ClaakyScene size={168} state={preview} onUnavailable={() => setFallback(true)} />
           )}
         </div>
         <div className="claaky-settings__states">
           {STATES.map(({ state, label }) => (
-            <div key={state} className="claaky-settings__state">
-              <Claaky state={state} size={56} />
+            <button
+              key={state}
+              type="button"
+              className="claaky-settings__state"
+              data-active={preview === state ? "true" : "false"}
+              onClick={() => setPreview(state)}
+              aria-label={`Voir la pose : ${label}`}
+            >
+              <Claaky state={state} size={56} decorative />
               <span className="python-runtime__muted">{label}</span>
-            </div>
+            </button>
           ))}
         </div>
       </div>

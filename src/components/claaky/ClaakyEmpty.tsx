@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { Claaky } from "./Claaky";
 import { ClaakyScene } from "./ClaakyScene";
+import { useClaakyAgentState } from "./claakyAgentState";
 
 /** Editor empty state: Claaky asks what we do next, with two quick starts. */
 export function ClaakyEmpty() {
   const [fallback, setFallback] = useState(false);
+  const agentState = useClaakyAgentState();
   const act = (action: "new-chat" | "new-rlm-chat") =>
     window.dispatchEvent(new CustomEvent("claakecode:claaky-action", { detail: action }));
 
   return (
     <div className="editor-empty claaky-empty">
       {fallback ? (
-        <Claaky state="idle" size={120} />
+        <Claaky state={agentState} size={120} />
       ) : (
-        <ClaakyScene size={168} onUnavailable={() => setFallback(true)} />
+        <ClaakyScene size={168} state={agentState} onUnavailable={() => setFallback(true)} />
       )}
       <span className="editor-empty__title">Que faisons-nous ?</span>
       <span className="editor-empty__sub">

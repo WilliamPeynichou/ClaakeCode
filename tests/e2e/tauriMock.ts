@@ -151,6 +151,11 @@ export function installTauriMock(options: MockOptions) {
       stopRequested = true;
       return null;
     },
+    estimate_context: () => ({
+      usedTokens: 1200, contextWindow: 200000, preferredWindow: 200000, maxOutputTokens: 8000,
+      inputTokens: 1000, outputTokens: 200, reasoningTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
+      exact: true, error: null, breakdown: [],
+    }),
     get_claaky_enabled: () => claakyOn,
     set_claaky_enabled: ({ enabled }) => { claakyOn = enabled; return null; },
     list_rlm_memories: () => memories.map((m) => ({ ...m })),

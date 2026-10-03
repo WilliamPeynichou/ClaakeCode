@@ -18,6 +18,9 @@ import { AIThinkingBlock } from "./AIThinkingBlock";
 import { FileChangeBlock } from "./FileChangeBlock";
 import { FileLinkedText, Markdown } from "./Markdown";
 import { PlanningNextMoveBlock } from "./PlanningNextMoveBlock";
+import { Claaky } from "../claaky/Claaky";
+import { useClaakyEnabled } from "../claaky/useClaakyEnabled";
+import { useClaakyFromView } from "../claaky/claakyAgentState";
 import { Questionnaire, type QuestionItem } from "./Questionnaire";
 import {
   AiAgentGlyph,
@@ -3079,6 +3082,8 @@ export function ChatPane({
     rewriteRestoreCheck.restorable;
 
   const showPlanningNextMove = shouldShowPlanningNextMove(displayView);
+  const claakyOn = useClaakyEnabled();
+  const claakyState = useClaakyFromView(displayView, true);
   const teamAgentRoster = useMemo(
     () => buildTeamAgentRoster(view.blocks, subAgentViews),
     [view.blocks, subAgentViews],
@@ -3274,6 +3279,9 @@ export function ChatPane({
         </span>
         )}
         {!viewingSubAgent && headActions}
+        {claakyOn && (
+          <Claaky state={claakyState} size={26} className="chat-head__claaky" decorative />
+        )}
         <span className="chat-head__dot" data-status={displayView.status} />
       </div>
       {belowHead}

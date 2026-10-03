@@ -10609,40 +10609,57 @@ textarea {
 .claaky__z { fill: #9d977f; font: 700 11px var(--font-ui, sans-serif); }
 .claaky__drop { fill: #7ab8e6; }
 
-.claaky[data-state="idle"] .claaky__bob { animation: claaky-bob 3.2s ease-in-out infinite; }
+/* Squishy: squash and stretch around the feet, with overshoot (spring-like easing). */
+.claaky__bob { transform-box: fill-box; transform-origin: 50% 100%; }
+.claaky[data-state="idle"] .claaky__bob { animation: claaky-breathe 3.4s ease-in-out infinite; }
 .claaky[data-state="idle"] .claaky__eyes { animation: claaky-blink 4.2s infinite; }
-.claaky[data-state="thinking"] .claaky__bob { animation: claaky-tilt 2.4s ease-in-out infinite; }
+.claaky[data-state="thinking"] .claaky__bob { animation: claaky-ponder 2.6s ease-in-out infinite; }
 .claaky[data-state="thinking"] .claaky__eyes { transform: translate(2px, -2px); }
 .claaky[data-state="thinking"] .claaky__dot { animation: claaky-dots 1.2s infinite; }
 .claaky[data-state="thinking"] .claaky__dot--2 { animation-delay: .2s; }
 .claaky[data-state="thinking"] .claaky__dot--3 { animation-delay: .4s; }
-.claaky[data-state="working"] .claaky__bob { animation: claaky-bob .5s ease-in-out infinite; }
-.claaky[data-state="working"] .claaky__arm--l { animation: claaky-type .28s ease-in-out infinite; }
-.claaky[data-state="working"] .claaky__arm--r { animation: claaky-type .28s ease-in-out .14s infinite; }
+.claaky[data-state="working"] .claaky__bob { animation: claaky-squish .52s infinite; }
+.claaky[data-state="working"] .claaky__arm--l { animation: claaky-type .26s ease-in-out infinite; }
+.claaky[data-state="working"] .claaky__arm--r { animation: claaky-type .26s ease-in-out .13s infinite; }
 .claaky[data-state="working"] .claaky__bulb { animation: claaky-pulse .7s ease-in-out infinite; }
-.claaky[data-state="planning"] .claaky__bob { animation: claaky-tilt 3s ease-in-out infinite; }
+.claaky[data-state="planning"] .claaky__bob { animation: claaky-sway 3.2s ease-in-out infinite; }
 .claaky[data-state="planning"] .claaky__spark { animation: claaky-twinkle 1.6s ease-in-out infinite; }
-.claaky[data-state="done"] .claaky__bob { animation: claaky-hop 1.1s ease-out 1; }
+.claaky[data-state="done"] .claaky__bob { animation: claaky-hop 1.2s 1 both; }
 .claaky[data-state="done"] .claaky__spark { animation: claaky-twinkle 1.1s ease-out 2; }
 .claaky[data-state="done"] .claaky__mouth { d: path("M26 43 Q32 50 38 43"); }
-.claaky[data-state="error"] .claaky__bob { transform: translateY(2px) rotate(-3deg); transform-origin: 32px 56px; }
+.claaky[data-state="error"] .claaky__bob { animation: claaky-droop 2.4s ease-in-out infinite; }
 .claaky[data-state="error"] .claaky__mouth { d: path("M28 46 Q32 43 36 46"); }
 .claaky[data-state="error"] .claaky__drop { opacity: .9; animation: claaky-drop 1.8s ease-in infinite; }
 .claaky[data-state="error"] .claaky__bulb { fill: #d97a6c; }
 .claaky[data-state="sleeping"] .claaky__eye { display: none; }
 .claaky[data-state="sleeping"] .claaky__lid { opacity: 1; }
-.claaky[data-state="sleeping"] .claaky__bob { animation: claaky-bob 5s ease-in-out infinite; }
+.claaky[data-state="sleeping"] .claaky__bob { animation: claaky-breathe 5.5s ease-in-out infinite; }
 .claaky[data-state="sleeping"] .claaky__z { animation: claaky-twinkle 2.4s ease-in-out infinite; }
 .claaky[data-state="sleeping"] .claaky__bulb { opacity: .35; }
 
-@keyframes claaky-bob { 50% { transform: translateY(-2px) scaleY(1.03); } }
-@keyframes claaky-tilt { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes claaky-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(.975, 1.045); } }
+@keyframes claaky-ponder { 0%, 100% { transform: rotate(-4deg) scale(1, 1); } 50% { transform: rotate(4deg) scale(.98, 1.03); } }
+@keyframes claaky-sway { 0%, 100% { transform: rotate(-6deg) scale(1.02, .98); } 50% { transform: rotate(6deg) scale(.98, 1.03); } }
+@keyframes claaky-squish {
+  0% { transform: scale(1, 1); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
+  30% { transform: scale(1.1, .86); animation-timing-function: cubic-bezier(.2, 1.7, .5, 1); }
+  60% { transform: scale(.95, 1.07); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes claaky-hop {
+  0% { transform: translateY(0) scale(1, 1); animation-timing-function: ease-out; }
+  14% { transform: translateY(0) scale(1.14, .82); animation-timing-function: cubic-bezier(.2, .8, .4, 1); }
+  38% { transform: translateY(-12px) scale(.9, 1.15); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  62% { transform: translateY(0) scale(1.16, .8); animation-timing-function: cubic-bezier(.2, 1.8, .5, 1); }
+  80% { transform: translateY(0) scale(.96, 1.05); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes claaky-droop { 0%, 100% { transform: rotate(-3deg) scale(1.04, .92); } 50% { transform: rotate(-4deg) scale(1.02, .94); } }
 @keyframes claaky-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 @keyframes claaky-dots { 0%, 100% { opacity: .15; } 40% { opacity: 1; } }
-@keyframes claaky-type { 50% { transform: translateY(-4px); } }
+@keyframes claaky-type { 50% { transform: translateY(-4px) scale(1.1, .9); } }
 @keyframes claaky-pulse { 50% { transform: scale(1.5); } }
 @keyframes claaky-twinkle { 0%, 100% { opacity: 0; transform: scale(.6); } 50% { opacity: 1; transform: scale(1); } }
-@keyframes claaky-hop { 0% { transform: translateY(0); } 30% { transform: translateY(-9px); } 55% { transform: translateY(0) scaleY(.94); } 100% { transform: translateY(0); } }
 @keyframes claaky-drop { 0% { opacity: 0; transform: translateY(-3px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(8px); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -10661,4 +10678,7 @@ textarea {
 .claaky-settings__toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .claaky-settings__preview { display: flex; justify-content: center; padding: 8px 0; }
 .claaky-settings__states { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
-.claaky-settings__state { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.claaky-settings__state { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 1px solid transparent; border-radius: 12px; padding: 6px 8px; cursor: pointer; color: inherit; font: inherit; }
+.claaky-settings__state[data-active="true"] { border-color: var(--accent-hi); background: var(--bg-2); }
+.chat-head__claaky { margin-left: auto; margin-right: -2px; }
+.chat-head__claaky + .chat-head__dot { margin-left: 0; }

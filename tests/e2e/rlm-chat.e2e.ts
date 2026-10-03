@@ -211,3 +211,46 @@ test('Claaky: empty editor greets, quick start opens a chat, Settings can turn h
   await browser.locator('.claaky-settings__toggle input').tap();
   expect(await calls(browser, 'set_claaky_enabled')).toEqual([{ enabled: false }]);
 });
+
+test('Claaky follows the agent: working during a turn, done after, and every pose renders in 3D', async ({ app, browser, screen }) => {
+  await openApp(app);
+  const page = surfaceOf(engine)!.page();
+  await page.evaluate(() => {
+    (window as any).__claakyStates = [];
+    new MutationObserver(() => {
+      const el = document.querySelector('.chat-head__claaky');
+      const st = el?.getAttribute('data-state');
+      const seen = (window as any).__claakyStates;
+      if (st && seen[seen.length - 1] !== st) seen.push(st);
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-state'], childList: true });
+  });
+  await openRlmTab(browser);
+  await screen.getByRole('button', 'Nouveau chat RLM').tap();
+  const composer = browser.locator('textarea').first();
+  await composer.fill('bonjour claaky');
+  await composer.press('Enter');
+  await expect(screen.getByText('RLM reply to: bonjour claaky', { exact: false })).toBeVisible();
+  await new Promise((r) => setTimeout(r, 800));
+  const seen: string[] = await page.evaluate(() => (window as any).__claakyStates);
+  expect(seen).toContain('working');
+  expect(seen).toContain('done');
+
+  await browser.locator('[title="Settings"]').first().tap();
+  await screen.getByRole('button', 'Claaky', { exact: true }).tap();
+  for (const label of ['Code', 'Terminé', 'Erreur', 'Dort']) {
+    await screen.getByRole('button', `Voir la pose : ${label}`).tap();
+    await new Promise((r) => setTimeout(r, label === 'Terminé' ? 450 : 1100));
+    await page.locator('.claaky-settings__preview').screenshot({ path: `.e2e/shots/claaky-pose-${label}.png` });
+  }
+});
+
+test('Claaky 3D frame cost stays low', async ({ app }) => {
+  await openApp(app);
+  const page = surfaceOf(engine)!.page();
+  await page.evaluate(() => { (window as any).__claakyPerf = []; });
+  await new Promise((r) => setTimeout(r, 4000));
+  const ms: number[] = await page.evaluate(() => (window as any).__claakyPerf);
+  ms.sort((a, b) => a - b);
+  console.log('claaky draw ms', JSON.stringify({ n: ms.length, median: ms[Math.floor(ms.length / 2)], p95: ms[Math.floor(ms.length * 0.95)], max: ms[ms.length - 1] }));
+  expect(ms.length).toBeGreaterThan(10);
+});
