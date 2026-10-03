@@ -7,6 +7,7 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── docs — notes et plans (déplacés de la racine)
+│   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B6) + mascotte Claaky (C1–C6), non implémenté
 │   ├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
 │   ├── EDIT_TOOL_COMPARISON.md — comparaison des outils d'édition
 │   ├── EmbendingFeatures.md — plan des providers d'embeddings
