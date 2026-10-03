@@ -76,6 +76,8 @@ B1 → B3 (valeur immédiate, sans migration) → B2 → B6 → B4 → B5.
 
 ## Chantier B — Claaky, le petit personnage
 
+> **État : implémenté (C1–C5)**, en 3D three.js construite en code (formes simples), pas en SVG seul. Claaky est le visage de l'agent : on lui parle, c'est lui qui code. Réglage on/off dans Settings > Claaky (persisté côté backend). Désactivé : anciens loaders, écran « Nothing open » et plus de persona dans le prompt. La persona est un court texte de ton (`CLAAKY_PERSONA`) placé après les règles `CLAAKE.md`, sans changer règles, outils ni langue ; elle s'applique aussi au chat RLM. Loaders : sprite SVG (pas de WebGL dans l'historique du chat). Écran vide : scène 3D (regard qui suit la souris, clignement, saut au clic, sommeil après 90 s) + 2 démarrages rapides ; repli SVG si WebGL indisponible ; `prefers-reduced-motion` = image fixe. three.js (0.170.0 épinglé) est un chunk séparé (177 Ko gzip). **Reste** : C6 (interactions), états `working`/`done`/`error` branchés sur le flux de l'agent (ils existent dans le sprite mais seuls `thinking` et `planning` sont utilisés), message d'accueil contextuel, variante visuelle pour le RLM.
+
 ### Rôle
 - **Remplace les loaders** de l'agent (« Thinking », « Planning next moves »).
 - Occupe l'**écran vide** de l'éditeur quand aucun fichier n'est ouvert, avec un message « Que faisons-nous ? ».

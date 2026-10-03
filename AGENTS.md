@@ -314,6 +314,7 @@ Code map:
     │   ├── UpdaterLockScreen.tsx
     │   ├── Welcome.tsx
     │   ├── WindowControls.tsx
+    │   ├── claaky/ — compagnon Claaky : Claaky.tsx (sprite SVG 7 états, remplace les loaders), ClaakyScene.tsx (3D three.js chargé à la demande, repli SVG), ClaakyEmpty.tsx (écran vide « Que faisons-nous ? »), ClaakySettingsSection.tsx, useClaakyEnabled.ts
     │   ├── Workspace.tsx — inclut l'onglet actif Chat/RLM (historiques séparés par harness), création selon l'onglet et le bouton Auto Compute (chat agent → nouveau chat RLM)
     │   └── chat
     │       ├── AIThinkingBlock.tsx

@@ -268,6 +268,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
     let mut conversation = state
@@ -659,6 +660,7 @@ pub(super) async fn stop_agent_swarm_command(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
     let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;

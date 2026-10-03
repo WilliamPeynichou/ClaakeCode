@@ -14,6 +14,7 @@ pub(super) async fn estimate_context(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
 
@@ -144,6 +145,7 @@ pub(super) async fn estimate_sub_agent_context(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
     let settings = state

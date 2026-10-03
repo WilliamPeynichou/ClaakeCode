@@ -1801,6 +1801,23 @@ export function Workspace({
     else void createConversation();
   }, [surface, createConversation, createRlmConversation]);
 
+  // Quick starts from Claaky's empty editor screen.
+  useEffect(() => {
+    const onAction = (event: Event) => {
+      const action = (event as CustomEvent<string>).detail;
+      if (action === "new-chat") {
+        setSurface("chat");
+        void createConversation();
+      } else if (action === "new-rlm-chat" && !IS_WINDOWS) {
+        keepSurfaceRef.current = true;
+        setSurface("rlm");
+        void createRlmConversation();
+      }
+    };
+    window.addEventListener("claakecode:claaky-action", onAction);
+    return () => window.removeEventListener("claakecode:claaky-action", onAction);
+  }, [createConversation, createRlmConversation]);
+
   // Auto Compute: one click opens a new RLM chat seeded with the current agent chat, on the
   // same model, and starts the turn. The agent chat itself is left untouched.
   const [autoComputing, setAutoComputing] = useState(false);

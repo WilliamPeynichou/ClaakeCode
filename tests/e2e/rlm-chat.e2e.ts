@@ -193,3 +193,21 @@ test('Learn button: asks the RLM agent to consolidate through its memory API', a
   expect(sent[0].input.text).toContain('rlm.harness');
   expect(sent[0].input.text).toContain('Never store secrets');
 });
+
+test('Claaky: empty editor greets, quick start opens a chat, Settings can turn him off', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await expect(screen.getByText('Que faisons-nous ?')).toBeVisible();
+  await new Promise((r) => setTimeout(r, 1500));
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/claaky-empty.png' });
+
+  await screen.getByRole('button', 'Calculer avec Claaky (RLM)').tap();
+  expect(await calls(browser, 'create_rlm_conversation')).toHaveLength(1);
+
+  await browser.locator('[title="Settings"]').first().tap();
+  await screen.getByRole('button', 'Claaky', { exact: true }).tap();
+  await expect(screen.getByText('Afficher Claaky', { exact: false })).toBeVisible();
+  await new Promise((r) => setTimeout(r, 1200));
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/claaky-settings.png' });
+  await browser.locator('.claaky-settings__toggle input').tap();
+  expect(await calls(browser, 'set_claaky_enabled')).toEqual([{ enabled: false }]);
+});

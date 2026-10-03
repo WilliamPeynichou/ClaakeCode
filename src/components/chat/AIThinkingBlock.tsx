@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { DotmSquare2 } from "./DotmSquare2";
+import { Claaky } from "../claaky/Claaky";
+import { useClaakyEnabled } from "../claaky/useClaakyEnabled";
 import { Markdown } from "./Markdown";
 
 type Props = {
@@ -18,6 +20,7 @@ export function AIThinkingBlock({
   durationMs,
   onOpenFile,
 }: Props) {
+  const claakyOn = useClaakyEnabled();
   const contentRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(() => isStreaming && content.trim().length > 0);
   const prevStreamingRef = useRef(isStreaming);
@@ -72,13 +75,12 @@ export function AIThinkingBlock({
           className="thinking-block__caret"
           data-open={contentOpen ? "true" : "false"}
         />
-        {isStreaming && (
-          <DotmSquare2
-            speed={1}
-            animated
-            className="thinking-block__matrix"
-          />
-        )}
+        {isStreaming &&
+          (claakyOn ? (
+            <Claaky state="thinking" size={26} className="claaky-loader" decorative />
+          ) : (
+            <DotmSquare2 speed={1} animated className="thinking-block__matrix" />
+          ))}
         <span
           className="thinking-block__label"
           data-streaming={isStreaming ? "true" : "false"}

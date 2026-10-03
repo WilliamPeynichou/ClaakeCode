@@ -77,6 +77,7 @@ pub(super) async fn send_message(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
     if !wait_for_conversation_turn_slot(&state.active_turns, &input.conversation_id).await {
@@ -503,6 +504,7 @@ pub(super) async fn compact_conversation(
             &workspace_root,
             &state.system_prompt,
             &state.store.load_skill_settings().map_err(error_to_string)?,
+            state.store.claaky_enabled(),
         )
             .map_err(error_to_string)?;
     if !wait_for_conversation_turn_slot(&state.active_turns, &input.conversation_id).await {
@@ -1590,11 +1592,15 @@ pub(super) fn system_prompt_for_workspace(
     workspace_root: &Path,
     base: &str,
     skill_settings: &SkillSettings,
+    claaky: bool,
 ) -> Result<String> {
     let mut sections = Vec::new();
     // The CLAAKE.md skill comes first: it defines the base rules of every agent.
     if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skill_settings) {
         sections.push(rules);
+    }
+    if claaky {
+        sections.push(claakecode_app::skill::CLAAKY_PERSONA.to_string());
     }
     sections.push(format!("# Shell environment\n\n{}", shell_system_prompt()));
 

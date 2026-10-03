@@ -1815,6 +1815,35 @@ impl AppStore {
         Ok(normalized)
     }
 
+    /// Claaky (the companion character and its persona) is on unless the user turned it off.
+    pub fn claaky_enabled(&self) -> bool {
+        let Ok(conn) = self.connection() else { return true };
+        conn.query_row(
+            "select value_json from app_settings where key = 'claaky_enabled'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .ok()
+        .flatten()
+        .map(|json| json != "false")
+        .unwrap_or(true)
+    }
+
+    pub fn set_claaky_enabled(&self, enabled: bool) -> Result<()> {
+        self.connection()?
+            .execute(
+                "insert into app_settings (key, value_json, updated_at_ms)
+                 values ('claaky_enabled', ?1, ?2)
+                 on conflict(key) do update set
+                    value_json = excluded.value_json,
+                    updated_at_ms = excluded.updated_at_ms",
+                params![if enabled { "true" } else { "false" }, now_ms()],
+            )
+            .context("unable to save claaky setting")?;
+        Ok(())
+    }
+
     pub fn load_sub_agent_settings(&self) -> Result<SubAgentSettings> {
         let conn = self.connection()?;
         let stored = conn

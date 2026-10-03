@@ -435,6 +435,8 @@ pub fn run() {
             rlm::get_python_runtime_status,
             rlm::restart_python_runtime,
             rlm::list_rlm_memories,
+            rlm::get_claaky_enabled,
+            rlm::set_claaky_enabled,
             rlm::edit_rlm_memory,
             rlm::delete_rlm_memory,
             turns::answer_question,
