@@ -159,8 +159,10 @@ jobs:
       - name: Prep macOS for DMG bundling
         if: runner.os == 'macOS'
         run: |
+          # Best effort: some runner images have no GUI session (open fails with error -600).
+          # The DMG step has its own retry, so this must never fail the whole release.
           sudo killall Finder 2>/dev/null || true
-          open -a Finder
+          open -a Finder || echo "::warning::Finder could not be pre-launched; continuing"
           sleep 3
 
       - name: Bypass macOS signing secrets
