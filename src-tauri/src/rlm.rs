@@ -359,6 +359,76 @@ pub(super) async fn get_python_runtime_status(
     })
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct MemoryRef {
+    /// "global" or an RLM conversation id.
+    scope: String,
+    kind: String,
+    id: String,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    content: String,
+}
+
+/// Memory, skills, prompt notes and subagent specs Prime saved: global plus every RLM chat.
+#[tauri::command]
+pub(super) async fn list_rlm_memories(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<Vec<claakecode_app::prime_memory::MemoryEntry>, String> {
+    use claakecode_app::prime_memory as mem;
+    let data_root = state.store.path().parent().ok_or("no data dir")?.to_path_buf();
+    let sessions = state.store.rlm_sessions().map_err(error_to_string)?;
+    tokio::task::spawn_blocking(move || {
+        let mut out = mem::read_entries(&mem::global_dir(&data_root.join("prime").join("agent")), "global", "Global");
+        for (id, title, file) in sessions {
+            if let Some(dir) = mem::local_dir(std::path::Path::new(&file)) {
+                out.extend(mem::read_entries(&dir, &id, &title));
+            }
+        }
+        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        out
+    })
+    .await
+    .map_err(|err| err.to_string())
+}
+
+async fn memory_dir(state: &DesktopState, scope: &str) -> std::result::Result<std::path::PathBuf, String> {
+    use claakecode_app::prime_memory as mem;
+    if scope == "global" {
+        let root = state.store.path().parent().ok_or("no data dir")?;
+        return Ok(mem::global_dir(&root.join("prime").join("agent")));
+    }
+    // Never rewrite a memory file under a running turn: Prime may write it back.
+    if state.active_turns.lock().await.contains_key(scope) {
+        return Err("A turn is running in this RLM chat: stop it before editing its memory".into());
+    }
+    let binding = state.store.rlm_binding(scope).map_err(error_to_string)?.ok_or("unknown RLM conversation")?;
+    let file = binding.session_path.ok_or("this RLM chat has no saved session yet")?;
+    mem::local_dir(std::path::Path::new(&file)).ok_or_else(|| "invalid session path".to_string())
+}
+
+#[tauri::command]
+pub(super) async fn edit_rlm_memory(
+    state: State<'_, DesktopState>,
+    input: MemoryRef,
+) -> std::result::Result<(), String> {
+    use claakecode_app::prime_memory as mem;
+    let dir = memory_dir(&state, &input.scope).await?;
+    mem::edit_entry(&dir, &input.kind, &input.id, &input.title, &input.content, &mem::now_iso())
+        .map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn delete_rlm_memory(
+    state: State<'_, DesktopState>,
+    input: MemoryRef,
+) -> std::result::Result<(), String> {
+    let dir = memory_dir(&state, &input.scope).await?;
+    claakecode_app::prime_memory::delete_entry(&dir, &input.kind, &input.id).map_err(error_to_string)
+}
+
 /// Stops Prime (and every kernel). Sessions reopen from their saved file on the next message.
 #[tauri::command]
 pub(super) async fn restart_python_runtime(state: State<'_, DesktopState>) -> std::result::Result<(), String> {

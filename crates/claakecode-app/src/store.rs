@@ -868,6 +868,23 @@ impl AppStore {
         Ok(())
     }
 
+    /// Every RLM conversation with a saved Prime session: (id, title, session file).
+    pub fn rlm_sessions(&self) -> Result<Vec<(String, String, String)>> {
+        let conn = self.connection()?;
+        let mut stmt = conn
+            .prepare(
+                "select b.conversation_id, c.title, b.session_path from rlm_bindings b \
+                 join conversations c on c.id = b.conversation_id where b.session_path is not null",
+            )
+            .context("unable to list rlm sessions")?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .context("unable to list rlm sessions")?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .context("unable to read rlm sessions")?;
+        Ok(rows)
+    }
+
     pub fn rlm_binding(&self, conversation_id: &str) -> Result<Option<RlmBinding>> {
         self.connection()?
             .query_row(

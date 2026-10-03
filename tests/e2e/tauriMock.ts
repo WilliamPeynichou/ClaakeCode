@@ -51,6 +51,12 @@ export function installTauriMock(options: MockOptions) {
     conversations.push(seeded);
     bindings["c-rlm-old"] = { worktreePath: "/tmp/e2e-workspace-claakecode-rlm-old", sessionPath: "/data/s.jsonl" };
   }
+  const memories = [
+    { id: "m-median", kind: "memory", title: "Median latency", content: "Use p50 on runs.csv, not the mean.", path: "general",
+      scope: "global", scopeLabel: "Global", source: "agent", createdAt: "2026-10-03T10:00:00.000Z", updatedAt: "2026-10-03T10:00:00.000Z", version: 1 },
+    { id: "m-csv", kind: "memory", title: "runs.csv encoding", content: "File is latin-1.", path: "general",
+      scope: "c-rlm-old", scopeLabel: "Old RLM chat", source: "agent", createdAt: "2026-10-02T10:00:00.000Z", updatedAt: "2026-10-02T10:00:00.000Z", version: 1 },
+  ];
   let stopRequested = false;
   const callbacks = new Map<number, (payload: unknown) => void>();
   const listeners = new Map<string, number[]>();
@@ -142,6 +148,17 @@ export function installTauriMock(options: MockOptions) {
     },
     stop_rlm_turn: () => {
       stopRequested = true;
+      return null;
+    },
+    list_rlm_memories: () => memories.map((m) => ({ ...m })),
+    edit_rlm_memory: ({ input }) => {
+      const m = memories.find((x) => x.id === input.id);
+      if (m) { m.title = input.title; m.content = input.content; m.source = "user"; m.version += 1; }
+      return null;
+    },
+    delete_rlm_memory: ({ input }) => {
+      const i = memories.findIndex((x) => x.id === input.id);
+      if (i >= 0) memories.splice(i, 1);
       return null;
     },
     get_python_runtime_status: () => ({

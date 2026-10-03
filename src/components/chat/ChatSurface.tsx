@@ -125,3 +125,12 @@ export function autoComputePrompt(sourceTitle: string, transcript: string): stri
     "</agent_chat>",
   ].join("\n");
 }
+
+/** Prompt sent by the "Apprendre de ce chat" button: asks Prime to consolidate through its own memory API. */
+export const LEARN_PROMPT =
+  "Learn from this conversation now. Using your persisted harness memory (rlm.harness), review what happened " +
+  "so far and save only durable, verified items: user corrections and preferences, facts about this project, " +
+  "and tactics that worked or failed, each with its evidence. Check existing entries first; update or delete " +
+  "stale or duplicate ones instead of adding new ones. Never store secrets, tokens or raw private text. " +
+  "Use global scope only for lessons useful in other chats. Then list what you actually saved, updated or " +
+  "removed, or say plainly that nothing was worth keeping.";

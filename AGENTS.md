@@ -109,6 +109,7 @@ Code map:
 │   │       ├── lib.rs
 │   │       ├── mcp.rs
 │   │       ├── powershell.rs
+│   │       ├── prime_memory.rs — lecture/édition/suppression atomiques du harness Prime (global + session-artifacts), tests ; commandes list/edit/delete_rlm_memory
 │   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
 │   │       ├── python.rs
 │   │       ├── question.rs
@@ -317,9 +318,9 @@ Code map:
     │   └── chat
     │       ├── AIThinkingBlock.tsx
     │       ├── ChatPane.tsx — props headTabs / headActions / belowHead pour les onglets et actions d'en-tête
-    │       ├── ChatSurface.tsx — onglets « Chat | RLM », état vide RLM, transcript et prompt Auto Compute
+    │       ├── ChatSurface.tsx — onglets « Chat | RLM », état vide RLM, transcript et prompt Auto Compute, LEARN_PROMPT (bouton « Apprendre de ce chat »)
     │       ├── RlmBanner.tsx — bandeau « confiance locale » du chat RLM (worktree isolé, pas de sandbox)
-    │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage, explication mémoire native durable versus variables volatiles (pas encore d’éditeur de souvenirs) ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)
+    │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage, liste « Mémoire de l'agent » (portée globale/par chat, modifier, supprimer ; via list/edit/delete_rlm_memory) ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)
     │       ├── DotmSquare2.tsx
     │       ├── DotmSquare5.tsx
     │       ├── FileChangeBlock.tsx

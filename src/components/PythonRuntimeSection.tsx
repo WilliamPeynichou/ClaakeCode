@@ -1,10 +1,171 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
-import { api, type PythonRuntimeStatus } from "../lib/ipc";
+import { api, type PythonRuntimeStatus, type RlmMemoryEntry } from "../lib/ipc";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+const KIND_LABEL: Record<RlmMemoryEntry["kind"], string> = {
+  memory: "Mémoire",
+  skill: "Skill",
+  prompt: "Prompt",
+  subagent: "Sous-agent",
+};
+
+/**
+ * What the RLM agent has learned and saved (Prime's persisted harness): readable, editable and
+ * deletable here. Variables Python are volatile; these entries survive restarts and new chats.
+ */
+function RlmMemoryList() {
+  const [entries, setEntries] = useState<RlmMemoryEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [scope, setScope] = useState("all");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ title: "", content: "" });
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const keyOf = (e: RlmMemoryEntry) => `${e.scope}|${e.kind}|${e.id}`;
+
+  const load = useCallback(async () => {
+    try {
+      setEntries(await api.listRlmMemories());
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const scopes = Array.from(new Map((entries ?? []).map((e) => [e.scope, e.scopeLabel])).entries());
+  const shown = (entries ?? []).filter((e) => scope === "all" || e.scope === scope);
+
+  const save = async (e: RlmMemoryEntry) => {
+    try {
+      await api.editRlmMemory({ scope: e.scope, kind: e.kind, id: e.id, ...draft });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+  const remove = async (e: RlmMemoryEntry) => {
+    try {
+      await api.deleteRlmMemory({ scope: e.scope, kind: e.kind, id: e.id });
+      setConfirming(null);
+      await load();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  return (
+    <section className="python-runtime__packages rlm-memory" aria-labelledby="rlm-memory-title">
+      <div className="python-runtime__packages-head">
+        <h2 id="rlm-memory-title">Mémoire de l'agent ({shown.length})</h2>
+        <div className="rlm-memory__tools">
+          <select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Portée">
+            <option value="all">Toutes les portées</option>
+            {scopes.map(([id, label]) => (
+              <option key={id} value={id}>
+                {id === "global" ? "Globale" : `Chat : ${label}`}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="settings-pane__btn" onClick={() => void load()}>
+            <Icon icon="solar:refresh-linear" width={13} height={13} />
+            <span>Recharger</span>
+          </button>
+        </div>
+      </div>
+      <p className="python-runtime__muted">
+        Ce que l'agent a retenu et sauvegardé : il le relit dans les chats suivants. Les variables
+        Python, elles, disparaissent au redémarrage du noyau. Rien ici n'entraîne le modèle. « Apprendre
+        de ce chat » (onglet RLM) demande une consolidation tout de suite ; sinon Prime consolide selon
+        ses propres règles.
+      </p>
+      {error && <p className="python-runtime__error" role="alert">{error}</p>}
+      {entries && shown.length === 0 && (
+        <p className="python-runtime__muted">Rien de sauvegardé pour l'instant.</p>
+      )}
+      <ul className="rlm-memory__list">
+        {shown.map((e) => {
+          const key = keyOf(e);
+          const isEditing = editing === key;
+          return (
+            <li key={key} className="rlm-memory__item">
+              <div className="rlm-memory__meta">
+                <span className="rlm-memory__badge">{KIND_LABEL[e.kind]}</span>
+                <span className="rlm-memory__badge" data-scope={e.scope === "global" ? "global" : "chat"}>
+                  {e.scope === "global" ? "Globale" : `Chat : ${e.scopeLabel}`}
+                </span>
+                <span className="python-runtime__muted">
+                  {e.source === "user" ? "modifiée par vous" : e.source || "agent"} ·{" "}
+                  {e.updatedAt ? new Date(e.updatedAt).toLocaleString() : "—"} · v{e.version}
+                </span>
+              </div>
+              {isEditing ? (
+                <div className="rlm-memory__edit">
+                  <input
+                    value={draft.title}
+                    onChange={(ev) => setDraft({ ...draft, title: ev.target.value })}
+                    aria-label="Titre"
+                  />
+                  <textarea
+                    rows={5}
+                    value={draft.content}
+                    onChange={(ev) => setDraft({ ...draft, content: ev.target.value })}
+                    aria-label="Contenu"
+                  />
+                  <div className="rlm-memory__row">
+                    <button type="button" className="settings-pane__btn" onClick={() => void save(e)}>
+                      Enregistrer
+                    </button>
+                    <button type="button" className="settings-pane__btn" onClick={() => setEditing(null)}>
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <strong className="rlm-memory__title">{e.title}</strong>
+                  <p className="rlm-memory__content">{e.content}</p>
+                  <div className="rlm-memory__row">
+                    <button
+                      type="button"
+                      className="settings-pane__btn"
+                      onClick={() => {
+                        setEditing(key);
+                        setDraft({ title: e.title, content: e.content });
+                      }}
+                    >
+                      Modifier
+                    </button>
+                    {confirming === key ? (
+                      <>
+                        <button type="button" className="settings-pane__btn" onClick={() => void remove(e)}>
+                          Confirmer la suppression
+                        </button>
+                        <button type="button" className="settings-pane__btn" onClick={() => setConfirming(null)}>
+                          Annuler
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="settings-pane__btn" onClick={() => setConfirming(key)}>
+                        Supprimer
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 /**
@@ -110,21 +271,7 @@ export function PythonRuntimeSection() {
               Exécution locale avec vos droits, sans sandbox. Chaque conversation RLM travaille dans
               son propre worktree.
             </p>
-            <section className="python-runtime__packages" aria-labelledby="rlm-learning-title">
-              <h2 id="rlm-learning-title">Mémoire et apprentissage RLM</h2>
-              <p className="python-runtime__muted">
-                Les variables Python restent en mémoire tant que le noyau tourne. Pour retenir une
-                correction ou une méthode vérifiée après un redémarrage, l’agent utilise la mémoire,
-                les skills et le harness persistés de Prime, pas les seules variables Python.
-              </p>
-              <p className="python-runtime__muted">
-                La mémoire locale appartient à la session ; la mémoire globale peut servir dans
-                d’autres chats RLM. Demandez à l’agent ce qu’il a retenu, sa source, ou de corriger
-                une entrée. La consolidation automatique dépend des preuves et des règles de
-                review de Prime : elle n’est pas garantie à chaque message et ne modifie pas les
-                poids du modèle. Cette page ne propose pas encore d’éditeur de souvenirs.
-              </p>
-            </section>
+            <RlmMemoryList />
             <div className="python-runtime__packages">
               <div className="python-runtime__packages-head">
                 <h2>Packages ({env?.packages.length ?? 0})</h2>

@@ -78,7 +78,31 @@ export type PythonRuntimeStatus = {
   connectedProviders: string[];
 };
 
+export type RlmMemoryEntry = {
+  id: string;
+  kind: "memory" | "skill" | "prompt" | "subagent";
+  title: string;
+  content: string;
+  path: string;
+  /** "global" or an RLM conversation id. */
+  scope: string;
+  scopeLabel: string;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+};
+
 export const api = {
+  listRlmMemories() {
+    return invoke<RlmMemoryEntry[]>("list_rlm_memories");
+  },
+  editRlmMemory(entry: Pick<RlmMemoryEntry, "scope" | "kind" | "id" | "title" | "content">) {
+    return invoke<void>("edit_rlm_memory", { input: entry });
+  },
+  deleteRlmMemory(entry: Pick<RlmMemoryEntry, "scope" | "kind" | "id">) {
+    return invoke<void>("delete_rlm_memory", { input: entry });
+  },
   getPythonRuntimeStatus() {
     return invoke<PythonRuntimeStatus>("get_python_runtime_status");
   },

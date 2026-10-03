@@ -163,3 +163,33 @@ test('Auto Compute: one click hands the agent chat to a new RLM chat', async ({ 
   await openChatTab(browser);
   await expect(screen.getByText('Il faut charger runs.csv', { exact: false })).toBeVisible();
 });
+
+test('Settings: agent memory is listed, editable and deletable', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await browser.locator('[title="Settings"]').first().tap();
+  await screen.getByRole('button', 'Python persistant', { exact: false }).tap();
+  await expect(screen.getByText('Median latency')).toBeVisible();
+  await expect(screen.getByText('runs.csv encoding')).toBeVisible();
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/rlm-memory.png' });
+
+  await screen.getByRole('button', 'Modifier').first().tap();
+  await browser.locator('.rlm-memory__edit textarea').fill('Use p50, never the mean.');
+  await screen.getByRole('button', 'Enregistrer').tap();
+  await expect(screen.getByText('Use p50, never the mean.')).toBeVisible();
+  expect(await calls(browser, 'edit_rlm_memory')).toHaveLength(1);
+
+  await screen.getByRole('button', 'Supprimer').first().tap();
+  await screen.getByRole('button', 'Confirmer la suppression').tap();
+  expect(await calls(browser, 'delete_rlm_memory')).toHaveLength(1);
+});
+
+test('Learn button: asks the RLM agent to consolidate through its memory API', async ({ app, browser, screen }) => {
+  await openApp(app, { seedRlm: true });
+  await openRlmTab(browser);
+  await screen.getByText('Old RLM chat').tap();
+  await screen.getByRole('button', 'Apprendre de ce chat').tap();
+  const sent = await calls(browser, 'send_rlm_message');
+  expect(sent).toHaveLength(1);
+  expect(sent[0].input.text).toContain('rlm.harness');
+  expect(sent[0].input.text).toContain('Never store secrets');
+});

@@ -12,6 +12,7 @@ pub mod mcp;
 mod powershell;
 pub mod prod;
 pub mod prime;
+pub mod prime_memory;
 pub mod python;
 pub mod question;
 pub mod read;
