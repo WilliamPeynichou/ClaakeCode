@@ -134,7 +134,7 @@ export function ClaakyScene({
           pivot.position.set(0, -0.92, 0);
           const piece = new THREE.Group();
           piece.position.set(side * 0.022, 0.92, 0);
-          piece.scale.set(1.12, 0.85, 1);
+          piece.scale.set(1.0, 0.95, 1);
           const shell = mesh(
             new THREE.SphereGeometry(R, 40, 28, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.PI, Math.PI / 2, Math.PI / 2),
             cream,
@@ -167,9 +167,9 @@ export function ClaakyScene({
 
         // Head: the logo's round dot, floating above the bowl with its own springy bounce.
         const head = new THREE.Group();
-        head.position.set(0, 0.98, 0.04);
+        head.position.set(0, 1.04, 0.04);
         root.add(head);
-        const skull = mesh(new THREE.SphereGeometry(0.58, 40, 30), fur);
+        const skull = mesh(new THREE.SphereGeometry(0.66, 40, 30), fur);
         head.add(skull);
         [1.04, 1.09].forEach((k, i) => {
           const shell = mesh(
@@ -183,9 +183,9 @@ export function ClaakyScene({
         const sparkMat = track(new THREE.MeshBasicMaterial({ color: 0xffffff }));
         const eyeGeo = new THREE.SphereGeometry(0.075, 20, 16);
         const sparkGeo = new THREE.SphereGeometry(0.022, 10, 8);
-        const eyes = [-0.2, 0.2].map((x) => {
+        const eyes = [-0.23, 0.23].map((x) => {
           const group = new THREE.Group();
-          group.position.set(x, 0.04, 0.53);
+          group.position.set(x, 0.06, 0.6);
           const eye = mesh(eyeGeo, eyeMat);
           eye.scale.set(0.9, 1.3, 0.6);
           const spark = mesh(sparkGeo, sparkMat);
@@ -197,15 +197,15 @@ export function ClaakyScene({
 
         const cheekMat = track(new THREE.MeshStandardMaterial({ color: 0xf0a9a0, roughness: 0.9, transparent: true, opacity: 0.85 }));
         const cheekGeo = new THREE.SphereGeometry(0.085, 16, 12);
-        [-0.36, 0.36].forEach((x) => {
+        [-0.41, 0.41].forEach((x) => {
           const cheek = mesh(cheekGeo, cheekMat);
           cheek.scale.set(1.3, 0.8, 0.35);
-          cheek.position.set(x, -0.1, 0.46);
+          cheek.position.set(x, -0.1, 0.52);
           head.add(cheek);
         });
 
         const mouthMat = track(new THREE.MeshStandardMaterial({ color: 0x1d1b16, roughness: 0.4 }));
-        const mouth = mesh(new THREE.TorusGeometry(0.08, 0.017, 8, 24, Math.PI), mouthMat);
+        const mouth = mesh(new THREE.TorusGeometry(0.11, 0.021, 8, 24, Math.PI), mouthMat);
         mouth.rotation.z = Math.PI;
         head.add(mouth);
 
@@ -492,7 +492,7 @@ export function ClaakyScene({
             group.position.x = baseX + lookX * 0.05;
             group.position.y = 0.04 - lookY * 0.04;
           });
-          head.position.y = 0.98 + headY.x + (asleep ? -0.1 : 0);
+          head.position.y = 1.04 + headY.x + (asleep ? -0.1 : 0);
           head.rotation.z = headTilt.x - lookX * 0.1;
           head.rotation.y = asleep ? 0 : lookX * 0.45;
           head.rotation.x = asleep ? 0.3 : lookY * 0.3;
@@ -500,7 +500,7 @@ export function ClaakyScene({
           leafLg.rotation.z = armL.x;
           leafRg.rotation.z = -armR.x;
           mouth.scale.set(wow.x, smile.x, 1);
-          mouth.position.set(0, -0.2 - ((1 - smile.x) / 2) * 0.09, 0.55 + ((1 - smile.x) / 2) * 0.02);
+          mouth.position.set(0, -0.2 - ((1 - smile.x) / 2) * 0.09, 0.63 + ((1 - smile.x) / 2) * 0.02);
           core.scale.setScalar(1 + (bulb - 0.5) * 0.06);
 
           coreMat.emissiveIntensity = bulb;
