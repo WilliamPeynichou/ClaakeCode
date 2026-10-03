@@ -8,6 +8,30 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 pub const PROTOCOL_VERSION: u32 = 7;
 pub const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 
+/// Only fixed categories cross the boundary; even short upstream strings can contain secrets.
+fn error_category(raw: &str) -> &'static str {
+    if raw.starts_with("Model not found:") { "model unavailable" }
+    else if raw.starts_with("No API key found for ") { "provider authentication unavailable" }
+    else if raw.starts_with("Unknown active session:") || raw.starts_with("Session not found:") { "session unavailable" }
+    else if raw == "Session worker timed out" { "session worker timed out" }
+    else if matches!(raw, "Supervisor is shutting down" | "supervisor is shutting down" | "Session is shutting down") { "daemon shutting down" }
+    else if raw == "Worker authentication failed" { "worker authentication refused" }
+    else if raw.starts_with("Invalid create config:") || raw.starts_with("Invalid thinking level") { "invalid session configuration" }
+    else if raw.starts_with("continueRecent is not supported:") { "explicit sessionPath required" }
+    else { "unclassified failure (upstream details withheld)" }
+}
+
+fn rejection(kind: &str, frame: &Value) -> String {
+    // Command names are caller-controlled too: display only known wire tags.
+    let kind = match kind {
+        "create" | "attach" | "abort" | "set_model" | "prompt" | "prompt_and_wait" |
+        "list" | "shutdown" | "get_messages" | "get_available_models" => kind,
+        _ => "unknown",
+    };
+    let raw = frame["error"].as_str().or_else(|| frame["error"]["message"].as_str()).unwrap_or("");
+    format!("Prime daemon rejected command `{kind}`: {}", error_category(raw))
+}
+
 pub fn command_frame(id: &str, command: Value) -> Result<Value> {
     if command.get("type").and_then(Value::as_str).is_none() {
         bail!("Prime command requires a type");
@@ -75,14 +99,13 @@ pub async fn call(
 ) -> Result<Value> {
     tokio::time::timeout(timeout, async {
         let mut connection = Connection::connect(socket).await?;
+        let kind = command["type"].as_str().unwrap_or("?").to_string();
         let id = connection.send(command).await?;
         loop {
             let value = connection.receive().await?;
             if value["type"] == "response" && value["id"] == id {
                 if value["success"] != true {
-                    // Upstream errors can echo command inputs or environment secrets.
-                    // Keep raw errors out of this public boundary until a redactor exists.
-                    bail!("Prime daemon rejected command");
+                    bail!("{}", rejection(&kind, &value));
                 }
                 return Ok(value.get("data").cloned().unwrap_or(Value::Null));
             }
@@ -143,12 +166,7 @@ pub fn map_session_event(frame: &Value) -> Option<PrimeEnvelope> {
         "agent_end" => {
             // A failed run ends with an assistant message whose stopReason is error/aborted.
             let last = event["messages"].as_array().and_then(|m| m.iter().rev().find(|m| m["role"] == "assistant"));
-            let reason = last.and_then(|m| m["stopReason"].as_str()).unwrap_or_default();
-            let error = match reason {
-                "error" | "aborted" => Some(last.and_then(|m| m["errorMessage"].as_str())
-                    .unwrap_or(reason).chars().take(500).collect()),
-                _ => None,
-            };
+            let error = last.and_then(stop_error);
             PrimeEvent::TurnEnded { error }
         }
         other => PrimeEvent::Other(other.into()),
@@ -277,8 +295,31 @@ pub async fn create_session_with(
     socket: &std::path::Path, cwd: &std::path::Path, name: &str, script: Option<&std::path::Path>,
     session_path: Option<&str>,
 ) -> Result<(String, Option<String>)> {
+    create_session_config(socket, cwd, name, script, session_path, None).await
+}
+
+/// Native Prime session: keep the base RLM prompt and append only host policy.
+/// `harness` is not a create-config selector in the pinned daemon; do not invent one.
+#[cfg(unix)]
+pub async fn create_rlm_session_with(
+    socket: &std::path::Path, cwd: &std::path::Path, name: &str,
+    session_path: Option<&str>, append_system_prompt: &str,
+) -> Result<(String, Option<String>)> {
+    let created = create_session_config(socket, cwd, name, None, session_path, Some(append_system_prompt)).await?;
+    if created.1.as_deref().is_none_or(|path| path.trim().is_empty()) {
+        bail!("Prime did not provide persisted RLM session");
+    }
+    Ok(created)
+}
+
+#[cfg(unix)]
+async fn create_session_config(
+    socket: &std::path::Path, cwd: &std::path::Path, name: &str,
+    script: Option<&std::path::Path>, session_path: Option<&str>, append_system_prompt: Option<&str>,
+) -> Result<(String, Option<String>)> {
     let cwd = std::fs::canonicalize(cwd).context("canonicalise session cwd")?;
     let mut config = json!({"cwd": cwd});
+    if let Some(policy) = append_system_prompt { config["appendSystemPrompt"] = json!([policy]); }
     if let Some(script) = script { config["script"] = json!(std::fs::canonicalize(script)?); }
     let mut command = json!({"type":"create","name":name,"config":config});
     if let Some(path) = session_path { command["sessionPath"] = json!(path); }
@@ -315,7 +356,7 @@ async fn wait_response(connection: &mut Connection, id: &str) -> Result<Value> {
         let frame = tokio::time::timeout(Duration::from_secs(30), connection.receive())
             .await.context("Prime attach timed out")??;
         if frame["type"] == "response" && frame["id"] == id {
-            if frame["success"] != true { bail!("Prime daemon rejected command"); }
+            if frame["success"] != true { bail!("{}", rejection("attach", &frame)); }
             return Ok(frame["data"].clone());
         }
     }
@@ -351,7 +392,8 @@ pub fn parse_attach(data: &Value) -> AttachSnapshot {
 
 fn stop_error(message: &Value) -> Option<String> {
     match message["stopReason"].as_str().unwrap_or_default() {
-        reason @ ("error" | "aborted") => Some(message["errorMessage"].as_str().unwrap_or(reason).chars().take(500).collect()),
+        "aborted" => Some("aborted".into()),
+        "error" => Some(format!("Prime run failed: {}", error_category(message["errorMessage"].as_str().unwrap_or("")))),
         _ => None,
     }
 }
@@ -406,7 +448,7 @@ pub async fn run_prompt(
             }
         };
         if frame["type"] == "response" && frame["id"] == prompt.as_str() {
-            if frame["success"] != true { bail!("Prime daemon rejected prompt"); }
+            if frame["success"] != true { bail!("{}", rejection("prompt", &frame)); }
             continue;
         }
         let Some(envelope) = map_session_event(&frame) else { continue };
@@ -637,6 +679,9 @@ mod unsupported {
     pub async fn create_session_with(
         _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&std::path::Path>, _: Option<&str>,
     ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
+    pub async fn create_rlm_session_with(
+        _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&str>, _: &str,
+    ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
     pub async fn abort_session(_: &std::path::Path, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
     pub async fn set_model(_: &std::path::Path, _: &str, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
     pub async fn run_prompt(
@@ -741,11 +786,26 @@ mod tests {
         error
     }
 
+    #[test]
+    fn diagnostics_never_echo_arbitrary_upstream_content() {
+        for secret in ["k", "SECRET_API_KEY", "private words", "/private/path", "é秘密"] {
+            let error = rejection(secret, &json!({"error":{"message":secret}}));
+            assert_eq!(error, "Prime daemon rejected command `unknown`: unclassified failure (upstream details withheld)");
+            let message = json!({"stopReason":"error","errorMessage":secret});
+            assert_eq!(stop_error(&message).as_deref(), Some("Prime run failed: unclassified failure (upstream details withheld)"));
+            assert_eq!(stop_error(&json!({"stopReason":"aborted","errorMessage":secret})).as_deref(), Some("aborted"));
+        }
+        assert_eq!(rejection("set_model", &json!({"error":"Model not found: SECRET"})),
+            "Prime daemon rejected command `set_model`: model unavailable");
+        assert_eq!(error_category("No API key found for SECRET"), "provider authentication unavailable");
+        assert_eq!(error_category("Unknown active session: SECRET"), "session unavailable");
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn rejects_failure_without_leaking_error_content() {
         let error = mock_response(b"{\"type\":\"response\",\"id\":\"REQUEST_ID\",\"success\":false,\"error\":\"SECRET_API_KEY\"}\n".to_vec()).await;
-        assert_eq!(error, "Prime daemon rejected command");
+        assert_eq!(error, "Prime daemon rejected command `list`: unclassified failure (upstream details withheld)");
         assert!(!error.contains("SECRET"));
     }
 
@@ -860,6 +920,38 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
+    async fn rlm_create_uses_native_policy_and_requires_persistence() {
+        use tokio::net::UnixListener;
+        for session_file in [json!("saved.jsonl"), Value::Null, json!("")] {
+            let path = std::env::temp_dir().join(format!("cc-prime-{}.sock", uuid::Uuid::new_v4()));
+            let listener = UnixListener::bind(&path).unwrap();
+            let persisted = session_file == "saved.jsonl";
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                let (reader, mut writer) = stream.into_split();
+                let mut line = String::new();
+                BufReader::new(reader).read_line(&mut line).await.unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                let command = &request["command"];
+                assert_eq!(command["sessionPath"], "reopen.jsonl");
+                assert_eq!(command["config"]["appendSystemPrompt"], json!(["native memory policy"]));
+                assert!(command["config"].get("harness").is_none());
+                assert!(command["config"].get("script").is_none());
+                assert!(command["config"].get("systemPrompt").is_none());
+                let response = json!({"type":"response","id":request["id"],"success":true,
+                    "data":{"activeSessionId":"s","sessionFile":session_file}});
+                writer.write_all(format!("{response}\n").as_bytes()).await.unwrap();
+            });
+            let result = create_rlm_session_with(&path, &std::env::temp_dir(), "memory", Some("reopen.jsonl"), "native memory policy").await;
+            assert_eq!(result.is_ok(), persisted);
+            if !persisted { assert_eq!(result.unwrap_err().to_string(), "Prime did not provide persisted RLM session"); }
+            server.await.unwrap();
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
     async fn rejects_eof_and_oversized_unterminated_frame() {
         assert!(mock_response(Vec::new()).await.contains("disconnected"));
         assert!(mock_response(vec![b'x'; MAX_FRAME_BYTES + 1]).await.contains("frame exceeds limit"));
@@ -969,6 +1061,13 @@ mod tests {
             binary: binary.into(), data_dir: root.clone(), uv_dir: None, credentials: vec![],
         }).await.unwrap();
         let sid = create_session(&sidecar.socket, &root, "auth", None).await.unwrap();
+        let refused = set_model(&sidecar.socket, &sid, "anthropic", "SECRET-short").await.unwrap_err().to_string();
+        assert_eq!(refused, "Prime daemon rejected command `set_model`: model unavailable");
+        assert!(!refused.contains("SECRET"));
+        let (native, file) = create_rlm_session_with(&sidecar.socket, &root, "native-memory", None,
+            "Use native rlm.harness memory mechanisms; do not claim model-weight training.").await.unwrap();
+        assert!(!native.is_empty());
+        assert!(file.is_some());
         let models = call(&sidecar.socket, json!({"type":"get_available_models","activeSessionId":sid}),
             Duration::from_secs(30), |_| {}).await.unwrap();
         let text = models.to_string();

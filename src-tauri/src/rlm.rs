@@ -3,6 +3,25 @@
 use crate::*;
 use claakecode_app::prime::{self, Sidecar, SidecarConfig};
 
+/// Supplemental policy only: Prime's built-in RLM prompt, skills, auto-refine review gates,
+/// memory CRUD, ranking and persistence remain authoritative. This does not train model weights.
+const RLM_MEMORY_POLICY: &str = r#"Claake Code RLM continual-harness policy:
+Use Prime's native persistent continual harness to learn from this conversation. Consult relevant
+local and global harness entries before repeating work. After a repeated failure, a verified
+reusable tactic, or a durable user correction, autonomously make the smallest evidence-backed
+update with the documented rlm.harness memory/prompt/skill/subagent APIs, or schedule
+await refine.run(instructions) using Prime's installed refine skill. Read its SKILL.md before use;
+refinement is scheduled for the turn boundary and may be refused or produce no edits.
+Default to local session memory for task progress, temporary blockers and project-specific facts.
+For verified stable user preferences or reusable lessons that should survive a new chat, use
+Prime's native global_=True scope, with project-qualified context where needed. Never store
+credentials, tokens, secrets, raw private transcripts or speculative claims. Correct or remove
+stale entries, and validate a learned tactic on the next applicable action. Native automatic
+refinement review is evidence-gated; do not force a refinement on every message or invent a
+separate memory store. Only report an entry as saved after a successful native persistence
+operation. Learning here means persisted harness entries, not fine-tuning model weights.
+"#;
+
 #[derive(Default)]
 pub(super) struct RlmRuntime {
     sidecar: Option<Sidecar>,
@@ -209,12 +228,12 @@ pub(super) async fn send_rlm_message(
             Some(id) => id.clone(),
             None => {
                 // A stored session file means this conversation already ran: reopen its transcript.
-                let (id, file) = prime::create_session_with(
+                let (id, file) = prime::create_rlm_session_with(
                     &socket,
                     &worktree,
                     "claakecode-rlm",
-                    None,
                     binding.session_path.as_deref(),
+                    RLM_MEMORY_POLICY,
                 )
                 .await
                 .map_err(error_to_string)?;

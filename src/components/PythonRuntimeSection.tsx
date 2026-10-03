@@ -110,6 +110,21 @@ export function PythonRuntimeSection() {
               Exécution locale avec vos droits, sans sandbox. Chaque conversation RLM travaille dans
               son propre worktree.
             </p>
+            <section className="python-runtime__packages" aria-labelledby="rlm-learning-title">
+              <h2 id="rlm-learning-title">Mémoire et apprentissage RLM</h2>
+              <p className="python-runtime__muted">
+                Les variables Python restent en mémoire tant que le noyau tourne. Pour retenir une
+                correction ou une méthode vérifiée après un redémarrage, l’agent utilise la mémoire,
+                les skills et le harness persistés de Prime, pas les seules variables Python.
+              </p>
+              <p className="python-runtime__muted">
+                La mémoire locale appartient à la session ; la mémoire globale peut servir dans
+                d’autres chats RLM. Demandez à l’agent ce qu’il a retenu, sa source, ou de corriger
+                une entrée. La consolidation automatique dépend des preuves et des règles de
+                review de Prime : elle n’est pas garantie à chaque message et ne modifie pas les
+                poids du modèle. Cette page ne propose pas encore d’éditeur de souvenirs.
+              </p>
+            </section>
             <div className="python-runtime__packages">
               <div className="python-runtime__packages-head">
                 <h2>Packages ({env?.packages.length ?? 0})</h2>

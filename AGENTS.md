@@ -278,7 +278,7 @@ Code map:
 │       ├── providers.rs
 │       ├── remote.rs
 │       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM (onglet RLM, état vide, Auto Compute, Stop, réouverture), `npm run test:e2e`)
-│       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath, Stop, get_rlm_binding
+│       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath obligatoire ; politique appendSystemPrompt native de mémoire locale/globale et refinement evidence-gated (sans fine-tuning ni moteur mémoire parallèle), Stop, get_rlm_binding
 │       ├── state.rs
 │       ├── swarm.rs
 │       ├── terminal.rs
@@ -319,7 +319,7 @@ Code map:
     │       ├── ChatPane.tsx — props headTabs / headActions / belowHead pour les onglets et actions d'en-tête
     │       ├── ChatSurface.tsx — onglets « Chat | RLM », état vide RLM, transcript et prompt Auto Compute
     │       ├── RlmBanner.tsx — bandeau « confiance locale » du chat RLM (worktree isolé, pas de sandbox)
-    │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)
+    │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage, explication mémoire native durable versus variables volatiles (pas encore d’éditeur de souvenirs) ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)
     │       ├── DotmSquare2.tsx
     │       ├── DotmSquare5.tsx
     │       ├── FileChangeBlock.tsx
