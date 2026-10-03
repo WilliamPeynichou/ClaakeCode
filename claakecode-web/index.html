@@ -56,7 +56,7 @@
       "alternateName": "ClaakeCode",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS, Windows, Linux",
-      "softwareVersion": "0.1.67",
+      "softwareVersion": "0.1.68",
       "license": "https://opensource.org/license/mit/",
       "isAccessibleForFree": true,
       "url": "https://claakecode-web.vercel.app/",
@@ -110,7 +110,7 @@
       <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
     </picture>
     <strong>claake <em>code</em></strong>
-    <span class="version">v0.1.67</span>
+    <span class="version">v0.1.68</span>
   </a>
   <div class="nav-links" id="navlinks">
     <a href="/features">Features</a>
@@ -134,7 +134,7 @@
       <a class="btn btn-ghost" aria-label="Download Claake Code for Linux AppImage" href="/download/linux">Linux ↓</a>
       <a class="btn btn-ghost" aria-label="Open Claake Code source code on GitHub" href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub ↗</a>
     </div>
-    <p class="meta">Latest <span>v0.1.67</span> · macOS · Windows · Linux · MIT licensed</p>
+    <p class="meta">Latest <span>v0.1.68</span> · macOS · Windows · Linux · MIT licensed</p>
   </div>
 </header>
 
@@ -156,68 +156,113 @@
   </section>
 
   <!-- ── RLM chat · scroll-driven motion section ────────────────────────────────────
-       Every frame is a pure function of scroll progress (rlmRender(p)): no CSS
-       transitions inside the stage, no timers, same p = same pixels.            -->
+       Every frame of the stage is a pure function of scroll (rlmRender(p, pre)): no CSS
+       transitions inside the stage, no timers, same inputs = same pixels. Only the mouse
+       tilt on .rlm-tilt is pointer-driven, outside rlmRender.                          -->
   <section class="rlm" id="rlm" aria-labelledby="rlm-title">
     <div class="wrap rlm-intro reveal">
-      <span class="eyebrow">New in v0.1.67 · experimental</span>
+      <span class="eyebrow">New in v0.1.68 · experimental</span>
       <h2 id="rlm-title">A second chat that <em>keeps its state</em>.</h2>
-      <p>The RLM chat runs the open-source Prime Agent engine next to the classic chat: an agent with a persistent Python kernel, working in its own git worktree.</p>
+      <p>The RLM chat runs the open-source Prime Agent engine in its own tab, next to Chat: an agent with a persistent Python kernel, working in its own git worktree. One click on <b>Auto Compute</b> hands any agent chat over to it.</p>
     </div>
 
     <div class="rlm-track" id="rlm-track">
       <div class="rlm-stage">
+        <div class="rlm-shade" aria-hidden="true"></div>
+        <canvas class="rlm-field" aria-hidden="true"></canvas>
+        <div class="rlm-glow" aria-hidden="true"></div>
+
+        <!-- Prelude: giant letters that split apart as the window flies in -->
+        <div class="rlm-hero" aria-hidden="true">
+          <div class="rlm-hero-word"><span class="rlm-L">R</span><span class="rlm-L">L</span><span class="rlm-L">M</span></div>
+          <div class="rlm-hero-sub"><span>persistent Python</span><i></i><span>own worktree</span><i></i><span>Auto Compute</span></div>
+          <div class="rlm-hero-hint"><span></span>scroll</div>
+        </div>
+
         <div class="wrap rlm-grid">
           <div class="rlm-copy">
             <ol class="rlm-rail" aria-hidden="true">
-              <li><span>01</span></li><li><span>02</span></li><li><span>03</span></li><li><span>04</span></li>
+              <li><span>01</span></li><li><span>02</span></li><li><span>03</span></li><li><span>04</span></li><li><span>05</span></li>
               <i class="rlm-rail-fill"></i>
             </ol>
             <div class="rlm-scenes">
+              <div class="rlm-count" aria-hidden="true"><span class="rlm-count-win"><span class="rlm-count-col"><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span></span></span><span class="rlm-count-of">/ 05</span></div>
               <article class="rlm-scene" data-scene="0">
-                <span class="rlm-k">01 · Same models</span>
-                <h3><span class="ln"><span>Next to the classic chat,</span></span><span class="ln"><span>not <em>instead</em> of it.</span></span></h3>
-                <p>Open one with the <b>RLM</b> button. It uses the providers you already connected: Anthropic and OpenAI sign-ins, OpenRouter and Mistral keys. Prime only receives short-lived access tokens, never refresh tokens.</p>
+                <span class="rlm-k">01 · Chat | RLM</span>
+                <h3><span class="ln"><span>A tab next to <em>Chat</em>,</span></span><span class="ln"><span>its own history.</span></span></h3>
+                <p>Open the <b>RLM</b> tab at the top of the chat panel. It keeps its own list of conversations and uses the same model picker, sign-ins and API keys as the classic chat: Anthropic and OpenAI accounts, OpenRouter and Mistral keys.</p>
               </article>
               <article class="rlm-scene" data-scene="1">
-                <span class="rlm-k">02 · Isolated worktree</span>
+                <span class="rlm-k">02 · Auto Compute</span>
+                <h3><span class="ln"><span>Hand a chat over,</span></span><span class="ln"><span>let it <em>compute</em>.</span></span></h3>
+                <p>Press <b>Auto Compute</b> in an agent chat: a new RLM chat opens on the same model, receives the conversation and starts checking, measuring and re-running what it needs in Python. The original chat stays untouched.</p>
+              </article>
+              <article class="rlm-scene" data-scene="2">
+                <span class="rlm-k">03 · Isolated worktree</span>
                 <h3><span class="ln"><span>Its own branch.</span></span><span class="ln"><span>Your files <em>untouched</em>.</span></span></h3>
                 <p>Each RLM conversation gets a git worktree on a <code>claakecode/rlm-…</code> branch. A banner says it plainly: the agent runs locally with your permissions, there is no sandbox.</p>
               </article>
-              <article class="rlm-scene" data-scene="2">
-                <span class="rlm-k">03 · Persistent Python</span>
+              <article class="rlm-scene" data-scene="3">
+                <span class="rlm-k">04 · Persistent Python</span>
                 <h3><span class="ln"><span>Variables survive</span></span><span class="ln"><span><em>between</em> messages.</span></span></h3>
                 <p>Load data once, reuse it three questions later. The <b>Python persistant</b> page in Settings shows the engine state, Python version, size, location and every installed package, with a restart button.</p>
               </article>
-              <article class="rlm-scene" data-scene="3">
-                <span class="rlm-k">04 · Resumes after a cut</span>
+              <article class="rlm-scene" data-scene="4">
+                <span class="rlm-k">05 · Resumes after a cut</span>
                 <h3><span class="ln"><span>Connection drops?</span></span><span class="ln"><span>The answer <em>still lands</em>.</span></span></h3>
                 <p>Claake Code reattaches to the running turn, fills the gap from Prime's snapshot without duplicating text, and never sends your prompt twice. Conversations reopen with their history after a restart.</p>
               </article>
             </div>
           </div>
 
+          <div class="rlm-tilt">
           <figure class="glass rlm-window" aria-label="Illustration of the RLM chat">
-            <div class="rlm-bar"><i></i><i></i><i></i><span class="rlm-bar-title">RLM chat</span><span class="rlm-illus">Illustration</span></div>
+            <div class="rlm-bar">
+              <i></i><i></i><i></i>
+              <div class="rlm-tabs"><span class="rlm-tab" data-tab="chat">Chat</span><span class="rlm-tab" data-tab="rlm">RLM</span><b class="rlm-tab-ind"></b></div>
+              <span class="rlm-ac-btn"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5"/><path d="M6 1v2M10 1v2M6 13v2M10 13v2M1 6h2M1 10h2M13 6h2M13 10h2"/><path class="bolt" d="M8.6 5.4 6.8 8.2h2.4l-1.8 2.6"/></svg>Auto Compute</span>
+              <span class="rlm-illus">Illustration</span>
+            </div>
             <div class="rlm-view">
-              <!-- Scene 0: providers flow into both chats -->
+              <!-- Scene 0: tabs with separate histories, shared providers -->
               <div class="rlm-layer" data-layer="0">
-                <div class="rlm-providers">
-                  <span class="rlm-chip">Anthropic</span><span class="rlm-chip">OpenAI</span><span class="rlm-chip">OpenRouter</span><span class="rlm-chip">Mistral</span>
+                <div class="rlm-hist">
+                  <div class="rlm-list" data-list="chat">
+                    <div class="rlm-row"><span class="rlm-dot"></span>Refactor auth middleware</div>
+                    <div class="rlm-row"><span class="rlm-dot"></span>Fix flaky CI job</div>
+                    <div class="rlm-row"><span class="rlm-dot"></span>Latency regression</div>
+                  </div>
+                  <div class="rlm-list" data-list="rlm">
+                    <div class="rlm-row rlm-row--rlm"><span class="rlm-dot"></span>Auto Compute · Latency regression</div>
+                    <div class="rlm-row rlm-row--rlm"><span class="rlm-dot"></span>Explore runs.csv</div>
+                    <div class="rlm-row rlm-row--ghost">+ New RLM chat</div>
+                  </div>
                 </div>
-                <svg class="rlm-wires" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
-                  <path d="M50 0 C50 60 120 60 120 120" /><path d="M150 0 C150 60 120 60 120 120" />
-                  <path d="M250 0 C250 60 280 60 280 120" /><path d="M350 0 C350 60 280 60 280 120" />
-                  <path d="M150 0 C150 70 280 50 280 120" /><path d="M250 0 C250 70 120 50 120 120" />
-                </svg>
-                <div class="rlm-convs">
-                  <div class="rlm-conv"><span class="rlm-dot"></span>Classic chat</div>
-                  <div class="rlm-conv rlm-conv--rlm"><span class="rlm-dot"></span>RLM chat<span class="rlm-badge">RLM</span></div>
+                <div class="rlm-shared">
+                  <span class="rlm-shared-k">same model picker · same sign-ins &amp; keys</span>
+                  <div class="rlm-providers">
+                    <span class="rlm-chip">Anthropic</span><span class="rlm-chip">OpenAI</span><span class="rlm-chip">OpenRouter</span><span class="rlm-chip">Mistral</span>
+                  </div>
                 </div>
               </div>
 
-              <!-- Scene 1: git worktree branches off -->
+              <!-- Scene 1: Auto Compute hand-over -->
               <div class="rlm-layer" data-layer="1">
+                <div class="rlm-src">
+                  <div class="rlm-msg rlm-msg--user">Why did p50 latency jump on Tuesday?</div>
+                  <div class="rlm-msg rlm-msg--agent2">Probably the new retry policy, but I can't confirm it without loading <code>runs.csv</code>.</div>
+                  <div class="rlm-msg rlm-msg--user">Can you check?</div>
+                </div>
+                <div class="rlm-dest">
+                  <div class="rlm-dest-title"><span class="rlm-pulse"></span>Auto Compute · Latency regression</div>
+                  <div class="rlm-handed"><code>&lt;agent_chat&gt;</code> 3 messages handed over <code>&lt;/agent_chat&gt;</code></div>
+                  <div class="rlm-msg rlm-msg--agent"><span class="rlm-stream2" data-text="Loading runs.csv into the kernel… grouping by day and retry policy, then testing the claim."></span></div>
+                </div>
+                <div class="rlm-sparks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+
+              <!-- Scene 2: git worktree branches off -->
+              <div class="rlm-layer" data-layer="2">
                 <div class="rlm-banner"><b>RLM · local trust</b> Isolated worktree. Runs with your permissions (no sandbox).</div>
                 <svg class="rlm-git" viewBox="0 0 400 170" aria-hidden="true">
                   <path class="rlm-git-main" d="M20 120 H380" />
@@ -230,27 +275,32 @@
                 </svg>
               </div>
 
-              <!-- Scene 2: persistent kernel -->
-              <div class="rlm-layer" data-layer="2">
+              <!-- Scene 3: persistent kernel -->
+              <div class="rlm-layer" data-layer="3">
                 <div class="rlm-cell" data-cell="0"><span class="rlm-in">msg 1</span><code class="rlm-type" data-text='df = pd.read_csv("runs.csv")'></code></div>
                 <div class="rlm-cell rlm-out" data-cell="1"><span class="rlm-in">out</span><code>12 840 rows × 6 columns</code></div>
                 <div class="rlm-gap" data-cell="2">… two questions later …</div>
                 <div class="rlm-cell" data-cell="3"><span class="rlm-in">msg 4</span><code class="rlm-type" data-text='df.groupby("model").latency.median()'></code></div>
                 <div class="rlm-cell rlm-out" data-cell="4"><span class="rlm-in">out</span><code>no reload · <b>df</b> still in memory</code></div>
-                <div class="rlm-kernel"><span class="rlm-pulse"></span>kernel alive · Python 3.12 · state kept between messages</div>
+                <div class="rlm-kernel"><span class="rlm-pulse"></span>kernel alive · state kept between messages<span class="rlm-ns">df</span></div>
               </div>
 
-              <!-- Scene 3: stream cut and resync -->
-              <div class="rlm-layer" data-layer="3">
-                <div class="rlm-msg rlm-msg--user">Summarise the failing tests</div>
+              <!-- Scene 4: stream cut and resync -->
+              <div class="rlm-layer" data-layer="4">
+                <div class="rlm-msg rlm-msg--user rlm-u4">Summarise the failing tests</div>
                 <div class="rlm-msg rlm-msg--agent"><span class="rlm-stream" data-text="Three tests fail in auth/: the token refresh path expects a refresh token that is no longer sent."></span><span class="rlm-caret"></span></div>
                 <div class="rlm-cut"><span class="rlm-cut-line"></span><span class="rlm-cut-tag">connection lost → reattach</span></div>
                 <div class="rlm-ledger">
                   <span>prompt sent <b>1×</b></span><span>duplicated text <b>0</b></span><span class="rlm-resync">resynced from snapshot</span>
                 </div>
               </div>
+
+              <div class="rlm-sweep" aria-hidden="true"></div>
             </div>
+            <svg class="rlm-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2.5 19 12l-6.6 1.4L9 20z"/></svg>
+            <span class="rlm-ripple" aria-hidden="true"></span>
           </figure>
+          </div>
         </div>
       </div>
     </div>
@@ -260,7 +310,7 @@
         <div><span class="rlm-k">Engine</span><p>Prime Agent 0.9.8, open source, pinned to a reviewed commit and bundled with the app.</p></div>
         <div><span class="rlm-k">Platforms</span><p>macOS and Linux. Windows shows the RLM chat as unavailable for now.</p></div>
         <div><span class="rlm-k">Providers</span><p>Anthropic, OpenAI, OpenRouter, Mistral. Google sign-in is not supported in RLM yet.</p></div>
-        <div><span class="rlm-k">Status</span><p>Experimental. Needs a git repository with at least one commit.</p></div>
+        <div><span class="rlm-k">Status</span><p>Experimental. Needs a git repository with at least one commit. Auto Compute hands over the text of the chat, not tool results.</p></div>
       </div>
     </div>
   </section>
@@ -276,7 +326,7 @@
             <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="/download/windows">Windows · .exe ↓</a>
             <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="/download/linux">Linux · AppImage ↓</a>
           </div>
-          <p class="meta" style="text-align:center">Latest v0.1.67 · open source · MIT</p>
+          <p class="meta" style="text-align:center">Latest v0.1.68 · open source · MIT</p>
         </div>
       </div>
     </div>
@@ -367,7 +417,9 @@
 </script>
 
 <script>
-/* RLM section motion. rlmRender(p) is pure: every style derives from p (0..1) and constants. */
+/* RLM section motion. rlmRender(p, pre) is pure: every style derives from its inputs, the
+   measured layout and constants. p = progress through the pinned track (0..1), pre = how far
+   the stage has entered the viewport before pinning (0..1). */
 (function () {
   const track = document.getElementById('rlm-track');
   if (!track) return;
@@ -377,128 +429,368 @@
   const lerp = (a, b, u) => a + (b - a) * u;
   const smooth = (u) => { u = clamp(u); return u * u * (3 - 2 * u); };
   const easeOut = (u) => 1 - Math.pow(1 - clamp(u), 4);
-  const prog = (p, start, dur, e = smooth) => e(clamp((p - start) / dur));
-  // Closed-form underdamped spring: overshoots slightly, then settles. Seekable.
-  function spring(tau, f = 2.2, z = 0.62) {
+  const easeInOut = (u) => { u = clamp(u); return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
+  const lin = (u) => clamp(u);
+  const prog = (x, start, dur, e = smooth) => e(clamp((x - start) / dur));
+  const bell = (u) => Math.sin(Math.PI * clamp(u));
+  // Closed-form underdamped spring: accelerates, overshoots a little, settles. Seekable.
+  function spring(tau, f = 1.6, z = 0.62) {
     if (tau <= 0) return 0;
     const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z);
     return 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z * w / wd) * Math.sin(wd * tau));
   }
+  function springTargets(x, base, changes, k, f, z) {
+    let v = base, prev = base;
+    for (const [at, target] of changes) { v += (target - prev) * spring((x - at) * k, f, z); prev = target; }
+    return v;
+  }
+  function mulberry32(seed) {
+    return () => {
+      let x = (seed += 0x6d2b79f5);
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
-  const N = 4, SEG = 1 / N;
+  const P0 = 0.14;               // prelude share of the track
+  const N = 5, SEG = 1 / N;
+  const stage = $('.rlm-stage');
+  const canvas = $('.rlm-field'), ctx = canvas.getContext('2d');
+  const glow = $('.rlm-glow'), shade = $('.rlm-shade');
+  const hero = $('.rlm-hero'), letters = $$('.rlm-L'), heroSub = $('.rlm-hero-sub'), heroHint = $('.rlm-hero-hint');
+  const copy = $('.rlm-copy'), tilt = $('.rlm-tilt'), win = $('.rlm-window');
   const scenes = $$('.rlm-scene'), layers = $$('.rlm-layer');
   const rail = $$('.rlm-rail li'), railFill = $('.rlm-rail-fill');
-  const chips = $$('.rlm-chip'), wires = $$('.rlm-wires path'), convs = $$('.rlm-conv');
+  const countCol = $('.rlm-count-col'), count = $('.rlm-count');
+  const tabs = $$('.rlm-tab'), tabInd = $('.rlm-tab-ind'), acBtn = $('.rlm-ac-btn');
+  const sweep = $('.rlm-sweep'), cursor = $('.rlm-cursor'), ripple = $('.rlm-ripple');
+  // 0
+  const chatRows = $$('[data-list="chat"] .rlm-row'), rlmRows = $$('[data-list="rlm"] .rlm-row');
+  const chips = $$('.rlm-chip'), sharedK = $('.rlm-shared-k');
+  // 1
+  const src = $('.rlm-src'), srcMsgs = $$('.rlm-src .rlm-msg'), sparks = $$('.rlm-sparks i');
+  const destTitle = $('.rlm-dest-title'), handed = $('.rlm-handed'), destMsg = $('.rlm-dest .rlm-msg'), stream2 = $('.rlm-stream2');
+  // 2
   const gitBranch = $('.rlm-git-branch'), gitMain = $('.rlm-git-main');
   const gitNodes = $$('.rlm-git-n'), gitLabel = $('.rlm-git-label'), banner = $('.rlm-banner');
-  const cells = $$('[data-cell]'), typers = $$('.rlm-type'), kernel = $('.rlm-kernel');
+  // 3
+  const cells = $$('[data-cell]'), typers = $$('.rlm-type'), kernel = $('.rlm-kernel'), ns = $('.rlm-ns');
+  // 4
   const stream = $('.rlm-stream'), caret = $('.rlm-caret'), cut = $('.rlm-cut'), ledger = $$('.rlm-ledger span');
-  const userMsg = $('.rlm-msg--user');
-  [...wires, gitBranch, gitMain].forEach((el) => { const L = el.getTotalLength(); el.style.strokeDasharray = L; el.dataset.len = L; });
+  const userMsg4 = $('.rlm-u4');
+
+  [gitBranch, gitMain].forEach((el) => { const L = el.getTotalLength(); el.style.strokeDasharray = L; el.dataset.len = L; });
   const draw = (el, u) => { el.style.strokeDashoffset = el.dataset.len * (1 - clamp(u)); };
   const typeText = (el, u) => { const t = el.dataset.text; el.textContent = t.slice(0, Math.round(t.length * clamp(u))); };
   const show = (el, u, dy = 14) => { el.style.opacity = clamp(u); el.style.transform = `translateY(${lerp(dy, 0, clamp(u))}px)`; };
 
-  // Scene visibility: in, hold, out inside its segment. First scene starts visible, last never leaves.
-  function sceneAmount(p, i) {
-    const s = i * SEG;
-    // Outgoing scene finishes leaving before the next one starts entering: no overlap.
-    const enter = i === 0 ? 1 : prog(p, s - 0.005, 0.06);
-    const leave = i === N - 1 ? 0 : prog(p, s + SEG - 0.055, 0.05);
-    return { enter, leave, local: clamp((p - s) / SEG) };
+  // ── Layout (measured, untransformed offsets) ─────────────────────────────────────────
+  const L = {};
+  function offsetIn(el, root) {
+    let x = 0, y = 0, n = el;
+    while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+    return { x, y };
+  }
+  const rnd = mulberry32(7);
+  let dots = [];
+  function layout() {
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    L.W = W; L.H = H;
+    const t = offsetIn(tilt, stage);
+    L.cx = t.x + tilt.offsetWidth / 2; L.cy = t.y + tilt.offsetHeight / 2;
+    L.hx = W / 2; L.hy = H / 2;
+    L.maxR = Math.hypot(W, H) * 1.05;
+    const gap = W < 700 ? 30 : 26;
+    const r = mulberry32(11);
+    dots = [];
+    for (let y = gap / 2; y < H; y += gap) for (let x = gap / 2; x < W; x += gap) dots.push([x, y, r()]);
+    // window-relative points for the Auto Compute choreography
+    const btn = offsetIn(acBtn, win), rt = offsetIn(tabs[1], win), s = offsetIn(src, win);
+    L.btnX = btn.x + acBtn.offsetWidth / 2; L.btnY = btn.y + acBtn.offsetHeight / 2;
+    L.tabX = rt.x + tabs[1].offsetWidth / 2; L.tabY = rt.y + tabs[1].offsetHeight / 2;
+    L.srcX = s.x + src.offsetWidth / 2; L.srcY = s.y + src.offsetHeight / 2;
+    L.winW = win.offsetWidth; L.winH = win.offsetHeight;
+    L.tab = tabs.map((t) => ({ x: t.offsetLeft, w: t.offsetWidth }));
+    L.sparkSeed = sparks.map(() => [rnd() - 0.5, rnd() - 0.5]);
+    L.accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e7c878';
+  }
+  function hexRgb(c) {
+    const m = c.replace('#', '');
+    const v = m.length === 3 ? m.split('').map((h) => h + h).join('') : m;
+    const n = parseInt(v, 16);
+    return Number.isNaN(n) ? [231, 200, 120] : [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
 
-  function rlmRender(p) {
-    railFill.style.transform = `scaleY(${clamp(p)})`;
-    rail.forEach((li, i) => li.classList.toggle('on', p >= i * SEG - 0.005));
+  // Scene visibility in q-space: outgoing scene leaves before the next one enters.
+  function sceneAmount(q, i) {
+    const s = i * SEG;
+    const enter = i === 0 ? 1 : prog(q, s - 0.004, 0.05);
+    const leave = i === N - 1 ? 0 : prog(q, s + SEG - 0.05, 0.042);
+    return { enter, leave, vis: enter * (1 - leave) };
+  }
+  const local = (q, i) => clamp((q - i * SEG) / SEG);
 
+  function field(p, q) {
+    const { W, H } = L;
+    ctx.clearRect(0, 0, W, H);
+    const [r, g, b] = hexRgb(L.accent);
+    const pre = p < P0;
+    const ox = pre ? L.hx : L.cx, oy = pre ? L.hy : L.cy;
+    // One ring per scene, launched at the scene start; a bigger one for the prelude.
+    const ringU = pre ? p / P0 : (q % SEG) / SEG;
+    const R = easeOut(ringU) * L.maxR * (pre ? 1 : 0.9);
+    const width = pre ? 110 : 80;
+    const fade = pre ? 1 : 1 - ringU * 0.6;
+    const appear = clamp(p / 0.03 + 0.25);
+    for (const [x, y, s] of dots) {
+      const dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy) || 1;
+      const ring = Math.exp(-Math.pow((d - R) / width, 2)) * fade;
+      const tw = 0.5 + 0.5 * Math.sin(s * 6.283 + p * 60 + d * 0.01);
+      const a = (0.05 + 0.05 * tw + 0.55 * ring) * appear;
+      if (a < 0.02) continue;
+      const push = ring * 6;
+      const size = 1.3 + ring * 1.6;
+      ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
+      ctx.fillRect(x + (dx / d) * push - size / 2, y + (dy / d) * push - size / 2, size, size);
+    }
+  }
+
+  function rlmRender(p, pre = 1) {
+    const q = clamp((p - P0) / (1 - P0));
+    const inPrelude = p < P0;
+
+    // ── Prelude: letters rise in as the stage arrives, then split and blow past the camera.
+    const out = prog(p, 0.035, 0.095, easeInOut);
+    hero.style.visibility = out < 0.999 ? 'visible' : 'hidden';
+    letters.forEach((el, i) => {
+      const inU = clamp(spring((pre - 0.35 - i * 0.07) * 3.2, 1.3, 0.6), 0, 1.15);
+      const ty = lerp(70, 0, inU);
+      const tx = (i - 1) * out * 36;
+      const sc = 1 + out * 1.8;
+      el.style.transform = `translate3d(${tx}vw, ${ty}%, 0) scale(${sc})`;
+      el.style.opacity = clamp(inU) * (1 - out);
+      el.style.filter = `blur(${(out * 16).toFixed(2)}px)`;
+    });
+    hero.style.setProperty('--fill', `${(prog(p, 0, 0.05, lin) * 100).toFixed(1)}%`);
+    const subIn = prog(pre, 0.7, 0.25);
+    heroSub.style.opacity = subIn * (1 - prog(p, 0.015, 0.04));
+    heroSub.style.transform = `translateY(${lerp(16, 0, subIn) - 20 * prog(p, 0.015, 0.04)}px)`;
+    heroHint.style.opacity = prog(pre, 0.85, 0.15) * (1 - prog(p, 0, 0.02));
+
+    // ── Window flies in from a tilted, far position with a spring, then a gentle camera drift.
+    const wT = clamp((p - 0.055) / 0.1);
+    const wIn = clamp(spring(wT * 1.25, 1.05, 0.7), 0, 1.06);
+    const yaw = springTargets(q, -3, [[SEG, 3], [2 * SEG, -2.5], [3 * SEG, 2.5], [4 * SEG, -1.5]], 30, 1.1, 0.65);
+    const pitch = springTargets(q, 2, [[SEG, -1.5], [2 * SEG, 1.5], [3 * SEG, -1], [4 * SEG, 1]], 30, 1.1, 0.65);
+    win.style.transform =
+      `translate3d(0, ${lerp(220, 0, wIn).toFixed(1)}px, ${lerp(-420, 0, wIn).toFixed(1)}px) ` +
+      `rotateX(${lerp(38, pitch, wIn).toFixed(2)}deg) rotateY(${lerp(-34, yaw, wIn).toFixed(2)}deg) rotateZ(${lerp(-6, 0, wIn).toFixed(2)}deg)`;
+    win.style.opacity = prog(p, 0.05, 0.035);
+    const cIn = prog(p, 0.085, 0.06, easeOut);
+    copy.style.opacity = cIn;
+    copy.style.transform = `translateX(${lerp(-40, 0, cIn)}px)`;
+
+    shade.style.opacity = clamp(pre * 1.2 - 0.1);
+    // ── Field + glow follow the window; a ring is launched at every scene start.
+    field(p, q);
+    const pulse = inPrelude ? 0 : Math.exp(-((q % SEG) / SEG) * 7);
+    glow.style.transform = `translate3d(${L.cx}px, ${L.cy}px, 0) translate(-50%, -50%) scale(${(0.6 + 0.4 * wIn + 0.25 * pulse).toFixed(3)})`;
+    glow.style.opacity = (0.25 + 0.35 * wIn + 0.3 * pulse) * clamp(p / 0.06 + 0.3);
+
+    // ── Rail + rolling counter
+    railFill.style.transform = `scaleY(${q})`;
+    rail.forEach((li, i) => li.classList.toggle('on', !inPrelude && q >= i * SEG - 0.004));
+    const idx = springTargets(q, 0, [1, 2, 3, 4].map((i) => [i * SEG - 0.02, i]), 32, 1.3, 0.62);
+    countCol.style.transform = `translateY(${(-idx * 100 / N).toFixed(3)}%)`;
+    count.style.opacity = cIn;
+
+    // ── Copy scenes: masked line reveal, lines leave upward.
     scenes.forEach((sc, i) => {
-      const { enter, leave } = sceneAmount(p, i);
-      const vis = enter * (1 - leave);
+      const a = sceneAmount(q, i);
+      const enter = i === 0 ? cIn : a.enter;
+      const vis = enter * (1 - a.leave);
       sc.style.visibility = vis > 0.001 ? 'visible' : 'hidden';
-      // Masked line reveal: lines rise into their clip box, then leave upward.
       $$('.ln > span', sc).forEach((line, j) => {
-        const inU = i === 0 ? 1 : prog(p, i * SEG - 0.005 + j * 0.018, 0.06, easeOut);
-        const y = leave > 0 ? lerp(0, -120, leave) : lerp(120, 0, inU);
+        const inU = i === 0 ? prog(p, 0.09 + j * 0.012, 0.05, easeOut) : prog(q, i * SEG - 0.004 + j * 0.014, 0.05, easeOut);
+        const y = a.leave > 0 ? lerp(0, -120, a.leave) : lerp(120, 0, inU);
         line.style.transform = `translateY(${y}%)`;
       });
       const k = $('.rlm-k', sc), para = $('p', sc);
       k.style.opacity = vis; para.style.opacity = vis;
-      para.style.transform = `translateY(${lerp(10, 0, enter) - 10 * leave}px)`;
+      para.style.transform = `translateY(${lerp(12, 0, enter) - 12 * a.leave}px)`;
+      para.style.filter = `blur(${((1 - enter) * 6 + a.leave * 6).toFixed(2)}px)`;
     });
 
+    // ── Window layers: depth crossfade (scale + blur), a light sweep covers each cut.
     layers.forEach((ly, i) => {
-      const { enter, leave } = sceneAmount(p, i);
-      const vis = enter * (1 - leave);
-      ly.style.visibility = vis > 0.001 ? 'visible' : 'hidden';
-      ly.style.opacity = vis;
-      ly.style.transform = `translateX(${lerp(24, 0, enter) - 24 * leave}px)`;
+      const a = sceneAmount(q, i);
+      ly.style.visibility = a.vis > 0.001 ? 'visible' : 'hidden';
+      ly.style.opacity = a.vis;
+      const sc = a.leave > 0 ? lerp(1, 0.94, a.leave) : lerp(1.05, 1, a.enter);
+      ly.style.transform = `translateY(${lerp(14, 0, a.enter) - 10 * a.leave}px) scale(${sc.toFixed(4)})`;
+      ly.style.filter = `blur(${((1 - a.enter) * 8 + a.leave * 8).toFixed(2)}px)`;
     });
+    let sw = 0;
+    for (let i = 1; i < N; i++) { const u = prog(q, i * SEG - 0.04, 0.08, lin); if (u > 0 && u < 1) sw = u; }
+    sweep.style.opacity = bell(sw);
+    sweep.style.transform = `translateY(${lerp(-30, 130, sw)}%)`;
 
-    // 0 · provider chips drop in with a spring, wires draw, both chats light up.
-    const l0 = clamp(p / SEG);
+    // ── Tabs: Chat ↔ RLM indicator, with springy travel.
+    const tabU = springTargets(q, 0, [[0.32 * SEG, 1], [SEG - 0.03, 0], [SEG + 0.56 * SEG, 1]], 42, 1.3, 0.6);
+    const tu = clamp(tabU, -0.08, 1.08);
+    tabInd.style.transform = `translateX(${lerp(L.tab[0].x, L.tab[1].x, tu).toFixed(1)}px)`;
+    tabInd.style.width = `${lerp(L.tab[0].w, L.tab[1].w, clamp(tu)).toFixed(1)}px`;
+    tabs[0].classList.toggle('on', tu < 0.5); tabs[1].classList.toggle('on', tu >= 0.5);
+    // Auto Compute only exists on the Chat tab, like in the app.
+    const l1 = local(q, 1);
+    const press = bell(prog(l1, 0.35, 0.06, lin));
+    acBtn.style.opacity = clamp(1 - tabU * 1.6);
+    acBtn.style.transform = `scale(${(1 - 0.1 * press).toFixed(3)})`;
+    acBtn.classList.toggle('hot', q > SEG && l1 > 0.28 && l1 < 0.5);
+
+    // 0 · histories flip with the tab; providers drop in, shared by both tabs.
+    const l0 = local(q, 0);
+    const fu = clamp(tabU, 0, 1);
+    chatRows.forEach((r, j) => {
+      const u = clamp(fu * 1.6 - j * 0.25);
+      r.style.transform = `rotateX(${(u * 90).toFixed(1)}deg)`; r.style.opacity = 1 - u;
+    });
+    rlmRows.forEach((r, j) => {
+      const u = clamp(fu * 1.6 - j * 0.25 - 0.2);
+      r.style.transform = `rotateX(${((1 - u) * -90).toFixed(1)}deg)`; r.style.opacity = u;
+    });
     chips.forEach((c, i) => {
-      const s = spring((l0 - i * 0.06) * 2.4);
-      c.style.transform = `translateY(${lerp(-26, 0, s)}px)`; c.style.opacity = clamp(l0 * 6 - i * 0.4);
+      const s = spring((l0 - 0.55 - i * 0.05) * 6, 1.6, 0.55);
+      c.style.transform = `translateY(${lerp(-24, 0, s).toFixed(1)}px)`; c.style.opacity = clamp(s * 1.4);
     });
-    wires.forEach((w, i) => draw(w, prog(l0, 0.18 + i * 0.05, 0.3)));
-    convs.forEach((c, i) => {
-      const u = prog(l0, 0.45 + i * 0.12, 0.2);
-      show(c, u, 18); c.classList.toggle('lit', u > 0.98);
-    });
+    sharedK.style.opacity = prog(l0, 0.5, 0.1);
 
-    // 1 · branch draws off main, its commits pop, the trust banner slides down.
-    const l1 = clamp((p - SEG) / SEG);
-    draw(gitMain, prog(l1, 0, 0.25)); draw(gitBranch, prog(l1, 0.2, 0.35));
+    // 1 · Auto Compute: messages arrive, cursor clicks, the chat packs into the RLM tab.
+    srcMsgs.forEach((m, j) => show(m, prog(l1, 0.02 + j * 0.05, 0.06), 12));
+    const cur = prog(l1, 0.12, 0.22, easeInOut);
+    const cx0 = L.winW * 0.82, cy0 = L.winH * 0.92;
+    const cxp = lerp(cx0, L.btnX, cur) + Math.sin(Math.PI * cur) * -40;
+    const cyp = lerp(cy0, L.btnY, cur);
+    const cVis = prog(l1, 0.1, 0.04) * (1 - prog(l1, 0.5, 0.06)) * sceneAmount(q, 1).vis;
+    cursor.style.opacity = cVis;
+    cursor.style.transform = `translate(${cxp.toFixed(1)}px, ${cyp.toFixed(1)}px) scale(${(1 - 0.18 * press).toFixed(3)})`;
+    const rp = prog(l1, 0.36, 0.12, easeOut);
+    ripple.style.opacity = (rp > 0 && rp < 1 ? 1 - rp : 0) * sceneAmount(q, 1).vis;
+    ripple.style.transform = `translate(${L.btnX}px, ${L.btnY}px) translate(-50%, -50%) scale(${lerp(0.3, 4, rp).toFixed(3)})`;
+    const k = prog(l1, 0.42, 0.17, easeInOut);
+    const dx = (L.tabX - L.srcX) * k, dy = (L.tabY - L.srcY) * k - bell(k) * 50;
+    src.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${lerp(1, 0.06, k).toFixed(4)})`;
+    src.style.opacity = 1 - prog(l1, 0.55, 0.05);
+    src.style.filter = `blur(${(k * 3).toFixed(2)}px)`;
+    sparks.forEach((s, j) => {
+      const u = prog(l1, 0.43 + j * 0.011, 0.17, easeInOut);
+      const [jx, jy] = L.sparkSeed[j];
+      const x = lerp(L.srcX, L.tabX, u) + bell(u) * jx * 140;
+      const y = lerp(L.srcY, L.tabY, u) - bell(u) * (50 + jy * 90);
+      s.style.opacity = bell(u) * sceneAmount(q, 1).vis;
+      s.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${lerp(1.4, 0.4, u).toFixed(3)})`;
+    });
+    show(destTitle, prog(l1, 0.62, 0.06), 10);
+    const hs = clamp(spring((l1 - 0.67) * 7, 1.5, 0.55), 0, 1.1);
+    handed.style.opacity = clamp(hs); handed.style.transform = `scale(${lerp(0.85, 1, hs).toFixed(4)})`;
+    show(destMsg, prog(l1, 0.74, 0.05), 10);
+    typeText(stream2, prog(l1, 0.76, 0.2, lin));
+
+    // 2 · branch draws off main, its commits pop, the trust banner slides down.
+    const l2 = local(q, 2);
+    draw(gitMain, prog(l2, 0, 0.25)); draw(gitBranch, prog(l2, 0.2, 0.35));
     gitNodes.forEach((n, i) => {
       const at = n.classList.contains('rlm-git-b') ? 0.45 + (i - 3) * 0.1 : i * 0.08;
-      const s = spring((l1 - at) * 2.2);
+      const s = spring((l2 - at) * 5, 1.6, 0.55);
       n.style.transform = `scale(${clamp(s, 0, 1.4)})`;
     });
-    gitLabel.style.opacity = prog(l1, 0.5, 0.15);
-    const b = prog(l1, 0.62, 0.2, easeOut);
+    gitLabel.style.opacity = prog(l2, 0.5, 0.15);
+    const b = prog(l2, 0.62, 0.2, easeOut);
     banner.style.opacity = b; banner.style.transform = `translateY(${lerp(-16, 0, b)}px)`;
 
-    // 2 · code types, output appears, later message reuses df; kernel stays alive.
-    const l2 = clamp((p - 2 * SEG) / SEG);
-    typeText(typers[0], prog(l2, 0.02, 0.22, (u) => u));
-    show(cells[0], prog(l2, 0, 0.06));
-    show(cells[1], prog(l2, 0.26, 0.08));
-    show(cells[2], prog(l2, 0.38, 0.08));
-    show(cells[3], prog(l2, 0.46, 0.06));
-    typeText(typers[1], prog(l2, 0.48, 0.24, (u) => u));
-    show(cells[4], prog(l2, 0.74, 0.08));
-    kernel.style.opacity = prog(l2, 0.05, 0.1);
+    // 3 · code types, output appears, later message reuses df; kernel stays alive.
+    const l3 = local(q, 3);
+    typeText(typers[0], prog(l3, 0.02, 0.22, lin));
+    show(cells[0], prog(l3, 0, 0.06));
+    show(cells[1], prog(l3, 0.26, 0.08));
+    show(cells[2], prog(l3, 0.38, 0.08));
+    show(cells[3], prog(l3, 0.46, 0.06));
+    typeText(typers[1], prog(l3, 0.48, 0.24, lin));
+    show(cells[4], prog(l3, 0.74, 0.08));
+    kernel.style.opacity = prog(l3, 0.05, 0.1);
+    const nsS = clamp(spring((l3 - 0.26) * 6, 1.6, 0.5), 0, 1.25);
+    ns.style.transform = `scale(${nsS.toFixed(3)})`;
+    ns.classList.toggle('hot', l3 > 0.74 && l3 < 0.9);
 
-    // 3 · text streams, the link cuts (stream freezes), reattach, the rest lands once.
-    const l3 = clamp((p - 3 * SEG) / SEG);
-    show(userMsg, prog(l3, 0, 0.08));
+    // 4 · text streams, the link cuts (stream freezes), reattach, the rest lands once.
+    const l4 = local(q, 4);
+    show(userMsg4, prog(l4, 0, 0.08));
     const cutAt = 0.38, resumeAt = 0.6;
-    const first = prog(l3, 0.08, cutAt - 0.08, (u) => u) * 0.45;
-    const rest = prog(l3, resumeAt, 0.3, (u) => u) * 0.55;
+    const first = prog(l4, 0.08, cutAt - 0.08, lin) * 0.45;
+    const rest = prog(l4, resumeAt, 0.3, lin) * 0.55;
     typeText(stream, first + rest);
-    const cutU = prog(l3, cutAt, 0.05) * (1 - prog(l3, resumeAt - 0.02, 0.06));
+    const cutU = prog(l4, cutAt, 0.05) * (1 - prog(l4, resumeAt - 0.02, 0.06));
     cut.style.opacity = cutU; cut.style.transform = `scaleX(${lerp(0.6, 1, cutU)})`;
-    caret.style.opacity = l3 > 0.08 && l3 < 0.92 ? 1 : 0;
+    caret.style.opacity = l4 > 0.08 && l4 < 0.92 ? 1 : 0;
     caret.classList.toggle('frozen', cutU > 0.5);
-    ledger.forEach((s, i) => show(s, prog(l3, 0.72 + i * 0.07, 0.08), 8));
+    win.classList.toggle('glitch', l4 > cutAt && l4 < cutAt + 0.04 && q > 4 * SEG);
+    ledger.forEach((s, i) => show(s, prog(l4, 0.72 + i * 0.07, 0.08), 8));
   }
   window.rlmRender = rlmRender;
 
+  // ── Drivers ─────────────────────────────────────────────────────────────────────────
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-  function progress() {
+  function inputs() {
     const r = track.getBoundingClientRect();
-    const total = r.height - window.innerHeight;
-    return total > 0 ? clamp(-r.top / total) : 0;
+    const vh = window.innerHeight;
+    const total = r.height - vh;
+    return {
+      p: total > 0 ? clamp(-r.top / total) : 0,
+      pre: clamp(1 - r.top / vh),
+      visible: r.bottom > 0 && r.top < vh,
+    };
   }
   let queued = false;
-  function frame() { queued = false; rlmRender(reduce.matches ? 1 : progress()); }
+  function frame() {
+    queued = false;
+    if (reduce.matches) return;
+    const i = inputs();
+    if (i.visible) rlmRender(i.p, i.pre);
+  }
   function request() { if (!queued) { queued = true; requestAnimationFrame(frame); } }
+  function relayout() { layout(); request(); }
   window.addEventListener('scroll', request, { passive: true });
-  window.addEventListener('resize', request);
-  reduce.addEventListener?.('change', () => { document.documentElement.classList.toggle('rlm-static', reduce.matches); request(); });
+  window.addEventListener('resize', relayout);
+  new MutationObserver(relayout).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  reduce.addEventListener?.('change', () => { document.documentElement.classList.toggle('rlm-static', reduce.matches); relayout(); });
   document.documentElement.classList.toggle('rlm-static', reduce.matches);
-  frame();
+  window.rlmLayout = layout;
+
+  // Pointer tilt (interactive garnish, outside the pure render): eased toward the pointer.
+  let tx = 0, ty = 0, cx = 0, cy = 0, tiltRaf = 0;
+  function tiltStep() {
+    cx += (tx - cx) * 0.1; cy += (ty - cy) * 0.1;
+    tilt.style.transform = `rotateX(${cy.toFixed(3)}deg) rotateY(${cx.toFixed(3)}deg)`;
+    tiltRaf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.01 ? requestAnimationFrame(tiltStep) : 0;
+  }
+  const finePointer = window.matchMedia('(pointer: fine)');
+  stage.addEventListener('pointermove', (e) => {
+    if (reduce.matches || !finePointer.matches) return;
+    const r = tilt.getBoundingClientRect();
+    tx = clamp((e.clientX - (r.left + r.width / 2)) / r.width, -1, 1) * 6;
+    ty = clamp((e.clientY - (r.top + r.height / 2)) / r.height, -1, 1) * -5;
+    if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep);
+  });
+  stage.addEventListener('pointerleave', () => { tx = 0; ty = 0; if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep); });
+
+  layout(); frame();
+  document.fonts?.ready.then(relayout);
+  window.addEventListener('load', relayout);
 })();
 </script>
 

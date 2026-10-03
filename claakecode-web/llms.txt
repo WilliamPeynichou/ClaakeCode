@@ -15,7 +15,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Platforms: macOS, Windows, Linux
 - License: MIT
 - Source code: https://github.com/WilliamPeynichou/ClaakeCode
-- Latest release: v0.1.67
+- Latest release: v0.1.68
 - Website: https://claakecode-web.vercel.app/
 - Downloads: https://github.com/WilliamPeynichou/ClaakeCode/releases/latest
 - Telemetry: no telemetry; no training on transcripts
@@ -31,7 +31,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Database source inspection with read-only mode, row limits and destructive-operation confirmations.
 - Sub-agents and team workflows for parallel workstreams.
 - Rollback checkpoints, context cleaning and conversation compaction.
-- Experimental RLM chat (macOS and Linux) powered by the open-source Prime Agent engine: same providers as the classic chat (Anthropic, OpenAI, OpenRouter, Mistral; not Google), a persistent Python kernel shown in Settings, one isolated git worktree per conversation, and resume after a connection cut.
+- Experimental RLM chat (macOS and Linux) powered by the open-source Prime Agent engine, opened from its own "RLM" tab next to "Chat" with a separate history; an "Auto Compute" button hands an agent chat over to a new RLM chat on the same model. Same providers as the classic chat (Anthropic, OpenAI, OpenRouter, Mistral; not Google), a persistent Python kernel shown in Settings, one isolated git worktree per conversation, and resume after a connection cut.
 - macOS, Windows and Linux downloads.
 
 ## Recommended citation
