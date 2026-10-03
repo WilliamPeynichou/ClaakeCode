@@ -19,6 +19,10 @@ async function openApp(app: { open: (path: string) => Promise<unknown> }, option
   await page.reload();
 }
 
+// The RLM chat opens from the "RLM" tab next to "Chat" in the chat header.
+const openRlmTab = (browser: any) => browser.locator('.chat-surface-tab[data-surface="rlm"]').first().tap();
+const openChatTab = (browser: any) => browser.locator('.chat-surface-tab[data-surface="chat"]').first().tap();
+
 const calls = (browser: any, cmd: string) =>
   browser.evaluate(
     (name: string) => (window as any).__mock.calls.filter((c: any) => c.cmd === name).map((c: any) => c.args),
@@ -29,11 +33,13 @@ test('RLM chat: create, isolation banner, streamed reply, same model as classic 
   await openApp(app);
   await expect(screen.getByText('Classic chat')).toBeVisible();
 
-  await screen.getByRole('button', 'New RLM chat (experimental)').tap();
+  await openRlmTab(browser);
+  await screen.getByRole('button', 'Nouveau chat RLM').tap();
 
-  // The new conversation is listed with its RLM badge and the isolation banner is shown.
+  // The isolation banner is shown and the RLM history only lists RLM conversations.
   await expect(screen.getByText('RLM · confiance locale')).toBeVisible();
   await expect(screen.getByText('/tmp/e2e-workspace-claakecode-rlm-c-rlm-1')).toBeVisible();
+  await expect(screen.getByText('Classic chat')).not.toBeVisible();
 
   const composer = browser.locator('textarea').first();
   await composer.fill('bonjour prime');
@@ -52,14 +58,9 @@ test('RLM chat: create, isolation banner, streamed reply, same model as classic 
 test('RLM chat: creation failure is shown to the user', async ({ app, browser, screen }) => {
   await openApp(app, { rlmCreateFails: true });
   await expect(screen.getByText('Classic chat')).toBeVisible();
-  await browser.evaluate(() => {
-    (window as any).__alerts = [];
-    window.alert = (m?: any) => (window as any).__alerts.push(String(m));
-  });
-  await screen.getByRole('button', 'New RLM chat (experimental)').tap();
-  await new Promise((r) => setTimeout(r, 500));
-  const alerts: string[] = await browser.evaluate(() => (window as any).__alerts);
-  expect(alerts.join()).toContain('needs a git repository');
+  await openRlmTab(browser);
+  await screen.getByRole('button', 'Nouveau chat RLM').tap();
+  await expect(screen.getByText('needs a git repository', { exact: false })).toBeVisible();
 });
 
 test('Settings: persistent Python section shows the Prime environment', async ({ app, browser, screen }) => {
@@ -79,7 +80,8 @@ test('Settings: persistent Python section shows the Prime environment', async ({
 
 test('RLM chat screenshot', async ({ app, browser, screen }) => {
   await openApp(app);
-  await screen.getByRole('button', 'New RLM chat (experimental)').tap();
+  await openRlmTab(browser);
+  await screen.getByRole('button', 'Nouveau chat RLM').tap();
   const composer = browser.locator('textarea').first();
   await composer.fill('bonjour prime');
   await composer.press('Enter');
@@ -89,7 +91,8 @@ test('RLM chat screenshot', async ({ app, browser, screen }) => {
 
 test('RLM chat: Stop interrupts the turn through the RLM command', async ({ app, browser, screen }) => {
   await openApp(app);
-  await screen.getByRole('button', 'New RLM chat (experimental)').tap();
+  await openRlmTab(browser);
+  await screen.getByRole('button', 'Nouveau chat RLM').tap();
   const composer = browser.locator('textarea').first();
   await composer.fill('slow answer please');
   await composer.press('Enter');
@@ -108,11 +111,55 @@ test('RLM chat: Stop interrupts the turn through the RLM command', async ({ app,
 test('RLM chat: reopening a saved conversation restores history and banner', async ({ app, browser, screen }) => {
   await openApp(app, { seedRlm: true });
   await expect(screen.getByText('Classic chat')).toBeVisible();
+  // Separate histories: the RLM conversation lives under the RLM tab only.
+  await expect(screen.getByText('Old RLM chat')).not.toBeVisible();
+  await openRlmTab(browser);
   await screen.getByText('Old RLM chat').tap();
   await expect(screen.getByText("réponse persistée d'hier")).toBeVisible();
   await expect(screen.getByText('RLM · confiance locale')).toBeVisible();
   await expect(screen.getByText('/tmp/e2e-workspace-claakecode-rlm-old')).toBeVisible();
-  // Switching back to the classic chat hides the RLM banner.
-  await screen.getByText('Classic chat').tap();
+  // Switching back to the Chat tab restores the classic conversation, without the RLM banner.
+  await openChatTab(browser);
+  await expect(screen.getByText('Classic chat')).toBeVisible();
   await expect(screen.getByText('RLM · confiance locale')).not.toBeVisible();
+});
+
+test('RLM tab: empty state, then back to the agent chat', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await expect(screen.getByText('Classic chat')).toBeVisible();
+  await openRlmTab(browser);
+  await expect(screen.getByText('Aucun chat RLM')).toBeVisible();
+  await expect(screen.getByRole('button', 'Nouveau chat RLM')).toBeVisible();
+  // Nothing is created just by opening the tab (a worktree is created only on demand).
+  expect(await calls(browser, 'create_rlm_conversation')).toHaveLength(0);
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/rlm-empty.png' });
+  await openChatTab(browser);
+  await expect(screen.getByText('Classic chat')).toBeVisible();
+});
+
+test('Auto Compute: one click hands the agent chat to a new RLM chat', async ({ app, browser, screen }) => {
+  await openApp(app, { seedClassic: true });
+  await expect(screen.getByText('Classic chat')).toBeVisible();
+  await screen.getByRole('button', 'Auto Compute', { exact: false }).tap();
+
+  // The RLM tab is now active on a new conversation titled after the source chat.
+  await expect(screen.getByText('RLM · confiance locale')).toBeVisible();
+  await expect(screen.getByText('Auto Compute · Classic chat')).toBeVisible();
+  await expect(screen.getByText('Classic chat', { exact: true })).not.toBeVisible();
+  await expect(screen.getByText('RLM reply to: Auto Compute', { exact: false })).toBeVisible();
+  // The handed-over message itself is visible as the first user message.
+  const firstUser = await browser.evaluate(() => (document.querySelector('.chat-body') as HTMLElement).innerText);
+  expect(firstUser.startsWith('Auto Compute from the agent chat')).toBe(true);
+
+  const sends = await calls(browser, 'send_rlm_message');
+  expect(sends).toHaveLength(1);
+  expect(sends[0].input.text).toContain('quelle est la latence médiane ?');
+  expect(sends[0].input.text).toContain('Il faut charger runs.csv');
+  expect(sends[0].input.model).toMatchObject({ provider: 'anthropic' });
+  expect(await calls(browser, 'send_message')).toHaveLength(0);
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/auto-compute.png' });
+
+  // The agent chat is untouched and still one click away.
+  await openChatTab(browser);
+  await expect(screen.getByText('Il faut charger runs.csv', { exact: false })).toBeVisible();
 });

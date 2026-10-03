@@ -11,11 +11,13 @@ export type MockOptions = {
   rlmCreateFails?: boolean;
   /** Seeds an existing RLM conversation with history, as after an app restart. */
   seedRlm?: boolean;
+  /** Gives the classic chat a short history, so Auto Compute has something to hand over. */
+  seedClassic?: boolean;
 };
 
 export function installTauriMock(options: MockOptions) {
   const WS = "/tmp/e2e-workspace";
-  const model = { provider: "anthropic", name: "claude-sonnet-4-5" };
+  const model = { provider: "anthropic", name: "claude-sonnet-5" };
   const modes = { act: model, ask: model, plan: model, goal: model };
   const now = Date.now();
   const conv = (id: string, title: string, harness: "classic" | "rlm") => ({
@@ -33,6 +35,12 @@ export function installTauriMock(options: MockOptions) {
     },
   });
   const conversations = [conv("c-classic", "Classic chat", "classic")];
+  if (options.seedClassic) {
+    conversations[0].saved.history.push(
+      { role: "user", parts: [{ type: "text", text: "quelle est la latence médiane ?" }] },
+      { role: "assistant", parts: [{ type: "text", text: "Il faut charger runs.csv pour la calculer." }] },
+    );
+  }
   const bindings: Record<string, { worktreePath: string; sessionPath: string | null }> = {};
   if (options.seedRlm) {
     const seeded = conv("c-rlm-old", "Old RLM chat", "rlm");
@@ -89,6 +97,24 @@ export function installTauriMock(options: MockOptions) {
       conversations.unshift(conv(id, "New RLM chat", "rlm"));
       bindings[id] = { worktreePath: `/tmp/e2e-workspace-claakecode-rlm-${id}`, sessionPath: null };
       return bootstrap(id);
+    },
+    rename_conversation: ({ input }) => {
+      const c = conversations.find((x) => x.summary.id === input.conversationId);
+      if (c) {
+        c.summary.title = input.title;
+        c.saved.title = input.title;
+      }
+      return conversations.map((x) => x.summary);
+    },
+    set_conversation_model_preference: ({ input }) => {
+      const c = conversations.find((x) => x.summary.id === input.conversationId);
+      if (c) c.saved.modeModelSettings = { ...c.saved.modeModelSettings, [input.mode]: input.model };
+      return c?.saved.modeModelSettings ?? modes;
+    },
+    delete_conversation: ({ input }) => {
+      const i = conversations.findIndex((x) => x.summary.id === input.conversationId);
+      if (i >= 0) conversations.splice(i, 1);
+      return bootstrap("c-classic");
     },
     get_rlm_binding: ({ input }) => bindings[input.conversationId] ?? null,
     send_rlm_message: async ({ input }) => {

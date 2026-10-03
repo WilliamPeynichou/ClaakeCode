@@ -197,6 +197,12 @@ type Props = {
   onOpenSettings: (section?: "providers") => void;
   externalDrops: ExternalDropFeed;
   dropZoneRef: RefObject<HTMLDivElement>;
+  /** Replaces the "Chat" title (Chat / RLM surface tabs). Hidden while viewing a sub-agent. */
+  headTabs?: ReactNode;
+  /** Extra header buttons, before the status dot (e.g. Auto Compute). */
+  headActions?: ReactNode;
+  /** Rendered between the header and the transcript (e.g. the RLM trust banner). */
+  belowHead?: ReactNode;
 };
 
 function preserveTrailingTurnDuration(
@@ -428,6 +434,9 @@ export function ChatPane({
   onOpenSettings,
   externalDrops,
   dropZoneRef,
+  headTabs,
+  headActions,
+  belowHead,
 }: Props) {
   const conversationViewsRef = useRef<Map<string, ChatViewState>>(new Map());
   const composerDraftsRef = useRef<Map<string, ComposerDraft>>(new Map());
@@ -3245,6 +3254,9 @@ export function ChatPane({
             <Icon icon="solar:alt-arrow-left-linear" width={16} height={16} />
           </button>
         )}
+        {headTabs && !viewingSubAgent ? (
+          headTabs
+        ) : (
         <span className="chat-head__title">
           {viewingSubAgent ? (
             <span style={{ display: "inline-flex", color: "var(--text-3)" }}>
@@ -3260,8 +3272,11 @@ export function ChatPane({
           )}
           <span>{activeSubAgent?.title ?? "Chat"}</span>
         </span>
+        )}
+        {!viewingSubAgent && headActions}
         <span className="chat-head__dot" data-status={displayView.status} />
       </div>
+      {belowHead}
       <div className="chat-body" ref={bodyRef}>
         <div className="chat-body__content" ref={bodyContentRef}>
           {displayView.blocks.length === 0 && !showPlanningNextMove ? (

@@ -6,6 +6,7 @@ import {
   useState,
   startTransition,
 } from "react";
+import { flushSync } from "react-dom";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Icon } from "@iconify/react";
@@ -23,6 +24,14 @@ import { RemotePanel } from "./RemotePanel";
 import { SearchPane } from "./SearchPane";
 import { ChatPane, type ExternalDropFeed } from "./chat/ChatPane";
 import { RlmBanner } from "./chat/RlmBanner";
+import {
+  ChatSurfaceTabs,
+  RlmEmptyState,
+  autoComputePrompt,
+  autoComputeTranscript,
+  surfaceOf,
+  type ChatSurface,
+} from "./chat/ChatSurface";
 import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { useTheme } from "../lib/theme";
 import { UpdateBadge } from "./UpdateBadge";
@@ -222,20 +231,43 @@ export function Workspace({
     }
   }, [workspacePath]);
 
+  // ---------------- Chat / RLM surfaces ----------------
+  // Two chats side by side in the header: the agent chat and the RLM chat, each with its own
+  // conversation history. The surface follows the active conversation, except right after the
+  // user switched tabs (or deleted a conversation), where the surface wins and we pick a
+  // conversation of that kind.
+  const [surface, setSurface] = useState<ChatSurface>(() =>
+    surfaceOf(bootstrap.conversations.find((c) => c.id === bootstrap.activeConversation.id)),
+  );
+  const keepSurfaceRef = useRef(false);
+  const lastIdBySurfaceRef = useRef<Record<ChatSurface, string | null>>({ chat: null, rlm: null });
+  const [rlmCreating, setRlmCreating] = useState(false);
+  const [rlmError, setRlmError] = useState<string | null>(null);
+  // An RLM error belongs to the conversation it happened in.
+  useEffect(() => setRlmError(null), [activeConv.id]);
+
   const createRlmConversation = useCallback(async () => {
     const seq = ++navigationSeqRef.current;
+    setRlmCreating(true);
+    setRlmError(null);
     try {
       const next = await api.createRlmConversation(workspacePath);
-      if (seq !== navigationSeqRef.current) return;
-      if (next.workspace.path !== workspacePath) return;
+      if (seq !== navigationSeqRef.current) return null;
+      if (next.workspace.path !== workspacePath) return null;
+      keepSurfaceRef.current = true;
+      setSurface("rlm");
       activeConvIdRef.current = next.activeConversation.id;
       setConversations(next.conversations);
       setActiveConv(next.activeConversation);
       setGlobalModeModelSettings(next.modeModelSettings);
+      return next;
     } catch (err) {
       console.error(err);
       // Isolation failures (non-git workspace, no commit) must be visible, not silent.
-      window.alert(String(err));
+      setRlmError(String(err));
+      return null;
+    } finally {
+      setRlmCreating(false);
     }
   }, [workspacePath]);
 
@@ -301,6 +333,8 @@ export function Workspace({
   const deleteConversation = useCallback(
     async (id: string) => {
       if (streamingConversationIds.has(id)) return;
+      // Deleting from the RLM history keeps the user on the RLM tab.
+      keepSurfaceRef.current = true;
       const seq = ++navigationSeqRef.current;
       try {
         const next = await api.deleteConversation(workspacePath, id);
@@ -1484,6 +1518,7 @@ export function Workspace({
       workspacePath,
       activeConv.id,
       activeConv.history.length,
+      conversations,
       applyOptimisticConversationTitle,
       markConversationStreaming,
       markConversationStreamingModel,
@@ -1699,6 +1734,165 @@ export function Workspace({
       console.error(err);
     }
   }, [workspacePath, activeConv.id, conversations]);
+
+  const activeSurface = surfaceOf(conversations.find((c) => c.id === activeConv.id));
+  const surfaceConversations = useMemo(
+    () => conversations.filter((c) => surfaceOf(c) === surface),
+    [conversations, surface],
+  );
+  const streamingBySurface = useMemo(() => {
+    const out: Record<ChatSurface, boolean> = { chat: false, rlm: false };
+    for (const c of conversations) {
+      if (streamingConversationIds.has(c.id)) out[surfaceOf(c)] = true;
+    }
+    return out;
+  }, [conversations, streamingConversationIds]);
+  const selectConversationRef = useRef(selectConversation);
+  selectConversationRef.current = selectConversation;
+  const createConversationRef = useRef(createConversation);
+  createConversationRef.current = createConversation;
+  const prevActiveIdRef = useRef(activeConv.id);
+  const reconcilingRef = useRef(false);
+
+  // Keeps the visible tab and the active conversation of the same kind.
+  useEffect(() => {
+    const idChanged = prevActiveIdRef.current !== activeConv.id;
+    prevActiveIdRef.current = activeConv.id;
+    if (activeSurface === surface) {
+      lastIdBySurfaceRef.current[surface] = activeConv.id;
+      keepSurfaceRef.current = false;
+      return;
+    }
+    // Activated from elsewhere (workspace switch, restored turn…): the tab follows.
+    if (idChanged && !keepSurfaceRef.current) {
+      setSurface(activeSurface);
+      return;
+    }
+    if (reconcilingRef.current) return;
+    const remembered = lastIdBySurfaceRef.current[surface];
+    const target =
+      surfaceConversations.find((c) => c.id === remembered) ?? surfaceConversations[0];
+    const done = () => {
+      reconcilingRef.current = false;
+    };
+    if (target) {
+      reconcilingRef.current = true;
+      void selectConversationRef.current(target.id).finally(done);
+    } else if (surface === "chat") {
+      reconcilingRef.current = true;
+      void createConversationRef.current().finally(done);
+    }
+    // RLM tab without any RLM conversation: the empty state offers to create one.
+  }, [activeConv.id, activeSurface, surface, surfaceConversations]);
+
+  const switchSurface = useCallback(
+    (next: ChatSurface) => {
+      if (next === surface) return;
+      keepSurfaceRef.current = true;
+      setRlmError(null);
+      setSurface(next);
+    },
+    [surface],
+  );
+
+  const createInSurface = useCallback(() => {
+    if (surface === "rlm") void createRlmConversation();
+    else void createConversation();
+  }, [surface, createConversation, createRlmConversation]);
+
+  // Auto Compute: one click opens a new RLM chat seeded with the current agent chat, on the
+  // same model, and starts the turn. The agent chat itself is left untouched.
+  const [autoComputing, setAutoComputing] = useState(false);
+  const autoCompute = useCallback(async () => {
+    if (IS_WINDOWS || autoComputing) return;
+    const source = activeConv;
+    const transcript = autoComputeTranscript(source.history);
+    if (!transcript) return;
+    setAutoComputing(true);
+    setRlmError(null);
+    const seq = ++navigationSeqRef.current;
+    try {
+      let next: Awaited<ReturnType<typeof api.createRlmConversation>>;
+      try {
+        next = await api.createRlmConversation(workspacePath);
+      } catch (err) {
+        // Shown on the RLM tab (non-git workspace, no commit…).
+        setRlmError(String(err));
+        keepSurfaceRef.current = true;
+        setSurface("rlm");
+        return;
+      }
+      const conversationId = next.activeConversation.id;
+      const title = `Auto Compute · ${source.title || "chat"}`.slice(0, 80);
+      const prompt = autoComputePrompt(source.title, transcript);
+      const model = source.model;
+      const thinking = thinkingFromRef(model);
+      const [summaries, modeModelSettings] = await Promise.all([
+        api.renameConversation(workspacePath, conversationId, title).catch(() => next.conversations),
+        api
+          .setConversationModelPreference(workspacePath, conversationId, "act", model, thinking)
+          .catch(() => null),
+      ]);
+      if (seq !== navigationSeqRef.current) return;
+      // One synchronous update: the chat opens on the new conversation with the handed-over
+      // message already visible (the backend persists the same message when the turn starts).
+      // It must be committed before the first stream event arrives, otherwise the chat view
+      // would be built from the events alone and miss the message.
+      keepSurfaceRef.current = true;
+      activeConvIdRef.current = conversationId;
+      flushSync(() => {
+        setSurface("rlm");
+        setConversations(summaries);
+        setActiveConv({
+          ...next.activeConversation,
+          title,
+          model,
+          modeModelSettings: modeModelSettings ?? next.activeConversation.modeModelSettings,
+          history: [{ role: "user", parts: [{ type: "text", text: prompt }] }],
+        });
+        markConversationStreamingModel(conversationId, model, thinking);
+        markConversationStreaming(conversationId, true);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      try {
+        await api.sendRlmMessage(workspacePath, conversationId, prompt, model);
+      } catch (err) {
+        markConversationStreaming(conversationId, false);
+        setRlmError(String(err));
+      }
+      void refreshConversationAfterMessageStart(workspacePath, conversationId).catch((err) =>
+        console.error(err),
+      );
+    } finally {
+      setAutoComputing(false);
+    }
+  }, [
+    activeConv,
+    autoComputing,
+    workspacePath,
+    markConversationStreaming,
+    markConversationStreamingModel,
+    refreshConversationAfterMessageStart,
+  ]);
+
+  const surfaceTabs = (
+    <ChatSurfaceTabs surface={surface} onChange={switchSurface} streaming={streamingBySurface} />
+  );
+  const autoComputeAction =
+    surface === "chat" && !IS_WINDOWS ? (
+      <div className="chat-head__actions">
+        <button
+          type="button"
+          className="chat-head__action"
+          onClick={() => void autoCompute()}
+          disabled={autoComputing || activeConv.history.length === 0}
+          title="Auto Compute : ouvre un chat RLM (Python persistant) qui reprend cette conversation"
+        >
+          <Icon icon="solar:cpu-bolt-linear" width={13} height={13} />
+          <span>{autoComputing ? "Ouverture…" : "Auto Compute"}</span>
+        </button>
+      </div>
+    ) : null;
 
   // Switch this window to another workspace path. Used by the Git
   // panel when the user clicks a worktree row or creates a new one.
@@ -2071,7 +2265,7 @@ export function Workspace({
                     width={13}
                     height={13}
                   />
-                  <span>Conversations</span>
+                  <span>{surface === "rlm" ? "RLM" : "Conversations"}</span>
                 </button>
                 <button
                   type="button"
@@ -2090,23 +2284,15 @@ export function Workspace({
                   <button
                     type="button"
                     className="sidebar__head-btn"
-                    onClick={createConversation}
-                    title="New conversation"
+                    onClick={createInSurface}
+                    disabled={surface === "rlm" && (IS_WINDOWS || rlmCreating)}
+                    title={surface === "rlm" ? "New RLM chat" : "New conversation"}
                   >
                     <Icon
                       icon="solar:add-square-linear"
                       width={15}
                       height={15}
                     />
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar__head-btn"
-                    onClick={createRlmConversation}
-                    title="New RLM chat (experimental, Prime Agent)"
-                    aria-label="New RLM chat (experimental)"
-                  >
-                    <span aria-hidden="true">RLM</span>
                   </button>
                 </div>
               )}
@@ -2126,7 +2312,8 @@ export function Workspace({
               }}
             >
               <ConversationList
-                conversations={conversations}
+                conversations={surfaceConversations}
+                emptyLabel={surface === "rlm" ? "Aucun chat RLM" : undefined}
                 activeId={activeConv.id}
                 streamingIds={streamingConversationIds}
                 onSelect={selectConversation}
@@ -2258,10 +2445,28 @@ export function Workspace({
             flexDirection: "column",
           }}
         >
-          {conversations.find((c) => c.id === activeConv.id)?.harness === "rlm" && (
-            <RlmBanner workspacePath={workspacePath} conversationId={activeConv.id} />
-          )}
+          {surface === "rlm" && activeSurface !== "rlm" ? (
+            <div className="chat-col">
+              <div className="chat-head">{surfaceTabs}</div>
+              <RlmEmptyState
+                available={!IS_WINDOWS}
+                creating={rlmCreating}
+                error={rlmError}
+                onCreate={() => void createRlmConversation()}
+              />
+            </div>
+          ) : (
           <ChatPane
+            headTabs={surfaceTabs}
+            headActions={autoComputeAction}
+            belowHead={
+              activeSurface === "rlm" ? (
+                <>
+                  <RlmBanner workspacePath={workspacePath} conversationId={activeConv.id} />
+                  {rlmError && <div className="rlm-error" role="alert">{rlmError}</div>}
+                </>
+              ) : null
+            }
             workspacePath={workspacePath}
             conversationId={activeConv.id}
             activeModel={activeConv.model}
@@ -2283,6 +2488,7 @@ export function Workspace({
             externalDrops={externalDropFeed}
             dropZoneRef={chatDropZoneRef}
           />
+          )}
         </div>
       </div>
     </div>

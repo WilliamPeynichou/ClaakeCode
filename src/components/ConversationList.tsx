@@ -9,6 +9,8 @@ type Props = {
   onSelect: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  /** Empty-list text (the RLM tab has its own history). */
+  emptyLabel?: string;
 };
 
 // Renders only the body of the conversations list. The parent owns the
@@ -21,6 +23,7 @@ export function ConversationList({
   onSelect,
   onRename,
   onDelete,
+  emptyLabel,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editRef = useRef<HTMLSpanElement | null>(null);
@@ -37,7 +40,7 @@ export function ConversationList({
     <div className="sidebar__body">
       <div className="conv-list">
         {conversations.length === 0 && (
-          <div className="conv-empty">No conversations yet.</div>
+          <div className="conv-empty">{emptyLabel ?? "No conversations yet."}</div>
         )}
         {conversations.map((conv) => {
           const isEditing = editingId === conv.id;
@@ -86,14 +89,6 @@ export function ConversationList({
               >
                 {conv.title || "Untitled"}
               </span>
-              {conv.harness === "rlm" && (
-                <span
-                  className="conv-row__badge"
-                  title="RLM chat (experimental, Prime Agent)"
-                >
-                  RLM
-                </span>
-              )}
               <span className="conv-row__actions">
                 <button
                   className="conv-row__btn"
