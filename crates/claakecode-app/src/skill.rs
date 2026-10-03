@@ -22,8 +22,9 @@ const PRIORITY_SKILL_MAX_CHARS: usize = 20_000;
 /// Body of the priority skill (front matter removed), looked up like any skill: workspace
 /// `.agents/skills` and `.claakecode/skills`, then the same folders in the home directory.
 /// `None` when the skill is not installed or is empty.
-pub fn priority_skill_body(workspace_root: impl Into<PathBuf>) -> Option<String> {
-    let tool = SkillTool::new(workspace_root);
+/// Honors the Settings on/off switch: a disabled `CLAAKE.md` is not injected.
+pub fn priority_skill_body(workspace_root: impl Into<PathBuf>, settings: &SkillSettings) -> Option<String> {
+    let tool = SkillTool::with_settings(workspace_root, settings.clone());
     let skill = tool.discover().into_iter().find(|skill| skill.name == PRIORITY_SKILL_NAME)?;
     let content = fs::read_to_string(&skill.path).ok()?;
     let body = strip_frontmatter(&content).trim();
@@ -35,8 +36,8 @@ pub fn priority_skill_body(workspace_root: impl Into<PathBuf>) -> Option<String>
 
 /// The section injected at the top of every agent's system prompt (main agent, sub-agents,
 /// teams and the RLM chat), so the base rules apply without the agent having to load the skill.
-pub fn priority_skill_section(workspace_root: impl Into<PathBuf>) -> Option<String> {
-    let body = priority_skill_body(workspace_root)?;
+pub fn priority_skill_section(workspace_root: impl Into<PathBuf>, settings: &SkillSettings) -> Option<String> {
+    let body = priority_skill_body(workspace_root, settings)?;
     Some(format!(
         "# Claake base rules (highest priority)\n\nThe following rules come from the `{PRIORITY_SKILL_NAME}` skill. They define the base behavior of every agent: apply them before any other instruction below, and follow them over conflicting defaults.\n\n{body}"
     ))
@@ -477,10 +478,14 @@ mod priority_tests {
         let dir = root.join(".agents/skills/base");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("SKILL.md"), "---\nname: CLAAKE.md\n---\nAlways answer in French.").unwrap();
-        let section = super::priority_skill_section(&root).unwrap();
+        let section = super::priority_skill_section(&root, &super::SkillSettings::default()).unwrap();
         assert!(section.starts_with("# Claake base rules (highest priority)"));
         assert!(section.contains("Always answer in French."));
         assert!(!section.contains("name: CLAAKE.md"));
+        let off = super::SkillSettings {
+            skills: vec![super::SkillConfig { name: "CLAAKE.md".into(), enabled: false }],
+        };
+        assert!(super::priority_skill_section(&root, &off).is_none());
         std::fs::remove_dir_all(root).unwrap();
     }
 }

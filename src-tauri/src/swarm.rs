@@ -264,7 +264,11 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
 
     let workspace_id = workspace_root.display().to_string();
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
     let mut conversation = state
         .store
@@ -651,7 +655,11 @@ pub(super) async fn stop_agent_swarm_command(
         .map_err(error_to_string)?
         .ok_or_else(|| "conversation not found".to_string())?;
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
     let mcp_settings = state.store.load_mcp_settings().map_err(error_to_string)?;
     let sub_agent_settings = state

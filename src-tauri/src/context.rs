@@ -10,7 +10,11 @@ pub(super) async fn estimate_context(
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let workspace_id = workspace_root.display().to_string();
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
 
     let mut conversation = state
@@ -100,7 +104,11 @@ pub(super) async fn estimate_context(
     let system_prompt =
         system_prompt_for_mode_with_plan_prompt(&system, mode, tool_settings.plan_mode_prompt());
     let workspace_rules_weight =
-        workspace_rules_weight(&workspace_root).map_err(error_to_string)?;
+        workspace_rules_weight(
+            &workspace_root,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
+        .map_err(error_to_string)?;
     let breakdown_weights = context_breakdown_weights(
         &system_prompt,
         workspace_rules_weight,
@@ -132,7 +140,11 @@ pub(super) async fn estimate_sub_agent_context(
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
     let settings = state
         .store
@@ -185,7 +197,11 @@ pub(super) async fn estimate_sub_agent_context(
     let system_prompt =
         system_prompt_for_mode_with_plan_prompt(&system, mode, tool_settings.plan_mode_prompt());
     let workspace_rules_weight =
-        workspace_rules_weight(&workspace_root).map_err(error_to_string)?;
+        workspace_rules_weight(
+            &workspace_root,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
+        .map_err(error_to_string)?;
     let breakdown_weights = context_breakdown_weights(
         &system_prompt,
         workspace_rules_weight,
@@ -447,10 +463,10 @@ pub(super) fn tool_name_set(tools: &[ToolDescriptor]) -> HashSet<String> {
     tools.iter().map(|tool| tool.name.clone()).collect()
 }
 
-pub(super) fn workspace_rules_weight(workspace_root: &Path) -> Result<u64> {
+pub(super) fn workspace_rules_weight(workspace_root: &Path, skill_settings: &SkillSettings) -> Result<u64> {
     let mut weight = 0;
 
-    if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root) {
+    if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skill_settings) {
         weight += context_text_weight(&rules);
     }
 

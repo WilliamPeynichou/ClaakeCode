@@ -23,8 +23,8 @@ operation. Learning here means persisted harness entries, not fine-tuning model 
 "#;
 
 /// Claake base rules (the CLAAKE.md skill) first, then the memory policy.
-fn rlm_append_prompt(workspace_root: &std::path::Path) -> String {
-    match claakecode_app::skill::priority_skill_section(workspace_root) {
+fn rlm_append_prompt(workspace_root: &std::path::Path, skills: &claakecode_app::skill::SkillSettings) -> String {
+    match claakecode_app::skill::priority_skill_section(workspace_root, skills) {
         Some(rules) => format!("{rules}\n\n{RLM_MEMORY_POLICY}"),
         None => RLM_MEMORY_POLICY.to_string(),
     }
@@ -241,7 +241,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?),
                 )
                 .await
                 .map_err(error_to_string)?;

@@ -73,7 +73,11 @@ pub(super) async fn send_message(
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let workspace_id = workspace_root.display().to_string();
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
     if !wait_for_conversation_turn_slot(&state.active_turns, &input.conversation_id).await {
         return Err("a turn is already running for this conversation".into());
@@ -495,7 +499,11 @@ pub(super) async fn compact_conversation(
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let workspace_id = workspace_root.display().to_string();
     let effective_system_prompt =
-        system_prompt_for_workspace(&workspace_root, &state.system_prompt)
+        system_prompt_for_workspace(
+            &workspace_root,
+            &state.system_prompt,
+            &state.store.load_skill_settings().map_err(error_to_string)?,
+        )
             .map_err(error_to_string)?;
     if !wait_for_conversation_turn_slot(&state.active_turns, &input.conversation_id).await {
         return Err("a turn is already running for this conversation".into());
@@ -1578,10 +1586,14 @@ pub(super) fn configurable_tool_catalog(workspace_root: &Path) -> Vec<ToolDescri
     tools
 }
 
-pub(super) fn system_prompt_for_workspace(workspace_root: &Path, base: &str) -> Result<String> {
+pub(super) fn system_prompt_for_workspace(
+    workspace_root: &Path,
+    base: &str,
+    skill_settings: &SkillSettings,
+) -> Result<String> {
     let mut sections = Vec::new();
     // The CLAAKE.md skill comes first: it defines the base rules of every agent.
-    if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root) {
+    if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skill_settings) {
         sections.push(rules);
     }
     sections.push(format!("# Shell environment\n\n{}", shell_system_prompt()));
