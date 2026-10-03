@@ -1,6 +1,6 @@
 # Spike P0 — Prime Agent en sidecar (ACP + daemon)
 
-Spike jetable du lot **P0** de `plansPrimeAgent.md` (F01). Il vérifie qu'on peut piloter
+Spike jetable du lot **P0** de `docs/plansPrimeAgent.md` (F01). Il vérifie qu'on peut piloter
 `prime-agent` comme sidecar depuis Claake Code, sans lier ses crates.
 
 - Prime Agent : fork `WilliamPeynichou/prime-agent`, SHA `3358e0016bce7cf34a195af58bbd91a26e17d694`, version 0.9.8

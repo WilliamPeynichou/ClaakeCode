@@ -6,20 +6,19 @@ Code map:
 ├── AGENTS.md
 ├── Cargo.lock
 ├── Cargo.toml
+├── docs — notes et plans (déplacés de la racine)
+│   ├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
+│   ├── EDIT_TOOL_COMPARISON.md — comparaison des outils d'édition
+│   ├── EmbendingFeatures.md — plan des providers d'embeddings
+│   └── FeatureProd.md — plan de développement des providers Prod
 ├── claakecode-web — site vitrine statique (Vercel)
 │   ├── index.html — accueil ; section #rlm « RLM chat » animée au scroll (rlmRender(p, pre) pur : prélude « RLM » 3D, champ de points canvas, 5 scènes dont onglets Chat|RLM et Auto Compute, compteur roulant, tilt souris, repli mouvement réduit)
 │   ├── styles.css — styles du site, dont le bloc .rlm-*
 │   └── llms.txt — résumé pour les LLM, inclut le chat RLM
-├── EDIT_FILE_HARNESS_COMPARISON.md
-├── EDIT_TOOL_COMPARISON.md
-├── FEATURES.md
-├── GLOB_HARNESS_COMPARISON.md
-├── GREP_HARNESS_COMPARISON.md
 ├── index.html
 ├── LICENSE
 ├── package-lock.json
 ├── package.json
-├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
 ├── README.md
 ├── remote
 │   ├── README.md
