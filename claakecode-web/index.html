@@ -73,6 +73,7 @@
         "Multi-provider AI models",
         "Database source inspection with safeguards",
         "Sub-agents and team workflows",
+        "Experimental RLM chat (Prime Agent) with a persistent Python kernel",
         "Rollback and context cleaning",
         "No telemetry"
       ],
@@ -115,6 +116,7 @@
     <a href="/features">Features</a>
     <a href="/settings">Settings</a>
     <a href="/agent">Agent</a>
+    <a href="/#rlm">RLM</a>
     <a href="/why">Why</a>
     <a href="/faq">FAQ</a>
   </div>
@@ -150,6 +152,116 @@
           </video>
         </div>
       </figure>
+    </div>
+  </section>
+
+  <!-- ── RLM chat · scroll-driven motion section ────────────────────────────────────
+       Every frame is a pure function of scroll progress (rlmRender(p)): no CSS
+       transitions inside the stage, no timers, same p = same pixels.            -->
+  <section class="rlm" id="rlm" aria-labelledby="rlm-title">
+    <div class="wrap rlm-intro reveal">
+      <span class="eyebrow">New in v0.1.67 · experimental</span>
+      <h2 id="rlm-title">A second chat that <em>keeps its state</em>.</h2>
+      <p>The RLM chat runs the open-source Prime Agent engine next to the classic chat: an agent with a persistent Python kernel, working in its own git worktree.</p>
+    </div>
+
+    <div class="rlm-track" id="rlm-track">
+      <div class="rlm-stage">
+        <div class="wrap rlm-grid">
+          <div class="rlm-copy">
+            <ol class="rlm-rail" aria-hidden="true">
+              <li><span>01</span></li><li><span>02</span></li><li><span>03</span></li><li><span>04</span></li>
+              <i class="rlm-rail-fill"></i>
+            </ol>
+            <div class="rlm-scenes">
+              <article class="rlm-scene" data-scene="0">
+                <span class="rlm-k">01 · Same models</span>
+                <h3><span class="ln"><span>Next to the classic chat,</span></span><span class="ln"><span>not <em>instead</em> of it.</span></span></h3>
+                <p>Open one with the <b>RLM</b> button. It uses the providers you already connected: Anthropic and OpenAI sign-ins, OpenRouter and Mistral keys. Prime only receives short-lived access tokens, never refresh tokens.</p>
+              </article>
+              <article class="rlm-scene" data-scene="1">
+                <span class="rlm-k">02 · Isolated worktree</span>
+                <h3><span class="ln"><span>Its own branch.</span></span><span class="ln"><span>Your files <em>untouched</em>.</span></span></h3>
+                <p>Each RLM conversation gets a git worktree on a <code>claakecode/rlm-…</code> branch. A banner says it plainly: the agent runs locally with your permissions, there is no sandbox.</p>
+              </article>
+              <article class="rlm-scene" data-scene="2">
+                <span class="rlm-k">03 · Persistent Python</span>
+                <h3><span class="ln"><span>Variables survive</span></span><span class="ln"><span><em>between</em> messages.</span></span></h3>
+                <p>Load data once, reuse it three questions later. The <b>Python persistant</b> page in Settings shows the engine state, Python version, size, location and every installed package, with a restart button.</p>
+              </article>
+              <article class="rlm-scene" data-scene="3">
+                <span class="rlm-k">04 · Resumes after a cut</span>
+                <h3><span class="ln"><span>Connection drops?</span></span><span class="ln"><span>The answer <em>still lands</em>.</span></span></h3>
+                <p>Claake Code reattaches to the running turn, fills the gap from Prime's snapshot without duplicating text, and never sends your prompt twice. Conversations reopen with their history after a restart.</p>
+              </article>
+            </div>
+          </div>
+
+          <figure class="glass rlm-window" aria-label="Illustration of the RLM chat">
+            <div class="rlm-bar"><i></i><i></i><i></i><span class="rlm-bar-title">RLM chat</span><span class="rlm-illus">Illustration</span></div>
+            <div class="rlm-view">
+              <!-- Scene 0: providers flow into both chats -->
+              <div class="rlm-layer" data-layer="0">
+                <div class="rlm-providers">
+                  <span class="rlm-chip">Anthropic</span><span class="rlm-chip">OpenAI</span><span class="rlm-chip">OpenRouter</span><span class="rlm-chip">Mistral</span>
+                </div>
+                <svg class="rlm-wires" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M50 0 C50 60 120 60 120 120" /><path d="M150 0 C150 60 120 60 120 120" />
+                  <path d="M250 0 C250 60 280 60 280 120" /><path d="M350 0 C350 60 280 60 280 120" />
+                  <path d="M150 0 C150 70 280 50 280 120" /><path d="M250 0 C250 70 120 50 120 120" />
+                </svg>
+                <div class="rlm-convs">
+                  <div class="rlm-conv"><span class="rlm-dot"></span>Classic chat</div>
+                  <div class="rlm-conv rlm-conv--rlm"><span class="rlm-dot"></span>RLM chat<span class="rlm-badge">RLM</span></div>
+                </div>
+              </div>
+
+              <!-- Scene 1: git worktree branches off -->
+              <div class="rlm-layer" data-layer="1">
+                <div class="rlm-banner"><b>RLM · local trust</b> Isolated worktree. Runs with your permissions (no sandbox).</div>
+                <svg class="rlm-git" viewBox="0 0 400 170" aria-hidden="true">
+                  <path class="rlm-git-main" d="M20 120 H380" />
+                  <path class="rlm-git-branch" d="M140 120 C190 120 190 50 240 50 H380" />
+                  <circle class="rlm-git-n" cx="60" cy="120" r="7" /><circle class="rlm-git-n" cx="140" cy="120" r="7" />
+                  <circle class="rlm-git-n rlm-git-head" cx="300" cy="120" r="7" />
+                  <circle class="rlm-git-n rlm-git-b" cx="270" cy="50" r="7" /><circle class="rlm-git-n rlm-git-b" cx="340" cy="50" r="7" />
+                  <text x="20" y="150">main · your workspace</text>
+                  <text class="rlm-git-label" x="240" y="28">claakecode/rlm-7f3a</text>
+                </svg>
+              </div>
+
+              <!-- Scene 2: persistent kernel -->
+              <div class="rlm-layer" data-layer="2">
+                <div class="rlm-cell" data-cell="0"><span class="rlm-in">msg 1</span><code class="rlm-type" data-text='df = pd.read_csv("runs.csv")'></code></div>
+                <div class="rlm-cell rlm-out" data-cell="1"><span class="rlm-in">out</span><code>12 840 rows × 6 columns</code></div>
+                <div class="rlm-gap" data-cell="2">… two questions later …</div>
+                <div class="rlm-cell" data-cell="3"><span class="rlm-in">msg 4</span><code class="rlm-type" data-text='df.groupby("model").latency.median()'></code></div>
+                <div class="rlm-cell rlm-out" data-cell="4"><span class="rlm-in">out</span><code>no reload · <b>df</b> still in memory</code></div>
+                <div class="rlm-kernel"><span class="rlm-pulse"></span>kernel alive · Python 3.12 · state kept between messages</div>
+              </div>
+
+              <!-- Scene 3: stream cut and resync -->
+              <div class="rlm-layer" data-layer="3">
+                <div class="rlm-msg rlm-msg--user">Summarise the failing tests</div>
+                <div class="rlm-msg rlm-msg--agent"><span class="rlm-stream" data-text="Three tests fail in auth/: the token refresh path expects a refresh token that is no longer sent."></span><span class="rlm-caret"></span></div>
+                <div class="rlm-cut"><span class="rlm-cut-line"></span><span class="rlm-cut-tag">connection lost → reattach</span></div>
+                <div class="rlm-ledger">
+                  <span>prompt sent <b>1×</b></span><span>duplicated text <b>0</b></span><span class="rlm-resync">resynced from snapshot</span>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap rlm-foot reveal">
+      <div class="glass rlm-facts">
+        <div><span class="rlm-k">Engine</span><p>Prime Agent 0.9.8, open source, pinned to a reviewed commit and bundled with the app.</p></div>
+        <div><span class="rlm-k">Platforms</span><p>macOS and Linux. Windows shows the RLM chat as unavailable for now.</p></div>
+        <div><span class="rlm-k">Providers</span><p>Anthropic, OpenAI, OpenRouter, Mistral. Google sign-in is not supported in RLM yet.</p></div>
+        <div><span class="rlm-k">Status</span><p>Experimental. Needs a git repository with at least one commit.</p></div>
+      </div>
     </div>
   </section>
 
@@ -251,6 +363,142 @@
     }, { rootMargin: '200px', threshold: 0 });
     videoObserver.observe(heroVideo);
   }
+})();
+</script>
+
+<script>
+/* RLM section motion. rlmRender(p) is pure: every style derives from p (0..1) and constants. */
+(function () {
+  const track = document.getElementById('rlm-track');
+  if (!track) return;
+  const $ = (s, r = track) => r.querySelector(s);
+  const $$ = (s, r = track) => Array.from(r.querySelectorAll(s));
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const smooth = (u) => { u = clamp(u); return u * u * (3 - 2 * u); };
+  const easeOut = (u) => 1 - Math.pow(1 - clamp(u), 4);
+  const prog = (p, start, dur, e = smooth) => e(clamp((p - start) / dur));
+  // Closed-form underdamped spring: overshoots slightly, then settles. Seekable.
+  function spring(tau, f = 2.2, z = 0.62) {
+    if (tau <= 0) return 0;
+    const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z * w / wd) * Math.sin(wd * tau));
+  }
+
+  const N = 4, SEG = 1 / N;
+  const scenes = $$('.rlm-scene'), layers = $$('.rlm-layer');
+  const rail = $$('.rlm-rail li'), railFill = $('.rlm-rail-fill');
+  const chips = $$('.rlm-chip'), wires = $$('.rlm-wires path'), convs = $$('.rlm-conv');
+  const gitBranch = $('.rlm-git-branch'), gitMain = $('.rlm-git-main');
+  const gitNodes = $$('.rlm-git-n'), gitLabel = $('.rlm-git-label'), banner = $('.rlm-banner');
+  const cells = $$('[data-cell]'), typers = $$('.rlm-type'), kernel = $('.rlm-kernel');
+  const stream = $('.rlm-stream'), caret = $('.rlm-caret'), cut = $('.rlm-cut'), ledger = $$('.rlm-ledger span');
+  const userMsg = $('.rlm-msg--user');
+  [...wires, gitBranch, gitMain].forEach((el) => { const L = el.getTotalLength(); el.style.strokeDasharray = L; el.dataset.len = L; });
+  const draw = (el, u) => { el.style.strokeDashoffset = el.dataset.len * (1 - clamp(u)); };
+  const typeText = (el, u) => { const t = el.dataset.text; el.textContent = t.slice(0, Math.round(t.length * clamp(u))); };
+  const show = (el, u, dy = 14) => { el.style.opacity = clamp(u); el.style.transform = `translateY(${lerp(dy, 0, clamp(u))}px)`; };
+
+  // Scene visibility: in, hold, out inside its segment. First scene starts visible, last never leaves.
+  function sceneAmount(p, i) {
+    const s = i * SEG;
+    // Outgoing scene finishes leaving before the next one starts entering: no overlap.
+    const enter = i === 0 ? 1 : prog(p, s - 0.005, 0.06);
+    const leave = i === N - 1 ? 0 : prog(p, s + SEG - 0.055, 0.05);
+    return { enter, leave, local: clamp((p - s) / SEG) };
+  }
+
+  function rlmRender(p) {
+    railFill.style.transform = `scaleY(${clamp(p)})`;
+    rail.forEach((li, i) => li.classList.toggle('on', p >= i * SEG - 0.005));
+
+    scenes.forEach((sc, i) => {
+      const { enter, leave } = sceneAmount(p, i);
+      const vis = enter * (1 - leave);
+      sc.style.visibility = vis > 0.001 ? 'visible' : 'hidden';
+      // Masked line reveal: lines rise into their clip box, then leave upward.
+      $$('.ln > span', sc).forEach((line, j) => {
+        const inU = i === 0 ? 1 : prog(p, i * SEG - 0.005 + j * 0.018, 0.06, easeOut);
+        const y = leave > 0 ? lerp(0, -120, leave) : lerp(120, 0, inU);
+        line.style.transform = `translateY(${y}%)`;
+      });
+      const k = $('.rlm-k', sc), para = $('p', sc);
+      k.style.opacity = vis; para.style.opacity = vis;
+      para.style.transform = `translateY(${lerp(10, 0, enter) - 10 * leave}px)`;
+    });
+
+    layers.forEach((ly, i) => {
+      const { enter, leave } = sceneAmount(p, i);
+      const vis = enter * (1 - leave);
+      ly.style.visibility = vis > 0.001 ? 'visible' : 'hidden';
+      ly.style.opacity = vis;
+      ly.style.transform = `translateX(${lerp(24, 0, enter) - 24 * leave}px)`;
+    });
+
+    // 0 · provider chips drop in with a spring, wires draw, both chats light up.
+    const l0 = clamp(p / SEG);
+    chips.forEach((c, i) => {
+      const s = spring((l0 - i * 0.06) * 2.4);
+      c.style.transform = `translateY(${lerp(-26, 0, s)}px)`; c.style.opacity = clamp(l0 * 6 - i * 0.4);
+    });
+    wires.forEach((w, i) => draw(w, prog(l0, 0.18 + i * 0.05, 0.3)));
+    convs.forEach((c, i) => {
+      const u = prog(l0, 0.45 + i * 0.12, 0.2);
+      show(c, u, 18); c.classList.toggle('lit', u > 0.98);
+    });
+
+    // 1 · branch draws off main, its commits pop, the trust banner slides down.
+    const l1 = clamp((p - SEG) / SEG);
+    draw(gitMain, prog(l1, 0, 0.25)); draw(gitBranch, prog(l1, 0.2, 0.35));
+    gitNodes.forEach((n, i) => {
+      const at = n.classList.contains('rlm-git-b') ? 0.45 + (i - 3) * 0.1 : i * 0.08;
+      const s = spring((l1 - at) * 2.2);
+      n.style.transform = `scale(${clamp(s, 0, 1.4)})`;
+    });
+    gitLabel.style.opacity = prog(l1, 0.5, 0.15);
+    const b = prog(l1, 0.62, 0.2, easeOut);
+    banner.style.opacity = b; banner.style.transform = `translateY(${lerp(-16, 0, b)}px)`;
+
+    // 2 · code types, output appears, later message reuses df; kernel stays alive.
+    const l2 = clamp((p - 2 * SEG) / SEG);
+    typeText(typers[0], prog(l2, 0.02, 0.22, (u) => u));
+    show(cells[0], prog(l2, 0, 0.06));
+    show(cells[1], prog(l2, 0.26, 0.08));
+    show(cells[2], prog(l2, 0.38, 0.08));
+    show(cells[3], prog(l2, 0.46, 0.06));
+    typeText(typers[1], prog(l2, 0.48, 0.24, (u) => u));
+    show(cells[4], prog(l2, 0.74, 0.08));
+    kernel.style.opacity = prog(l2, 0.05, 0.1);
+
+    // 3 · text streams, the link cuts (stream freezes), reattach, the rest lands once.
+    const l3 = clamp((p - 3 * SEG) / SEG);
+    show(userMsg, prog(l3, 0, 0.08));
+    const cutAt = 0.38, resumeAt = 0.6;
+    const first = prog(l3, 0.08, cutAt - 0.08, (u) => u) * 0.45;
+    const rest = prog(l3, resumeAt, 0.3, (u) => u) * 0.55;
+    typeText(stream, first + rest);
+    const cutU = prog(l3, cutAt, 0.05) * (1 - prog(l3, resumeAt - 0.02, 0.06));
+    cut.style.opacity = cutU; cut.style.transform = `scaleX(${lerp(0.6, 1, cutU)})`;
+    caret.style.opacity = l3 > 0.08 && l3 < 0.92 ? 1 : 0;
+    caret.classList.toggle('frozen', cutU > 0.5);
+    ledger.forEach((s, i) => show(s, prog(l3, 0.72 + i * 0.07, 0.08), 8));
+  }
+  window.rlmRender = rlmRender;
+
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function progress() {
+    const r = track.getBoundingClientRect();
+    const total = r.height - window.innerHeight;
+    return total > 0 ? clamp(-r.top / total) : 0;
+  }
+  let queued = false;
+  function frame() { queued = false; rlmRender(reduce.matches ? 1 : progress()); }
+  function request() { if (!queued) { queued = true; requestAnimationFrame(frame); } }
+  window.addEventListener('scroll', request, { passive: true });
+  window.addEventListener('resize', request);
+  reduce.addEventListener?.('change', () => { document.documentElement.classList.toggle('rlm-static', reduce.matches); request(); });
+  document.documentElement.classList.toggle('rlm-static', reduce.matches);
+  frame();
 })();
 </script>
 

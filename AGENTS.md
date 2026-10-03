@@ -6,6 +6,10 @@ Code map:
 ├── AGENTS.md
 ├── Cargo.lock
 ├── Cargo.toml
+├── claakecode-web — site vitrine statique (Vercel)
+│   ├── index.html — accueil ; section #rlm « RLM chat » animée au scroll (rlmRender(p) pur, 4 scènes, repli mouvement réduit)
+│   ├── styles.css — styles du site, dont le bloc .rlm-*
+│   └── llms.txt — résumé pour les LLM, inclut le chat RLM
 ├── EDIT_FILE_HARNESS_COMPARISON.md
 ├── EDIT_TOOL_COMPARISON.md
 ├── FEATURES.md

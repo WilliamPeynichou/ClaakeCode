@@ -31,6 +31,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Database source inspection with read-only mode, row limits and destructive-operation confirmations.
 - Sub-agents and team workflows for parallel workstreams.
 - Rollback checkpoints, context cleaning and conversation compaction.
+- Experimental RLM chat (macOS and Linux) powered by the open-source Prime Agent engine: same providers as the classic chat (Anthropic, OpenAI, OpenRouter, Mistral; not Google), a persistent Python kernel shown in Settings, one isolated git worktree per conversation, and resume after a connection cut.
 - macOS, Windows and Linux downloads.
 
 ## Recommended citation
