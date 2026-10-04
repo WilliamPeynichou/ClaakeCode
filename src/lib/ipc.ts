@@ -93,7 +93,44 @@ export type RlmMemoryEntry = {
   version: number;
 };
 
+export type ModelStatsRow = {
+  harness: "classic" | "rlm" | string;
+  provider: string;
+  model: string;
+  responses: number;
+  conversations: number;
+  inputTokens: number;
+  /** Whole prompt including cache, comparable across providers. */
+  promptTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  toolCalls: number;
+  toolErrors: number;
+};
+
+export type ModelStatsReport = {
+  rows: ModelStatsRow[];
+  totalResponses: number;
+  minReliable: number;
+  sinceMs: number | null;
+};
+
+export type ModelStatsFilter = {
+  /** null = all history. */
+  periodDays: number | null;
+  /** null = both harnesses. */
+  harness: "classic" | "rlm" | null;
+};
+
 export const api = {
+  getModelStats(filter: ModelStatsFilter) {
+    return invoke<ModelStatsReport>("get_model_stats", { input: filter });
+  },
+  exportModelStatsCsv(filter: ModelStatsFilter, path: string) {
+    return invoke<void>("export_model_stats_csv", { input: { ...filter, path } });
+  },
   listRlmMemories() {
     return invoke<RlmMemoryEntry[]>("list_rlm_memories");
   },

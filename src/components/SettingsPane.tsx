@@ -26,6 +26,7 @@ import { ProdSection } from "./ProdSettingsSection";
 import { TypeSafeSection } from "./TypeSafeSettingsSection";
 import { ClaakySettingsSection } from "./claaky/ClaakySettingsSection";
 import { PythonRuntimeSection } from "./PythonRuntimeSection";
+import { ModelStatsSection } from "./ModelStatsSection";
 import { EmbeddingSection } from "./EmbeddingSettingsSection";
 import {
   EMPTY_PROD_SETTINGS,
@@ -132,6 +133,7 @@ type Section =
   | "subagents"
   | "embedding"
   | "python"
+  | "modelStats"
   | "claaky";
 
 export function SettingsPane({ workspacePath }: Props) {
@@ -2264,6 +2266,22 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "modelStats" ? "true" : "false"}
+          title="Performance des modèles"
+          onClick={() => setSection("modelStats")}
+        >
+          <Icon
+            icon="solar:chart-2-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">Performance</span>
+          <span className="settings-pane__nav-count" />
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "claaky" ? "true" : "false"}
           onClick={() => setSection("claaky")}
         >
@@ -2493,6 +2511,8 @@ export function SettingsPane({ workspacePath }: Props) {
           />
         ) : section === "python" ? (
           <PythonRuntimeSection />
+        ) : section === "modelStats" ? (
+          <ModelStatsSection />
         ) : section === "claaky" ? (
           <ClaakySettingsSection />
         ) : section === "embedding" ? (

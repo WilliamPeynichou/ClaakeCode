@@ -185,6 +185,17 @@ export function installTauriMock(options: MockOptions) {
       connectedProviders: ["anthropic", "openrouter"],
     }),
     restart_python_runtime: () => null,
+    get_model_stats: ({ input }) => {
+      const row = (harness: string, model: string, responses: number) => ({
+        harness, provider: "anthropic", model, responses, conversations: 3,
+        inputTokens: responses * 1000, promptTokens: responses * 4000, outputTokens: responses * 300,
+        reasoningTokens: responses * 30, cacheReadTokens: responses * 3000, cacheCreationTokens: 0,
+        toolCalls: responses, toolErrors: 1,
+      });
+      const rows = [row("classic", "claude-sonnet-5", 42), row("classic", "claude-haiku-5", 7)]
+        .filter((r) => !input?.harness || r.harness === input.harness);
+      return { rows, totalResponses: rows.reduce((s, r) => s + r.responses, 0), minReliable: 20, sinceMs: null };
+    },
     "plugin:event|listen": ({ event, handler }) => {
       listeners.set(event, [...(listeners.get(event) ?? []), handler]);
       return handler;

@@ -78,6 +78,26 @@ test('Settings: persistent Python section shows the Prime environment', async ({
   expect(await calls(browser, 'restart_python_runtime')).toHaveLength(1);
 });
 
+test('Settings: model performance table, n warning and filters', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await browser.locator('[title="Settings"]').first().tap();
+  await screen.getByRole('button', 'Performance', { exact: false }).tap();
+  await expect(screen.getByRole('heading', 'Performance des modèles')).toBeVisible();
+  await expect(screen.getByText('claude-sonnet-5')).toBeVisible();
+  // 7 responses < 20: flagged; 42: not.
+  expect(await browser.locator('tr[data-low="true"]').count()).toBe(1);
+  await expect(screen.getByText('49 réponses au total', { exact: false })).toBeVisible();
+  await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/model-stats.png' });
+
+  // Default period is 30 days, both harnesses; RLM filter shows the empty state.
+  expect((await calls(browser, 'get_model_stats'))[0]).toEqual({ input: { periodDays: 30, harness: null } });
+  // The chat header "RLM" is a tab, so the only "RLM" button is the harness filter.
+  await screen.getByRole('button', 'RLM', { exact: true }).tap();
+  await expect(screen.getByText('Pas encore de données', { exact: false })).toBeVisible();
+  const last = (await calls(browser, 'get_model_stats')).pop();
+  expect(last).toEqual({ input: { periodDays: 30, harness: 'rlm' } });
+});
+
 test('RLM chat screenshot', async ({ app, browser, screen }) => {
   await openApp(app);
   await openRlmTab(browser);

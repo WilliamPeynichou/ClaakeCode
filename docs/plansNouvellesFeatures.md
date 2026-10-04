@@ -1,6 +1,6 @@
 # Plan — Benchmark des modèles + Claaky
 
-Statut : **proposition, rien d'implémenté**. Deux chantiers indépendants, livrables séparément.
+Statut : **chantier A : B1 et B3 implémentés** (branche `feature/model-benchmark`) ; B2, B4, B5, B6 restent à faire. Chantier B (Claaky) : C1–C5 faits.
 
 ---
 
@@ -66,6 +66,13 @@ Dans le sélecteur du chat, affichage discret d'un résumé par modèle (tokens/
 
 ### Ordre conseillé
 B1 → B3 (valeur immédiate, sans migration) → B2 → B6 → B4 → B5.
+
+### État B1 + B3 (implémenté)
+- **B1** : `crates/claakecode-app/src/model_stats.rs` (agrégation pure, tests) + `AppStore::model_stats(since_ms, harness)`. Groupe par harness / provider / modèle : réponses (un message assistant avec `token_usage` = une réponse ; un tour avec outils en compte plusieurs), conversations, tokens entrée / sortie / raisonnement / cache, appels d'outils et appels en erreur (attribués au modèle via `tool_call_id`). Aucune migration.
+- **`prompt_tokens`** : contexte complet cache compris, `total − output`. Nécessaire car `input_tokens` exclut le cache chez Anthropic et l'inclut chez OpenAI ; le taux de cache affiché est `cache_read / prompt_tokens`.
+- **Période approximative** : les messages n'ont pas d'horodatage, le filtre garde les conversations dont `updated_at_ms` est dans la période. B2 corrigera.
+- **B3** : Settings « Performance » (`src/components/ModelStatsSection.tsx`) : période 7 j / 30 j / tout, harness Tous / Chat / RLM, tri par colonne, mini-barres, badge « n faible » sous 20 réponses, notes sur les limites, export CSV (généré en Rust, `.csv` uniquement, cellules neutralisées contre les formules). Commandes Tauri `get_model_stats` / `export_model_stats_csv` (`src-tauri/src/stats.rs`, en `spawn_blocking`). Test e2e dans `tests/e2e/rlm-chat.e2e.ts`.
+- **Pas fait** : bouton « Effacer les statistiques » (sans table dédiée, effacer reviendrait à supprimer l'historique : attend B2), taux de réécriture, durée / tokens/s / premier token (B2). Le chat RLM n'enregistre pas de `token_usage` : son filtre reste vide.
 
 ### Risques
 - Chiffres trompeurs : toujours n + avertissement.

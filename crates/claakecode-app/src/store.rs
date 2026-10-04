@@ -1844,6 +1844,53 @@ impl AppStore {
         Ok(())
     }
 
+    /// Model usage stats (benchmark B1). Messages carry no timestamp, so the period keeps
+    /// conversations active since `since_ms` (`updated_at_ms`): an approximation, shown as such.
+    pub fn model_stats(
+        &self,
+        since_ms: Option<i64>,
+        harness: Option<&str>,
+    ) -> Result<crate::model_stats::ModelStatsReport> {
+        let conn = self.connection()?;
+        let mut statement = conn
+            .prepare(
+                "select m.conversation_id, c.harness, m.message_json
+                 from messages m join conversations c on c.id = m.conversation_id
+                 where c.updated_at_ms >= ?1 and (?2 is null or c.harness = ?2)
+                 order by m.conversation_id, m.ordinal",
+            )
+            .context("unable to prepare model stats query")?;
+        let mut rows = statement
+            .query(params![since_ms.unwrap_or(i64::MIN), harness])
+            .context("unable to read messages for model stats")?;
+
+        let mut acc = crate::model_stats::ModelStatsAccumulator::default();
+        let mut current: Option<(String, String)> = None;
+        let mut batch: Vec<ChatMessage> = Vec::new();
+        while let Some(row) = rows.next().context("bad model stats row")? {
+            let conversation_id: String = row.get(0)?;
+            let row_harness: String = row.get(1)?;
+            let json: String = row.get(2)?;
+            if current.as_ref().map(|(id, _)| id != &conversation_id).unwrap_or(true) {
+                if let Some((id, h)) = current.take() {
+                    acc.add_conversation(&id, &h, &batch);
+                }
+                batch.clear();
+                current = Some((conversation_id, row_harness));
+            }
+            // Cheap pre-filter: user messages are needed only for tool results.
+            if json.contains("token_usage") || json.contains("\"is_error\":true") {
+                if let Ok(message) = serde_json::from_str::<ChatMessage>(&json) {
+                    batch.push(message);
+                }
+            }
+        }
+        if let Some((id, h)) = current {
+            acc.add_conversation(&id, &h, &batch);
+        }
+        Ok(acc.finish(since_ms))
+    }
+
     pub fn load_sub_agent_settings(&self) -> Result<SubAgentSettings> {
         let conn = self.connection()?;
         let stored = conn
@@ -2481,6 +2528,35 @@ mod tests {
         })();
         let _ = fs::remove_file(path);
         result
+    }
+
+    #[test]
+    fn model_stats_reads_history_and_filters_by_harness_and_period() -> Result<()> {
+        let store = AppStore::in_memory()?;
+        let model = ModelRef::new("test", "model");
+        let classic = store.create_conversation("w", &model, "system")?;
+        let rlm = store.create_rlm_conversation("w", &model, "system")?;
+        let usage = |m: &str| {
+            Some(json!({ "token_usage": { "provider": "anthropic", "model": m, "input_tokens": 10, "output_tokens": 4 } }))
+        };
+        store.append_conversation_message("w", &classic.id, &message(Role::User, "q", None))?;
+        store.append_conversation_message("w", &classic.id, &message(Role::Assistant, "a", usage("opus")))?;
+        store.append_conversation_message("w", &classic.id, &message(Role::Assistant, "b", usage("opus")))?;
+        store.append_conversation_message("w", &rlm.id, &message(Role::Assistant, "c", usage("sonnet")))?;
+
+        let all = store.model_stats(None, None)?;
+        assert_eq!(all.total_responses, 3);
+        assert_eq!(all.rows[0].model, "opus");
+        assert_eq!(all.rows[0].input_tokens, 20);
+
+        let only_rlm = store.model_stats(None, Some(HARNESS_RLM))?;
+        assert_eq!(only_rlm.rows.len(), 1);
+        assert_eq!(only_rlm.rows[0].model, "sonnet");
+
+        let future = store.model_stats(Some(now_ms() + 60_000), None)?;
+        assert!(future.rows.is_empty());
+        let _ = fs::remove_file(store.path());
+        Ok(())
     }
 
     #[test]
