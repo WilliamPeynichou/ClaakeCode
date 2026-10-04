@@ -16,6 +16,7 @@ Code map:
 │   ├── index.html — accueil ; section #rlm « RLM chat » animée au scroll (rlmRender(p, pre) pur : prélude « RLM » 3D, champ de points canvas, 5 scènes dont onglets Chat|RLM et Auto Compute, compteur roulant, tilt souris, repli mouvement réduit)
 │   ├── styles.css — styles du site, dont le bloc .rlm-*
 │   └── llms.txt — résumé pour les LLM, inclut le chat RLM
+├── films/claaky — teaser vidéo reproductible : BRIEF.md, BEATMAP.md, film.html (three.js, window.seek(t)), probe.mjs ; probe/sheet.jpg = quatre compositions à valider avant rendu MP4
 ├── index.html
 ├── LICENSE
 ├── package-lock.json

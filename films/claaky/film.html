@@ -1,0 +1,132 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><title>Claaky — présentation</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#161e19;color:#f6efd8;font-family:Arial,sans-serif;width:1080px;height:1350px;overflow:hidden}#stage{position:relative;width:1080px;height:1350px;background:radial-gradient(ellipse at 70% 55%,#294536 0,transparent 63%),#161e19}#canvas{position:absolute;inset:0;z-index:2}.brand{position:absolute;left:76px;top:60px;letter-spacing:4px;font-size:22px;z-index:5;color:#bcbda8}.number{position:absolute;right:76px;top:60px;font-size:18px;letter-spacing:3px;color:#939d86;z-index:5}.copy{position:absolute;z-index:5;left:76px;top:152px;right:76px}.mask{overflow:hidden;padding-bottom:14px}.line{font-family:Georgia,serif;font-size:110px;line-height:1.06;letter-spacing:-4px;display:block}.sub{font-size:30px;line-height:1.5;color:#bdc9b7;margin-top:22px;max-width:760px}.bubble{position:absolute;left:76px;top:490px;background:#f6efd8;color:#20382a;border-radius:28px 28px 4px 28px;padding:32px;font-size:34px;z-index:4;max-width:500px}.code{position:absolute;left:76px;right:76px;bottom:140px;padding:34px;border:1px solid #5b715c;border-radius:24px;background:#101c16;z-index:4;font:26px/1.6 monospace}.tag{font:16px Arial;letter-spacing:3px;color:#8eaa90;margin-bottom:18px}.footer{position:absolute;left:76px;right:76px;bottom:60px;font-size:20px;color:#a8b69f;letter-spacing:1px;z-index:5}.rule{position:absolute;left:76px;right:76px;top:110px;height:1px;background:#4e5a47;z-index:5}
+.landscape .copy{top:250px;right:auto;width:840px}.landscape .sub{max-width:650px}.landscape .bubble{top:570px}.landscape .code{right:auto;width:800px;bottom:180px;white-space:pre-wrap}.code{white-space:pre-wrap}.landscape .number{right:76px}.landscape .line{font-size:108px}
+</style><div id="stage"><div class="brand">CLAAKE CODE</div><div class="number">RENCONTREZ CLAAKY</div><div class="rule"></div><canvas id="canvas"></canvas><div class="copy"><div class="mask"><span class="line" id="title"></span></div><div class="sub" id="sub"></div></div><div class="bubble" id="bubble">On construit quoi ?</div><div class="code" id="code"><div class="tag">ILLUSTRATION · PAS UNE EXÉCUTION</div><span id="typed"></span></div><div class="footer" id="footer">Votre compagnon, dans Claake Code.</div></div>
+<script type="module">
+import * as THREE from './assets/three.module.js';
+const clamp=x=>Math.max(0,Math.min(1,x)), p=(t,s,d)=>clamp((t-s)/d), ease=x=>1-Math.pow(1-clamp(x),4);
+const spring=(t,f=2,z=.65)=>{if(t<=0)return 0;const w=2*Math.PI*f,wd=w*Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(wd*t)+z*w/wd*Math.sin(wd*t));};
+const landscape=new URLSearchParams(location.search).get('format')==='landscape',W=landscape?1920:1080,H=landscape?1080:1350;
+if(landscape){document.body.classList.add('landscape');document.body.style.width=W+'px';document.body.style.height=H+'px';document.querySelector('#stage').style.width=W+'px';document.querySelector('#stage').style.height=H+'px';}
+const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#canvas'),alpha:true,antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(32,W/H,.1,50);camera.position.set(0,.12,9.8);camera.lookAt(0,.1,0);
+scene.add(new THREE.HemisphereLight(0xfff6e0,0x4a4636,1.2));const key=new THREE.DirectionalLight(0xffffff,1.5);key.position.set(2.5,3.5,4);scene.add(key);const rim=new THREE.DirectionalLight(0xe7c878,1.2);rim.position.set(-3,1.5,-2.5);scene.add(rim);
+const mats=[],geos=[],track=m=>(mats.push(m),m),mesh=(g,m)=>(geos.push(g),new THREE.Mesh(g,m));
+const fur=track(new THREE.MeshPhysicalMaterial({color:0xf6edd6,emissive:0x4a4332,emissiveIntensity:.55,roughness:.92,metalness:0,sheen:1,sheenColor:new THREE.Color(0xfff1d2),sheenRoughness:.35}));
+const FOOT_Y=-1;
+        // squish pivots on the feet; root floats on top of it.
+        const squish = new THREE.Group();
+        squish.position.y = FOOT_Y;
+        scene.add(squish);
+        const root = new THREE.Group();
+        root.position.y = -FOOT_Y;
+        squish.add(root);
+
+        // Body: the logo's bowl, two leaf-petals (lower half-spheres with flat tops) and a gap.
+        const R = 1.08;
+        const cream = fur;
+        // The channel between the petals shows the logo's green, not the inside of a shell.
+        const channel = track(new THREE.MeshStandardMaterial({ color: 0x1f5a41, roughness: 0.8 }));
+        const leafGroup = (side) => {
+          const pivot = new THREE.Group(); // flaps around the bottom centre, like opening petals
+          pivot.position.set(0, -0.92, 0);
+          const piece = new THREE.Group();
+          piece.position.set(side * 0.022, 0.92, 0);
+          piece.scale.set(1.0, 0.95, 1);
+          const shell = mesh(
+            new THREE.SphereGeometry(R, 40, 28, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.PI, Math.PI / 2, Math.PI / 2),
+            cream,
+          );
+          const top = mesh(new THREE.CircleGeometry(R, 40, side === -1 ? Math.PI / 2 : -Math.PI / 2, Math.PI), cream);
+          top.rotation.x = -Math.PI / 2;
+          const inner = mesh(new THREE.CircleGeometry(R, 40, Math.PI, Math.PI), channel);
+          inner.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+          [shell, top, inner].forEach((m) => piece.add(m));
+          // soft halo shell so the edges look fluffy
+          const halo = mesh(
+            new THREE.SphereGeometry(R * 1.035, 32, 20, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.PI, Math.PI / 2, Math.PI / 2),
+            track(new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: 0.1, depthWrite: false })),
+          );
+          piece.add(halo);
+          pivot.add(piece);
+          root.add(pivot);
+          return pivot;
+        };
+        const leafLg = leafGroup(-1);
+        const leafRg = leafGroup(1);
+
+        // Core: the logo's round belly, between the petals.
+        const coreMat = track(
+          new THREE.MeshStandardMaterial({ color: 0x2e7355, emissive: 0x2e7355, emissiveIntensity: 0.6, roughness: 0.45 }),
+        );
+        const core = mesh(new THREE.SphereGeometry(0.5, 36, 28), coreMat);
+        core.position.set(0, -0.42, 0.78);
+        root.add(core);
+
+        // Head: the logo's round dot, floating above the bowl with its own springy bounce.
+        const head = new THREE.Group();
+        head.position.set(0, 1.04, 0.04);
+        root.add(head);
+        const skull = mesh(new THREE.SphereGeometry(0.66, 40, 30), fur);
+        head.add(skull);
+        [1.04, 1.09].forEach((k, i) => {
+          const shell = mesh(
+            new THREE.SphereGeometry(0.66 * k, 28, 20),
+            track(new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: i ? 0.05 : 0.1, depthWrite: false })),
+          );
+          head.add(shell);
+        });
+
+        const eyeMat = track(new THREE.MeshStandardMaterial({ color: 0x1d1b16, roughness: 0.2 }));
+        const sparkMat = track(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        const eyeGeo = new THREE.SphereGeometry(0.075, 20, 16);
+        const sparkGeo = new THREE.SphereGeometry(0.022, 10, 8);
+        const eyes = [-0.23, 0.23].map((x) => {
+          const group = new THREE.Group();
+          group.position.set(x, 0.06, 0.6);
+          const eye = mesh(eyeGeo, eyeMat);
+          eye.scale.set(0.9, 1.3, 0.6);
+          const spark = mesh(sparkGeo, sparkMat);
+          spark.position.set(0.024, 0.045, 0.045);
+          group.add(eye, spark);
+          head.add(group);
+          return { group, baseX: x };
+        });
+
+        const cheekMat = track(new THREE.MeshStandardMaterial({ color: 0xf0a9a0, roughness: 0.9, transparent: true, opacity: 0.85 }));
+        const cheekGeo = new THREE.SphereGeometry(0.085, 16, 12);
+        [-0.41, 0.41].forEach((x) => {
+          const cheek = mesh(cheekGeo, cheekMat);
+          cheek.scale.set(1.3, 0.8, 0.35);
+          cheek.position.set(x, -0.1, 0.52);
+          head.add(cheek);
+        });
+
+        const mouthMat = track(new THREE.MeshStandardMaterial({ color: 0x1d1b16, roughness: 0.4 }));
+        const mouth = mesh(new THREE.TorusGeometry(0.11, 0.021, 8, 24, Math.PI), mouthMat);
+        mouth.rotation.z = Math.PI;
+        head.add(mouth);
+
+        const shadowMat = track(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.24, depthWrite: false }));
+        const shadow = mesh(new THREE.CircleGeometry(0.9, 32), shadowMat);
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.set(0, FOOT_Y - 0.02, 0);
+        scene.add(shadow);
+
+
+const title=document.querySelector('#title'),sub=document.querySelector('#sub'),bubble=document.querySelector('#bubble'),code=document.querySelector('#code'),typed=document.querySelector('#typed'),footer=document.querySelector('#footer');
+const chapters=[{s:0,e:4.8,title:'Voici Claaky.',sub:'Un petit compagnon.\nUne grande envie de coder.'},{s:4.8,e:9.6,title:'Vous lui parlez.',sub:'Votre idée. Votre projet. Ensemble.'},{s:9.6,e:16.8,title:'Il code avec vous.',sub:'Il réfléchit, planifie et vous accompagne.'},{s:16.8,e:20.4,title:'Tout doux.\nTout squishy.',sub:'Un sourire, même quand aucun fichier n’est ouvert.'},{s:20.4,e:24,title:'Que faisons-nous ?',sub:'Découvrez Claake Code.'}];
+window.seek=async t=>{t=Math.max(0,Math.min(24,t));let ch=chapters.find(c=>t>=c.s&&t<c.e)||chapters.at(-1);let u=t-ch.s;title.textContent=ch.title;title.style.fontSize=ch.s===20.4?'84px':'110px';title.style.whiteSpace='pre-line';title.style.transform=`translateY(${(1-ease(p(u,0,.65)))*115}%)`;sub.textContent=ch.sub;sub.style.opacity=ease(p(u,.25,.7));sub.style.transform=`translateY(${(1-ease(p(u,.25,.7)))*20}px)`;
+bubble.style.opacity=(t>=4.8&&t<9.6)?ease(p(u,.5,.5)):0;bubble.style.transform=`translateX(${(1-ease(p(u,.5,.5)))*-40}px)`;
+code.style.opacity=t>=9.6&&t<16.8?ease(p(u,.6,.5)):0;const txt='// Votre idée prend forme\nconst projet = construireEnsemble();';typed.textContent=txt.slice(0,Math.floor(txt.length*p(t,10.2,3.5)));
+footer.textContent=t>=20.4?'claakecode-web.vercel.app':'Votre compagnon, dans Claake Code.';
+const work=t>=9.6&&t<16.8,cheer=t>=16.8&&t<20.4;const intro=spring(t,1.5,.7);const scale=t>=4.8&&t<9.6?.78:t>=9.6&&t<16.8?.74:.9;
+let squash=.025*Math.sin(t*2.2);if(work)squash=.085*Math.sin(t*12);if(cheer){let a=t-16.8;squash=.25*Math.exp(-a*1.5)*Math.sin(a*13);}
+squish.scale.set(scale*(1-squash*.55),scale*(1+squash),scale*(1-squash*.55));squish.position.set(t>=4.8&&t<9.6?.9:0,-1.55+(1-intro)*-3,0);squish.position.y+=cheer?Math.max(0,Math.sin((t-16.8)*Math.PI*2))*Math.exp(-(t-16.8)*.7)*.55:0;
+root.rotation.y=.12*Math.sin(t*.8);root.rotation.z=work?.05*Math.sin(t*10):.035*Math.sin(t*2);head.position.y=1.04+.05*Math.sin(t*2.2-.6);head.rotation.z=.07*Math.sin(t*1.2);leafLg.rotation.z=cheer?.75:work?.13+.15*Math.sin(t*12):.04;leafRg.rotation.z=cheer?-.75:work?-.13-.15*Math.sin(t*12+1.5):-.04;
+eyes.forEach(({group,baseX})=>{group.position.set(baseX,.06,.6);group.scale.y=(t%4.2)>4.05?.12:1;});mouth.position.set(0,-.2,.63);mouth.scale.set(1,1,1);core.scale.setScalar(1+.025*Math.sin(t*4));
+if(landscape){squish.position.x=2.05;squish.position.y=-1.05+(1-intro)*-3;shadow.position.x=2.05;shadow.position.y=-2.05;camera.position.z=9.1;}
+{const gy=(landscape?-1.05:-1.55)+(1-intro)*-3-.08;shadow.position.set(squish.position.x,gy,0);const lift=Math.max(0,squish.position.y-(gy+.08));shadow.scale.setScalar(Math.max(.5,scale*1.05-lift*.25));shadow.material.opacity=Math.max(.1,.24-lift*.1);}
+renderer.render(scene,camera);await document.fonts.ready;return true;};window.ready=document.fonts.ready.then(()=>window.seek(0));
+</script></html>
