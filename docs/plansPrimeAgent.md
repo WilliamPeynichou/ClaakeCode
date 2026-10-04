@@ -7,6 +7,10 @@
 
 ## Sommaire
 
+### Performance de la mascotte partagée Chat / RLM
+
+Claaky est mémoïsé pour éviter les reconstructions SVG lors du streaming à props identiques. Les loaders sous 40 px ne définissent ni n'utilisent de filtres SVG. Les vignettes Settings sont fixes et sans éclairage ; seul l'aperçu principal conserve la texture animée. `claakyVisibility.ts` partage un observateur d'intersection et un écouteur de visibilité pour suspendre les animations hors écran/fenêtre masquée, avec nettoyage complet lorsque le dernier personnage est démonté. Aucun timer ou raf par mascotte. Ces changements ne modifient ni les agents ni leurs outils.
+
 1. [Vision et périmètre](#1-vision-et-périmètre)
 2. [Référence Prime Agent et stratégie de réutilisation](#2-référence-prime-agent-et-stratégie-de-réutilisation)
 3. [Existant Claake Code et écarts](#3-existant-claake-code-et-écarts)

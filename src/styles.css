@@ -10655,13 +10655,13 @@ textarea {
 .claaky[data-state="thinking"] .claaky__dots circle:nth-child(3) { animation-delay: .4s; }
 
 /* ---------- working: typing arms, focused, </> bubble ---------- */
-.claaky[data-state="working"] .claaky__arm--l { transform: rotate(140deg); animation: claaky-type-l .36s ease-in-out infinite alternate; }
-.claaky[data-state="working"] .claaky__arm--r { transform: rotate(-140deg); animation: claaky-type-r .36s ease-in-out infinite alternate .18s; }
+.claaky[data-state="working"] .claaky__arm--l { transform: rotate(140deg); animation: claaky-type-l .46s ease-in-out infinite alternate; }
+.claaky[data-state="working"] .claaky__arm--r { transform: rotate(-140deg); animation: claaky-type-r .46s ease-in-out infinite alternate; }
 .claaky[data-state="working"] .claaky__mouth--open { opacity: 0; }
 .claaky[data-state="working"] .claaky__mouth--smile { opacity: 1; }
 .claaky[data-state="working"] .claaky__look { transform: translateY(2px); }
 .claaky[data-state="working"] .claaky__brows { transform: translateY(1.6px); }
-.claaky[data-state="working"] .claaky__squash { animation: claaky-bounce .72s ease-in-out infinite; }
+.claaky[data-state="working"] .claaky__squash { animation: claaky-bounce .92s ease-in-out infinite; }
 .claaky[data-state="working"] .claaky__bubble--code { opacity: 1; animation: claaky-pop 1.4s ease-in-out infinite; transform-origin: 106px 82px; }
 
 /* ---------- planning: points up, sways, checklist ---------- */
@@ -10679,8 +10679,8 @@ textarea {
 .claaky[data-state="done"] .claaky__eyes--happy { opacity: 1; }
 .claaky[data-state="done"] .claaky__arm--l { transform: rotate(-28deg); }
 .claaky[data-state="done"] .claaky__arm--r { transform: rotate(28deg); }
-.claaky[data-state="done"] .claaky__body { animation: claaky-jump .9s cubic-bezier(.3,0,.4,1) infinite; }
-.claaky[data-state="done"] .claaky__shadow { animation: claaky-shadow .9s cubic-bezier(.3,0,.4,1) infinite; }
+.claaky[data-state="done"] .claaky__body { animation: claaky-jump 1.15s ease-in-out infinite; }
+.claaky[data-state="done"] .claaky__shadow { animation: claaky-shadow 1.15s ease-in-out infinite; }
 .claaky[data-state="done"] .claaky__sparks { opacity: 1; }
 .claaky[data-state="done"] .claaky__sparks path { animation: claaky-twinkle .9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .claaky[data-state="done"] .claaky__sparks path:nth-child(2) { animation-delay: .3s; }
@@ -10722,18 +10722,21 @@ textarea {
 @keyframes claaky-tilt { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(3deg); } }
 @keyframes claaky-dot { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
 @keyframes claaky-type-l { from { transform: rotate(150deg); } to { transform: rotate(128deg); } }
-@keyframes claaky-type-r { from { transform: rotate(-150deg); } to { transform: rotate(-128deg); } }
+@keyframes claaky-type-r { from { transform: rotate(-128deg); } to { transform: rotate(-150deg); } }
 @keyframes claaky-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08) translateY(-1px); } }
 @keyframes claaky-point { 0%,100% { transform: rotate(40deg); } 50% { transform: rotate(28deg); } }
 @keyframes claaky-sway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 @keyframes claaky-write { 0% { stroke-dashoffset: 12; } 60%,100% { stroke-dashoffset: 0; } }
 @keyframes claaky-jump {
-  0%,100% { transform: translateY(0) scale(1.08,.92); }
-  20% { transform: translateY(0) scale(.94,1.08); }
-  50% { transform: translateY(-12px) scale(.98,1.03); }
-  80% { transform: translateY(0) scale(1.06,.94); }
+  0%,100% { transform: translateY(0) scale(1,1); }
+  12% { transform: translateY(0) scale(1.045,.955); }
+  28% { transform: translateY(-6px) scale(.975,1.025); }
+  46% { transform: translateY(-12px) scale(1,1); }
+  64% { transform: translateY(0) scale(1.055,.945); }
+  78% { transform: translateY(0) scale(.985,1.015); }
+  90% { transform: translateY(0) scale(1.005,.995); }
 }
-@keyframes claaky-shadow { 0%,20%,80%,100% { transform: scale(1); opacity: .14; } 50% { transform: scale(.7); opacity: .08; } }
+@keyframes claaky-shadow { 0%,12%,64%,100% { transform: scale(1); opacity: .14; } 46% { transform: scale(.7); opacity: .08; } }
 @keyframes claaky-twinkle { 0%,100% { transform: scale(.4); opacity: .3; } 50% { transform: scale(1.1); opacity: 1; } }
 @keyframes claaky-shake { 0%,70%,100% { transform: rotate(0); } 75% { transform: rotate(-3deg); } 80% { transform: rotate(3deg); } 85% { transform: rotate(-2deg); } 90% { transform: rotate(1deg); } }
 @keyframes claaky-drip { 0% { transform: translateY(-2px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
@@ -10742,7 +10745,15 @@ textarea {
 /* tiny sizes: no side effects, they only add noise */
 .claaky--tiny .claaky__fx { display: none; }
 
-@media (prefers-reduced-motion: reduce) { .claaky * { animation: none !important; } }
+.claaky[data-paused="true"] *, .claaky[data-paused="true"] { animation-play-state: paused !important; }
+.claaky[data-static="true"] * { animation: none !important; }
+/* Invisible tiny effects must not keep their own animation timelines alive. */
+.claaky--tiny .claaky__fx * { animation: none !important; }
+/* Short fades for expressions; no layout properties or blanket GPU layer promotion. */
+.claaky__eyes, .claaky__mouth, .claaky__brows { transition: opacity 160ms ease-out; }
+.claaky__look, .claaky__ball { transition: transform 240ms ease-out; }
+.claaky[data-static="true"] * { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .claaky * { animation: none !important; transition: none !important; } }
 
 .claaky-loader { width: 26px; height: 26px; margin: -3px 2px -3px 0; }
 .claaky-empty { gap: 10px; }

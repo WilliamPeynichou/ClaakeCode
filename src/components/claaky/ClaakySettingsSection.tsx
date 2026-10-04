@@ -64,7 +64,7 @@ export function ClaakySettingsSection() {
               onClick={() => setPreview(state)}
               aria-label={`Voir la pose : ${label}`}
             >
-              <Claaky state={state} size={56} decorative />
+              <Claaky state={state} size={56} decorative animated={false} textured={false} />
               <span className="python-runtime__muted">{label}</span>
             </button>
           ))}

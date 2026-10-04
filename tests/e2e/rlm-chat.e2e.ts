@@ -238,12 +238,20 @@ test('Claaky follows the agent: working during a turn, done after, and every pos
   const head = await page.evaluate(() => ({
     found: document.querySelectorAll('.chat-head__claaky').length,
     lights: document.querySelectorAll('.chat-head__claaky feDiffuseLighting').length,
+    filters: document.querySelectorAll('.chat-head__claaky filter').length,
   }));
   expect(head.found).toBe(1);
   expect(head.lights).toBe(0);
+  expect(head.filters).toBe(0);
 
   await browser.locator('[title="Settings"]').first().tap();
   await screen.getByRole('button', 'Claaky', { exact: true }).tap();
+  const thumbnails = await page.evaluate(() => ({
+    static: document.querySelectorAll('.claaky-settings__states svg[data-static="true"]').length,
+    lights: document.querySelectorAll('.claaky-settings__states feDiffuseLighting').length,
+  }));
+  expect(thumbnails.static).toBe(7);
+  expect(thumbnails.lights).toBe(0);
   for (const [label, state] of [['Code', 'working'], ['Terminé', 'done'], ['Erreur', 'error'], ['Dort', 'sleeping']] as const) {
     await screen.getByRole('button', `Voir la pose : ${label}`).tap();
     await page.waitForFunction((st) => document.querySelector('.claaky-settings__preview .claaky')?.getAttribute('data-state') === st, state);
@@ -279,4 +287,16 @@ test('Claaky 2D: clay SVG on the empty screen (no WebGL), animation stays smooth
   })`);
   console.log('claaky 2D frame pacing', JSON.stringify(stats));
   expect(stats.fps).toBeGreaterThan(20);
+  // Off-screen characters pause, then resume on return (no React/frame-loop work).
+  await page.evaluate(() => {
+    const el = document.querySelector('.claaky-empty svg.claaky') as SVGElement;
+    el.style.transform = 'translateY(2000px)';
+  });
+  await page.waitForFunction(() => document.querySelector('.claaky-empty svg.claaky')?.getAttribute('data-paused') === 'true');
+  const paused = await page.evaluate(() => getComputedStyle(document.querySelector('.claaky-empty .claaky__squash')!).animationPlayState);
+  expect(paused).toBe('paused');
+  await page.evaluate(() => {
+    (document.querySelector('.claaky-empty svg.claaky') as SVGElement).style.transform = '';
+  });
+  await page.waitForFunction(() => document.querySelector('.claaky-empty svg.claaky')?.getAttribute('data-paused') === 'false');
 });

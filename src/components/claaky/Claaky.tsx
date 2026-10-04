@@ -1,4 +1,5 @@
-import { useId, type CSSProperties } from "react";
+import { memo, useEffect, useId, useRef, type CSSProperties } from "react";
+import { observeClaaky } from "./claakyVisibility";
 
 export type ClaakyState =
   | "idle"
@@ -75,30 +76,42 @@ function Eye({ uid, cx, cy, mirror }: { uid: string; cx: number; cy: number; mir
  * gradients below CLAY_MIN. Poses are pure CSS on transform/opacity, driven by data-state, and stop
  * under prefers-reduced-motion. Used for the loaders, the chat header, the empty editor and Settings.
  */
-export function Claaky({
+export const Claaky = memo(function Claaky({
   state = "idle",
   size = 24,
   className,
   decorative = false,
+  animated = true,
+  textured = true,
 }: {
   state?: ClaakyState;
   size?: number;
   className?: string;
   /** When another element already carries the label (e.g. "Thinking"). */
   decorative?: boolean;
+  /** Static pose thumbnails do not need any animation or visibility observer. */
+  animated?: boolean;
+  /** Keep expensive lighting for the main character, not every Settings thumbnail. */
+  textured?: boolean;
 }) {
   const uid = `ck${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const clay = size >= CLAY_MIN;
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (animated && ref.current) return observeClaaky(ref.current);
+  }, [animated]);
+  const clay = textured && size >= CLAY_MIN;
   const tiny = size < TINY_MAX;
   const skin = `url(#${uid}s)`;
   const green = `url(#${uid}g)`;
   const f = (k: string) => (clay ? `url(#${uid}${k})` : undefined);
-  const blur = `url(#${uid}b)`;
+  const blur = tiny ? undefined : `url(#${uid}b)`;
   const classes = ["claaky", tiny ? "claaky--tiny" : "", className ?? ""].filter(Boolean).join(" ");
 
   return (
     <svg
+      ref={ref}
       className={classes}
+      data-static={!animated ? "true" : undefined}
       data-state={state}
       viewBox="0 0 120 128"
       width={size}
@@ -148,12 +161,14 @@ export function Claaky({
             <ClayFilter id={`${uid}ct`} depth={3} sheen={8} grain={0.07} />
           </>
         )}
+        {!tiny && <>
         <filter id={`${uid}b`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" />
         </filter>
         <filter id={`${uid}b2`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2.6" />
         </filter>
+        </>}
       </defs>
 
       <ellipse className="claaky__shadow" cx="60" cy="121" rx="26" ry="4" filter={blur} />
@@ -180,7 +195,7 @@ export function Claaky({
             filter={f("cg")}
             d="M49 79 C34 88 35 114 58.5 114.5 C73 115 78.5 103 72 95.5 C66.5 89.5 56.5 91.5 57 100 C49.5 99 44 90 49 79 Z"
           />
-          <ellipse className="claaky__ao" cx="60" cy="80" rx="25" ry="5" filter={`url(#${uid}b2)`} />
+          <ellipse className="claaky__ao" cx="60" cy="80" rx="25" ry="5" filter={tiny ? undefined : `url(#${uid}b2)`} />
 
           <g className="claaky__head">
             <g transform="translate(38 38)">
@@ -270,4 +285,4 @@ export function Claaky({
       </g>
     </svg>
   );
-}
+});
