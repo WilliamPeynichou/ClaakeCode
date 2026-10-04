@@ -212,7 +212,7 @@ test('Claaky: empty editor greets, quick start opens a chat, Settings can turn h
   expect(await calls(browser, 'set_claaky_enabled')).toEqual([{ enabled: false }]);
 });
 
-test('Claaky follows the agent: working during a turn, done after, and every pose renders in 3D', async ({ app, browser, screen }) => {
+test('Claaky follows the agent: working during a turn, done after, and every pose renders', async ({ app, browser, screen }) => {
   await openApp(app);
   const page = surfaceOf(engine)!.page();
   await page.evaluate(() => {
@@ -234,23 +234,49 @@ test('Claaky follows the agent: working during a turn, done after, and every pos
   const seen: string[] = await page.evaluate(() => (window as any).__claakyStates);
   expect(seen).toContain('working');
   expect(seen).toContain('done');
+  // The 26 px header Claaky is flat: clay filters only from 48 px (GPU cost in long histories).
+  const head = await page.evaluate(() => ({
+    found: document.querySelectorAll('.chat-head__claaky').length,
+    lights: document.querySelectorAll('.chat-head__claaky feDiffuseLighting').length,
+  }));
+  expect(head.found).toBe(1);
+  expect(head.lights).toBe(0);
 
   await browser.locator('[title="Settings"]').first().tap();
   await screen.getByRole('button', 'Claaky', { exact: true }).tap();
-  for (const label of ['Code', 'Terminé', 'Erreur', 'Dort']) {
+  for (const [label, state] of [['Code', 'working'], ['Terminé', 'done'], ['Erreur', 'error'], ['Dort', 'sleeping']] as const) {
     await screen.getByRole('button', `Voir la pose : ${label}`).tap();
+    await page.waitForFunction((st) => document.querySelector('.claaky-settings__preview .claaky')?.getAttribute('data-state') === st, state);
     await new Promise((r) => setTimeout(r, label === 'Terminé' ? 450 : 1100));
     await page.locator('.claaky-settings__preview').screenshot({ path: `.e2e/shots/claaky-pose-${label}.png` });
   }
 });
 
-test('Claaky 3D frame cost stays low', async ({ app }) => {
+test('Claaky 2D: clay SVG on the empty screen (no WebGL), animation stays smooth', async ({ app }) => {
   await openApp(app);
   const page = surfaceOf(engine)!.page();
-  await page.evaluate(() => { (window as any).__claakyPerf = []; });
-  await new Promise((r) => setTimeout(r, 4000));
-  const ms: number[] = await page.evaluate(() => (window as any).__claakyPerf);
-  ms.sort((a, b) => a - b);
-  console.log('claaky draw ms', JSON.stringify({ n: ms.length, median: ms[Math.floor(ms.length / 2)], p95: ms[Math.floor(ms.length * 0.95)], max: ms[ms.length - 1] }));
-  expect(ms.length).toBeGreaterThan(10);
+  await page.waitForFunction(() => document.querySelectorAll('.claaky-empty svg.claaky').length === 1);
+  // Large Claaky carries the clay lighting filters; no canvas anywhere (three.js is gone).
+  const dom = await page.evaluate(() => ({
+    lights: document.querySelectorAll('.claaky-empty feDiffuseLighting').length,
+    canvases: document.querySelectorAll('.claaky-empty canvas').length,
+  }));
+  expect(dom.lights).toBeGreaterThan(0);
+  expect(dom.canvases).toBe(0);
+  // Frame pacing while Claaky animates: count rAF frames for 3 s.
+  // Passed as a string: the test bundler injects a `__name` helper into named functions, absent in the page.
+  const stats: { fps: number; long: number } = await page.evaluate(`new Promise((resolve) => {
+    let frames = 0, long = 0, last = performance.now();
+    const t0 = last;
+    function tick(t) {
+      frames++;
+      if (t - last > 50) long++;
+      last = t;
+      if (t - t0 < 3000) requestAnimationFrame(tick);
+      else resolve({ fps: (frames * 1000) / (t - t0), long });
+    }
+    requestAnimationFrame(tick);
+  })`);
+  console.log('claaky 2D frame pacing', JSON.stringify(stats));
+  expect(stats.fps).toBeGreaterThan(20);
 });

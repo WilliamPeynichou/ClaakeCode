@@ -1,7 +1,7 @@
 {
   "name": "claakecode",
   "private": true,
-  "version": "0.1.71",
+  "version": "0.1.72",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,6 @@
     "@monaco-editor/react": "^4.6.0",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.0.1",
-    "@types/three": "0.170.0",
     "@xterm/addon-clipboard": "0.3.0-beta.218",
     "@xterm/addon-fit": "0.12.0-beta.218",
     "@xterm/addon-unicode11": "0.10.0-beta.218",
@@ -37,7 +36,6 @@
     "react-markdown": "^9.0.1",
     "rehype-highlight": "^7.0.1",
     "remark-gfm": "^4.0.0",
-    "three": "0.170.0",
     "web-push": "3.6.7",
     "ws": "8.21.0"
   },

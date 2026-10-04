@@ -7,7 +7,8 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── docs — notes et plans (déplacés de la racine)
-│   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B6) + mascotte Claaky (C1–C6), non implémenté
+│   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B6, non commencé) + mascotte Claaky (C1–C5 faits, version 2D)
+│   ├── claaky2d/ — prototype du Claaky 2D : claaky2d.js/.css (dessin + poses), preview.html (planche animée), shoot.mjs (rend claaky2d-preview.png via Playwright)
 │   ├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
 │   ├── EDIT_TOOL_COMPARISON.md — comparaison des outils d'édition
 │   ├── EmbendingFeatures.md — plan des providers d'embeddings
@@ -16,7 +17,7 @@ Code map:
 │   ├── index.html — accueil ; section #rlm « RLM chat » animée au scroll (rlmRender(p, pre) pur : prélude « RLM » 3D, champ de points canvas, 5 scènes dont onglets Chat|RLM et Auto Compute, compteur roulant, tilt souris, repli mouvement réduit)
 │   ├── styles.css — styles du site, dont le bloc .rlm-*
 │   └── llms.txt — résumé pour les LLM, inclut le chat RLM
-├── films/claaky — teaser vidéo reproductible : BRIEF.md, BEATMAP.md, film.html (three.js, window.seek(t)), probe.mjs ; probe/sheet.jpg = quatre compositions à valider avant rendu MP4
+├── films/claaky — teaser vidéo reproductible (montre l'ancien Claaky 3D ; assets/ contient l'illustration de référence du Claaky 2D) : BRIEF.md, BEATMAP.md, film.html (three.js, window.seek(t)), probe.mjs ; probe/sheet.jpg = quatre compositions à valider avant rendu MP4
 ├── index.html
 ├── LICENSE
 ├── package-lock.json
@@ -315,7 +316,7 @@ Code map:
     │   ├── UpdaterLockScreen.tsx
     │   ├── Welcome.tsx
     │   ├── WindowControls.tsx
-    │   ├── claaky/ — compagnon Claaky : Claaky.tsx (sprite SVG 7 états d'après le logo : tête ronde, deux pétales, bille verte ; remplace les loaders), ClaakyScene.tsx (3D three.js « squishy » à ressorts amortis : squash/stretch sur les pieds, rebonds, gelée ; fourrure velours ; chargée à la demande, repli SVG), claakyAgentState.ts (état de l'agent → pose : working/thinking/planning/done/error), ClaakyEmpty.tsx (écran vide « Que faisons-nous ? »), ClaakySettingsSection.tsx, useClaakyEnabled.ts
+    │   ├── claaky/ — compagnon Claaky : Claaky.tsx (SVG 2D d'après films/claaky/assets/image_6e11fda6-…webp : corps crème menthe, oreilles feuilles, bille, virgule au ventre, yeux anime ; texture pâte mate par filtres SVG d'éclairage ≥ 48 px ; 7 poses CSS ; remplace les loaders), claakyAgentState.ts (état de l'agent → pose : working/thinking/planning/done/error), ClaakyEmpty.tsx (écran vide « Que faisons-nous ? »), ClaakySettingsSection.tsx, useClaakyEnabled.ts
     │   ├── Workspace.tsx — inclut l'onglet actif Chat/RLM (historiques séparés par harness), création selon l'onglet et le bouton Auto Compute (chat agent → nouveau chat RLM)
     │   └── chat
     │       ├── AIThinkingBlock.tsx

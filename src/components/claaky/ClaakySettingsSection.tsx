@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Claaky, type ClaakyState } from "./Claaky";
-import { ClaakyScene } from "./ClaakyScene";
 import { setClaakyEnabled, useClaakyEnabled } from "./useClaakyEnabled";
 
 const STATES: { state: ClaakyState; label: string }[] = [
@@ -16,7 +15,6 @@ const STATES: { state: ClaakyState; label: string }[] = [
 export function ClaakySettingsSection() {
   const enabled = useClaakyEnabled();
   const [error, setError] = useState<string | null>(null);
-  const [fallback, setFallback] = useState(false);
   const [preview, setPreview] = useState<ClaakyState>("idle");
 
   const toggle = async () => {
@@ -50,15 +48,11 @@ export function ClaakySettingsSection() {
           nom Claaky. Ses règles, ses outils et sa langue ne changent pas dans les deux cas.
         </p>
         <p className="python-runtime__muted">
-          Cliquez sur une pose pour la voir en 3D. Cliquez sur Claaky pour le faire sauter, maintenez
-          pour l'écraser : il rebondit comme un doudou.
+          Cliquez sur une pose pour la voir en grand : chaque pose correspond à ce que fait l'agent
+          (réfléchit, code, planifie, a terminé, erreur, dort après 90 s sans activité).
         </p>
         <div className="claaky-settings__preview">
-          {fallback ? (
-            <Claaky state={preview} size={120} />
-          ) : (
-            <ClaakyScene size={168} state={preview} onUnavailable={() => setFallback(true)} />
-          )}
+          <Claaky state={preview} size={168} />
         </div>
         <div className="claaky-settings__states">
           {STATES.map(({ state, label }) => (

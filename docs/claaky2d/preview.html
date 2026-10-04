@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<script>
+  // Cache-bust: always load the latest Claaky CSS (preview only).
+  document.write('<link rel="stylesheet" href="claaky2d.css?v=' + Date.now() + '">');
+</script>
+<style>
+  body { margin: 0; background: #f7f4ea; font-family: "DM Sans", system-ui, sans-serif; color: #1d3326; }
+  .sheet { width: 1600px; padding: 56px 64px; box-sizing: border-box; }
+  h1 { font: 400 52px/1 "DM Serif Display", Georgia, serif; margin: 0 0 6px; }
+  .sub { color: #5b6e60; margin: 0 0 36px; font-size: 17px; }
+  .top { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 36px; }
+  .card { background: #fff; border-radius: 22px; padding: 22px; box-shadow: 0 1px 0 #e7e2d2; display: flex; flex-direction: column; align-items: center; }
+  .card img { width: 360px; border-radius: 14px; }
+  .tag { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #6c8070; margin-top: 12px; }
+  .poses { display: grid; grid-template-columns: repeat(7, 1fr); gap: 16px; margin-bottom: 36px; }
+  .pose { background: #fff; border-radius: 18px; padding: 18px 8px 14px; display: flex; flex-direction: column; align-items: center; }
+  .pose b { margin-top: 8px; font-size: 15px; } .pose span { font-size: 12px; color: #6c8070; text-align: center; margin-top: 4px; min-height: 30px; }
+  .sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .row { border-radius: 18px; padding: 22px 28px; display: flex; align-items: center; gap: 28px; }
+  .light { background: #fff; } .dark { background: #16201a; color: #cfe0d2; }
+  .chip { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+</style></head>
+<body><div class="sheet" id="sheet">
+  <h1>Claaky — version 2D</h1>
+  <p class="sub">Dessiné uniquement d'après l'illustration de référence · SVG + CSS, sans three.js · 7 poses liées à ce que fait l'agent</p>
+  <div class="top">
+    <div class="card"><img src="../../films/claaky/assets/image_6e11fda6-c86e-4997-88c2-ae134ace8245_0.webp"><div class="tag">Référence</div></div>
+    <div class="card" id="hero"></div>
+  </div>
+  <div class="poses" id="poses"></div>
+  <div class="sizes">
+    <div class="row light" id="small-light"></div>
+    <div class="row dark" id="small-dark"></div>
+  </div>
+</div>
+<script type="module">
+  const { claakySvg, STATES } = await import("./claaky2d.js?v=" + Date.now());
+  const desc = {
+    idle: "attend, respire, cligne, salue", thinking: "main au menton, regarde en l'air, …",
+    working: "tape au clavier, bulle </>", planning: "montre du doigt, liste qui s'écrit",
+    done: "saute, bras levés, yeux ^^", error: "oreilles basses, goutte, « o »",
+    sleeping: "yeux fermés, Zz (90 s sans activité)",
+  };
+  document.getElementById("hero").innerHTML = claakySvg("idle", 330) + '<div class="tag">Claaky 2D · idle</div>';
+  document.getElementById("poses").innerHTML = STATES.map(s =>
+    `<div class="pose">${claakySvg(s, 150)}<b>${s}</b><span>${desc[s]}</span></div>`).join("");
+  for (const id of ["small-light", "small-dark"])
+    document.getElementById(id).innerHTML = [20, 28, 40, 64].map(px =>
+      `<div class="chip">${claakySvg(px >= 40 ? "working" : "thinking", px).replace('class="ck"', px < 40 ? 'class="ck ck--tiny"' : 'class="ck"')}${px}px</div>`).join("") + '<div class="chip">tailles loader</div>';
+  // ?t=ms freezes every animation at that time (used by shoot.mjs); without it, Claaky moves.
+  const tParam = new URLSearchParams(location.search).get("t");
+  if (tParam !== null) requestAnimationFrame(() => document.getAnimations().forEach(a => { a.pause(); a.currentTime = Number(tParam); }));
+  window.ready = true;
+</script>
+</body></html>

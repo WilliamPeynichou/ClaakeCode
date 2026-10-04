@@ -1,0 +1,149 @@
+/* Claaky 2D — poses + motion. transform/opacity only; stops under prefers-reduced-motion. */
+.ck { overflow: visible; display: block; }
+.ck * { transform-box: view-box; }
+/* Matte clay: no outlines anywhere on the body; colours sampled from the reference. */
+.ck__shadow { fill: #6f7a58; opacity: .28; transform-origin: 60px 121px; }
+.ck__ao { fill: #97a578; opacity: .55; }
+.ck__cheeks { fill: #ec9c93; opacity: .8; }
+.ck__hl { fill: #fff; opacity: .95; }
+.ck__hl--s { opacity: .75; }
+.ck__lash { fill: #10221a; }
+.ck__iris-lt { fill: #6cc07a; opacity: .75; }
+.ck__brows path, .ck__eyes--happy path, .ck__eyes--closed path, .ck__mouth--smile, .ck__mouth--flat {
+  fill: none; stroke: #1c5232; stroke-width: 2.2; stroke-linecap: round;
+}
+.ck__brows path { stroke: #4f8f62; stroke-width: 1.5; opacity: .85; }
+.ck__mouth-in { fill: #8a3d3e; }
+.ck__tongue { fill: #efa39e; }
+.ck__fx text { font: 700 13px/1 "DM Sans", system-ui, sans-serif; fill: #2a8048; }
+.ck__bubble rect { fill: #fff; stroke: #2a8048; stroke-width: 1.2; }
+.ck__bubble text { font-size: 9px; text-anchor: middle; }
+.ck__bubble path { stroke: #2a8048; stroke-width: 1.6; stroke-linecap: round; fill: none; }
+.ck__dots circle { fill: #2a8048; }
+.ck__sparks path { fill: #f2c94c; }
+.ck__sweat { fill: #8fd3f4; stroke: #4aa6d6; stroke-width: .6; }
+
+/* origins */
+.ck__arm { transform-origin: 0 0; }
+.ck__ear { transform-origin: 0 0; }
+.ck__squash { transform-origin: 60px 120px; }
+.ck__head { transform-origin: 60px 80px; }
+.ck__ball { transform-origin: 60px 24px; }
+.ck__eyes--open { transform-origin: 60px 54px; }
+
+/* default visibility: everything optional hidden */
+.ck__eyes--happy, .ck__eyes--closed, .ck__mouth--smile, .ck__mouth--o, .ck__mouth--flat,
+.ck__bubble, .ck__dots, .ck__sparks, .ck__sweat, .ck__zz { opacity: 0; }
+
+/* ---------- base pose: arms out, like the reference ---------- */
+.ck__arm--l { transform: rotate(-62deg); }
+.ck__arm--r { transform: rotate(62deg); }
+
+/* ---------- idle: breathe, blink, little wave ---------- */
+.ck[data-state="idle"] .ck__squash { animation: ck-breathe 3.2s ease-in-out infinite; }
+.ck[data-state="idle"] .ck__eyes--open { animation: ck-blink 4.6s infinite; }
+.ck[data-state="idle"] .ck__arm--r { animation: ck-wave 4.6s ease-in-out infinite; }
+.ck[data-state="idle"] .ck__ear--l { animation: ck-ear-l 3.2s ease-in-out infinite; }
+.ck[data-state="idle"] .ck__ear--r { animation: ck-ear-r 3.2s ease-in-out infinite; }
+
+/* ---------- thinking: hand on chin, eyes up, dots ---------- */
+.ck[data-state="thinking"] .ck__mouth--open { opacity: 0; }
+.ck[data-state="thinking"] .ck__mouth--flat { opacity: 1; }
+.ck[data-state="thinking"] .ck__arm--r { transform: rotate(-42deg); }
+.ck[data-state="thinking"] .ck__arm--l { transform: rotate(-145deg); }
+.ck[data-state="thinking"] .ck__look { transform: translate(2px, -2.4px); }
+.ck[data-state="thinking"] .ck__head { animation: ck-tilt 2.8s ease-in-out infinite; }
+.ck[data-state="thinking"] .ck__dots { opacity: 1; }
+.ck[data-state="thinking"] .ck__dots circle { animation: ck-dot 1.4s ease-in-out infinite; }
+.ck[data-state="thinking"] .ck__dots circle:nth-child(2) { animation-delay: .2s; }
+.ck[data-state="thinking"] .ck__dots circle:nth-child(3) { animation-delay: .4s; }
+
+/* ---------- working: typing arms, focused, </> bubble ---------- */
+.ck[data-state="working"] .ck__arm--l { transform: rotate(140deg); animation: ck-type-l .36s ease-in-out infinite alternate; }
+.ck[data-state="working"] .ck__arm--r { transform: rotate(-140deg); animation: ck-type-r .36s ease-in-out infinite alternate .18s; }
+.ck[data-state="working"] .ck__mouth--open { opacity: 0; }
+.ck[data-state="working"] .ck__mouth--smile { opacity: 1; }
+.ck[data-state="working"] .ck__look { transform: translateY(2px); }
+.ck[data-state="working"] .ck__brows { transform: translateY(1.6px); }
+.ck[data-state="working"] .ck__squash { animation: ck-bounce .72s ease-in-out infinite; }
+.ck[data-state="working"] .ck__bubble--code { opacity: 1; animation: ck-pop 1.4s ease-in-out infinite; transform-origin: 106px 82px; }
+
+/* ---------- planning: points up, sways, checklist ---------- */
+.ck[data-state="planning"] .ck__arm--r { transform: rotate(40deg); animation: ck-point 1.6s ease-in-out infinite; }
+.ck[data-state="planning"] .ck__arm--l { transform: rotate(-160deg); }
+.ck[data-state="planning"] .ck__mouth--open { opacity: 0; }
+.ck[data-state="planning"] .ck__mouth--smile { opacity: 1; }
+.ck[data-state="planning"] .ck__look { transform: translate(2.4px, -1.4px); }
+.ck[data-state="planning"] .ck__body { animation: ck-sway 2.4s ease-in-out infinite; transform-origin: 60px 120px; }
+.ck[data-state="planning"] .ck__bubble--plan { opacity: 1; }
+.ck[data-state="planning"] .ck__bubble--plan path { stroke-dasharray: 12; animation: ck-write 2.4s ease-in-out infinite; }
+
+/* ---------- done: jump, arms up, ^^, sparkles ---------- */
+.ck[data-state="done"] .ck__eyes--open { opacity: 0; }
+.ck[data-state="done"] .ck__eyes--happy { opacity: 1; }
+.ck[data-state="done"] .ck__arm--l { transform: rotate(-28deg); }
+.ck[data-state="done"] .ck__arm--r { transform: rotate(28deg); }
+.ck[data-state="done"] .ck__body { animation: ck-jump .9s cubic-bezier(.3,0,.4,1) infinite; }
+.ck[data-state="done"] .ck__shadow { animation: ck-shadow .9s cubic-bezier(.3,0,.4,1) infinite; }
+.ck[data-state="done"] .ck__sparks { opacity: 1; }
+.ck[data-state="done"] .ck__sparks path { animation: ck-twinkle .9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ck[data-state="done"] .ck__sparks path:nth-child(2) { animation-delay: .3s; }
+.ck[data-state="done"] .ck__sparks path:nth-child(3) { animation-delay: .6s; }
+
+/* ---------- error: droopy ears, worried, sweat, small shake ---------- */
+.ck[data-state="error"] .ck__ear--l { transform: rotate(-38deg); }
+.ck[data-state="error"] .ck__ear--r { transform: rotate(38deg); }
+.ck[data-state="error"] .ck__brows path:first-child { transform: rotate(14deg); transform-origin: 45px 38px; }
+.ck[data-state="error"] .ck__brows path:last-child { transform: rotate(-14deg); transform-origin: 75px 38px; }
+.ck[data-state="error"] .ck__mouth--open { opacity: 0; }
+.ck[data-state="error"] .ck__mouth--o { opacity: 1; }
+.ck[data-state="error"] .ck__arm--l { transform: rotate(-168deg); }
+.ck[data-state="error"] .ck__arm--r { transform: rotate(168deg); }
+.ck[data-state="error"] .ck__body { animation: ck-shake 2.4s ease-in-out infinite; transform-origin: 60px 120px; }
+.ck[data-state="error"] .ck__sweat { opacity: 1; animation: ck-drip 2.4s ease-in infinite; }
+
+/* ---------- sleeping: closed eyes, ears down, slow breath, Zz ---------- */
+.ck[data-state="sleeping"] .ck__eyes--open, .ck[data-state="sleeping"] .ck__mouth--open, .ck[data-state="sleeping"] .ck__brows { opacity: 0; }
+.ck[data-state="sleeping"] .ck__eyes--closed, .ck[data-state="sleeping"] .ck__mouth--flat { opacity: 1; }
+.ck[data-state="sleeping"] .ck__ear--l { transform: rotate(-46deg); }
+.ck[data-state="sleeping"] .ck__ear--r { transform: rotate(46deg); }
+.ck[data-state="sleeping"] .ck__ball { transform: translate(-6px, 4px); }
+.ck[data-state="sleeping"] .ck__arm--l { transform: rotate(-170deg); }
+.ck[data-state="sleeping"] .ck__arm--r { transform: rotate(170deg); }
+.ck[data-state="sleeping"] .ck__head { transform: rotate(-6deg); }
+.ck[data-state="sleeping"] .ck__squash { animation: ck-breathe 4.8s ease-in-out infinite; }
+.ck[data-state="sleeping"] .ck__zz { opacity: 1; }
+.ck[data-state="sleeping"] .ck__zz text { animation: ck-z 3s ease-out infinite; }
+.ck[data-state="sleeping"] .ck__zz text:nth-child(2) { animation-delay: 1.5s; }
+
+/* ---------- keyframes (squishy = squash & stretch) ---------- */
+@keyframes ck-breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.03,.97); } }
+@keyframes ck-bounce { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.035,.965); } }
+@keyframes ck-blink { 0%,93%,100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes ck-wave { 0%,55%,100% { transform: rotate(62deg); } 65%,85% { transform: rotate(30deg); } 75%,95% { transform: rotate(52deg); } }
+@keyframes ck-ear-l { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-5deg); } }
+@keyframes ck-ear-r { 0%,100% { transform: rotate(0); } 50% { transform: rotate(5deg); } }
+@keyframes ck-tilt { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(3deg); } }
+@keyframes ck-dot { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes ck-type-l { from { transform: rotate(150deg); } to { transform: rotate(128deg); } }
+@keyframes ck-type-r { from { transform: rotate(-150deg); } to { transform: rotate(-128deg); } }
+@keyframes ck-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08) translateY(-1px); } }
+@keyframes ck-point { 0%,100% { transform: rotate(40deg); } 50% { transform: rotate(28deg); } }
+@keyframes ck-sway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes ck-write { 0% { stroke-dashoffset: 12; } 60%,100% { stroke-dashoffset: 0; } }
+@keyframes ck-jump {
+  0%,100% { transform: translateY(0) scale(1.08,.92); }
+  20% { transform: translateY(0) scale(.94,1.08); }
+  50% { transform: translateY(-12px) scale(.98,1.03); }
+  80% { transform: translateY(0) scale(1.06,.94); }
+}
+@keyframes ck-shadow { 0%,20%,80%,100% { transform: scale(1); opacity: .14; } 50% { transform: scale(.7); opacity: .08; } }
+@keyframes ck-twinkle { 0%,100% { transform: scale(.4); opacity: .3; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes ck-shake { 0%,70%,100% { transform: rotate(0); } 75% { transform: rotate(-3deg); } 80% { transform: rotate(3deg); } 85% { transform: rotate(-2deg); } 90% { transform: rotate(1deg); } }
+@keyframes ck-drip { 0% { transform: translateY(-2px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
+@keyframes ck-z { 0% { transform: translate(0,4px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(6px,-10px); opacity: 0; } }
+
+/* tiny sizes: no side effects, they only add noise */
+.ck--tiny .ck__fx { display: none; }
+
+@media (prefers-reduced-motion: reduce) { .ck * { animation: none !important; } }
