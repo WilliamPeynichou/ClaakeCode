@@ -8,6 +8,8 @@ pub mod glob;
 pub mod grep;
 pub mod image;
 pub mod mcp;
+pub mod model_stats;
+pub mod model_turns;
 #[cfg(windows)]
 mod powershell;
 pub mod prod;
@@ -69,6 +71,7 @@ pub use prod::{
     ProdSecretStorageInfo, ProdSettings, PROD_PROVIDER_IDS, PROD_TOKEN_ENV_KEYS,
 };
 pub use python::PythonTool;
+pub use model_stats::{model_stats_csv, ModelStatsReport, ModelStatsRow, MODEL_STATS_MIN_RELIABLE};
 pub use question::QuestionTool;
 pub use read::{ReadFingerprint, ReadTool};
 pub use skill::{

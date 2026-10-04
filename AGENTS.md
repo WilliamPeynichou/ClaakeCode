@@ -7,7 +7,7 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── docs — notes et plans (déplacés de la racine)
-│   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B6, non commencé) + mascotte Claaky (C1–C5 faits, version 2D)
+│   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B4/B6 faits, B5 phase 2 optionnelle) + mascotte Claaky (C1–C5 faits, version 2D)
 │   ├── claaky2d/ — prototype du Claaky 2D : claaky2d.js/.css (dessin + poses), preview.html (planche animée), shoot.mjs (rend claaky2d-preview.png via Playwright)
 │   ├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
 │   ├── EDIT_TOOL_COMPARISON.md — comparaison des outils d'édition
@@ -110,6 +110,7 @@ Code map:
 │   │       ├── image.rs
 │   │       ├── lib.rs
 │   │       ├── mcp.rs
+│   │       ├── model_stats.rs — benchmark B1 : agrégation des `token_usage` de l'historique par harness/provider/modèle (réponses, tokens, cache via prompt_tokens normalisé, outils en erreur), export CSV, tests
 │   │       ├── powershell.rs
 │   │       ├── prime_memory.rs — lecture/édition/suppression atomiques du harness Prime (global + session-artifacts), tests ; commandes list/edit/delete_rlm_memory
 │   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
@@ -117,7 +118,8 @@ Code map:
 │   │       ├── question.rs
 │   │       ├── read.rs
 │   │       ├── skill.rs — outil skill + priority_skill_section : le skill « CLAAKE.md » est injecté en tête du prompt de tout agent
-│   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10)
+│   │       ├── model_turns.rs — mesures locales sans contenu, collecte run_turn (classique/sous-agents) et RLM, agrégats médians, effacement et tarifs manuels ; migration store v12
+│   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10) ; model_stats(since_ms, harness) pour le benchmark ; table model_turns v12
 │   │       ├── subagent.rs
 │   │       ├── team.rs
 │   │       ├── team
@@ -283,6 +285,7 @@ Code map:
 │       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM (onglet RLM, état vide, Auto Compute, Stop, réouverture), `npm run test:e2e`)
 │       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath obligatoire ; politique appendSystemPrompt native de mémoire locale/globale et refinement evidence-gated (sans fine-tuning ni moteur mémoire parallèle), Stop, get_rlm_binding
 │       ├── state.rs
+│       ├── stats.rs — get_model_stats / export_model_stats_csv / clear_model_stats / save_model_prices (spawn_blocking, CSV .csv uniquement)
 │       ├── swarm.rs
 │       ├── terminal.rs
 │       ├── typesafe.rs
@@ -307,6 +310,9 @@ Code map:
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx
     │   ├── SettingsPane.tsx
+│   ├── ModelStatsSection.tsx — Settings « Performance » (B3) : historique et tours mesurés séparés, filtres, export CSV, effacement confirmé sans supprimer les chats
+│   ├── MeasuredModelTable.tsx — médianes, débit de tour, erreurs/interruption/réécriture, sous-agents et coût estimé
+│   ├── ModelPricesEditor.tsx — grille de tarifs manuels par million de tokens, validation et estimation
     │   ├── TypeSafeSettingsSection.tsx
     │   ├── SinewDesignDialog.tsx
     │   ├── SinewMark.tsx
@@ -320,7 +326,7 @@ Code map:
     │   ├── Workspace.tsx — inclut l'onglet actif Chat/RLM (historiques séparés par harness), création selon l'onglet et le bouton Auto Compute (chat agent → nouveau chat RLM)
     │   └── chat
     │       ├── AIThinkingBlock.tsx
-    │       ├── ChatPane.tsx — props headTabs / headActions / belowHead pour les onglets et actions d'en-tête
+    │       ├── ChatPane.tsx — props headTabs / headActions / belowHead pour les onglets et actions d'en-tête ; résumé benchmark dans le sélecteur pour n≥20 tours réussis
     │       ├── ChatSurface.tsx — onglets « Chat | RLM », état vide RLM, transcript et prompt Auto Compute, LEARN_PROMPT (bouton « Apprendre de ce chat »)
     │       ├── RlmBanner.tsx — bandeau « confiance locale » du chat RLM (worktree isolé, pas de sandbox)
     │   (PythonRuntimeSection.tsx — section Settings « Python persistant » : état moteur Prime, venv, packages, redémarrage, liste « Mémoire de l'agent » (portée globale/par chat, modifier, supprimer ; via list/edit/delete_rlm_memory) ; via get_python_runtime_status / restart_python_runtime, backend prime::inspect_python_env)

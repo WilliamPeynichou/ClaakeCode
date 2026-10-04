@@ -93,7 +93,58 @@ export type RlmMemoryEntry = {
   version: number;
 };
 
+export type ModelStatsRow = {
+  harness: "classic" | "rlm" | string;
+  provider: string;
+  model: string;
+  responses: number;
+  conversations: number;
+  inputTokens: number;
+  /** Whole prompt including cache, comparable across providers. */
+  promptTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  toolCalls: number;
+  toolErrors: number;
+};
+
+export type ModelPrice = { provider: string; model: string; input: number; output: number; cacheRead: number; cacheCreation: number };
+export type MeasuredModelStats = {
+  provider: string; model: string; harness: string; isSubagent: boolean;
+  turns: number; usageTurns: number; errors: number; interrupted: number; rewrites: number;
+  medianDurationMs: number | null; medianFirstTokenMs: number | null;
+  medianTokensPerSecond: number | null; speedSamples: number;
+  inputTokens: number; promptTokens: number; outputTokens: number; reasoningTokens: number;
+  cacheReadTokens: number; cacheCreationTokens: number; toolCalls: number; toolErrors: number;
+};
+
+export type ModelStatsReport = {
+  measured: MeasuredModelStats[];
+  prices: ModelPrice[];
+  rows: ModelStatsRow[];
+  totalResponses: number;
+  minReliable: number;
+  sinceMs: number | null;
+};
+
+export type ModelStatsFilter = {
+  /** null = all history. */
+  periodDays: number | null;
+  /** null = both harnesses. */
+  harness: "classic" | "rlm" | null;
+};
+
 export const api = {
+  clearModelStats() { return invoke<void>("clear_model_stats"); },
+  saveModelPrices(prices: ModelPrice[]) { return invoke<void>("save_model_prices", { prices }); },
+  getModelStats(filter: ModelStatsFilter) {
+    return invoke<ModelStatsReport>("get_model_stats", { input: filter });
+  },
+  exportModelStatsCsv(filter: ModelStatsFilter, path: string) {
+    return invoke<void>("export_model_stats_csv", { input: { ...filter, path } });
+  },
   listRlmMemories() {
     return invoke<RlmMemoryEntry[]>("list_rlm_memories");
   },
