@@ -441,6 +441,8 @@ pub fn run() {
             rlm::edit_rlm_memory,
             rlm::delete_rlm_memory,
             stats::get_model_stats,
+            stats::clear_model_stats,
+            stats::save_model_prices,
             stats::export_model_stats_csv,
             turns::answer_question,
             turns::reject_question,

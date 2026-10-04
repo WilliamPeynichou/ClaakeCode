@@ -297,14 +297,33 @@ pub(super) async fn send_rlm_message(
         &conversation_id,
         &claakecode_core::ChatMessage::user_text(text.clone()),
     );
+    let measured_model = input.model.as_ref().map(|m| ModelRef::new(&m.provider, &m.name)).or_else(|| state.store.load_conversation_model_by_id(&conversation_id).ok().flatten()).unwrap_or_else(|| ModelRef::new("unknown", "unknown"));
+    let mut measurement = claakecode_app::model_turns::TurnMeasurement::new(
+        conversation_id.clone(), measured_model.provider, measured_model.name, "rlm", false, None,
+    );
     let mut reply = String::new();
     let result = prime::run_prompt(&socket, &session_id, &text, Duration::from_secs(30 * 60), |event| {
+        match &event {
+            AgentEvent::TextChunk { delta } if !delta.is_empty() => measurement.first_token(),
+            AgentEvent::ToolStarted { .. } => measurement.record.tool_calls += 1,
+            AgentEvent::ToolFinished { is_error: true, .. } => measurement.record.tool_errors += 1,
+            AgentEvent::Interrupted => measurement.record.status = "interrupted".into(),
+            AgentEvent::Error { .. } => measurement.record.status = "error".into(),
+            _ => {},
+        }
         if let AgentEvent::TextChunk { delta } = &event {
             reply.push_str(delta);
         }
         let _ = emit_agent_event(&app, &workspace_id, &conversation_id, &event);
     })
     .await;
+    if result.is_err() && measurement.record.status != "interrupted" { measurement.record.status = "error".into(); }
+    let record = measurement.finish();
+    let measurement_store = state.store.clone();
+    match tokio::task::spawn_blocking(move || measurement_store.record_model_turn(&record)).await {
+        Ok(Ok(())) => {},
+        other => eprintln!("RLM measurement persistence failed: {other:?}"),
+    }
     if !reply.is_empty() {
         let _ = state.store.append_conversation_message(
             &workspace_id,

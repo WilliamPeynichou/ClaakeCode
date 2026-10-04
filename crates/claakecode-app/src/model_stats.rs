@@ -14,7 +14,7 @@ use serde_json::Value;
 /// Below this many responses a row is flagged as not reliable.
 pub const MODEL_STATS_MIN_RELIABLE: u64 = 20;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatsRow {
     pub harness: String,
@@ -35,7 +35,7 @@ pub struct ModelStatsRow {
     pub tool_errors: u64,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatsReport {
     pub rows: Vec<ModelStatsRow>,
@@ -43,6 +43,8 @@ pub struct ModelStatsReport {
     pub min_reliable: u64,
     /// Lower bound of the period (ms since epoch), `None` = all history.
     pub since_ms: Option<i64>,
+    pub measured: Vec<crate::model_turns::MeasuredModelStats>,
+    pub prices: Vec<crate::model_turns::ModelPrice>,
 }
 
 /// Accumulates conversations one by one; call [`ModelStatsAccumulator::finish`] at the end.
@@ -114,6 +116,8 @@ impl ModelStatsAccumulator {
             rows,
             min_reliable: MODEL_STATS_MIN_RELIABLE,
             since_ms,
+            measured: vec![],
+            prices: vec![],
         }
     }
 }
@@ -167,6 +171,17 @@ pub fn model_stats_csv(report: &ModelStatsReport) -> String {
             row.tool_errors.to_string(),
         ];
         out.push_str(&fields.join(","));
+        out.push('\n');
+    }
+    out.push_str("\nmeasured_harness,provider,model,subagent,turns,usage_turns,errors,interrupted,rewrites,median_duration_ms,median_first_token_ms,median_tokens_per_second,speed_samples\n");
+    for r in &report.measured {
+        out.push_str(&[
+            csv_field(&r.harness), csv_field(&r.provider), csv_field(&r.model), r.is_subagent.to_string(),
+            r.turns.to_string(), r.usage_turns.to_string(), r.errors.to_string(), r.interrupted.to_string(), r.rewrites.to_string(),
+            r.median_duration_ms.map(|v| v.to_string()).unwrap_or_default(),
+            r.median_first_token_ms.map(|v| v.to_string()).unwrap_or_default(),
+            r.median_tokens_per_second.map(|v| v.to_string()).unwrap_or_default(), r.speed_samples.to_string(),
+        ].join(","));
         out.push('\n');
     }
     out

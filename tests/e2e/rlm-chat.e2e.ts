@@ -83,7 +83,7 @@ test('Settings: model performance table, n warning and filters', async ({ app, b
   await browser.locator('[title="Settings"]').first().tap();
   await screen.getByRole('button', 'Performance', { exact: false }).tap();
   await expect(screen.getByRole('heading', 'Performance des modèles')).toBeVisible();
-  await expect(screen.getByText('claude-sonnet-5')).toBeVisible();
+   await expect(browser.locator('.model-stats__table:not(.model-stats__measured) .model-stats__model').first()).toBeVisible();
   // 7 responses < 20: flagged; 42: not.
   expect(await browser.locator('tr[data-low="true"]').count()).toBe(1);
   await expect(screen.getByText('49 réponses au total', { exact: false })).toBeVisible();
@@ -93,9 +93,38 @@ test('Settings: model performance table, n warning and filters', async ({ app, b
   expect((await calls(browser, 'get_model_stats'))[0]).toEqual({ input: { periodDays: 30, harness: null } });
   // The chat header "RLM" is a tab, so the only "RLM" button is the harness filter.
   await screen.getByRole('button', 'RLM', { exact: true }).tap();
-  await expect(screen.getByText('Pas encore de données', { exact: false })).toBeVisible();
+  await expect(browser.locator('.model-stats__empty strong')).toBeVisible();
   const last = (await calls(browser, 'get_model_stats')).pop();
   expect(last).toEqual({ input: { periodDays: 30, harness: 'rlm' } });
+});
+
+test('Benchmark: prices, measured turns and safe clear', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await browser.locator('[title="Settings"]').first().tap();
+  await screen.getByRole('button', 'Performance', { exact: false }).tap();
+  await expect(screen.getByRole('heading', 'Tours mesurés')).toBeVisible();
+  await browser.locator('.model-stats details summary').tap();
+  await screen.getByRole('button', 'Ajouter un tarif').tap();
+  const inputs = browser.locator('.model-stats__prices input');
+  await inputs.nth(0).fill('anthropic');
+  await inputs.nth(1).fill('claude-sonnet-5');
+  await inputs.nth(2).fill('3');
+  await inputs.nth(3).fill('15');
+  await screen.getByRole('button', 'Enregistrer les tarifs').tap();
+  await expect(screen.getByText('Coût estimé', { exact: true })).toBeVisible();
+  expect(await calls(browser, 'save_model_prices')).toHaveLength(1);
+  await screen.getByRole('button', 'Effacer les statistiques').tap();
+  expect(await calls(browser, 'clear_model_stats')).toHaveLength(0);
+  await screen.getByRole('button', 'Confirmer l’effacement').tap();
+  await expect(screen.getByText('Aucun tour mesuré', { exact: false })).toBeVisible();
+  expect(await calls(browser, 'clear_model_stats')).toHaveLength(1);
+  expect(await calls(browser, 'delete_conversation')).toHaveLength(0);
+});
+
+test('Benchmark: sufficient samples shown in model picker', async ({ app, browser, screen }) => {
+  await openApp(app);
+  await browser.locator('.composer__picker[data-kind="model"] button').first().tap();
+  await expect(screen.getByText('200 tok/s · n=22', { exact: false })).toBeVisible();
 });
 
 test('RLM chat screenshot', async ({ app, browser, screen }) => {

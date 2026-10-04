@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { ModelPricesEditor } from "./ModelPricesEditor";
+import { MeasuredModelTable } from "./MeasuredModelTable";
 import { api, type ModelStatsFilter, type ModelStatsReport, type ModelStatsRow } from "../lib/ipc";
 
 /**
@@ -102,17 +104,23 @@ export function ModelStatsSection() {
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<{ id: string; desc: boolean }>({ id: "responses", desc: true });
 
+  const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [requestId] = useState(() => ({ current: 0 }));
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
     try {
-      setReport(await api.getModelStats(filter));
+      const next = await api.getModelStats(filter);
+      if (id !== requestId.current) return;
+      setReport(next);
       setError(null);
     } catch (err) {
-      setError(String(err));
+      if (id === requestId.current) setError(String(err));
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
-  }, [filter]);
+  }, [filter, requestId]);
 
   useEffect(() => {
     void load();
@@ -175,7 +183,7 @@ export function ModelStatsSection() {
             type="button"
             className="settings-pane__btn"
             onClick={() => void exportCsv()}
-            disabled={!report || report.rows.length === 0}
+            disabled={loading || (!report?.rows.length && !report?.measured?.length)}
           >
             <Icon icon="solar:download-linear" width={13} height={13} />
             <span>Exporter CSV</span>
@@ -218,6 +226,23 @@ export function ModelStatsSection() {
         {error && <p className="python-runtime__error" role="alert">{error}</p>}
         {status && <p className="python-runtime__muted" role="status">{status}</p>}
 
+        {!report?.rows.length && !loading && <p className="python-runtime__muted">Pas encore de données historiques pour ce filtre.</p>}
+        {report && <>
+          <MeasuredModelTable rows={report.measured ?? []} prices={report.prices ?? []} minReliable={minReliable} />
+          <details><summary>Tarifs et coûts estimés</summary><ModelPricesEditor key={JSON.stringify(report.prices ?? [])} initial={report.prices ?? []} onSaved={() => { void load(); window.dispatchEvent(new Event("claakecode:model-stats-changed")); }} /></details>
+          <div className="settings-pane__actions">
+            {confirmClear ? <>
+              <button type="button" className="settings-pane__btn" disabled={clearing} onClick={async () => {
+                setClearing(true);
+                try { await api.clearModelStats(); setConfirmClear(false); await load(); window.dispatchEvent(new Event("claakecode:model-stats-changed")); }
+                catch (e) { setError(String(e)); } finally { setClearing(false); }
+              }}>Confirmer l’effacement</button>
+              <button type="button" className="settings-pane__btn" onClick={() => setConfirmClear(false)}>Annuler</button>
+            </> : <button type="button" className="settings-pane__btn" onClick={() => setConfirmClear(true)}>Effacer les statistiques</button>}
+          </div>
+          <p className="python-runtime__muted">Effacement de toutes les statistiques, tous filtres confondus, sans supprimer vos chats ni vos tarifs. Les compteurs historiques restent masqués ; les prochains tours sont mesurés.</p>
+        </>}
+        <h2>Historique des réponses (rétroactif)</h2>
         {!report ? (
           <p className="python-runtime__muted">Chargement…</p>
         ) : rows.length === 0 ? (
@@ -301,10 +326,9 @@ export function ModelStatsSection() {
             ne sont pas encore horodatés un par un).
           </li>
           <li>
-            Pas encore mesurés : durée des tours, vitesse (tokens/s), temps au premier token, taux
-            d'erreur des appels au modèle et usage du chat RLM.
+            Ce tableau historique ne mesure pas les durées. Les mesures précises des nouveaux tours sont affichées au-dessus, sans les additionner à cet historique.
           </li>
-          <li>Rien n'est envoyé sur le réseau : seuls des compteurs sont lus, jamais le contenu des messages.</li>
+          <li>Aucun compteur n’est envoyé sur le réseau. La table de mesures ne stocke ni prompts ni réponses ; l’agrégation rétroactive lit l’historique existant en local.</li>
         </ul>
       </div>
     </>

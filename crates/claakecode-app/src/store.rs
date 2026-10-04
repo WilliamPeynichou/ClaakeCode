@@ -1851,6 +1851,8 @@ impl AppStore {
         since_ms: Option<i64>,
         harness: Option<&str>,
     ) -> Result<crate::model_stats::ModelStatsReport> {
+        let cleared: Option<bool> = self.load_json_setting("model_stats_legacy_cleared")?;
+        if cleared.unwrap_or(false) { return Ok(crate::model_stats::ModelStatsAccumulator::default().finish(since_ms)); }
         let conn = self.connection()?;
         let mut statement = conn
             .prepare(
@@ -2084,7 +2086,7 @@ impl AppStore {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap_or(0);
 
-        if version >= 11 {
+        if version >= 12 {
             return Ok(());
         }
 
@@ -2139,12 +2141,20 @@ impl AppStore {
         }
         ensure_conversations_harness_column(&conn)?;
         ensure_rlm_bindings_table(&conn)?;
-        conn.pragma_update(None, "user_version", 11)
+        conn.execute_batch("create table if not exists model_turns (
+            id integer primary key autoincrement,
+            conversation_id text not null,
+            started_at_ms integer not null,
+            history_index integer,
+            rewritten integer not null default 0,
+            record_json text not null
+        ); create index if not exists idx_model_turns_time on model_turns(started_at_ms);")?;
+        conn.pragma_update(None, "user_version", 12)
             .context("unable to set sqlite schema version")?;
         Ok(())
     }
 
-    fn connection(&self) -> Result<Connection> {
+    pub(crate) fn connection(&self) -> Result<Connection> {
         let conn = Connection::open(&self.path).context("unable to open sqlite database")?;
         conn.execute_batch("pragma foreign_keys = on;")
             .context("unable to enable foreign keys")?;

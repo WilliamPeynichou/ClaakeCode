@@ -44,7 +44,12 @@ fn harness_filter(harness: Option<String>) -> std::result::Result<Option<String>
 async fn compute(store: AppStore, input: ModelStatsInput) -> std::result::Result<ModelStatsReport, String> {
     let harness = harness_filter(input.harness)?;
     let since = since_ms(input.period_days);
-    tokio::task::spawn_blocking(move || store.model_stats(since, harness.as_deref()))
+    tokio::task::spawn_blocking(move || -> anyhow::Result<ModelStatsReport> {
+        let mut report = store.model_stats(since, harness.as_deref())?;
+        report.measured = store.measured_model_stats(since, harness.as_deref())?;
+        report.prices = store.model_prices()?;
+        Ok(report)
+    })
         .await
         .map_err(|err| err.to_string())?
         .map_err(error_to_string)
@@ -72,5 +77,18 @@ pub(super) async fn export_model_stats_csv(
         return Err("export file must end with .csv".into());
     }
     let report = compute(state.store.clone(), input.filter).await?;
-    fs::write(&path, model_stats_csv(&report)).map_err(|err| format!("unable to write CSV: {err}"))
+    tokio::task::spawn_blocking(move || fs::write(&path, model_stats_csv(&report)))
+        .await.map_err(error_to_string)?.map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn clear_model_stats(state: State<'_, DesktopState>) -> std::result::Result<(), String> {
+    let store = state.store.clone();
+    tokio::task::spawn_blocking(move || store.clear_model_stats()).await.map_err(error_to_string)?.map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn save_model_prices(state: State<'_, DesktopState>, prices: Vec<claakecode_app::model_turns::ModelPrice>) -> std::result::Result<(), String> {
+    let store = state.store.clone();
+    tokio::task::spawn_blocking(move || store.save_model_prices(&prices)).await.map_err(error_to_string)?.map_err(error_to_string)
 }

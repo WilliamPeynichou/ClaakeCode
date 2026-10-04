@@ -57,6 +57,8 @@ export function installTauriMock(options: MockOptions) {
     { id: "m-csv", kind: "memory", title: "runs.csv encoding", content: "File is latin-1.", path: "general",
       scope: "c-rlm-old", scopeLabel: "Old RLM chat", source: "agent", createdAt: "2026-10-02T10:00:00.000Z", updatedAt: "2026-10-02T10:00:00.000Z", version: 1 },
   ];
+  let statsCleared = false;
+  let prices: any[] = [];
   let claakyOn = true;
   let stopRequested = false;
   const callbacks = new Map<number, (payload: unknown) => void>();
@@ -192,10 +194,16 @@ export function installTauriMock(options: MockOptions) {
         reasoningTokens: responses * 30, cacheReadTokens: responses * 3000, cacheCreationTokens: 0,
         toolCalls: responses, toolErrors: 1,
       });
-      const rows = [row("classic", "claude-sonnet-5", 42), row("classic", "claude-haiku-5", 7)]
+      const rows = (statsCleared ? [] : [row("classic", "claude-sonnet-5", 42), row("classic", "claude-haiku-5", 7)])
         .filter((r) => !input?.harness || r.harness === input.harness);
-      return { rows, totalResponses: rows.reduce((s, r) => s + r.responses, 0), minReliable: 20, sinceMs: null };
+      const measured = statsCleared ? [] : [{ ...row("classic", "claude-sonnet-5", 42),
+        isSubagent: false, turns: 25, usageTurns: 25, errors: 1, interrupted: 2, rewrites: 1,
+        medianDurationMs: 1500, medianFirstTokenMs: 300, medianTokensPerSecond: 200, speedSamples: 22,
+      }].filter(r => !input?.harness || input.harness === r.harness);
+      return { rows, measured, prices, totalResponses: rows.reduce((s, r) => s + r.responses, 0), minReliable: 20, sinceMs: null };
     },
+    clear_model_stats: () => { statsCleared = true; return null; },
+    save_model_prices: ({ prices: next }) => { prices = next; return null; },
     "plugin:event|listen": ({ event, handler }) => {
       listeners.set(event, [...(listeners.get(event) ?? []), handler]);
       return handler;

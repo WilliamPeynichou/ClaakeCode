@@ -30,7 +30,7 @@ import {
 } from "./ToolCard";
 import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
-import { api } from "../../lib/ipc";
+import { api, type MeasuredModelStats } from "../../lib/ipc";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -494,6 +494,16 @@ export function ChatPane({
     [history, rewriteState],
   );
   const [modelOpen, setModelOpen] = useState(false);
+  const [modelBenchmarks, setModelBenchmarks] = useState<MeasuredModelStats[]>([]);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => { void api.getModelStats({ periodDays: 30, harness: "classic" }).then(report => {
+      if (active) setModelBenchmarks((report.measured ?? []).filter(r => !r.isSubagent && r.speedSamples >= report.minReliable));
+    }).catch(() => { if (active) setModelBenchmarks([]); }); };
+    if (modelOpen) refresh();
+    window.addEventListener("claakecode:model-stats-changed", refresh);
+    return () => { active = false; window.removeEventListener("claakecode:model-stats-changed", refresh); };
+  }, [modelOpen]);
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
   const [fastServiceTierEnabled, setFastServiceTierEnabled] = useState(
@@ -3789,6 +3799,8 @@ export function ChatPane({
                   >
                     {availableModels.map((m) => {
                       const selected = m.value === model;
+                      const benchmarkRef = modelRefFromId(m.value);
+                      const benchmark = modelBenchmarks.find(r => r.provider === benchmarkRef.provider && r.model === benchmarkRef.name);
                       const providerIcon =
                         PROVIDERS.find((p) => p.value === m.provider)?.icon;
                       return (
@@ -3806,6 +3818,9 @@ export function ChatPane({
                               <Icon icon={providerIcon} width={13} height={13} />
                             )}
                             <span>{m.label}</span>
+                            {benchmark && benchmark.medianTokensPerSecond !== null && <small className="model-stats__picker-summary" title="Débit médian du tour entier (outils et attentes compris), 30 jours. Pas un classement de qualité.">
+                              {benchmark.medianTokensPerSecond.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} tok/s · n={benchmark.speedSamples}
+                            </small>}
                           </span>
                           {selected && (
                             <Icon

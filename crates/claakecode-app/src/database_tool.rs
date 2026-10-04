@@ -44,6 +44,8 @@ impl DatabaseTool {
         Self { store }
     }
 
+    pub(crate) fn store(&self) -> AppStore { self.store.clone() }
+
     pub fn descriptors_static() -> Vec<ToolDescriptor> {
         vec![
             list_sources_descriptor(),

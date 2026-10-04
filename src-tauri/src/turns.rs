@@ -98,6 +98,7 @@ pub(super) async fn send_message(
         if !is_rewritable_user_message(message) {
             return Err("rewrite index must point to a rewritable user message".into());
         }
+        state.store.mark_model_turns_rewritten(&conversation.id, index).map_err(error_to_string)?;
         if input.revert_workspace_changes {
             restore_workspace_for_rewrite(
                 &app,

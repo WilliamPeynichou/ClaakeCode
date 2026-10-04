@@ -110,7 +110,19 @@ export type ModelStatsRow = {
   toolErrors: number;
 };
 
+export type ModelPrice = { provider: string; model: string; input: number; output: number; cacheRead: number; cacheCreation: number };
+export type MeasuredModelStats = {
+  provider: string; model: string; harness: string; isSubagent: boolean;
+  turns: number; usageTurns: number; errors: number; interrupted: number; rewrites: number;
+  medianDurationMs: number | null; medianFirstTokenMs: number | null;
+  medianTokensPerSecond: number | null; speedSamples: number;
+  inputTokens: number; promptTokens: number; outputTokens: number; reasoningTokens: number;
+  cacheReadTokens: number; cacheCreationTokens: number; toolCalls: number; toolErrors: number;
+};
+
 export type ModelStatsReport = {
+  measured: MeasuredModelStats[];
+  prices: ModelPrice[];
   rows: ModelStatsRow[];
   totalResponses: number;
   minReliable: number;
@@ -125,6 +137,8 @@ export type ModelStatsFilter = {
 };
 
 export const api = {
+  clearModelStats() { return invoke<void>("clear_model_stats"); },
+  saveModelPrices(prices: ModelPrice[]) { return invoke<void>("save_model_prices", { prices }); },
   getModelStats(filter: ModelStatsFilter) {
     return invoke<ModelStatsReport>("get_model_stats", { input: filter });
   },

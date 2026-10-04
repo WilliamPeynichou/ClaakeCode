@@ -78,6 +78,11 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         mut cmd_rx,
     } = ctx;
 
+    let mut measurement = crate::model_turns::TurnMeasurement::new(
+        cache_key.clone().unwrap_or_default(), model.provider.clone(), model.name.clone(),
+        "classic", event_scope.is_some(), if event_scope.is_none() { history.len().checked_sub(1) } else { None },
+    );
+    let measurement_store = database.store();
     send_event(&event_tx, event_scope.as_ref(), AgentEvent::TurnStarted);
     strip_all_visible_tool_result_ids(&mut history);
     normalize_tool_call_inputs(&mut history);
@@ -199,6 +204,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 }
                 Ok(false) => {}
                 Err(err) => {
+                    measurement.record.status = "error".into();
                     send_event(
                         &event_tx,
                         event_scope.as_ref(),
@@ -267,6 +273,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                                 continue 'conversation;
                             }
                             Err(compaction_err) => {
+                                measurement.record.status = "error".into();
                                 send_event(
                                     &event_tx,
                                     event_scope.as_ref(),
@@ -280,6 +287,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             }
                         }
                     }
+                    measurement.record.status = "error".into();
                     send_event(
                         &event_tx,
                         event_scope.as_ref(),
@@ -320,6 +328,10 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             }
                         };
 
+                        if matches!(&event, StreamEvent::TextDelta { delta, .. } | StreamEvent::ThinkingDelta { delta, .. } if !delta.is_empty())
+                            || matches!(&event, StreamEvent::ToolJsonDelta { chunk, .. } if !chunk.is_empty()) {
+                            measurement.first_token();
+                        }
                         match event {
                             StreamEvent::MessageStart { .. } => {}
                             StreamEvent::PartStart { index, kind, tool } => {
@@ -522,6 +534,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             continue 'conversation;
                         }
                         Err(compaction_err) => {
+                            measurement.record.status = "error".into();
                             send_event(
                                 &event_tx,
                                 event_scope.as_ref(),
@@ -536,6 +549,8 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     }
                 }
 
+                if let Some(usage) = response_usage { measurement.usage(usage); }
+                measurement.record.status = "error".into();
                 send_event(
                     &event_tx,
                     event_scope.as_ref(),
@@ -550,6 +565,8 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         };
 
         let mut assistant = message_builder.finish();
+        if let Some(usage) = response_usage { measurement.usage(usage); }
+        measurement.record.tool_calls += assistant.parts.iter().filter(|p| matches!(p, Part::ToolCall { .. })).count() as u64;
         if cancelled {
             if eager_tool_results.is_empty() {
                 retain_cancelled_visible_parts(&mut assistant);
@@ -600,6 +617,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         }
 
         if loops >= max_tool_rounds {
+            measurement.record.status = "error".into();
             abort_eager_tool_results(&mut eager_tool_results);
             send_event(
                 &event_tx,
@@ -804,6 +822,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     .and_then(Value::as_bool)
                     .unwrap_or(false))
         }) && mode == AgentMode::Plan;
+        measurement.record.tool_errors += tool_results.iter().filter(|p| matches!(p, Part::ToolResult { is_error: true, .. })).count() as u64;
         history.push(ChatMessage {
             role: Role::User,
             parts: tool_results,
@@ -827,10 +846,18 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
     if cancelled {
         send_event(&event_tx, event_scope.as_ref(), AgentEvent::Interrupted);
     }
+    if cancelled { measurement.record.status = "interrupted".into(); }
+    let record = measurement.finish();
+    let measured_duration = record.duration_ms;
+    match tokio::task::spawn_blocking(move || measurement_store.record_model_turn(&record)).await {
+        Ok(Ok(())) => {},
+        Ok(Err(err)) => tracing::warn!("model measurement persistence failed: {err}"),
+        Err(err) => tracing::warn!("model measurement worker failed: {err}"),
+    }
     send_event(
         &event_tx,
         event_scope.as_ref(),
-        AgentEvent::TurnFinished { duration_ms: None },
+        AgentEvent::TurnFinished { duration_ms: Some(measured_duration) },
     );
     todo_list.normalize();
     TurnOutput {

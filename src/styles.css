@@ -10612,6 +10612,19 @@ textarea {
 .model-stats__bar { display: block; height: 3px; margin-top: 4px; margin-left: auto; width: 64px; border-radius: 2px; background: var(--border, rgba(127,127,127,.15)); overflow: hidden; }
 .model-stats__bar > span { display: block; height: 100%; margin-left: auto; background: var(--accent, #3fb950); }
 .model-stats__notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.model-stats { --brand: #6b7c5c; --brand-light: #8a9b78; --brand-dark: #4e5c42; font-family: 'DM Sans', sans-serif; }
+.model-stats h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(15px, 1.4vw, 18px); font-weight: 400; margin: 12px 0; }
+.model-stats p { max-width: 65ch; }
+.model-stats__prices fieldset { display: grid; grid-template-columns: 4fr 8fr; gap: 8px 12px; border: 1px solid var(--border); margin: 12px 0; padding: 12px; }
+.model-stats__prices label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; min-width: 0; }
+.model-stats__prices input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--border); border-radius: 0; padding: 5px 8px; background: var(--bg-2); color: inherit; font: inherit; }
+.model-stats .settings-pane__btn, .model-stats__segmented, .model-stats__empty { border-radius: 0; }
+.model-stats .settings-pane__btn:hover:not(:disabled) { background: var(--brand-dark); }
+.model-stats__bar > span { background: var(--brand-light); }
+.model-stats__picker-summary { font-size: 10px; color: var(--fg-2); margin-left: 8px; }
+.model-stats details summary { cursor: pointer; font-size: 12px; }
+.model-stats__measured small { color: var(--fg-2); font-size: 10px; }
+@media (max-width: 600px) { .model-stats__prices fieldset { grid-template-columns: 1fr; } }
 
 /* ── Claaky ─────────────────────────────────────────────────────────────────────
    2D, drawn from films/claaky/assets/image_6e11fda6-…webp (cream-mint body, leaf ears, green ball,

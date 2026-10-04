@@ -1,6 +1,6 @@
 # Plan — Benchmark des modèles + Claaky
 
-Statut : **chantier A : B1 et B3 implémentés** (branche `feature/model-benchmark`) ; B2, B4, B5, B6 restent à faire. Chantier B (Claaky) : C1–C5 faits.
+Statut : **chantier A : B1–B4 et B6 implémentés** (branche `feature/model-benchmark`) ; B5 reste la phase 2 optionnelle (appels payants, non activée). Chantier B (Claaky) : C1–C5 faits.
 
 ---
 
@@ -72,7 +72,11 @@ B1 → B3 (valeur immédiate, sans migration) → B2 → B6 → B4 → B5.
 - **`prompt_tokens`** : contexte complet cache compris, `total − output`. Nécessaire car `input_tokens` exclut le cache chez Anthropic et l'inclut chez OpenAI ; le taux de cache affiché est `cache_read / prompt_tokens`.
 - **Période approximative** : les messages n'ont pas d'horodatage, le filtre garde les conversations dont `updated_at_ms` est dans la période. B2 corrigera.
 - **B3** : Settings « Performance » (`src/components/ModelStatsSection.tsx`) : période 7 j / 30 j / tout, harness Tous / Chat / RLM, tri par colonne, mini-barres, badge « n faible » sous 20 réponses, notes sur les limites, export CSV (généré en Rust, `.csv` uniquement, cellules neutralisées contre les formules). Commandes Tauri `get_model_stats` / `export_model_stats_csv` (`src-tauri/src/stats.rs`, en `spawn_blocking`). Test e2e dans `tests/e2e/rlm-chat.e2e.ts`.
-- **Pas fait** : bouton « Effacer les statistiques » (sans table dédiée, effacer reviendrait à supprimer l'historique : attend B2), taux de réécriture, durée / tokens/s / premier token (B2). Le chat RLM n'enregistre pas de `token_usage` : son filtre reste vide.
+- **B2/B3 complétés** : migration SQLite v12, table `model_turns` (compteurs JSON sans texte, horodatage, index d’historique et marqueur de réécriture). `run_turn` mesure tous les tours classiques et sous-agents ; RLM mesure durée, premier texte, statut et outils mais garde les tokens inconnus. Médianes et débit de tour entier (outils/attentes compris), lignes de sous-agents séparées, période exacte pour les nouvelles mesures. Historique rétroactif séparé pour éviter le double comptage. Réécriture = proxy de satisfaction, mesuré sur les tours classiques avec index connu ; non disponible pour les sous-agents/RLM.
+- **Effacement** : transaction qui supprime les mesures et masque définitivement l’agrégation historique ; ne supprime ni chats ni tarifs. Les nouveaux tours continuent à être mesurés.
+- **B4** : tarifs manuels par provider/modèle et par million de tokens (entrée hors cache, sortie, lecture/création cache), même devise choisie par l’utilisateur. Validation des montants finis/non négatifs et des doublons. Colonne coût masquée sans grille ; estimation uniquement sur les tokens connus, hors abonnements/remises.
+- **B6** : sélecteur du chat, résumé du débit médian sur 30 jours et n, uniquement avec ≥20 tours réussis avec usage connu, sans sous-agents. Rafraîchi à l’ouverture et après effacement.
+- **Limites** : pas d’usage tokens RLM fourni par le mapping actuel ; premier token classique = premier delta texte/raisonnement/arguments, RLM = premier texte. Les retries récupérés ne sont pas comptés comme tours en erreur. Pas de vitesse de génération pure. B5 non implémenté (phase 2 optionnelle).
 
 ### Risques
 - Chiffres trompeurs : toujours n + avertissement.
