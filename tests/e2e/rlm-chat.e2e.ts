@@ -237,21 +237,19 @@ test('Claaky follows the agent: working during a turn, done after, and every pos
   // The 26 px header Claaky is flat: clay filters only from 48 px (GPU cost in long histories).
   const head = await page.evaluate(() => ({
     found: document.querySelectorAll('.chat-head__claaky').length,
-    lights: document.querySelectorAll('.chat-head__claaky feDiffuseLighting').length,
     filters: document.querySelectorAll('.chat-head__claaky filter').length,
   }));
   expect(head.found).toBe(1);
-  expect(head.lights).toBe(0);
   expect(head.filters).toBe(0);
 
   await browser.locator('[title="Settings"]').first().tap();
   await screen.getByRole('button', 'Claaky', { exact: true }).tap();
   const thumbnails = await page.evaluate(() => ({
     static: document.querySelectorAll('.claaky-settings__states svg[data-static="true"]').length,
-    lights: document.querySelectorAll('.claaky-settings__states feDiffuseLighting').length,
+    filters: document.querySelectorAll('.claaky-settings__states filter').length,
   }));
   expect(thumbnails.static).toBe(7);
-  expect(thumbnails.lights).toBe(0);
+  expect(thumbnails.filters).toBe(0);
   for (const [label, state] of [['Code', 'working'], ['Terminé', 'done'], ['Erreur', 'error'], ['Dort', 'sleeping']] as const) {
     await screen.getByRole('button', `Voir la pose : ${label}`).tap();
     await page.waitForFunction((st) => document.querySelector('.claaky-settings__preview .claaky')?.getAttribute('data-state') === st, state);
@@ -264,13 +262,16 @@ test('Claaky 2D: clay SVG on the empty screen (no WebGL), animation stays smooth
   await openApp(app);
   const page = surfaceOf(engine)!.page();
   await page.waitForFunction(() => document.querySelectorAll('.claaky-empty svg.claaky').length === 1);
-  // Large Claaky carries the clay lighting filters; no canvas anywhere (three.js is gone).
+  // No SVG filter anywhere (CPU-rendered, very slow in WebKit) and no canvas; the big Claaky gets its
+  // volume from gradient overlays instead.
   const dom = await page.evaluate(() => ({
-    lights: document.querySelectorAll('.claaky-empty feDiffuseLighting').length,
+    filters: document.querySelectorAll('svg.claaky filter').length,
     canvases: document.querySelectorAll('.claaky-empty canvas').length,
+    overlays: document.querySelectorAll('.claaky-empty svg.claaky radialGradient').length,
   }));
-  expect(dom.lights).toBeGreaterThan(0);
+  expect(dom.filters).toBe(0);
   expect(dom.canvases).toBe(0);
+  expect(dom.overlays).toBeGreaterThan(8);
   // Frame pacing while Claaky animates: count rAF frames for 3 s.
   // Passed as a string: the test bundler injects a `__name` helper into named functions, absent in the page.
   const stats: { fps: number; long: number } = await page.evaluate(`new Promise((resolve) => {

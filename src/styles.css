@@ -10593,14 +10593,12 @@ textarea {
 
 /* ── Claaky ─────────────────────────────────────────────────────────────────────
    2D, drawn from films/claaky/assets/image_6e11fda6-…webp (cream-mint body, leaf ears, green ball,
-   belly swirl). Matte clay texture = SVG lighting filters (Claaky.tsx, ≥48px only). Poses are CSS on
+   belly swirl). Matte clay volume = gradient overlays, no SVG filter (Claaky.tsx, ≥48px only). Poses are CSS on
    transform/opacity driven by data-state; reduced motion = still pose. */
 .claaky { display: inline-block; flex: 0 0 auto; overflow: visible; vertical-align: middle; }
 .claaky * { transform-box: view-box; }
 /* Matte clay: no outlines anywhere on the body; colours sampled from the reference. */
-.claaky__shadow { fill: #6f7a58; opacity: .28; transform-origin: 60px 121px; }
-.claaky__ao { fill: #97a578; opacity: .55; }
-.claaky__cheeks { fill: #ec9c93; opacity: .8; }
+.claaky__shadow { transform-origin: 60px 121px; }
 .claaky__hl { fill: #fff; opacity: .95; }
 .claaky__hl--s { opacity: .75; }
 .claaky__lash { fill: #10221a; }
@@ -10749,6 +10747,8 @@ textarea {
 .claaky[data-static="true"] * { animation: none !important; }
 /* Invisible tiny effects must not keep their own animation timelines alive. */
 .claaky--tiny .claaky__fx * { animation: none !important; }
+/* At loader size, arms/ears/eyes are a few pixels: only the body motion stays animated. */
+.claaky--tiny .claaky__arm, .claaky--tiny .claaky__ear, .claaky--tiny .claaky__eyes, .claaky--tiny .claaky__head { animation: none !important; }
 /* Short fades for expressions; no layout properties or blanket GPU layer promotion. */
 .claaky__eyes, .claaky__mouth, .claaky__brows { transition: opacity 160ms ease-out; }
 .claaky__look, .claaky__ball { transition: transform 240ms ease-out; }

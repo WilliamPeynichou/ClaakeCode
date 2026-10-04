@@ -20,34 +20,41 @@ const LABELS: Record<ClaakyState, string> = {
   sleeping: "Claaky dort",
 };
 
-/** Below this width the clay lighting filters are skipped (cost) and the speech bubbles hidden (noise). */
+/** Below this width the volume overlays are skipped and the speech bubbles hidden. */
 const CLAY_MIN = 48;
 const TINY_MAX = 40;
 
 /**
- * Lighting filter turning a flat shape into a soft, puffy, matte clay volume: the shape's alpha is
- * blurred into a height map, lit (diffuse = volume, specular = satin sheen), then a faint grain is added.
+ * A "puffy" matte shape without any SVG filter (filters are CPU-rendered and very slow in WebKit):
+ * base fill, a rim-shade overlay (volume) and a soft top-left highlight, all plain gradients.
  */
-function ClayFilter({ id, depth, sheen, grain }: { id: string; depth: number; sheen: number; grain: number }) {
-  const scale = depth * 1.1;
+function Puffy({
+  as: Tag,
+  base,
+  rim,
+  light,
+  volume,
+  ...geometry
+}: {
+  as: "ellipse" | "path" | "circle";
+  base: string;
+  rim: string;
+  light: string;
+  volume: boolean;
+  cx?: number;
+  cy?: number;
+  rx?: number;
+  ry?: number;
+  r?: number;
+  d?: string;
+}) {
+  const Shape = Tag as "path";
   return (
-    <filter id={id} x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation={depth} result="h" />
-      <feDiffuseLighting in="h" surfaceScale={scale} diffuseConstant={1} lightingColor="#fff" result="d">
-        <feDistantLight azimuth={235} elevation={58} />
-      </feDiffuseLighting>
-      <feComposite in="SourceGraphic" in2="d" operator="arithmetic" k1={0.42} k2={0.62} k3={0} k4={0} result="lit" />
-      <feSpecularLighting in="h" surfaceScale={scale} specularConstant={0.3} specularExponent={sheen} lightingColor="#fffdf2" result="sp">
-        <feDistantLight azimuth={235} elevation={48} />
-      </feSpecularLighting>
-      <feComposite in="sp" in2="SourceAlpha" operator="in" result="sp2" />
-      <feTurbulence type="fractalNoise" baseFrequency={0.9} numOctaves={2} seed={7} result="n" />
-      <feColorMatrix in="n" type="matrix" values={`0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .45  0 0 0 ${grain} 0`} result="g" />
-      <feComposite in="g" in2="SourceAlpha" operator="in" result="g2" />
-      <feComposite in="lit" in2="sp2" operator="arithmetic" k2={1} k3={0.22} result="ls" />
-      <feBlend in="g2" in2="ls" mode="soft-light" result="out" />
-      <feComposite in="out" in2="SourceAlpha" operator="in" />
-    </filter>
+    <>
+      <Shape {...geometry} fill={base} />
+      {volume && <Shape {...geometry} fill={rim} />}
+      {volume && <Shape {...geometry} fill={light} />}
+    </>
   );
 }
 
@@ -72,8 +79,8 @@ function Eye({ uid, cx, cy, mirror }: { uid: string; cx: number; cy: number; mir
 /**
  * Claaky, the companion: a 2D SVG drawn from the reference illustration
  * (films/claaky/assets/image_6e11fda6-…webp) — cream-mint body, green leaf ears, green ball on top,
- * green swirl on the belly. Matte clay texture from SVG lighting filters at readable sizes; flat
- * gradients below CLAY_MIN. Poses are pure CSS on transform/opacity, driven by data-state, and stop
+ * green swirl on the belly. Matte clay volume from plain gradient overlays (no SVG filter: they are
+ * CPU-rendered and slow in WebKit) at readable sizes; flat fills below CLAY_MIN. Poses are pure CSS on transform/opacity, driven by data-state, and stop
  * under prefers-reduced-motion. Used for the loaders, the chat header, the empty editor and Settings.
  */
 export const Claaky = memo(function Claaky({
@@ -103,8 +110,8 @@ export const Claaky = memo(function Claaky({
   const tiny = size < TINY_MAX;
   const skin = `url(#${uid}s)`;
   const green = `url(#${uid}g)`;
-  const f = (k: string) => (clay ? `url(#${uid}${k})` : undefined);
-  const blur = tiny ? undefined : `url(#${uid}b)`;
+  const sk = { base: skin, rim: `url(#${uid}sr)`, light: `url(#${uid}sh)`, volume: clay };
+  const gr = { base: green, rim: `url(#${uid}gr)`, light: `url(#${uid}gh)`, volume: clay };
   const classes = ["claaky", tiny ? "claaky--tiny" : "", className ?? ""].filter(Boolean).join(" ");
 
   return (
@@ -154,24 +161,44 @@ export const Claaky = memo(function Claaky({
           <stop offset=".85" stopColor="#134a28" stopOpacity=".7" />
           <stop offset="1" stopColor="#0c2a17" stopOpacity="0" />
         </radialGradient>
-        {clay && (
-          <>
-            <ClayFilter id={`${uid}cs`} depth={6.5} sheen={10} grain={0.07} />
-            <ClayFilter id={`${uid}cg`} depth={4} sheen={8} grain={0.08} />
-            <ClayFilter id={`${uid}ct`} depth={3} sheen={8} grain={0.07} />
-          </>
-        )}
-        {!tiny && <>
-        <filter id={`${uid}b`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.6" />
-        </filter>
-        <filter id={`${uid}b2`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2.6" />
-        </filter>
-        </>}
+        {/* Volume + soft shadows as gradients only: no SVG filter anywhere. */}
+        <radialGradient id={`${uid}sr`} cx="50%" cy="46%" r="58%">
+          <stop offset=".62" stopColor="#7d8f5a" stopOpacity="0" />
+          <stop offset=".86" stopColor="#7d8f5a" stopOpacity=".22" />
+          <stop offset="1" stopColor="#5f7344" stopOpacity=".5" />
+        </radialGradient>
+        <radialGradient id={`${uid}sh`} cx="34%" cy="26%" r="46%">
+          <stop offset="0" stopColor="#fffff2" stopOpacity=".62" />
+          <stop offset=".55" stopColor="#fffff2" stopOpacity=".16" />
+          <stop offset="1" stopColor="#fffff2" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}gr`} cx="50%" cy="46%" r="58%">
+          <stop offset=".6" stopColor="#0c3a20" stopOpacity="0" />
+          <stop offset=".88" stopColor="#0c3a20" stopOpacity=".32" />
+          <stop offset="1" stopColor="#082a16" stopOpacity=".6" />
+        </radialGradient>
+        <radialGradient id={`${uid}gh`} cx="34%" cy="26%" r="46%">
+          <stop offset="0" stopColor="#bfe8c6" stopOpacity=".5" />
+          <stop offset=".55" stopColor="#bfe8c6" stopOpacity=".14" />
+          <stop offset="1" stopColor="#bfe8c6" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}sd`}>
+          <stop offset="0" stopColor="#6f7a58" stopOpacity=".34" />
+          <stop offset=".6" stopColor="#6f7a58" stopOpacity=".16" />
+          <stop offset="1" stopColor="#6f7a58" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}ao`}>
+          <stop offset="0" stopColor="#8f9d70" stopOpacity=".55" />
+          <stop offset="1" stopColor="#8f9d70" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}ch`}>
+          <stop offset="0" stopColor="#ec9c93" stopOpacity=".85" />
+          <stop offset=".6" stopColor="#ec9c93" stopOpacity=".5" />
+          <stop offset="1" stopColor="#ec9c93" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
-      <ellipse className="claaky__shadow" cx="60" cy="121" rx="26" ry="4" filter={blur} />
+      <ellipse className="claaky__shadow" cx="60" cy="121" rx="30" ry="5.2" fill={`url(#${uid}sd)`} />
 
       <g className="claaky__fx">
         <g className="claaky__bubble claaky__bubble--code">
@@ -186,48 +213,40 @@ export const Claaky = memo(function Claaky({
 
       <g className="claaky__body">
         <g className="claaky__squash">
-          <ellipse cx="48.5" cy="113.5" rx="9" ry="7.5" fill={skin} filter={f("ct")} />
-          <ellipse cx="71.5" cy="113.5" rx="9" ry="7.5" fill={skin} filter={f("ct")} />
-          <ellipse className="claaky__ao" cx="60" cy="112" rx="5" ry="6" filter={blur} />
-          <path fill={skin} filter={f("cs")} d="M35 77 C25 94 30 117 60 117 C90 117 95 94 85 77 Z" />
-          <path
-            fill={green}
-            filter={f("cg")}
+          <Puffy as="ellipse" {...sk} cx={48.5} cy={113.5} rx={9} ry={7.5} />
+          <Puffy as="ellipse" {...sk} cx={71.5} cy={113.5} rx={9} ry={7.5} />
+          <ellipse cx="60" cy="112" rx="7" ry="8" fill={`url(#${uid}ao)`} />
+          <Puffy as="path" {...sk} d="M35 77 C25 94 30 117 60 117 C90 117 95 94 85 77 Z" />
+          <Puffy
+            as="path"
+            {...gr}
             d="M49 79 C34 88 35 114 58.5 114.5 C73 115 78.5 103 72 95.5 C66.5 89.5 56.5 91.5 57 100 C49.5 99 44 90 49 79 Z"
           />
-          <ellipse className="claaky__ao" cx="60" cy="80" rx="25" ry="5" filter={tiny ? undefined : `url(#${uid}b2)`} />
+          <ellipse cx="60" cy="80" rx="30" ry="8" fill={`url(#${uid}ao)`} />
 
           <g className="claaky__head">
             <g transform="translate(38 38)">
               <g className="claaky__ear claaky__ear--l">
-                <path
-                  fill={`url(#${uid}l)`}
-                  filter={f("cg")}
-                  d="M9 7 C-6 15 -31 8 -35 -27 C-34 -31 -30 -32 -26 -31 C-10 -26 1 -14 5 -6 C8 0 10 3 9 7 Z"
-                />
+                <Puffy as="path" {...gr} base={`url(#${uid}l)`} d="M9 7 C-6 15 -31 8 -35 -27 C-34 -31 -30 -32 -26 -31 C-10 -26 1 -14 5 -6 C8 0 10 3 9 7 Z" />
               </g>
             </g>
             <g transform="translate(82 38)">
               <g className="claaky__ear claaky__ear--r">
-                <path
-                  fill={`url(#${uid}r)`}
-                  filter={f("cg")}
-                  d="M-9 7 C6 15 31 8 35 -27 C34 -31 30 -32 26 -31 C10 -26 -1 -14 -5 -6 C-8 0 -10 3 -9 7 Z"
-                />
+                <Puffy as="path" {...gr} base={`url(#${uid}r)`} d="M-9 7 C6 15 31 8 35 -27 C34 -31 30 -32 26 -31 C10 -26 -1 -14 -5 -6 C-8 0 -10 3 -9 7 Z" />
               </g>
             </g>
             <g className="claaky__ball">
-              <circle cx="60" cy="15.5" r="9.5" fill={green} filter={f("cg")} />
-              <ellipse className="claaky__ao" cx="60" cy="24.5" rx="7" ry="1.8" filter={blur} />
+              <Puffy as="circle" {...gr} cx={60} cy={15.5} r={9.5} />
+              <ellipse cx="60" cy="25" rx="9" ry="3" fill={`url(#${uid}ao)`} />
             </g>
-            <ellipse cx="60" cy="51" rx="35" ry="31.5" fill={skin} filter={f("cs")} />
+            <Puffy as="ellipse" {...sk} cx={60} cy={51} rx={35} ry={31.5} />
             <g className="claaky__brows">
               <path d="M41.5 38.5 Q45.5 36.2 49.5 38" />
               <path d="M70.5 38 Q74.5 36.2 78.5 38.5" />
             </g>
-            <g className="claaky__cheeks" filter={blur}>
-              <ellipse cx="37" cy="63.5" rx="6" ry="4" />
-              <ellipse cx="83" cy="63.5" rx="6" ry="4" />
+            <g className="claaky__cheeks">
+              <ellipse cx="37" cy="63.5" rx="8.5" ry="6" fill={`url(#${uid}ch)`} />
+              <ellipse cx="83" cy="63.5" rx="8.5" ry="6" fill={`url(#${uid}ch)`} />
             </g>
             <g className="claaky__eyes claaky__eyes--open">
               <g className="claaky__look">
@@ -255,12 +274,12 @@ export const Claaky = memo(function Claaky({
           {/* Stubby arms (origin = shoulder), drawn over the head so poses can reach the face. */}
           <g transform="translate(40 84)">
             <g className="claaky__arm claaky__arm--l">
-              <ellipse cx="0" cy="-9" rx="7" ry="11.5" fill={skin} filter={f("ct")} />
+              <Puffy as="ellipse" {...sk} cx={0} cy={-9} rx={7} ry={11.5} />
             </g>
           </g>
           <g transform="translate(80 84)">
             <g className="claaky__arm claaky__arm--r">
-              <ellipse cx="0" cy="-9" rx="7" ry="11.5" fill={skin} filter={f("ct")} />
+              <Puffy as="ellipse" {...sk} cx={0} cy={-9} rx={7} ry={11.5} />
             </g>
           </g>
         </g>
