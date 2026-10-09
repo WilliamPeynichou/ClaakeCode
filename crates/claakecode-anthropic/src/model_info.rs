@@ -71,6 +71,14 @@ const MODELS: &[AnthropicModelInfo] = &[
         beta_1m_preferred_window: None,
     },
     AnthropicModelInfo {
+        id: "claude-haiku-5-5",
+        context_window: 200_000,
+        preferred_window: 180_000,
+        max_output_tokens: 64_000,
+        beta_1m_context_window: None,
+        beta_1m_preferred_window: None,
+    },
+    AnthropicModelInfo {
         id: "claude-haiku-4-5",
         context_window: 200_000,
         preferred_window: 180_000,

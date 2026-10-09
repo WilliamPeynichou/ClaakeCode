@@ -149,6 +149,13 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "medium",
   },
   {
+    value: "anthropic:claude-haiku-5-5",
+    provider: "anthropic",
+    label: "Haiku 5.5",
+    thinking: ["off", "low", "medium", "high", "max"],
+    defaultThinking: "high",
+  },
+  {
     value: "anthropic:claude-haiku-4-5",
     provider: "anthropic",
     label: "Haiku 4.5",

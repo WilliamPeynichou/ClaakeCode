@@ -1,6 +1,19 @@
 use super::*;
 use crate::PythonTool;
 
+/// Default swarm teammate model when the lead runs on Claude: Haiku 5.5 at
+/// High effort. A sub-agent profile (`agent_profiles`) still overrides this.
+pub(super) const DEFAULT_ANTHROPIC_TEAMMATE_MODEL: &str = "claude-haiku-5-5";
+
+pub(super) fn default_teammate_model(lead: &ModelRef) -> ModelRef {
+    if lead.provider == "anthropic" {
+        ModelRef::new("anthropic", DEFAULT_ANTHROPIC_TEAMMATE_MODEL)
+            .with_effort(claakecode_core::Effort::High)
+    } else {
+        lead.clone()
+    }
+}
+
 impl TeamTool {
     pub(super) async fn run_agent_turn(
         &self,
@@ -431,7 +444,7 @@ impl TeamTool {
                 .unwrap_or_else(|| "Team collaborator".to_string());
             let model = profile
                 .map(|agent| agent.model.clone())
-                .unwrap_or_else(|| self.default_model.clone());
+                .unwrap_or_else(|| default_teammate_model(&self.default_model));
             self.validate_model(&model)?;
             let prompt = profile
                 .map(|agent| agent.prompt.clone())
