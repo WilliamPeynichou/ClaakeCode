@@ -13,6 +13,8 @@ use tokio::sync::{mpsc, Notify, RwLock, Semaphore};
 use uuid::Uuid;
 
 use crate::tool_run::{DiffLineKind, FileChange, FileChangeKind, ToolRunImage};
+#[cfg(test)]
+use crate::subagent::{SwarmSettings, SwarmTeammateModelSource, SWARM_MAX_TEAMMATES};
 use crate::{
     run_turn, subagent_system_prompt, tool_names, AgentEvent, AgentEventScope, AgentMode, BashTool,
     CreateImageTool, DatabaseTool, EditFileTool, GlobTool, GoalWorkflowState, GrepTool, McpSettings,
@@ -44,6 +46,9 @@ mod render;
 mod session;
 mod status_stop;
 mod task_board;
+
+#[cfg(test)]
+use self::agent_turns::DEFAULT_ANTHROPIC_TEAMMATE_MODEL;
 
 #[cfg(test)]
 mod tests;

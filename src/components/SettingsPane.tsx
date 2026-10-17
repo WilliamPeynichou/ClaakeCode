@@ -93,6 +93,7 @@ import type {
   SkillSettings,
   SubAgentConfig,
   SubAgentSettings,
+  SwarmSettings,
   ThinkingLevel,
   ToolConfig,
   ToolSettings,
@@ -174,6 +175,7 @@ export function SettingsPane({ workspacePath }: Props) {
 
   const [subAgentSettings, setSubAgentSettings] = useState<SubAgentSettings>({
     agents: [],
+    swarm: defaultSwarmSettings(),
   });
   const [savedSubAgentJson, setSavedSubAgentJson] = useState("");
   const [subAgentsLoading, setSubAgentsLoading] = useState(false);
@@ -2086,6 +2088,7 @@ export function SettingsPane({ workspacePath }: Props) {
   const updateSubAgent = useCallback(
     (id: string, patch: Partial<SubAgentConfig>) => {
       setSubAgentSettings((current) => ({
+        ...current,
         agents: current.agents.map((agent) =>
           agent.id === id ? { ...agent, ...patch } : agent,
         ),
@@ -2094,12 +2097,45 @@ export function SettingsPane({ workspacePath }: Props) {
     [],
   );
 
+  const updateSwarmSettings = useCallback((patch: Partial<SwarmSettings>) => {
+    setSubAgentSettings((current) => ({
+      ...current,
+      swarm: { ...current.swarm, ...patch },
+    }));
+  }, []);
+
+  const duplicateSubAgent = useCallback(
+    (id: string) => {
+      const source = subAgentSettings.agents.find((agent) => agent.id === id);
+      if (!source) return;
+      const next = {
+        ...createSubAgent(subAgentSettings.agents.length + 1, availableModels),
+        name: `${source.name || "Sub-agent"} (copy)`,
+        description: source.description,
+        prompt: source.prompt,
+        model: { ...source.model },
+        hideForSameModel: source.hideForSameModel,
+        enabled: source.enabled,
+        swarmEnabled: source.swarmEnabled,
+      };
+      setSubAgentSettings((current) => ({
+        ...current,
+        agents: [...current.agents, next],
+      }));
+      setSelectedSubAgentId(next.id);
+    },
+    [availableModels, subAgentSettings.agents],
+  );
+
   const addSubAgent = useCallback(() => {
     const next = createSubAgent(
       subAgentSettings.agents.length + 1,
       availableModels,
     );
-    setSubAgentSettings((current) => ({ agents: [...current.agents, next] }));
+    setSubAgentSettings((current) => ({
+      ...current,
+      agents: [...current.agents, next],
+    }));
     setSelectedSubAgentId(next.id);
   }, [availableModels, subAgentSettings.agents.length]);
 
@@ -2110,7 +2146,7 @@ export function SettingsPane({ workspacePath }: Props) {
         if (selected !== id) return selected;
         return agents[0]?.id ?? null;
       });
-      return { agents };
+      return { ...current, agents };
     });
   }, []);
 
@@ -2550,6 +2586,8 @@ export function SettingsPane({ workspacePath }: Props) {
             onDelete={deleteSubAgent}
             onSave={() => void saveSubAgents()}
             onUpdate={updateSubAgent}
+            onDuplicate={duplicateSubAgent}
+            onUpdateSwarm={updateSwarmSettings}
           />
         )}
       </section>
@@ -4574,6 +4612,8 @@ type SubAgentsSectionProps = {
   onDelete: (id: string) => void;
   onSave: () => void;
   onUpdate: (id: string, patch: Partial<SubAgentConfig>) => void;
+  onDuplicate: (id: string) => void;
+  onUpdateSwarm: (patch: Partial<SwarmSettings>) => void;
 };
 
 function SubAgentsSection({
@@ -4589,8 +4629,11 @@ function SubAgentsSection({
   onDelete,
   onSave,
   onUpdate,
+  onDuplicate,
+  onUpdateSwarm,
 }: SubAgentsSectionProps) {
   const enabledCount = settings.agents.filter((agent) => agent.enabled).length;
+  const [showSwarm, setShowSwarm] = useState(false);
 
   return (
     <>
@@ -4644,14 +4687,29 @@ function SubAgentsSection({
             </button>
           </div>
           <div className="settings-pane__nav-list-items">
+            <button
+              type="button"
+              className="settings-pane__nav-list-item"
+              data-active={showSwarm ? "true" : "false"}
+              data-on="true"
+              onClick={() => setShowSwarm(true)}
+            >
+              <Icon icon="solar:users-group-rounded-linear" width={12} height={12} />
+              <span className="settings-pane__nav-list-item-name">Agent Swarm</span>
+            </button>
             {settings.agents.map((agent) => (
               <button
                 type="button"
                 key={agent.id}
                 className="settings-pane__nav-list-item"
-                data-active={selectedAgent?.id === agent.id ? "true" : "false"}
+                data-active={
+                  !showSwarm && selectedAgent?.id === agent.id ? "true" : "false"
+                }
                 data-on={agent.enabled ? "true" : "false"}
-                onClick={() => onSelect(agent.id)}
+                onClick={() => {
+                  setShowSwarm(false);
+                  onSelect(agent.id);
+                }}
               >
                 <span
                   className="settings-pane__nav-list-item-dot"
@@ -4672,12 +4730,19 @@ function SubAgentsSection({
         </aside>
 
         <main className="settings-pane__detail-pane">
-          {selectedAgent ? (
+          {showSwarm ? (
+            <SwarmSettingsEditor
+              swarm={settings.swarm}
+              availableModels={availableModels}
+              onUpdate={onUpdateSwarm}
+            />
+          ) : selectedAgent ? (
             <SubAgentEditor
               agent={selectedAgent}
               availableModels={availableModels}
               onUpdate={(patch) => onUpdate(selectedAgent.id, patch)}
               onDelete={() => onDelete(selectedAgent.id)}
+              onDuplicate={() => onDuplicate(selectedAgent.id)}
             />
           ) : (
             <div className="settings-pane__empty settings-pane__empty--main">
@@ -4787,32 +4852,165 @@ function settingsThinkingLabel(
   return level.label;
 }
 
+function SwarmSettingsEditor({
+  swarm,
+  availableModels,
+  onUpdate,
+}: {
+  swarm: SwarmSettings;
+  availableModels: readonly ModelEntry[];
+  onUpdate: (patch: Partial<SwarmSettings>) => void;
+}) {
+  const explicitId =
+    swarm.teammateModelSource === "explicit" && swarm.teammateModel
+      ? modelIdFromRef(swarm.teammateModel)
+      : null;
+  const explicitEntry = explicitId
+    ? availableModels.find((model) => model.value === explicitId) ?? null
+    : null;
+  const pickerValue =
+    swarm.teammateModelSource === "explicit" && explicitId
+      ? `model:${explicitId}`
+      : swarm.teammateModelSource;
+  const options = [
+    { value: "auto", label: "Auto (Haiku 5.5 High si lead Claude)" },
+    { value: "lead", label: "Hériter du modèle du lead" },
+    ...availableModels.map((model) => ({
+      value: `model:${model.value}`,
+      label: model.label,
+      icon: PROVIDERS.find((p) => p.value === model.provider)?.icon,
+    })),
+  ];
+  if (explicitId && !explicitEntry) {
+    options.push({ value: `model:${explicitId}`, label: `${explicitId} (indisponible)` });
+  }
+  const numberField = (
+    label: string,
+    hint: string,
+    value: number | null,
+    key: "maxTeammates" | "maxTurnsPerAgent" | "maxSwarmDurationSecs",
+    min: number,
+    max?: number,
+  ) => (
+    <label className="settings-pane__field">
+      <span>{label}</span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value ?? ""}
+        placeholder={hint}
+        onChange={(event) => {
+          const raw = event.target.value.trim();
+          const parsed = raw === "" ? null : Math.floor(Number(raw));
+          onUpdate({
+            [key]:
+              parsed === null || !Number.isFinite(parsed) || parsed < min
+                ? null
+                : max !== undefined
+                  ? Math.min(parsed, max)
+                  : parsed,
+          });
+        }}
+      />
+    </label>
+  );
+
+  return (
+    <div className="settings-pane__subagent-editor">
+      <div className="settings-pane__detail-head">
+        <span className="settings-pane__detail-title-input">Agent Swarm</span>
+      </div>
+      <div className="settings-pane__subagent-form">
+        <div className="settings-pane__subagent-row">
+          <label className="settings-pane__field">
+            <span>Modèle par défaut des teammates</span>
+            <SettingsPicker
+              value={pickerValue}
+              options={options}
+              onSelect={(value) => {
+                if (value === "auto" || value === "lead") {
+                  onUpdate({ teammateModelSource: value });
+                  return;
+                }
+                const id = value.slice("model:".length);
+                const entry = availableModels.find((model) => model.value === id);
+                if (!entry) return;
+                onUpdate({
+                  teammateModelSource: "explicit",
+                  teammateModel: modelRefWithThinking(
+                    modelRefFromId(entry.value),
+                    entry.defaultThinking,
+                  ),
+                });
+              }}
+            />
+          </label>
+          {numberField("Teammates max", "8", swarm.maxTeammates, "maxTeammates", 2, 8)}
+        </div>
+        {explicitId && !explicitEntry && (
+          <span className="settings-pane__status" data-tone="error">
+            Le modèle {explicitId} n'est pas disponible : configure son provider.
+          </span>
+        )}
+        <div className="settings-pane__subagent-row">
+          {numberField("Tours max par agent", "60", swarm.maxTurnsPerAgent, "maxTurnsPerAgent", 1)}
+          {numberField(
+            "Durée max du swarm (s)",
+            "3600",
+            swarm.maxSwarmDurationSecs,
+            "maxSwarmDurationSecs",
+            1,
+          )}
+        </div>
+        <p className="settings-pane__subtitle">
+          Priorité : modèle nommé dans le prompt (agent_models) &gt; profil du
+          sous-agent &gt; ce réglage &gt; modèle du lead. Exemple : « lance un
+          swarm, @ui en Sonnet 5 et @api en GPT-6 Luna ».
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SubAgentEditor({
   agent,
   availableModels,
   onUpdate,
   onDelete,
+  onDuplicate,
 }: {
   agent: SubAgentConfig;
   availableModels: readonly ModelEntry[];
   onUpdate: (patch: Partial<SubAgentConfig>) => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const rawModelId = modelIdFromRef(agent.model);
   const thinking = thinkingFromRef(agent.model);
+  // Pas de repli silencieux : un modèle absent reste affiché et signalé.
   const modelEntry =
-    availableModels.find((model) => model.value === rawModelId) ??
-    availableModels[0] ??
-    null;
-  const modelId = modelEntry?.value ?? rawModelId;
+    availableModels.find((model) => model.value === rawModelId) ?? null;
+  const modelMissing = modelEntry === null;
+  const modelId = rawModelId;
   const thinkingOptions = modelEntry
     ? THINKING_LEVELS.filter((level) => modelEntry.thinking.includes(level.value))
     : [];
+  const modelOptions = availableModels.map((model) => ({
+    value: model.value as string,
+    label: model.label,
+    icon: PROVIDERS.find((p) => p.value === model.provider)?.icon,
+  }));
+  if (modelMissing) {
+    modelOptions.unshift({
+      value: rawModelId,
+      label: `${rawModelId} (indisponible)`,
+      icon: undefined,
+    });
+  }
 
   const updateModel = (nextModelId: ModelId) => {
-    const nextEntry =
-      availableModels.find((model) => model.value === nextModelId) ??
-      availableModels[0];
+    const nextEntry = availableModels.find((model) => model.value === nextModelId);
     if (!nextEntry) return;
     const nextThinking = nextEntry.thinking.includes(thinking)
       ? thinking
@@ -4853,6 +5051,15 @@ function SubAgentEditor({
           <button
             type="button"
             className="settings-pane__icon-btn"
+            onClick={onDuplicate}
+            title="Duplicate agent"
+            aria-label="Duplicate agent"
+          >
+            <Icon icon="solar:copy-linear" width={13} height={13} />
+          </button>
+          <button
+            type="button"
+            className="settings-pane__icon-btn"
             data-confirm={confirmDelete ? "true" : "false"}
             onClick={() => {
               if (confirmDelete) {
@@ -4885,6 +5092,15 @@ function SubAgentEditor({
       </div>
 
       <div className="settings-pane__subagent-form">
+        <span className="settings-pane__subtitle" title="Utilisable dans agent_profiles">
+          ID : <code>{agent.id}</code>
+        </span>
+        {modelMissing && (
+          <span className="settings-pane__status" data-tone="error">
+            Le modèle {rawModelId} n'est pas disponible (provider non configuré
+            ou modèle retiré). Choisis-en un autre ou configure le provider.
+          </span>
+        )}
         <label className="settings-pane__field settings-pane__field--grow">
           <span>Description seen by the main agent</span>
           <textarea
@@ -4898,11 +5114,7 @@ function SubAgentEditor({
             <span>Model</span>
             <SettingsPicker
               value={modelId}
-              options={availableModels.map((model) => ({
-                value: model.value,
-                label: model.label,
-                icon: PROVIDERS.find((p) => p.value === model.provider)?.icon,
-              }))}
+              options={modelOptions}
               onSelect={(value) => updateModel(value as ModelId)}
             />
           </label>
@@ -4931,6 +5143,25 @@ function SubAgentEditor({
             >
               <span className="settings-pane__inline-toggle-text">
                 Hide for same model
+              </span>
+              <span className="settings-pane__inline-toggle-track" aria-hidden="true">
+                <span className="settings-pane__inline-toggle-thumb" />
+              </span>
+            </button>
+          </div>
+          <div className="settings-pane__field settings-pane__field--toggle">
+            <span>Swarm</span>
+            <button
+              type="button"
+              className="settings-pane__inline-toggle"
+              role="switch"
+              aria-checked={agent.swarmEnabled}
+              title="Autoriser ce profil comme teammate dans team_run"
+              data-on={agent.swarmEnabled ? "true" : "false"}
+              onClick={() => onUpdate({ swarmEnabled: !agent.swarmEnabled })}
+            >
+              <span className="settings-pane__inline-toggle-text">
+                Usable in swarm
               </span>
               <span className="settings-pane__inline-toggle-track" aria-hidden="true">
                 <span className="settings-pane__inline-toggle-thumb" />
@@ -5372,11 +5603,27 @@ function createSubAgent(
     model: modelRefWithThinking(modelRefFromId(model.value), model.defaultThinking),
     hideForSameModel: false,
     enabled: true,
+    swarmEnabled: true,
+  };
+}
+
+function defaultSwarmSettings(): SwarmSettings {
+  return {
+    teammateModelSource: "auto",
+    teammateModel: null,
+    maxTeammates: null,
+    maxTurnsPerAgent: null,
+    maxSwarmDurationSecs: null,
   };
 }
 
 function normalizeSubAgentSettings(settings: SubAgentSettings): SubAgentSettings {
+  const swarm = { ...defaultSwarmSettings(), ...(settings.swarm ?? {}) };
+  if (swarm.teammateModelSource === "explicit" && !swarm.teammateModel) {
+    swarm.teammateModelSource = "auto";
+  }
   return {
+    swarm,
     agents: (settings.agents ?? []).map((agent, index) => ({
       id: agent.id || `agent-${index + 1}`,
       name: agent.name || `Sub-agent ${index + 1}`,
@@ -5387,6 +5634,7 @@ function normalizeSubAgentSettings(settings: SubAgentSettings): SubAgentSettings
         modelRefWithThinking(modelRefFromId(MODELS[0].value), MODELS[0].defaultThinking),
       hideForSameModel: agent.hideForSameModel === true,
       enabled: agent.enabled !== false,
+      swarmEnabled: agent.swarmEnabled !== false,
     })),
   };
 }

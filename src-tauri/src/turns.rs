@@ -293,6 +293,7 @@ pub(super) async fn send_message(
     let workspace_root_for_wake = workspace_root.clone();
     let plan_requested = policy.attach_plan;
     let before_turn_snapshot_for_checkpoint = before_turn_snapshot;
+    let mut partial_checkpoint = event_pump::PartialTurnCheckpoint::new(conversation.clone());
 
     tauri::async_runtime::spawn(async move {
         let mut engine = Box::pin(tauri::async_runtime::spawn(async move {
@@ -300,6 +301,7 @@ pub(super) async fn send_message(
         }));
         let mut engine_done = false;
         let mut events_done = false;
+        let mut pump = event_pump::EventPump::new();
 
         loop {
             tokio::select! {
@@ -309,23 +311,37 @@ pub(super) async fn send_message(
                             if matches!(event, AgentEvent::TurnFinished { .. }) {
                                 continue;
                             }
-                            schedule_main_wake_for_swarm_event(
-                                &app,
-                                &state_for_wake,
-                                &workspace_root_for_wake,
-                                &conversation_id,
-                                &event,
-                            );
-                            let _ = emit_agent_event(&app, &workspace_id, &conversation_id, &event);
-                            emit_agent_file_changes(&app, &workspace_id, &event);
+                            if !engine_done {
+                                partial_checkpoint.observe(&event);
+                                partial_checkpoint.maybe_save(&store);
+                            }
+                            if pump.push(event) {
+                                let batch = pump.take();
+                                emit_agent_event_batch(&app, &workspace_id, &conversation_id, batch, &state_for_wake, &workspace_root_for_wake);
+                            }
                         }
                         None => {
                             events_done = true;
                         }
                     }
                 }
+                _ = tokio::time::sleep_until(pump.flush_deadline()), if pump.has_pending() => {
+                    let batch = pump.take();
+                    emit_agent_event_batch(&app, &workspace_id, &conversation_id, batch, &state_for_wake, &workspace_root_for_wake);
+                }
                 engine_result = &mut engine, if !engine_done => {
                     engine_done = true;
+                    // Vider les événements déjà en file avant tout traitement de fin :
+                    // le lot en attente part en premier, dans l'ordre d'arrivée.
+                    drain_turn_events(
+                        &app,
+                        &workspace_id,
+                        &conversation_id,
+                        &mut pump,
+                        &mut event_rx,
+                        &state_for_wake,
+                        &workspace_root_for_wake,
+                    );
                     match engine_result {
                         Ok(output) => {
                             let mut history = output.history;
@@ -1004,7 +1020,7 @@ pub(super) fn active_turn_summaries_from_map(
     summaries
 }
 
-fn remember_active_turn_event(
+pub(super) fn remember_active_turn_event(
     app: &AppHandle,
     conversation_id: &str,
     event: AgentEvent,

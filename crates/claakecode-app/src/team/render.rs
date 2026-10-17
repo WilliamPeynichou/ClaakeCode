@@ -9,6 +9,7 @@ pub(super) fn team_agent_system_prompt(base: &str, team_name: &str, agent: &Team
         model: agent.model.clone(),
         hide_for_same_model: false,
         enabled: true,
+        swarm_enabled: true,
     };
     let base = subagent_system_prompt(base, &config_agent);
     format!(

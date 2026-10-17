@@ -77,6 +77,7 @@ impl TeamTool {
             || parsed.agent_names.is_some()
             || agent_profiles.is_some()
             || agent_prompt_inputs.is_some()
+            || parsed.agent_models.is_some()
             || parsed.tasks.is_some();
         if let Some(agent_name) = parsed
             .agent
@@ -116,11 +117,14 @@ impl TeamTool {
                 Ok(value) => value,
                 Err(err) => return ToolRunResult::err(err, Vec::new()),
             };
-        let agent_configs =
-            match self.prepare_team_agent_configs(&agent_names, agent_profiles.as_ref()) {
-                Ok(value) => value,
-                Err(err) => return ToolRunResult::err(err, Vec::new()),
-            };
+        let agent_configs = match self.prepare_team_agent_configs(
+            &agent_names,
+            agent_profiles.as_ref(),
+            parsed.agent_models.as_deref(),
+        ) {
+            Ok(value) => value,
+            Err(err) => return ToolRunResult::err(err, Vec::new()),
+        };
         self.create_or_reset_team(&team_name, Some(objective.to_string()))
             .await;
         for config in &agent_configs {

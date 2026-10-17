@@ -27,6 +27,9 @@ pub struct SubAgentConfig {
     pub hide_for_same_model: bool,
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Whether this profile may be assigned to a teammate through `team_run`.
+    #[serde(default = "default_swarm_enabled")]
+    pub swarm_enabled: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -34,6 +37,64 @@ pub struct SubAgentConfig {
 pub struct SubAgentSettings {
     #[serde(default)]
     pub agents: Vec<SubAgentConfig>,
+    #[serde(default)]
+    pub swarm: SwarmSettings,
+}
+
+/// Réglages « Agent Swarm » : modèle par défaut des teammates, nombre max et budgets.
+/// Un budget `None` = fallback constant côté runtime (team/live.rs).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmSettings {
+    #[serde(default)]
+    pub teammate_model_source: SwarmTeammateModelSource,
+    /// Utilisé seulement avec `teammate_model_source = explicit`.
+    #[serde(default)]
+    pub teammate_model: Option<ModelRef>,
+    /// Nombre max de teammates par swarm, borné à 2..=8.
+    #[serde(default)]
+    pub max_teammates: Option<u8>,
+    /// Nombre max de tours par teammate avant arrêt contrôlé.
+    #[serde(default)]
+    pub max_turns_per_agent: Option<u32>,
+    /// Durée max d'un swarm, en secondes.
+    #[serde(default)]
+    pub max_swarm_duration_secs: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwarmTeammateModelSource {
+    /// Défaut intégré : Haiku 5.5 High pour un lead Anthropic, sinon modèle du lead.
+    #[default]
+    Auto,
+    /// Hérite toujours du modèle du lead.
+    Lead,
+    /// Modèle et thinking explicites (`SwarmSettings::teammate_model`).
+    Explicit,
+}
+
+pub const SWARM_MIN_TEAMMATES: u8 = 2;
+pub const SWARM_MAX_TEAMMATES: u8 = 8;
+
+impl SwarmSettings {
+    fn normalized(mut self) -> Self {
+        if self.teammate_model_source == SwarmTeammateModelSource::Explicit
+            && self.teammate_model.is_none()
+        {
+            self.teammate_model_source = SwarmTeammateModelSource::Auto;
+        }
+        self.max_teammates = self
+            .max_teammates
+            .map(|value| value.clamp(SWARM_MIN_TEAMMATES, SWARM_MAX_TEAMMATES));
+        if self.max_turns_per_agent == Some(0) {
+            self.max_turns_per_agent = None;
+        }
+        if self.max_swarm_duration_secs == Some(0) {
+            self.max_swarm_duration_secs = None;
+        }
+        self
+    }
 }
 
 impl SubAgentSettings {
@@ -54,6 +115,7 @@ impl SubAgentSettings {
             agent.description = agent.description.trim().to_string();
             agent.prompt = agent.prompt.trim().to_string();
         }
+        self.swarm = self.swarm.normalized();
         self
     }
 }
@@ -402,5 +464,9 @@ fn same_model_identity(left: &ModelRef, right: &ModelRef) -> bool {
 }
 
 fn default_enabled() -> bool {
+    true
+}
+
+fn default_swarm_enabled() -> bool {
     true
 }

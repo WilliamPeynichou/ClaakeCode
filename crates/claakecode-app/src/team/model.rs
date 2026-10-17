@@ -150,9 +150,22 @@ pub(super) struct TeamRunInput {
     pub(super) agent_profiles: Option<AgentProfilesInput>,
     #[serde(default, alias = "agentPrompts")]
     pub(super) agent_prompts: Option<AgentPromptsInput>,
+    #[serde(default, alias = "agentModels")]
+    pub(super) agent_models: Option<Vec<AgentModelAssignmentInput>>,
     pub(super) tasks: Option<Vec<TeamRunTaskInput>>,
     #[serde(flatten)]
     pub(super) extra: HashMap<String, Value>,
+}
+
+/// Choix explicite de modèle pour un teammate (`agent_models`).
+/// `model` est au format `provider:name`, ex. `anthropic:claude-sonnet-5`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AgentModelAssignmentInput {
+    pub(super) agent: String,
+    pub(super) model: String,
+    #[serde(default)]
+    pub(super) thinking: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

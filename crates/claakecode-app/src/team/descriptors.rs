@@ -13,7 +13,7 @@ impl TeamTool {
         vec![
             ToolDescriptor {
                 name: TEAM_RUN_TOOL.into(),
-                description: "Launch an agent team. Use this for swarms/agent teams.".into(),
+                description: "Launch an agent team. Use this for swarms/agent teams. Model choice: if the user names a model for a teammate (for example \"avec GPT-6 Luna\" or \"@ui en Sonnet 5\"), translate it into agent_models with provider:name. If the named model is unknown or unavailable, say so to the user instead of silently choosing another model.".into(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -31,6 +31,30 @@ impl TeamTool {
                             "maxItems": 8,
                             "items": { "type": "string" },
                             "description": "Required teammate names when starting a new team."
+                        },
+                        "agent_models": {
+                            "type": "array",
+                            "description": "Optional per-teammate model choice. Use it only when the user names a model for a teammate. model uses the provider:name format, e.g. openai:gpt-6-luna or anthropic:claude-haiku-5-5. Known providers: anthropic, openai, google, xai, kimi, mistral, openrouter. This overrides the model of agent_profiles only; the profile prompt and description are kept. thinking is optional: off, low, medium, high, xhigh or max. Do not invent model names; if unsure, ask the user or omit the entry.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "agent": {
+                                        "type": "string",
+                                        "description": "Teammate name from agent_names."
+                                    },
+                                    "model": {
+                                        "type": "string",
+                                        "description": "Model in provider:name format."
+                                    },
+                                    "thinking": {
+                                        "type": "string",
+                                        "enum": ["off", "low", "medium", "high", "xhigh", "max"],
+                                        "description": "Optional thinking level for this teammate."
+                                    }
+                                },
+                                "required": ["agent", "model"],
+                                "additionalProperties": false
+                            }
                         },
                         "agent_profiles": {
                             "type": "array",

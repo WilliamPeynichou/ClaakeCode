@@ -1,8 +1,11 @@
+use super::model::AgentModelAssignmentInput;
 use super::*;
+use crate::subagent::{SwarmTeammateModelSource, SWARM_MAX_TEAMMATES};
 use crate::PythonTool;
 
-/// Default swarm teammate model when the lead runs on Claude: Haiku 5.5 at
-/// High effort. A sub-agent profile (`agent_profiles`) still overrides this.
+/// Built-in swarm teammate model when the lead runs on Claude: Haiku 5.5 at
+/// High effort. Used by the `auto` teammate model source (default). A sub-agent
+/// profile (`agent_profiles`) and `agent_models` still override this.
 pub(super) const DEFAULT_ANTHROPIC_TEAMMATE_MODEL: &str = "claude-haiku-5-5";
 
 pub(super) fn default_teammate_model(lead: &ModelRef) -> ModelRef {
@@ -11,6 +14,56 @@ pub(super) fn default_teammate_model(lead: &ModelRef) -> ModelRef {
             .with_effort(claakecode_core::Effort::High)
     } else {
         lead.clone()
+    }
+}
+
+/// Parse `provider:name` (ex. `openai:gpt-6-luna`). Seul le premier `:` sert de séparateur.
+pub(super) fn parse_provider_model(value: &str) -> std::result::Result<ModelRef, String> {
+    let value = value.trim();
+    let Some((provider, name)) = value.split_once(':') else {
+        return Err(format!(
+            "agent_models model `{value}` must use the provider:name format, e.g. anthropic:claude-haiku-5-5"
+        ));
+    };
+    let (provider, name) = (provider.trim(), name.trim());
+    if provider.is_empty() || name.is_empty() {
+        return Err(format!(
+            "agent_models model `{value}` must use the provider:name format, e.g. anthropic:claude-haiku-5-5"
+        ));
+    }
+    Ok(ModelRef::new(provider, name))
+}
+
+/// Traduit le thinking demandé (`off`, `low`, ..., `max`) en effort. `off` = `None`.
+pub(super) fn parse_thinking_effort(
+    value: &str,
+) -> std::result::Result<Option<claakecode_core::Effort>, String> {
+    use claakecode_core::Effort;
+    let effort = match value.trim().to_ascii_lowercase().as_str() {
+        "off" | "none" => Effort::None,
+        "minimal" | "low" => Effort::Low,
+        "medium" => Effort::Medium,
+        "high" => Effort::High,
+        "xhigh" => Effort::Xhigh,
+        "max" => Effort::Max,
+        other => {
+            return Err(format!(
+                "unknown agent_models thinking `{other}`; expected off, low, medium, high, xhigh or max"
+            ))
+        }
+    };
+    Ok(Some(effort))
+}
+
+pub(super) fn effort_label(effort: claakecode_core::Effort) -> &'static str {
+    use claakecode_core::Effort;
+    match effort {
+        Effort::None => "off",
+        Effort::Low => "low",
+        Effort::Medium => "medium",
+        Effort::High => "high",
+        Effort::Xhigh => "xhigh",
+        Effort::Max => "max",
     }
 }
 
@@ -407,11 +460,38 @@ impl TeamTool {
             .cloned()
     }
 
+    /// Modèle par défaut des teammates sans `agent_models` ni profil, selon le
+    /// réglage Settings > Agents > Agent Swarm. `auto` garde le comportement historique.
+    pub(super) fn teammate_default_model(&self) -> std::result::Result<ModelRef, String> {
+        let swarm = &self.sub_agent_settings.swarm;
+        match swarm.teammate_model_source {
+            SwarmTeammateModelSource::Auto => Ok(default_teammate_model(&self.default_model)),
+            SwarmTeammateModelSource::Lead => Ok(self.default_model.clone()),
+            SwarmTeammateModelSource::Explicit => swarm.teammate_model.clone().ok_or_else(|| {
+                "swarm teammate model is set to explicit but no model is configured".to_string()
+            }),
+        }
+    }
+
+    /// Priorité : `agent_models` > profil (`agent_profiles`) > défaut Settings > lead.
+    /// Un profil ne fournit que prompt et description quand `agent_models` le remplace.
     pub(super) fn prepare_team_agent_configs(
         &self,
         agent_names: &[String],
         agent_profiles: Option<&HashMap<String, String>>,
+        agent_models: Option<&[AgentModelAssignmentInput]>,
     ) -> std::result::Result<Vec<PreparedTeamAgentConfig>, String> {
+        let max_teammates = self
+            .sub_agent_settings
+            .swarm
+            .max_teammates
+            .unwrap_or(SWARM_MAX_TEAMMATES) as usize;
+        if agent_names.len() > max_teammates {
+            return Err(format!(
+                "team_run accepts at most {max_teammates} teammates (Settings > Agents > Agent Swarm)"
+            ));
+        }
+
         let mut profile_by_agent = HashMap::<String, SubAgentConfig>::new();
         if let Some(agent_profiles) = agent_profiles {
             for (agent_name, profile_name) in agent_profiles {
@@ -432,20 +512,36 @@ impl TeamTool {
                 let Some(profile) = self.select_profile(Some(profile_name)) else {
                     return Err(format!("sub-agent profile `{profile_name}` not found"));
                 };
+                if !profile.swarm_enabled {
+                    return Err(format!(
+                        "sub-agent profile `{profile_name}` is not enabled for agent swarms"
+                    ));
+                }
                 profile_by_agent.insert(agent_key(canonical_name), profile);
             }
         }
 
+        let model_by_agent = self.parse_agent_model_choices(agent_names, agent_models)?;
+        let default_model = self.teammate_default_model()?;
+
         let mut configs = Vec::with_capacity(agent_names.len());
         for name in agent_names {
-            let profile = profile_by_agent.get(&agent_key(name));
+            let key = agent_key(name);
+            let profile = profile_by_agent.get(&key);
             let description = profile
                 .map(|agent| agent.description.clone())
                 .unwrap_or_else(|| "Team collaborator".to_string());
-            let model = profile
-                .map(|agent| agent.model.clone())
-                .unwrap_or_else(|| default_teammate_model(&self.default_model));
-            self.validate_model(&model)?;
+            let model = if let Some(model) = model_by_agent.get(&key) {
+                self.validate_model(model)?;
+                self.validate_effort(model)?;
+                model.clone()
+            } else if let Some(profile) = profile {
+                self.validate_model(&profile.model)?;
+                profile.model.clone()
+            } else {
+                self.validate_model(&default_model)?;
+                default_model.clone()
+            };
             let prompt = profile
                 .map(|agent| agent.prompt.clone())
                 .unwrap_or_default();
@@ -457,6 +553,79 @@ impl TeamTool {
             });
         }
         Ok(configs)
+    }
+
+    /// Parse `agent_models` (`provider:name` + thinking optionnel) en modèles par teammate.
+    fn parse_agent_model_choices(
+        &self,
+        agent_names: &[String],
+        agent_models: Option<&[AgentModelAssignmentInput]>,
+    ) -> std::result::Result<HashMap<String, ModelRef>, String> {
+        let mut choices = HashMap::new();
+        let Some(agent_models) = agent_models else {
+            return Ok(choices);
+        };
+        for entry in agent_models {
+            let agent_name = entry.agent.trim();
+            if agent_name.is_empty() {
+                return Err("agent_models entries require a non-empty agent".to_string());
+            }
+            let agent_key_value = agent_key(agent_name);
+            let Some(canonical_name) = agent_names
+                .iter()
+                .find(|name| agent_key(name) == agent_key_value)
+            else {
+                return Err(format!("agent_models references unknown teammate `{agent_name}`"));
+            };
+            let mut model = parse_provider_model(&entry.model)?;
+            if let Some(thinking) = entry.thinking.as_deref() {
+                model.effort = parse_thinking_effort(thinking)?;
+            }
+            if choices.insert(agent_key(canonical_name), model).is_some() {
+                return Err(format!(
+                    "agent_models contains duplicate teammate `{agent_name}`"
+                ));
+            }
+        }
+        Ok(choices)
+    }
+
+    /// Refuse un effort de réflexion que le modèle ne supporte pas (au lieu de le
+    /// dégrader silencieusement). `off` est toujours accepté.
+    pub(super) fn validate_effort(&self, model: &ModelRef) -> std::result::Result<(), String> {
+        let Some(effort) = model.effort else {
+            return Ok(());
+        };
+        if effort == claakecode_core::Effort::None {
+            return Ok(());
+        }
+        let capabilities = self.model_capabilities(model)?;
+        if !capabilities.supports_thinking
+            || capabilities.effort_mode == claakecode_core::EffortMode::None
+        {
+            return Err(format!(
+                "model `{}:{}` does not support thinking effort `{}`",
+                model.provider,
+                model.name,
+                effort_label(effort)
+            ));
+        }
+        Ok(())
+    }
+
+    fn model_capabilities(
+        &self,
+        model: &ModelRef,
+    ) -> std::result::Result<claakecode_core::ModelCapabilities, String> {
+        let provider = self.providers.get(&model.provider).ok_or_else(|| {
+            format!(
+                "provider `{}` is not configured or missing credentials",
+                model.provider
+            )
+        })?;
+        provider
+            .capabilities(model)
+            .ok_or_else(|| format!("model `{}` is not supported", model.name))
     }
 
     pub(super) fn validate_model(&self, model: &ModelRef) -> std::result::Result<(), String> {

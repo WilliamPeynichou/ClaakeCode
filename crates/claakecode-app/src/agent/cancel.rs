@@ -42,6 +42,11 @@ impl TurnCancel {
         Self::default()
     }
 
+    /// Vrai une fois l'annulation demandée. Lu entre deux continuations d'un swarm.
+    pub fn is_cancelled(&self) -> bool {
+        self.state.lock().map(|state| state.cancelled).unwrap_or(false)
+    }
+
     pub fn register(&self, sender: mpsc::UnboundedSender<EngineCommand>) {
         if let Ok(mut state) = self.state.lock() {
             if state.cancelled {

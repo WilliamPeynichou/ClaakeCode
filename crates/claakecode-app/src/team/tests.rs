@@ -577,3 +577,432 @@ fn test_task(
         completed_at_ms: (status == TeamTaskStatus::Completed).then_some(0),
     }
 }
+
+/// Provider synthétique : n'accepte que les modèles listés, sans appel réseau.
+struct SwarmTestProvider {
+    name: &'static str,
+    models: Vec<&'static str>,
+    supports_thinking: bool,
+}
+
+#[async_trait::async_trait]
+impl Provider for SwarmTestProvider {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn capabilities(&self, model: &ModelRef) -> Option<claakecode_core::ModelCapabilities> {
+        if !self.models.iter().any(|name| *name == model.name) {
+            return None;
+        }
+        Some(claakecode_core::ModelCapabilities {
+            model: model.clone(),
+            context_window: 1000,
+            preferred_window: 1000,
+            max_output_tokens: 100,
+            supports_thinking: self.supports_thinking,
+            visible_thinking: false,
+            supports_tools: true,
+            supports_images: false,
+            effort_mode: if self.supports_thinking {
+                claakecode_core::EffortMode::Tier
+            } else {
+                claakecode_core::EffortMode::None
+            },
+        })
+    }
+
+    async fn estimate_tokens(
+        &self,
+        _request: claakecode_core::ProviderRequest,
+    ) -> claakecode_core::Result<claakecode_core::TokenEstimate> {
+        unreachable!("swarm config tests never call the provider")
+    }
+
+    async fn stream(
+        &self,
+        _request: claakecode_core::ProviderRequest,
+    ) -> claakecode_core::Result<claakecode_core::ProviderStream> {
+        unreachable!("swarm config tests never call the provider")
+    }
+}
+
+fn swarm_test_tool(
+    lead: ModelRef,
+    settings: SubAgentSettings,
+    providers: Vec<(&'static str, Arc<dyn Provider>)>,
+) -> TeamTool {
+    let providers = providers
+        .into_iter()
+        .map(|(name, provider)| (name.to_string(), provider))
+        .collect();
+    TeamTool::new(
+        "test-scope".to_string(),
+        PathBuf::from("."),
+        String::new(),
+        providers,
+        settings,
+        McpSettings::default(),
+        ToolSettings::default(),
+        SkillSettings::default(),
+        crate::DatabaseTool::new(crate::store::AppStore::in_memory().expect("in-memory store")),
+        lead,
+        1,
+        None,
+        Arc::new(RwLock::new(TeamRuntime::default())),
+        TurnCancel::empty(),
+    )
+}
+
+fn swarm_test_providers() -> Vec<(&'static str, Arc<dyn Provider>)> {
+    vec![
+        (
+            "anthropic",
+            Arc::new(SwarmTestProvider {
+                name: "anthropic",
+                models: vec!["claude-haiku-5-5", "claude-sonnet-5", "claude-opus-5"],
+                supports_thinking: true,
+            }) as Arc<dyn Provider>,
+        ),
+        (
+            "openai",
+            Arc::new(SwarmTestProvider {
+                name: "openai",
+                models: vec!["gpt-6-luna"],
+                supports_thinking: false,
+            }) as Arc<dyn Provider>,
+        ),
+    ]
+}
+
+fn swarm_names(names: &[&str]) -> Vec<String> {
+    names.iter().map(|name| name.to_string()).collect()
+}
+
+fn swarm_model_input(agent: &str, model: &str, thinking: Option<&str>) -> model::AgentModelAssignmentInput {
+    model::AgentModelAssignmentInput {
+        agent: agent.to_string(),
+        model: model.to_string(),
+        thinking: thinking.map(str::to_string),
+    }
+}
+
+#[test]
+fn agent_models_parse_provider_model_and_thinking() {
+    let parsed: TeamRunInput = serde_json::from_value(json!({
+        "objective": "ship app",
+        "agent_names": ["ui", "api"],
+        "agent_models": [
+            { "agent": "ui", "model": "anthropic:claude-sonnet-5", "thinking": "high" },
+            { "agent": "api", "model": "openai:gpt-6-luna" }
+        ]
+    }))
+    .expect("agent_models should parse");
+    let models = parsed.agent_models.expect("agent_models should exist");
+    assert_eq!(models.len(), 2);
+    assert_eq!(models[0].thinking.as_deref(), Some("high"));
+    assert!(models[1].thinking.is_none());
+}
+
+#[test]
+fn agent_models_descriptor_exposes_provider_name_format() {
+    let descriptor = TeamTool::descriptors_static()
+        .into_iter()
+        .find(|tool| tool.name == TEAM_RUN_TOOL)
+        .expect("TeamRun descriptor should exist");
+    assert_eq!(
+        descriptor
+            .input_schema
+            .pointer("/properties/agent_models/type")
+            .and_then(Value::as_str),
+        Some("array")
+    );
+    assert!(descriptor
+        .input_schema
+        .pointer("/properties/agent_models/items/properties/model")
+        .is_some());
+}
+
+#[test]
+fn agent_model_priority_is_models_then_profile_then_settings_then_lead() {
+    let profile = SubAgentConfig {
+        id: "reviewer".to_string(),
+        name: "reviewer".to_string(),
+        description: "Reviews code".to_string(),
+        prompt: "Be strict.".to_string(),
+        model: ModelRef::new("anthropic", "claude-opus-5"),
+        hide_for_same_model: false,
+        enabled: true,
+        swarm_enabled: true,
+    };
+    let settings = SubAgentSettings {
+        agents: vec![profile],
+        swarm: SwarmSettings {
+            teammate_model_source: SwarmTeammateModelSource::Explicit,
+            teammate_model: Some(ModelRef::new("anthropic", "claude-sonnet-5")),
+            ..SwarmSettings::default()
+        },
+    };
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        settings,
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["ui", "api", "review"]);
+    let mut profiles = HashMap::new();
+    profiles.insert("review".to_string(), "reviewer".to_string());
+    let models = vec![swarm_model_input("ui", "openai:gpt-6-luna", Some("off"))];
+
+    let configs = tool
+        .prepare_team_agent_configs(&names, Some(&profiles), Some(&models))
+        .expect("configs should prepare");
+
+    // agent_models gagne sur le défaut Settings.
+    assert_eq!(configs[0].model.provider, "openai");
+    assert_eq!(configs[0].model.name, "gpt-6-luna");
+    assert_eq!(configs[0].model.effort, Some(claakecode_core::Effort::None));
+    // Sans agent_models : le profil garde son modèle, prompt et description.
+    assert_eq!(configs[2].model.name, "claude-opus-5");
+    assert_eq!(configs[2].description, "Reviews code");
+    assert_eq!(configs[2].prompt, "Be strict.");
+    // Sans rien : défaut Settings explicite.
+    assert_eq!(configs[1].model.name, "claude-sonnet-5");
+}
+
+#[test]
+fn agent_model_profile_keeps_prompt_when_models_override_it() {
+    let profile = SubAgentConfig {
+        id: "reviewer".to_string(),
+        name: "reviewer".to_string(),
+        description: "Reviews code".to_string(),
+        prompt: "Be strict.".to_string(),
+        model: ModelRef::new("anthropic", "claude-opus-5"),
+        hide_for_same_model: false,
+        enabled: true,
+        swarm_enabled: true,
+    };
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        SubAgentSettings {
+            agents: vec![profile],
+            ..SubAgentSettings::default()
+        },
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["review", "api"]);
+    let mut profiles = HashMap::new();
+    profiles.insert("review".to_string(), "reviewer".to_string());
+    let models = vec![swarm_model_input("review", "anthropic:claude-sonnet-5", None)];
+
+    let configs = tool
+        .prepare_team_agent_configs(&names, Some(&profiles), Some(&models))
+        .expect("configs should prepare");
+    assert_eq!(configs[0].model.name, "claude-sonnet-5");
+    assert_eq!(configs[0].prompt, "Be strict.");
+    assert_eq!(configs[0].description, "Reviews code");
+}
+
+#[test]
+fn agent_models_reject_invalid_format_unknown_agent_and_unknown_model() {
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        SubAgentSettings::default(),
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["ui", "api"]);
+
+    let no_colon = vec![swarm_model_input("ui", "gpt-6-luna", None)];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&no_colon))
+        .expect_err("model without provider must fail");
+    assert!(err.contains("provider:name"));
+
+    let unknown_agent = vec![swarm_model_input("ghost", "anthropic:claude-sonnet-5", None)];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&unknown_agent))
+        .expect_err("unknown teammate must fail");
+    assert!(err.contains("unknown teammate `ghost`"));
+
+    // Modèle inconnu du provider : erreur explicite, pas de repli silencieux.
+    let unknown_model = vec![swarm_model_input("ui", "anthropic:claude-unknown", None)];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&unknown_model))
+        .expect_err("unknown model must fail");
+    assert!(err.contains("not supported"));
+}
+
+#[test]
+fn agent_models_reject_provider_not_configured() {
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        SubAgentSettings::default(),
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["ui", "api"]);
+    let models = vec![swarm_model_input("ui", "mistral:mistral-large", None)];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&models))
+        .expect_err("unconfigured provider must fail");
+    assert!(err.contains("not configured or missing credentials"));
+}
+
+#[test]
+fn agent_models_reject_unsupported_effort() {
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        SubAgentSettings::default(),
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["ui", "api"]);
+    // gpt-6-luna sans thinking : effort `high` refusé.
+    let models = vec![swarm_model_input("ui", "openai:gpt-6-luna", Some("high"))];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&models))
+        .expect_err("unsupported effort must fail");
+    assert!(err.contains("does not support thinking effort"));
+
+    let bad_thinking = vec![swarm_model_input("ui", "anthropic:claude-sonnet-5", Some("ultra"))];
+    let err = tool
+        .prepare_team_agent_configs(&names, None, Some(&bad_thinking))
+        .expect_err("unknown thinking must fail");
+    assert!(err.contains("unknown agent_models thinking"));
+}
+
+#[test]
+fn swarm_teammate_default_follows_settings_source() {
+    let lead = ModelRef::new("anthropic", "claude-opus-5");
+    let names = swarm_names(&["ui", "api"]);
+
+    let auto = swarm_test_tool(lead.clone(), SubAgentSettings::default(), swarm_test_providers());
+    let configs = auto
+        .prepare_team_agent_configs(&names, None, None)
+        .expect("auto configs");
+    assert_eq!(configs[0].model.name, DEFAULT_ANTHROPIC_TEAMMATE_MODEL);
+
+    let lead_settings = SubAgentSettings {
+        swarm: SwarmSettings {
+            teammate_model_source: SwarmTeammateModelSource::Lead,
+            ..SwarmSettings::default()
+        },
+        ..SubAgentSettings::default()
+    };
+    let inherit = swarm_test_tool(lead.clone(), lead_settings, swarm_test_providers());
+    let configs = inherit
+        .prepare_team_agent_configs(&names, None, None)
+        .expect("lead configs");
+    assert_eq!(configs[0].model, lead);
+}
+
+#[test]
+fn swarm_max_teammates_setting_is_enforced() {
+    let settings = SubAgentSettings {
+        swarm: SwarmSettings {
+            max_teammates: Some(2),
+            ..SwarmSettings::default()
+        },
+        ..SubAgentSettings::default()
+    };
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        settings,
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["a", "b", "c"]);
+    let err = tool
+        .prepare_team_agent_configs(&names, None, None)
+        .expect_err("third teammate must be refused");
+    assert!(err.contains("at most 2 teammates"));
+}
+
+#[test]
+fn swarm_profile_disabled_for_swarms_is_refused() {
+    let profile = SubAgentConfig {
+        id: "reviewer".to_string(),
+        name: "reviewer".to_string(),
+        description: String::new(),
+        prompt: String::new(),
+        model: ModelRef::new("anthropic", "claude-opus-5"),
+        hide_for_same_model: false,
+        enabled: true,
+        swarm_enabled: false,
+    };
+    let tool = swarm_test_tool(
+        ModelRef::new("anthropic", "claude-opus-5"),
+        SubAgentSettings {
+            agents: vec![profile],
+            ..SubAgentSettings::default()
+        },
+        swarm_test_providers(),
+    );
+    let names = swarm_names(&["review", "api"]);
+    let mut profiles = HashMap::new();
+    profiles.insert("review".to_string(), "reviewer".to_string());
+    let err = tool
+        .prepare_team_agent_configs(&names, Some(&profiles), None)
+        .expect_err("profile not enabled for swarms must fail");
+    assert!(err.contains("not enabled for agent swarms"));
+}
+
+#[test]
+fn sub_agent_settings_without_swarm_block_still_load() {
+    let loaded: SubAgentSettings = serde_json::from_value(json!({
+        "agents": [{
+            "id": "reviewer",
+            "name": "reviewer",
+            "description": "",
+            "prompt": "",
+            "model": { "provider": "anthropic", "name": "claude-opus-5" }
+        }]
+    }))
+    .expect("legacy settings should load");
+    let normalized = loaded.normalized();
+    assert_eq!(normalized.swarm, SwarmSettings::default());
+    assert!(normalized.agents[0].swarm_enabled);
+
+    let round_trip: SubAgentSettings = serde_json::from_str(
+        &serde_json::to_string(&normalized).expect("serialize"),
+    )
+    .expect("round trip");
+    assert_eq!(round_trip.swarm, SwarmSettings::default());
+}
+
+#[test]
+fn swarm_settings_round_trip_and_clamp() {
+    let settings: SubAgentSettings = serde_json::from_value::<SubAgentSettings>(json!({
+        "agents": [],
+        "swarm": {
+            "teammateModelSource": "explicit",
+            "teammateModel": { "provider": "openai", "name": "gpt-6-luna" },
+            "maxTeammates": 20,
+            "maxTurnsPerAgent": 0,
+            "maxSwarmDurationSecs": 900
+        }
+    }))
+    .expect("swarm settings should load")
+    .normalized();
+    assert_eq!(
+        settings.swarm.teammate_model_source,
+        SwarmTeammateModelSource::Explicit
+    );
+    assert_eq!(settings.swarm.max_teammates, Some(SWARM_MAX_TEAMMATES));
+    assert_eq!(settings.swarm.max_turns_per_agent, None);
+    assert_eq!(settings.swarm.max_swarm_duration_secs, Some(900));
+
+    let json = serde_json::to_value(&settings).expect("serialize");
+    assert_eq!(json["swarm"]["maxSwarmDurationSecs"], json!(900));
+    assert_eq!(json["swarm"]["teammateModelSource"], json!("explicit"));
+}
+
+#[test]
+fn explicit_swarm_model_without_model_falls_back_to_auto() {
+    let settings = SubAgentSettings {
+        swarm: SwarmSettings {
+            teammate_model_source: SwarmTeammateModelSource::Explicit,
+            teammate_model: None,
+            ..SwarmSettings::default()
+        },
+        ..SubAgentSettings::default()
+    }
+    .normalized();
+    assert_eq!(settings.swarm.teammate_model_source, SwarmTeammateModelSource::Auto);
+}

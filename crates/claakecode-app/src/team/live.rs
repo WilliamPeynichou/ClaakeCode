@@ -1,5 +1,34 @@
 use super::*;
 
+/// Valeurs de repli quand les réglages Settings (`SubAgentSettings.swarm`) sont absents.
+const LIVE_DEFAULT_MAX_TURNS_PER_AGENT: u32 = 60;
+const LIVE_DEFAULT_MAX_SWARM_DURATION_SECS: u64 = 3_600;
+/// Nombre de continuations identiques sans changement avant arrêt contrôlé.
+const LIVE_MAX_STALLED_CONTINUATIONS: u32 = 3;
+
+#[derive(Debug, Clone, Copy)]
+struct LiveSwarmBudget {
+    max_turns_per_agent: u32,
+    max_duration: Duration,
+}
+
+impl LiveSwarmBudget {
+    fn from_settings(settings: &crate::subagent::SwarmSettings) -> Self {
+        Self {
+            max_turns_per_agent: settings
+                .max_turns_per_agent
+                .unwrap_or(LIVE_DEFAULT_MAX_TURNS_PER_AGENT)
+                .max(1),
+            max_duration: Duration::from_secs(
+                settings
+                    .max_swarm_duration_secs
+                    .unwrap_or(LIVE_DEFAULT_MAX_SWARM_DURATION_SECS)
+                    .max(1),
+            ),
+        }
+    }
+}
+
 impl TeamTool {
     pub(super) async fn run_agent_team_live(
         &self,
@@ -9,15 +38,22 @@ impl TeamTool {
         mode: AgentMode,
         parent_event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> ToolRunResult {
+        let budget = LiveSwarmBudget::from_settings(&self.sub_agent_settings.swarm);
+        let started_at = tokio::time::Instant::now();
         let futures = initial_turns.into_iter().map(|initial_turn| {
             let agent_name = initial_turn.agent_name.clone();
             let tool = self.clone();
             let team_name = team_name.to_string();
             let tool_call_id = tool_call_id.to_string();
             let parent_event_tx = parent_event_tx.clone();
+            let budget = budget;
+            let started_at = started_at;
             async move {
                 let mut report = LiveAgentReport::default();
                 let mut next_turn = Some(initial_turn);
+                let mut turns_run: u32 = 0;
+                let mut stalled: u32 = 0;
+                let mut last_signature: Option<(Option<u64>, String)> = None;
 
                 loop {
                     let turn = match next_turn.take() {
@@ -27,6 +63,25 @@ impl TeamTool {
                             None => break,
                         },
                     };
+
+                    // Contrôle entre continuations : annulation, durée et tours max.
+                    let over_duration = started_at.elapsed() >= budget.max_duration;
+                    let over_turns = turns_run >= budget.max_turns_per_agent;
+                    if tool.cancel.is_cancelled() || over_duration || over_turns {
+                        let reason = if tool.cancel.is_cancelled() {
+                            "annulé"
+                        } else if over_duration {
+                            "durée max du swarm atteinte"
+                        } else {
+                            "tours max par agent atteints"
+                        };
+                        report.reports.push(format!(
+                            "@{}: arrêt contrôlé ({reason}, {})",
+                            turn.agent_name, turn.label
+                        ));
+                        tool.stop_live_agent(&team_name, &agent_name).await;
+                        break;
+                    }
 
                     let child_tool_call_id = format!(
                         "{tool_call_id}-live-{}-{}",
@@ -50,6 +105,7 @@ impl TeamTool {
                             "agent turn finished"
                         })
                         .to_string();
+                    turns_run = turns_run.saturating_add(1);
                     if result.is_error {
                         if let Some(task_id) = turn.task_id {
                             tool.block_task_after_agent_error(
@@ -61,12 +117,34 @@ impl TeamTool {
                             .await;
                         }
                     }
+
+                    // Non-progression : même tâche, même résultat, aucun fichier modifié.
+                    let signature = (turn.task_id, line.clone());
+                    let no_change = !result.is_error && result.file_changes.is_empty();
+                    if turn.task_id.is_some()
+                        && no_change
+                        && last_signature.as_ref() == Some(&signature)
+                    {
+                        stalled = stalled.saturating_add(1);
+                    } else {
+                        stalled = 0;
+                    }
+                    last_signature = Some(signature);
+
                     report.file_changes.extend(result.file_changes);
                     report.images.extend(result.images);
                     report.last_meta = result.meta;
                     report
                         .reports
                         .push(format!("@{}: {} ({})", turn.agent_name, line, turn.label));
+                    if stalled >= LIVE_MAX_STALLED_CONTINUATIONS {
+                        report.reports.push(format!(
+                            "@{}: arrêt contrôlé (non-progression après {} continuations)",
+                            turn.agent_name, stalled
+                        ));
+                        tool.stop_live_agent(&team_name, &agent_name).await;
+                        break;
+                    }
                     next_turn = tool.next_live_turn_for_agent(&team_name, &agent_name).await;
                 }
 
@@ -149,6 +227,49 @@ impl TeamTool {
                 continue;
             }
             notify.notified().await;
+        }
+    }
+
+    /// Arrêt contrôlé d'un teammate par budget : il passe `Stopped` et son travail
+    /// `in_progress`/`blocked` repasse en `pending`, comme `run_stop`. Sans cela,
+    /// la boucle live du swarm ne se terminerait jamais.
+    pub(super) async fn stop_live_agent(&self, team_name: &str, agent_name: &str) {
+        let changed = {
+            let mut runtime = self.runtime.write().await;
+            let Some(session) = runtime
+                .scopes
+                .get_mut(&self.scope_id)
+                .and_then(|scope| scope.teams.get_mut(team_name))
+            else {
+                return;
+            };
+            let agent_key_value = agent_key(agent_name);
+            let now = now_ms();
+            if let Some(agent) = session.agents.get_mut(&agent_key_value) {
+                agent.status = TeamAgentStatus::Stopped;
+                agent.updated_at_ms = now;
+            }
+            for task in &mut session.tasks {
+                if task.owner.as_deref().map(agent_key).as_deref()
+                    != Some(agent_key_value.as_str())
+                {
+                    continue;
+                }
+                if matches!(
+                    task.status,
+                    TeamTaskStatus::InProgress | TeamTaskStatus::Blocked
+                ) {
+                    task.status = TeamTaskStatus::Pending;
+                    task.owner = None;
+                    task.completed_at_ms = None;
+                    task.updated_at_ms = now;
+                }
+            }
+            session.updated_at_ms = now;
+            true
+        };
+        if changed {
+            self.notify_all_team_agents(team_name).await;
         }
     }
 

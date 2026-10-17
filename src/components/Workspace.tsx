@@ -43,6 +43,7 @@ import type {
   AgentEvent,
   AgentMode,
   ConversationEventPayload,
+  ConversationEventBatchPayload,
   ConversationSummary,
   EditorRevealTarget,
   EditorTab,
@@ -977,11 +978,8 @@ export function Workspace({
   useEffect(() => {
     let cancelled = false;
     let unlisten: UnlistenFn | null = null;
-    (async () => {
-      const u = await listen<ConversationEventPayload>(
-        "agent-event",
-        (event) => {
-          const payload = event.payload;
+    let unlistenBatch: UnlistenFn | null = null;
+    const dispatch = (payload: ConversationEventPayload) => {
           if (
             payload.workspaceId &&
             payload.workspaceId !== workspacePathRef.current
@@ -1008,17 +1006,39 @@ export function Workspace({
           for (const handler of agentSubsRef.current) {
             handler(payload.conversationId, payload.event, payload.sequence);
           }
+    };
+    (async () => {
+      const u = await listen<ConversationEventPayload>("agent-event", (event) =>
+        dispatch(event.payload),
+      );
+      // Lots ordonnés émis par le backend (event_pump.rs) : un seul message IPC
+      // pour plusieurs événements, rejoués un par un dans l'ordre d'arrivée.
+      const ub = await listen<ConversationEventBatchPayload>(
+        "agent-event-batch",
+        (event) => {
+          const { workspaceId, conversationId, events } = event.payload;
+          for (const item of events) {
+            dispatch({
+              workspaceId,
+              conversationId,
+              sequence: item.sequence,
+              event: item.event,
+            });
+          }
         },
       );
       if (cancelled) {
         u();
+        ub();
       } else {
         unlisten = u;
+        unlistenBatch = ub;
       }
     })();
     return () => {
       cancelled = true;
       if (unlisten) unlisten();
+      if (unlistenBatch) unlistenBatch();
     };
   }, []);
 

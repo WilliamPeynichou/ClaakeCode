@@ -129,6 +129,7 @@ use tokio::{
 
 mod context;
 mod conversations;
+mod event_pump;
 mod git;
 mod models;
 mod platform;
@@ -154,6 +155,7 @@ use platform::*;
 use providers::*;
 use remote::*;
 use state::*;
+use event_pump::*;
 use swarm::*;
 use turns::*;
 use workflow::*;

@@ -162,10 +162,27 @@ export type SubAgentConfig = {
   model: ModelRef;
   hideForSameModel: boolean;
   enabled: boolean;
+  /** Utilisable comme profil de teammate dans team_run (défaut true). */
+  swarmEnabled: boolean;
+};
+
+export type SwarmTeammateModelSource = "auto" | "lead" | "explicit";
+
+export type SwarmSettings = {
+  teammateModelSource: SwarmTeammateModelSource;
+  /** Utilisé seulement si teammateModelSource === "explicit". */
+  teammateModel: ModelRef | null;
+  /** Nombre max de teammates par swarm, 2..8. */
+  maxTeammates: number | null;
+  /** Tours max par teammate ; null = défaut runtime. */
+  maxTurnsPerAgent: number | null;
+  /** Durée max d'un swarm en secondes ; null = défaut runtime. */
+  maxSwarmDurationSecs: number | null;
 };
 
 export type SubAgentSettings = {
   agents: SubAgentConfig[];
+  swarm: SwarmSettings;
 };
 
 export type ToolConfig = {
@@ -962,6 +979,13 @@ export type ConversationEventPayload = {
   workspaceId?: string;
   sequence?: number;
   event: AgentEvent;
+};
+
+/** Lot ordonné émis sur `agent-event-batch` (src-tauri/src/event_pump.rs). */
+export type ConversationEventBatchPayload = {
+  conversationId: string;
+  workspaceId?: string;
+  events: { sequence?: number; event: AgentEvent }[];
 };
 
 export type SequencedAgentEvent = {

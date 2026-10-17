@@ -1027,6 +1027,11 @@ impl RemoteRuntime {
         .await
     }
 
+    async fn has_connected_devices(&self) -> bool {
+        let inner = self.inner.lock().await;
+        !inner.connected_devices.is_empty()
+    }
+
     async fn broadcast_payload<T: Serialize>(&self, payload: &T) -> Result<()> {
         let devices = {
             let inner = self.inner.lock().await;
@@ -1302,6 +1307,44 @@ fn workspace_display_name(workspace_id: &str) -> String {
         .unwrap_or_else(|| workspace_id.to_string())
 }
 
+pub(super) fn forward_agent_events(
+    app: &AppHandle,
+    workspace_id: &str,
+    conversation_id: &str,
+    events: Vec<(Option<u64>, AgentEvent)>,
+) {
+    let Some(state) = app.try_state::<DesktopState>() else {
+        return;
+    };
+    if events.is_empty() {
+        return;
+    }
+    let runtime = state.remote.clone();
+    let workspace_id = workspace_id.to_string();
+    let conversation_id = conversation_id.to_string();
+    // Une seule tâche par lot. Sans appareil connecté, la tâche sort immédiatement.
+    tauri::async_runtime::spawn(async move {
+        if !runtime.has_connected_devices().await {
+            return;
+        }
+        let notify_finished = events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::TurnFinished { .. }));
+        for (sequence, event) in events {
+            let payload = RemotePcPayload::AgentEvent {
+                workspace_id: workspace_id.clone(),
+                conversation_id: conversation_id.clone(),
+                sequence,
+                event,
+            };
+            let _ = runtime.broadcast_payload(&payload).await;
+        }
+        if notify_finished {
+            runtime.notify_turn_finished(&conversation_id).await;
+        }
+    });
+}
+
 pub(super) fn forward_agent_event(
     app: &AppHandle,
     workspace_id: &str,
@@ -1309,25 +1352,12 @@ pub(super) fn forward_agent_event(
     sequence: Option<u64>,
     event: &AgentEvent,
 ) {
-    let Some(state) = app.try_state::<DesktopState>() else {
-        return;
-    };
-    let runtime = state.remote.clone();
-    let workspace_id = workspace_id.to_string();
-    let conversation_id = conversation_id.to_string();
-    let event = event.clone();
-    tauri::async_runtime::spawn(async move {
-        let payload = RemotePcPayload::AgentEvent {
-            workspace_id,
-            conversation_id: conversation_id.clone(),
-            sequence,
-            event: event.clone(),
-        };
-        let _ = runtime.broadcast_payload(&payload).await;
-        if matches!(event, AgentEvent::TurnFinished { .. }) {
-            runtime.notify_turn_finished(&conversation_id).await;
-        }
-    });
+    forward_agent_events(
+        app,
+        workspace_id,
+        conversation_id,
+        vec![(sequence, event.clone())],
+    );
 }
 
 pub(super) fn forward_active_turns(app: &AppHandle, active_turns: Vec<ActiveTurnSummary>) {
