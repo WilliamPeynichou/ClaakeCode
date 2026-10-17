@@ -849,4 +849,7 @@ pub(super) struct RlmMessageInput {
     /// Same model picker as the classic chat; `None` keeps Prime's session model.
     #[serde(default)]
     pub(super) model: Option<ModelInput>,
+    /// Thinking level of the picker; `None` keeps Prime's session level.
+    #[serde(default)]
+    pub(super) thinking: Option<ThinkingLevelInput>,
 }

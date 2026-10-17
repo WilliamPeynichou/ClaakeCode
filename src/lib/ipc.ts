@@ -433,6 +433,7 @@ export const api = {
     conversationId: string,
     text: string,
     model?: { provider: string; name: string },
+    thinking?: ThinkingLevel,
   ) {
     return invoke<void>("send_rlm_message", {
       input: {
@@ -440,6 +441,7 @@ export const api = {
         conversationId,
         text,
         model: model ? { provider: model.provider, name: model.name } : null,
+        thinking: thinking ?? null,
       },
     });
   },

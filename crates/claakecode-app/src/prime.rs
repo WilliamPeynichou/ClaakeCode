@@ -24,8 +24,8 @@ fn error_category(raw: &str) -> &'static str {
 fn rejection(kind: &str, frame: &Value) -> String {
     // Command names are caller-controlled too: display only known wire tags.
     let kind = match kind {
-        "create" | "attach" | "abort" | "set_model" | "prompt" | "prompt_and_wait" |
-        "list" | "shutdown" | "get_messages" | "get_available_models" => kind,
+        "create" | "attach" | "abort" | "set_model" | "set_thinking_level" | "prompt" |
+        "prompt_and_wait" | "list" | "shutdown" | "get_messages" | "get_available_models" => kind,
         _ => "unknown",
     };
     let raw = frame["error"].as_str().or_else(|| frame["error"]["message"].as_str()).unwrap_or("");
@@ -346,6 +346,86 @@ pub async fn set_model(socket: &std::path::Path, session_id: &str, provider: &st
     )
     .await
     .map(|_| ())
+}
+
+/// True when Prime refused a model because it is not in its catalog (as opposed to a missing
+/// sign-in or a dead session). Only this refusal is fixed by declaring the model.
+pub fn is_model_unavailable(error: &anyhow::Error) -> bool {
+    error.to_string().ends_with(": model unavailable")
+}
+
+/// Applies a thinking level (Prime wire names: off, minimal, low, medium, high, xhigh, max).
+/// Prime clamps it to what the session model supports.
+#[cfg(unix)]
+pub async fn set_thinking_level(socket: &std::path::Path, session_id: &str, level: &str) -> Result<()> {
+    call(
+        socket,
+        json!({"type":"set_thinking_level","activeSessionId":session_id,"level":level}),
+        Duration::from_secs(30),
+        |_| {},
+    )
+    .await
+    .map(|_| ())
+}
+
+/// A Claake Code model Prime's offline catalog does not know yet. The daemon runs with
+/// `PI_OFFLINE=1`, so its catalog stays at the pinned build: newer models are declared through
+/// Prime's own `models.json` under the built-in provider, which supplies the API and base URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelDeclaration {
+    pub provider: String,
+    pub id: String,
+    pub name: String,
+    pub reasoning: bool,
+    /// Wire value sent for `max` (some providers only accept up to `xhigh`).
+    pub max_effort: String,
+    pub images: bool,
+    pub context_window: u64,
+    pub max_tokens: u64,
+}
+
+fn declaration_json(model: &ModelDeclaration) -> Value {
+    let mut value = json!({
+        "id": model.id,
+        "name": model.name,
+        "reasoning": model.reasoning,
+        "input": if model.images { json!(["text", "image"]) } else { json!(["text"]) },
+        "contextWindow": model.context_window.max(1),
+        "maxTokens": model.max_tokens.max(1),
+    });
+    if model.reasoning {
+        // `off` stays unmapped: each provider sends its own "no reasoning" value.
+        // xhigh/max must be mapped explicitly or Prime treats them as unsupported.
+        value["thinkingLevelMap"] = json!({
+            "minimal": "low", "low": "low", "medium": "medium", "high": "high",
+            "xhigh": "xhigh", "max": model.max_effort,
+        });
+    }
+    value
+}
+
+/// Adds or replaces one model in Prime's `models.json`, keeping every other entry (other RLM
+/// chats and Prime's remembered default model may rely on them). Unreadable content is replaced.
+/// Prime rebuilds its registry on every model resolution, so a running daemon picks it up.
+pub fn declare_model(agent_dir: &std::path::Path, model: &ModelDeclaration) -> Result<()> {
+    std::fs::create_dir_all(agent_dir).context("create Prime agent dir")?;
+    let target = agent_dir.join("models.json");
+    let mut document = std::fs::read(&target)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .filter(|doc| doc["providers"].is_object())
+        .unwrap_or_else(|| json!({"providers": {}}));
+    let provider = &mut document["providers"][model.provider.as_str()];
+    if !provider["models"].is_array() {
+        provider["models"] = json!([]);
+    }
+    let list = provider["models"].as_array_mut().expect("models is an array");
+    list.retain(|entry| entry["id"] != model.id.as_str());
+    list.push(declaration_json(model));
+    let temp = agent_dir.join(".models.json.tmp");
+    std::fs::write(&temp, serde_json::to_vec_pretty(&document)?).context("write Prime models file")?;
+    std::fs::rename(&temp, &target).context("install Prime models file")?;
+    Ok(())
 }
 
 /// Returns the response `data`. Session events arriving before the response are dropped:
@@ -684,6 +764,7 @@ mod unsupported {
     ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
     pub async fn abort_session(_: &std::path::Path, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
     pub async fn set_model(_: &std::path::Path, _: &str, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
+    pub async fn set_thinking_level(_: &std::path::Path, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
     pub async fn run_prompt(
         _: &std::path::Path, _: &str, _: &str, _: Duration, _: impl FnMut(crate::AgentEvent),
     ) -> Result<()> { bail!(UNSUPPORTED) }
@@ -1042,6 +1123,55 @@ mod tests {
         { use std::os::unix::fs::PermissionsExt;
           assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600); }
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn declaration(provider: &str, id: &str, reasoning: bool) -> ModelDeclaration {
+        ModelDeclaration {
+            provider: provider.into(), id: id.into(), name: id.into(), reasoning,
+            max_effort: "max".into(), images: true, context_window: 200_000, max_tokens: 64_000,
+        }
+    }
+
+    #[test]
+    fn models_file_declares_unknown_models_under_built_in_providers() {
+        let dir = std::env::temp_dir().join(format!("cc-prime-models-{}", uuid::Uuid::new_v4()));
+        let mut luna = declaration("openai-codex", "gpt-6-luna", true);
+        luna.max_effort = "xhigh".into();
+        // Unreadable leftovers are replaced, existing entries are kept, same id is replaced.
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("models.json"), "not json").unwrap();
+        declare_model(&dir, &declaration("anthropic", "claude-haiku-5-5", false)).unwrap();
+        declare_model(&dir, &luna).unwrap();
+        declare_model(&dir, &declaration("mistral", "devstral-2", false)).unwrap();
+        declare_model(&dir, &declaration("anthropic", "claude-haiku-5-5", true)).unwrap();
+        let doc: Value = serde_json::from_slice(&std::fs::read(dir.join("models.json")).unwrap()).unwrap();
+        assert_eq!(doc["providers"]["anthropic"]["models"].as_array().unwrap().len(), 1);
+        let haiku = &doc["providers"]["anthropic"]["models"][0];
+        assert_eq!(haiku["id"], "claude-haiku-5-5");
+        assert_eq!(haiku["input"], json!(["text", "image"]));
+        assert_eq!(haiku["contextWindow"], 200_000);
+        // No api/baseUrl: Prime inherits them from the built-in provider.
+        assert!(haiku.get("api").is_none() && haiku.get("baseUrl").is_none());
+        assert_eq!(haiku["thinkingLevelMap"]["max"], "max");
+        // `off` is left to each provider's own "no reasoning" value.
+        assert!(haiku["thinkingLevelMap"].get("off").is_none());
+        assert_eq!(doc["providers"]["openai-codex"]["models"][0]["thinkingLevelMap"]["max"], "xhigh");
+        let devstral = &doc["providers"]["mistral"]["models"][0];
+        assert_eq!(devstral["reasoning"], false);
+        assert!(devstral.get("thinkingLevelMap").is_none());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn only_catalog_refusals_count_as_unavailable_models() {
+        let refused = |raw: &str| anyhow::anyhow!("{}", rejection("set_model", &json!({"error": raw})));
+        assert!(is_model_unavailable(&refused("Model not found: anthropic/claude-haiku-5-5")));
+        assert!(!is_model_unavailable(&refused("Provider \"anthropic\" is not signed in.")));
+        assert!(!is_model_unavailable(&refused("Unknown active session: s1")));
+        assert_eq!(
+            rejection("set_thinking_level", &json!({"error": "Invalid thinking level \"x\""})),
+            "Prime daemon rejected command `set_thinking_level`: invalid session configuration"
+        );
     }
 
     /// Prime must see the providers written to auth.json (API key and OAuth access token alike).

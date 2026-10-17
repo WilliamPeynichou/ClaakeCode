@@ -1504,7 +1504,7 @@ export function Workspace({
           conversations.find((c) => c.id === conversationId)?.harness === "rlm"
         ) {
           // RLM turns go to the Prime sidecar; the backend refuses other harnesses.
-          await api.sendRlmMessage(workspaceAtRequest, conversationId, text, model);
+          await api.sendRlmMessage(workspaceAtRequest, conversationId, text, model, thinking);
           return;
         }
         await sendMessageWithBusyRetry(
@@ -1893,7 +1893,7 @@ export function Workspace({
       });
       await new Promise((resolve) => setTimeout(resolve, 0));
       try {
-        await api.sendRlmMessage(workspacePath, conversationId, prompt, model);
+        await api.sendRlmMessage(workspacePath, conversationId, prompt, model, thinking);
       } catch (err) {
         markConversationStreaming(conversationId, false);
         setRlmError(String(err));

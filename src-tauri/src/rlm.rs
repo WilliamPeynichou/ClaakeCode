@@ -130,6 +130,85 @@ fn prime_provider(provider: &str, credentials: &[(String, prime::PrimeCredential
     Ok(mapped)
 }
 
+/// Prime wire name of a thinking level from the Claake picker.
+fn prime_thinking_level(level: ThinkingLevelInput) -> &'static str {
+    match level {
+        ThinkingLevelInput::Off => "off",
+        ThinkingLevelInput::Low => "low",
+        ThinkingLevelInput::Medium => "medium",
+        ThinkingLevelInput::High => "high",
+        ThinkingLevelInput::Xhigh => "xhigh",
+        ThinkingLevelInput::Max => "max",
+    }
+}
+
+/// Highest reasoning value the provider accepts for `max` (same rule as Claake's own clients:
+/// OpenAI only accepts `max` on GPT-6 / GPT-5.6, OpenRouter tops out at `xhigh`).
+fn max_effort(prime_provider: &str, model_id: &str) -> &'static str {
+    match prime_provider {
+        "openai" | "openai-codex" => {
+            let max = model_id == "gpt-6" || model_id.starts_with("gpt-6-") || model_id == "gpt-5.6" || model_id.starts_with("gpt-5.6-");
+            if max { "max" } else { "xhigh" }
+        }
+        "openrouter" => "xhigh",
+        _ => "max",
+    }
+}
+
+/// Declares a Claake model to Prime from Claake's own capabilities (context, output, thinking,
+/// images), so models newer than Prime's offline catalog run in the RLM chat as in the classic one.
+fn model_declaration(
+    state: &DesktopState,
+    model: &ModelInput,
+    prime_provider: &str,
+) -> std::result::Result<prime::ModelDeclaration, String> {
+    let reference = ModelRef::new(&model.provider, &model.name);
+    let caps = provider_from_registry(state, &model.provider)?
+        .capabilities(&reference)
+        .ok_or_else(|| format!("model `{}` is not supported", model.name))?;
+    Ok(prime::ModelDeclaration {
+        provider: prime_provider.to_string(),
+        id: model.name.clone(),
+        name: model.name.clone(),
+        reasoning: caps.supports_thinking && caps.effort_mode != claakecode_core::EffortMode::None,
+        max_effort: max_effort(prime_provider, &model.name).to_string(),
+        images: caps.supports_images,
+        context_window: u64::from(caps.context_window),
+        max_tokens: u64::from(caps.max_output_tokens),
+    })
+}
+
+/// Selects the model (and thinking level) of the Prime session. A model missing from Prime's
+/// offline catalog is declared once in its models.json, then selected again; any other refusal
+/// (provider signed out, dead session) is surfaced as is, never replaced by another model.
+async fn apply_model(
+    state: &DesktopState,
+    socket: &std::path::Path,
+    session_id: &str,
+    model: &ModelInput,
+    thinking: Option<ThinkingLevelInput>,
+    credentials: &[(String, prime::PrimeCredential)],
+) -> std::result::Result<(), String> {
+    let provider = prime_provider(&model.provider, credentials)?;
+    let refused = |_| format!("Prime refused model {}/{} (provider not signed in or unknown to Prime)", model.provider, model.name);
+    match prime::set_model(socket, session_id, provider, &model.name).await {
+        Ok(()) => {}
+        Err(err) if prime::is_model_unavailable(&err) => {
+            let declaration = model_declaration(state, model, provider)?;
+            let agent_dir = state.store.path().parent().ok_or("no data dir")?.join("prime").join("agent");
+            prime::declare_model(&agent_dir, &declaration).map_err(error_to_string)?;
+            prime::set_model(socket, session_id, provider, &model.name).await.map_err(refused)?;
+        }
+        Err(err) => return Err(refused(err)),
+    }
+    if let Some(level) = thinking {
+        prime::set_thinking_level(socket, session_id, prime_thinking_level(level))
+            .await
+            .map_err(error_to_string)?;
+    }
+    Ok(())
+}
+
 /// Resolution order: explicit override, then `prime-agent` next to the app executable
 /// (where the bundler places sidecars). No download and no PATH lookup: the binary must be pinned.
 fn sidecar_binary() -> std::result::Result<std::path::PathBuf, String> {
@@ -274,10 +353,11 @@ pub(super) async fn send_rlm_message(
         (socket, session_id, credentials)
     };
     if let Some(model) = &input.model {
-        let provider = prime_provider(&model.provider, &credentials)?;
-        prime::set_model(&socket, &session_id, provider, &model.name)
+        apply_model(&state, &socket, &session_id, model, input.thinking, &credentials).await?;
+    } else if let Some(level) = input.thinking {
+        prime::set_thinking_level(&socket, &session_id, prime_thinking_level(level))
             .await
-            .map_err(|_| format!("Prime refused model {}/{} (provider not signed in or unknown to Prime)", model.provider, model.name))?;
+            .map_err(error_to_string)?;
     }
     // Same single-turn rule as the classic chat: one running turn per conversation, visible
     // in the active-turns list. Stop goes through Prime's abort, not this cancel handle.
