@@ -127,16 +127,42 @@ export type ModelStatsReport = {
   totalResponses: number;
   minReliable: number;
   sinceMs: number | null;
+  /** Exclusive end of an explicit calendar range; null for rolling/all-time filters. */
+  untilMs?: number | null;
 };
+
+export type ModelUsageBucket = {
+  startAtMs: number; endAtMs: number; turns: number; usageTurns: number;
+  knownUsageTurns: number; unknownUsageTurns: number; priceCoverageTurns: number;
+  inputTokens: number; promptTokens: number; outputTokens: number; reasoningTokens: number;
+  cacheReadTokens: number; cacheCreationTokens: number; estimatedCost: number | null;
+};
+
+export type ModelUsageSeriesInput = {
+  buckets: { startAtMs: number; endAtMs: number }[];
+  harness?: "classic" | "rlm" | null;
+};
+
+export type StartBenchmarkInput = { providerId: string; modelId: string; budgetUsd: number; maxOutputTokens: number; repetitions: number; confirmed: boolean };
+export type BenchmarkRun = { runId: string; provider: string; model: string; suiteVersion: string; startedAtMs: number; finishedAtMs: number | null; status: string; completedCases: number; totalCases: number; inputTokens: number; outputTokens: number; estimatedCost: number; medianTtftMs: number | null; medianOutputTokensPerSecond: number | null; verifiedChecks: number; error: string | null };
 
 export type ModelStatsFilter = {
   /** null = all history. */
   periodDays: number | null;
+  /** UTC epoch milliseconds, inclusive start / exclusive end. Supply both; overrides periodDays. */
+  startAtMs?: number | null;
+  endAtMs?: number | null;
   /** null = both harnesses. */
   harness: "classic" | "rlm" | null;
 };
 
 export const api = {
+  getModelUsageSeries(input: ModelUsageSeriesInput) {
+    return invoke<ModelUsageBucket[]>("get_model_usage_series", { input });
+  },
+  getActiveBenchmarkRuns() { return invoke<BenchmarkRun[]>("get_active_benchmark_runs"); },
+  startActiveBenchmark(input: StartBenchmarkInput) { return invoke<string>("start_active_benchmark", { input }); },
+  stopActiveBenchmark(runId: string) { return invoke<void>("stop_active_benchmark", { runId }); },
   clearModelStats() { return invoke<void>("clear_model_stats"); },
   saveModelPrices(prices: ModelPrice[]) { return invoke<void>("save_model_prices", { prices }); },
   getModelStats(filter: ModelStatsFilter) {

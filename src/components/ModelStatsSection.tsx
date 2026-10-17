@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { modelStatsCalendarRange, shiftModelStatsCalendar } from "../lib/modelStatsPeriod";
 import { ModelPricesEditor } from "./ModelPricesEditor";
 import { MeasuredModelTable } from "./MeasuredModelTable";
+import { UsageTimeline } from "./UsageTimeline";
+import { ActiveBenchmarkSection } from "./ActiveBenchmarkSection";
 import { api, type ModelStatsFilter, type ModelStatsReport, type ModelStatsRow } from "../lib/ipc";
 
 /**
@@ -10,10 +13,12 @@ import { api, type ModelStatsFilter, type ModelStatsReport, type ModelStatsRow }
  * Measures the user's real usage, not model quality: n is always shown and small samples flagged.
  */
 
-const PERIODS: { label: string; days: number | null }[] = [
-  { label: "7 jours", days: 7 },
-  { label: "30 jours", days: 30 },
-  { label: "Tout", days: null },
+const PERIODS: { label: string; value: "7" | "30" | "month" | "year" | "all" }[] = [
+  { label: "7 jours", value: "7" },
+  { label: "30 jours", value: "30" },
+  { label: "Mois", value: "month" },
+  { label: "Année", value: "year" },
+  { label: "Tout", value: "all" },
 ];
 
 const HARNESSES: { label: string; value: ModelStatsFilter["harness"] }[] = [
@@ -97,8 +102,25 @@ const COLUMNS: Column[] = [
 const rowKey = (r: ModelStatsRow) => `${r.harness}|${r.provider}|${r.model}`;
 
 export function ModelStatsSection() {
-  const [filter, setFilter] = useState<ModelStatsFilter>({ periodDays: 30, harness: null });
-  const [report, setReport] = useState<ModelStatsReport | null>(null);
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]["value"]>("30");
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [year, setYear] = useState(() => String(new Date().getFullYear()));
+  const [harness, setHarness] = useState<ModelStatsFilter["harness"]>(null);
+  const calendar = period === "month" || period === "year" ? period : null;
+  const calendarValue = calendar === "month" ? month : year;
+  const range = useMemo(() => calendar ? modelStatsCalendarRange(calendar, calendarValue) : null, [calendar, calendarValue]);
+  const validPeriod = !calendar || !!range;
+  const filter = useMemo<ModelStatsFilter>(() => ({
+    periodDays: period === "7" ? 7 : period === "30" ? 30 : null,
+    harness,
+    ...range,
+  }), [period, harness, range]);
+  const [loaded, setLoaded] = useState<{ filter: ModelStatsFilter; report: ModelStatsReport } | null>(null);
+  // Never render the previous period under the newly selected label, even before the effect runs.
+  const report = validPeriod && loaded && JSON.stringify(loaded.filter) === JSON.stringify(filter) ? loaded.report : null;
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -109,22 +131,27 @@ export function ModelStatsSection() {
   const [requestId] = useState(() => ({ current: 0 }));
   const load = useCallback(async () => {
     const id = ++requestId.current;
+    setLoaded(null);
+    setError(null);
+    setStatus(null);
+    if (!validPeriod) { setLoading(false); return; }
     setLoading(true);
     try {
       const next = await api.getModelStats(filter);
       if (id !== requestId.current) return;
-      setReport(next);
+      setLoaded({ filter, report: next });
       setError(null);
     } catch (err) {
       if (id === requestId.current) setError(String(err));
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [filter, requestId]);
+  }, [filter, requestId, validPeriod]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    return () => { ++requestId.current; };
+  }, [load, requestId]);
 
   const rows = useMemo(() => {
     const column = COLUMNS.find((c) => c.id === sort.id) ?? COLUMNS[0];
@@ -168,7 +195,7 @@ export function ModelStatsSection() {
     <>
       <header className="settings-pane__header">
         <div className="settings-pane__header-text">
-          <h1 className="settings-pane__title">Performance des modèles</h1>
+          <h1>Performance des modèles</h1>
           <p className="settings-pane__subtitle">
             Chiffres tirés de votre usage réel, calculés en local. Ce n'est pas un classement de
             qualité : ils dépendent des tâches, des prompts et du réseau.
@@ -197,20 +224,36 @@ export function ModelStatsSection() {
               <button
                 key={p.label}
                 type="button"
-                data-active={filter.periodDays === p.days ? "true" : "false"}
-                onClick={() => setFilter((f) => ({ ...f, periodDays: p.days }))}
+                data-active={period === p.value ? "true" : "false"}
+                aria-pressed={period === p.value}
+                onClick={() => setPeriod(p.value)}
               >
                 {p.label}
               </button>
             ))}
           </div>
+          {calendar && <div className="model-stats__calendar">
+            <button type="button" className="settings-pane__btn" aria-label={calendar === "month" ? "Mois précédent" : "Année précédente"}
+              disabled={!shiftModelStatsCalendar(calendar, calendarValue, -1)}
+              onClick={() => { const next = shiftModelStatsCalendar(calendar, calendarValue, -1); if (next) (calendar === "month" ? setMonth : setYear)(next); }}>←</button>
+            <label>
+              <span>{calendar === "month" ? "Mois calendaire" : "Année calendaire"}</span>
+              <input type={calendar === "month" ? "month" : "number"} min={calendar === "month" ? "0001-01" : 1}
+                max={calendar === "month" ? "9998-12" : 9998} step={1} value={calendarValue}
+                onChange={(event) => (calendar === "month" ? setMonth : setYear)(event.target.value)} />
+            </label>
+            <button type="button" className="settings-pane__btn" aria-label={calendar === "month" ? "Mois suivant" : "Année suivante"}
+              disabled={!shiftModelStatsCalendar(calendar, calendarValue, 1)}
+              onClick={() => { const next = shiftModelStatsCalendar(calendar, calendarValue, 1); if (next) (calendar === "month" ? setMonth : setYear)(next); }}>→</button>
+          </div>}
           <div className="model-stats__segmented" role="group" aria-label="Harness">
             {HARNESSES.map((h) => (
               <button
                 key={h.label}
                 type="button"
                 data-active={filter.harness === h.value ? "true" : "false"}
-                onClick={() => setFilter((f) => ({ ...f, harness: h.value }))}
+                aria-pressed={filter.harness === h.value}
+                onClick={() => setHarness(h.value)}
               >
                 {h.label}
               </button>
@@ -223,11 +266,19 @@ export function ModelStatsSection() {
           )}
         </div>
 
+        <p className="python-runtime__muted" aria-live="polite">
+          {range ? <>Du {new Date(range.startAtMs).toLocaleString("fr-FR")} inclus au {new Date(range.endAtMs).toLocaleString("fr-FR")} exclu</>
+            : calendar ? "Sélectionnez une période valide (année de 0001 à 9998)."
+            : period === "all" ? "Tout l’historique" : `${period} derniers jours glissants`}
+          {" · Fuseau local : "}{Intl.DateTimeFormat().resolvedOptions().timeZone}
+        </p>
+        {loading && <p className="python-runtime__muted" role="status">Chargement des statistiques…</p>}
         {error && <p className="python-runtime__error" role="alert">{error}</p>}
         {status && <p className="python-runtime__muted" role="status">{status}</p>}
 
-        {!report?.rows.length && !loading && <p className="python-runtime__muted">Pas encore de données historiques pour ce filtre.</p>}
+        {report && !report.rows.length && <p className="python-runtime__muted">Pas encore de données historiques pour ce filtre.</p>}
         {report && <>
+          {calendar && <UsageTimeline period={calendar} value={calendarValue} harness={harness} />}
           <MeasuredModelTable rows={report.measured ?? []} prices={report.prices ?? []} minReliable={minReliable} />
           <details><summary>Tarifs et coûts estimés</summary><ModelPricesEditor key={JSON.stringify(report.prices ?? [])} initial={report.prices ?? []} onSaved={() => { void load(); window.dispatchEvent(new Event("claakecode:model-stats-changed")); }} /></details>
           <div className="settings-pane__actions">
@@ -242,10 +293,9 @@ export function ModelStatsSection() {
           </div>
           <p className="python-runtime__muted">Effacement de toutes les statistiques, tous filtres confondus, sans supprimer vos chats ni vos tarifs. Les compteurs historiques restent masqués ; les prochains tours sont mesurés.</p>
         </>}
+        <ActiveBenchmarkSection />
         <h2>Historique des réponses (rétroactif)</h2>
-        {!report ? (
-          <p className="python-runtime__muted">Chargement…</p>
-        ) : rows.length === 0 ? (
+        {!report ? null : rows.length === 0 ? (
           <div className="model-stats__empty">
             <strong>Pas encore de données sur cette période</strong>
             <p className="python-runtime__muted">
@@ -322,8 +372,7 @@ export function ModelStatsSection() {
             venir du hasard.
           </li>
           <li>
-            La période retient les conversations actives depuis la date choisie (les messages
-            ne sont pas encore horodatés un par un).
+            Période exacte pour les nouveaux tours, selon leur heure de démarrage. Historique approximatif : la période filtre la dernière activité des conversations, pas la date de chaque réponse ; leurs anciens messages peuvent donc être inclus.
           </li>
           <li>
             Ce tableau historique ne mesure pas les durées. Les mesures précises des nouveaux tours sont affichées au-dessus, sans les additionner à cet historique.

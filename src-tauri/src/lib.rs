@@ -127,6 +127,7 @@ use tokio::{
     sync::{mpsc, Mutex, Notify, RwLock},
 };
 
+mod benchmark;
 mod context;
 mod conversations;
 mod event_pump;
@@ -443,6 +444,10 @@ pub fn run() {
             rlm::edit_rlm_memory,
             rlm::delete_rlm_memory,
             stats::get_model_stats,
+            stats::get_model_usage_series,
+            benchmark::start_active_benchmark,
+            benchmark::stop_active_benchmark,
+            benchmark::get_active_benchmark_runs,
             stats::clear_model_stats,
             stats::save_model_prices,
             stats::export_model_stats_csv,

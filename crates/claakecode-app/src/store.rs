@@ -1851,6 +1851,18 @@ impl AppStore {
         since_ms: Option<i64>,
         harness: Option<&str>,
     ) -> Result<crate::model_stats::ModelStatsReport> {
+        self.model_stats_in_range(since_ms, None, harness)
+    }
+
+    /// Legacy history only: bounds apply to conversation `updated_at_ms`, not message dates.
+    /// These approximate counters must never be added to exact measured-turn counters.
+    pub fn model_stats_in_range(
+        &self,
+        since_ms: Option<i64>,
+        until_ms: Option<i64>,
+        harness: Option<&str>,
+    ) -> Result<crate::model_stats::ModelStatsReport> {
+        anyhow::ensure!(!matches!((since_ms, until_ms), (Some(start), Some(end)) if start >= end), "start must be before end");
         let cleared: Option<bool> = self.load_json_setting("model_stats_legacy_cleared")?;
         if cleared.unwrap_or(false) { return Ok(crate::model_stats::ModelStatsAccumulator::default().finish(since_ms)); }
         let conn = self.connection()?;
@@ -1859,11 +1871,12 @@ impl AppStore {
                 "select m.conversation_id, c.harness, m.message_json
                  from messages m join conversations c on c.id = m.conversation_id
                  where c.updated_at_ms >= ?1 and (?2 is null or c.harness = ?2)
+                   and (?3 is null or c.updated_at_ms < ?3)
                  order by m.conversation_id, m.ordinal",
             )
             .context("unable to prepare model stats query")?;
         let mut rows = statement
-            .query(params![since_ms.unwrap_or(i64::MIN), harness])
+            .query(params![since_ms.unwrap_or(i64::MIN), harness, until_ms])
             .context("unable to read messages for model stats")?;
 
         let mut acc = crate::model_stats::ModelStatsAccumulator::default();
@@ -2565,6 +2578,19 @@ mod tests {
 
         let future = store.model_stats(Some(now_ms() + 60_000), None)?;
         assert!(future.rows.is_empty());
+
+        // Legacy periods use the conversation update date, not invented message timestamps.
+        let conn = store.connection()?;
+        conn.execute("update conversations set updated_at_ms = 100 where id = ?1", [&classic.id])?;
+        conn.execute("update conversations set updated_at_ms = 200 where id = ?1", [&rlm.id])?;
+        drop(conn);
+        let bounded = store.model_stats_in_range(Some(100), Some(200), None)?;
+        assert_eq!(bounded.total_responses, 2);
+        assert_eq!(bounded.rows[0].model, "opus");
+        assert!(store.model_stats_in_range(Some(100), Some(200), Some(HARNESS_RLM))?.rows.is_empty());
+        assert_eq!(store.model_stats_in_range(Some(200), Some(300), None)?.total_responses, 1);
+        assert!(store.model_stats_in_range(Some(200), Some(100), None).is_err());
+        assert_eq!(store.model_stats(None, None)?.total_responses, 3);
         let _ = fs::remove_file(store.path());
         Ok(())
     }

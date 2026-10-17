@@ -460,13 +460,20 @@ fn map_wrapped_websocket_error_event(
 }
 
 fn map_http_status(status: StatusCode, message: String) -> AppError {
+    let detail = message.trim();
+    let detail = if detail.is_empty() {
+        "empty error response"
+    } else {
+        detail
+    };
+    let message = format!("OpenAI WebSocket HTTP {status}: {detail}");
     if status == StatusCode::UNAUTHORIZED {
         AppError::Auth(message)
     } else if status == StatusCode::TOO_MANY_REQUESTS {
         AppError::RateLimit(message)
     } else if is_transient_http_status(status) {
         AppError::RetryableStream {
-            message: format!("HTTP {status}: {message}"),
+            message,
             delay_ms: None,
         }
     } else if status.is_client_error() {
@@ -477,7 +484,7 @@ fn map_http_status(status: StatusCode, message: String) -> AppError {
             AppError::InvalidRequest(message)
         }
     } else {
-        AppError::Provider(format!("HTTP {status}: {message}"))
+        AppError::Provider(message)
     }
 }
 
@@ -508,6 +515,35 @@ mod tests {
     fn websocket_url_keeps_existing_responses_path() {
         let url = responses_websocket_url("http://localhost:8080/v1/responses").unwrap();
         assert_eq!(url.as_str(), "ws://localhost:8080/v1/responses");
+    }
+
+    #[test]
+    fn empty_client_error_keeps_transport_status_and_fallback_message() {
+        for body in ["", "  \n\t"] {
+            let error = map_http_status(StatusCode::BAD_REQUEST, body.into());
+            assert!(matches!(error, AppError::InvalidRequest(_)));
+            assert_eq!(error.to_string(), "invalid request: OpenAI WebSocket HTTP 400 Bad Request: empty error response");
+        }
+    }
+
+    #[test]
+    fn http_errors_preserve_classification_and_details() {
+        for (status, expected) in [
+            (StatusCode::UNAUTHORIZED, "auth error:"),
+            (StatusCode::TOO_MANY_REQUESTS, "rate limited:"),
+            (StatusCode::BAD_REQUEST, "invalid request:"),
+            (StatusCode::INTERNAL_SERVER_ERROR, "retryable stream error:"),
+        ] {
+            let error = map_http_status(status, "unsupported parameter".into());
+            let text = error.to_string();
+            assert!(text.starts_with(expected), "{text}");
+            assert!(text.contains(&format!("OpenAI WebSocket HTTP {status}")), "{text}");
+            assert!(text.ends_with("unsupported parameter"), "{text}");
+        }
+        assert!(matches!(
+            map_http_status(StatusCode::BAD_REQUEST, "context too long".into()),
+            AppError::ContextLength(_)
+        ));
     }
 
     #[test]

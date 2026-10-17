@@ -7,6 +7,7 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── docs — notes et plans (déplacés de la racine)
+│   ├── model-benchmark-plan.md — feuille de route performance modèles P0 filtres/intégrité, P1 métriques/comparabilité/qualité, P2 benchmark actif sécurisé (B5) + confidentialité
 │   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B4/B6 faits, B5 phase 2 optionnelle) + mascotte Claaky (C1–C5 faits, version 2D)
 │   ├── claaky2d/ — prototype du Claaky 2D : claaky2d.js/.css (dessin + poses), preview.html (planche animée), shoot.mjs (rend claaky2d-preview.png via Playwright)
 │   ├── plansPrimeAgent.md — plan complet par features : intégration Prime Agent, Auto Compute, Python persistant, chat RLM, mémoire/apprentissage et UI/UX
@@ -180,7 +181,7 @@ Code map:
 │   │       ├── model_info.rs
 │   │       ├── responses_stream.rs
 │   │       ├── stream.rs
-│   │       ├── websocket.rs
+│   │       ├── websocket.rs — transport OpenAI WebSocket ; erreurs HTTP avec statut, transport et message de secours si corps vide ; tests locaux de classification
 │   │       └── wire.rs
 │   └── claakecode-openrouter
 │       ├── Cargo.toml
@@ -273,7 +274,9 @@ Code map:
 │   │       ├── AppIcon-76x76@2x.png
 │   │       └── AppIcon-83.5x83.5@2x.png
 │   └── src
-│       ├── context.rs (poids du skill CLAAKE.md inclus)
+│               ├── benchmark.rs — benchmark actif opt-in, plafond budgétaire, arrêt et résultats séparés `active_benchmark_runs`
+        ├── context.rs (poids du skill CLAAKE.md inclus)
+
 │       ├── conversations.rs
 │       ├── git.rs
 │       ├── lib.rs
@@ -285,7 +288,8 @@ Code map:
 │       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM (onglet RLM, état vide, Auto Compute, Stop, réouverture), `npm run test:e2e`)
 │       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath obligatoire ; politique appendSystemPrompt native de mémoire locale/globale et refinement evidence-gated (sans fine-tuning ni moteur mémoire parallèle), Stop, get_rlm_binding
 │       ├── state.rs
-│       ├── stats.rs — get_model_stats / export_model_stats_csv / clear_model_stats / save_model_prices (spawn_blocking, CSV .csv uniquement)
+│               ├── stats.rs — `get_model_stats` / `get_model_usage_series` exactes par buckets / export / effacement / prix
+
 │       ├── swarm.rs
 │       ├── terminal.rs
 │       ├── typesafe.rs
@@ -310,7 +314,7 @@ Code map:
     │   ├── ClaakeCodeMark.tsx
     │   ├── DatabaseSettingsSection.tsx
     │   ├── SettingsPane.tsx
-│   ├── ModelStatsSection.tsx — Settings « Performance » (B3) : historique et tours mesurés séparés, filtres, export CSV, effacement confirmé sans supprimer les chats
+│   ├── ModelStatsSection.tsx — Settings « Performance » : historique distinct des séries exactes calendaires quotidiennes/mensuelles, filtres et tarifs
 │   ├── MeasuredModelTable.tsx — médianes, débit de tour, erreurs/interruption/réécriture, sous-agents et coût estimé
 │   ├── ModelPricesEditor.tsx — grille de tarifs manuels par million de tokens, validation et estimation
     │   ├── TypeSafeSettingsSection.tsx

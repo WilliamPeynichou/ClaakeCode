@@ -27,6 +27,33 @@ pub struct ModelTurn {
     pub status: String,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelUsageBucketInput {
+    pub start_at_ms: i64,
+    pub end_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelUsageBucket {
+    pub start_at_ms: i64,
+    pub end_at_ms: i64,
+    pub turns: u64,
+    pub usage_turns: u64,
+    pub known_usage_turns: u64,
+    pub unknown_usage_turns: u64,
+    pub price_coverage_turns: u64,
+    pub input_tokens: u64,
+    pub prompt_tokens: u64,
+    pub output_tokens: u64,
+    pub reasoning_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_creation_tokens: u64,
+    /// Estimated using the currently configured user price; absent unless all turns have usage and a price.
+    pub estimated_cost: Option<f64>,
+}
+
 pub struct TurnMeasurement {
     start: Instant,
     pub record: ModelTurn,
@@ -135,10 +162,17 @@ impl AppStore {
         Ok(())
     }
     pub fn measured_model_stats(&self, since: Option<i64>, harness: Option<&str>) -> Result<Vec<MeasuredModelStats>> {
+        self.measured_model_stats_in_range(since, None, harness)
+    }
+
+    /// Exact turn-start filtering in UTC epoch milliseconds: [since, until).
+    /// Unlike legacy history, no conversation-level timestamp approximation is needed.
+    pub fn measured_model_stats_in_range(&self, since: Option<i64>, until: Option<i64>, harness: Option<&str>) -> Result<Vec<MeasuredModelStats>> {
+        anyhow::ensure!(!matches!((since, until), (Some(start), Some(end)) if start >= end), "start must be before end");
         use std::collections::BTreeMap;
         let conn = self.connection()?;
-        let mut statement = conn.prepare("select record_json, rewritten from model_turns where started_at_ms >= ?1 order by id")?;
-        let records = statement.query_map([since.unwrap_or(i64::MIN)], |row| Ok((row.get::<_, String>(0)?, row.get::<_, bool>(1)?)))?;
+        let mut statement = conn.prepare("select record_json, rewritten from model_turns where started_at_ms >= ?1 and (?2 is null or started_at_ms < ?2) order by id")?;
+        let records = statement.query_map(params![since.unwrap_or(i64::MIN), until], |row| Ok((row.get::<_, String>(0)?, row.get::<_, bool>(1)?)))?;
         let mut groups: BTreeMap<(String, String, String, bool), (MeasuredModelStats, Vec<f64>, Vec<f64>, Vec<f64>)> = BTreeMap::new();
         for record in records {
             let (json, rewritten) = record?;
@@ -176,6 +210,60 @@ impl AppStore {
             s
         }).collect())
     }
+    /// Exact local measurements grouped into caller-provided UTC half-open calendar buckets.
+    /// Legacy conversation history is intentionally excluded: its per-message timestamps are approximate.
+    pub fn measured_model_usage_series(&self, buckets: &[ModelUsageBucketInput], harness: Option<&str>) -> Result<Vec<ModelUsageBucket>> {
+        anyhow::ensure!(!buckets.is_empty() && buckets.len() <= 366, "bucket count must be between 1 and 366");
+        for (i, b) in buckets.iter().enumerate() {
+            anyhow::ensure!(b.start_at_ms < b.end_at_ms, "bucket start must be before end");
+            if i > 0 {
+                anyhow::ensure!(buckets[i - 1].end_at_ms == b.start_at_ms, "buckets must be contiguous and ordered");
+            }
+        }
+        let conn = self.connection()?;
+        let prices = self.model_prices()?;
+        let mut out: Vec<ModelUsageBucket> = buckets.iter().map(|b| ModelUsageBucket {
+            start_at_ms: b.start_at_ms, end_at_ms: b.end_at_ms, ..Default::default()
+        }).collect();
+        let mut statement = conn.prepare("select record_json from model_turns where started_at_ms >= ?1 and started_at_ms < ?2 order by started_at_ms, id")?;
+        for (i, bucket) in buckets.iter().enumerate() {
+            let records = statement.query_map(params![bucket.start_at_ms, bucket.end_at_ms], |row| row.get::<_, String>(0))?;
+            let mut cost = 0.0;
+            let mut all_usage_known = true;
+            let mut matched_price = true;
+            for json in records {
+                let r: ModelTurn = serde_json::from_str(&json?)?;
+                if harness.is_some_and(|h| h != r.harness) { continue; }
+                let b = &mut out[i];
+                b.turns += 1;
+                let (Some(input), Some(prompt), Some(output), Some(cache_read), Some(cache_creation)) =
+                    (r.input_tokens, r.prompt_tokens, r.output_tokens, r.cache_read_tokens, r.cache_creation_tokens) else {
+                        b.unknown_usage_turns += 1;
+                        all_usage_known = false;
+                        continue;
+                    };
+                b.usage_turns += 1;
+                b.known_usage_turns += 1;
+                b.input_tokens = b.input_tokens.saturating_add(input);
+                b.prompt_tokens = b.prompt_tokens.saturating_add(prompt);
+                b.output_tokens = b.output_tokens.saturating_add(output);
+                b.reasoning_tokens = b.reasoning_tokens.saturating_add(r.reasoning_tokens.unwrap_or(0));
+                b.cache_read_tokens = b.cache_read_tokens.saturating_add(cache_read);
+                b.cache_creation_tokens = b.cache_creation_tokens.saturating_add(cache_creation);
+                if let Some(price) = prices.iter().find(|p| p.provider == r.provider && p.model == r.model) {
+                    let uncached = prompt.saturating_sub(cache_read).saturating_sub(cache_creation);
+                    cost += (uncached as f64 * price.input + output as f64 * price.output + cache_read as f64 * price.cache_read + cache_creation as f64 * price.cache_creation) / 1_000_000.0;
+                    b.price_coverage_turns += 1;
+                } else { matched_price = false; }
+            }
+            let b = &mut out[i];
+            b.unknown_usage_turns = b.turns.saturating_sub(b.known_usage_turns);
+            if b.turns == 0 { b.estimated_cost = Some(0.0); }
+            else if all_usage_known && matched_price && b.price_coverage_turns == b.turns { b.estimated_cost = Some(cost); }
+        }
+        Ok(out)
+    }
+
     pub fn model_prices(&self) -> Result<Vec<ModelPrice>> { Ok(self.load_json_setting("model_prices")?.unwrap_or_default()) }
     pub fn save_model_prices(&self, prices: &[ModelPrice]) -> Result<()> {
         let mut seen = std::collections::HashSet::new();
@@ -218,6 +306,67 @@ mod tests {
         let _ = std::fs::remove_file(store.path());
         Ok(())
     }
+    #[test]
+    fn calendar_bounds_are_half_open_and_keep_leap_day() -> Result<()> {
+        let store = AppStore::in_memory()?;
+        // 2024-02-01, leap day, and 2024-03-01 at 00:00 UTC.
+        let feb = 1_706_745_600_000;
+        let leap = 1_709_164_800_000;
+        let march = 1_709_251_200_000;
+        for started_at_ms in [feb - 1, feb, leap, march - 1, march, i64::MAX] {
+            store.record_model_turn(&ModelTurn {
+                conversation_id: "calendar".into(), provider: "p".into(), model: "m".into(),
+                harness: "classic".into(), started_at_ms, output_tokens: Some(7),
+                ..Default::default()
+            })?;
+        }
+        let rows = store.measured_model_stats_in_range(Some(feb), Some(march), None)?;
+        assert_eq!(rows[0].turns, 3);
+        assert_eq!(rows[0].output_tokens, 21);
+        assert!(store.measured_model_stats_in_range(Some(feb), Some(march), Some("rlm"))?.is_empty());
+        assert_eq!(store.measured_model_stats(Some(march), None)?[0].turns, 2);
+        assert_eq!(store.measured_model_stats(None, None)?[0].turns, 6);
+        assert!(store.measured_model_stats_in_range(Some(march), Some(feb), None).is_err());
+        assert!(store.measured_model_stats_in_range(Some(feb), Some(feb), None).is_err());
+        let _ = std::fs::remove_file(store.path());
+        Ok(())
+    }
+
+    #[test]
+    fn usage_series_exact_boundaries_coverage_prices_and_empty_buckets() -> Result<()> {
+        let store = AppStore::in_memory()?;
+        store.save_model_prices(&[ModelPrice { provider: "p".into(), model: "m".into(), input: 2., output: 4., cache_read: 0.5, cache_creation: 1. }])?;
+        for (at, output) in [(99, Some(2)), (100, Some(3)), (199, Some(4)), (200, Some(5))] {
+            store.record_model_turn(&ModelTurn { conversation_id: "c".into(), provider: "p".into(), model: "m".into(), harness: "classic".into(), started_at_ms: at, input_tokens: Some(10), prompt_tokens: Some(10), output_tokens: output, cache_read_tokens: Some(2), cache_creation_tokens: Some(1), ..Default::default() })?;
+        }
+        let rows = store.measured_model_usage_series(&[
+            ModelUsageBucketInput { start_at_ms: 100, end_at_ms: 200 },
+            ModelUsageBucketInput { start_at_ms: 200, end_at_ms: 300 },
+        ], None)?;
+        assert_eq!((rows[0].turns, rows[0].known_usage_turns, rows[0].output_tokens), (2, 2, 7));
+        assert!((rows[0].estimated_cost.unwrap() - (14.0*2.0 + 7.0*4.0 + 4.0*0.5 + 2.0*1.0)/1_000_000.0).abs() < 1e-12);
+        assert_eq!(rows[1].turns, 1);
+        assert_eq!(rows[1].estimated_cost, Some((7.0*2.0 + 5.0*4.0 + 2.0*0.5 + 1.0)/1_000_000.0));
+        let empty = store.measured_model_usage_series(&[ModelUsageBucketInput { start_at_ms: 300, end_at_ms: 400 }], None)?;
+        assert_eq!(empty[0].estimated_cost, Some(0.0));
+        assert!(store.measured_model_usage_series(&[
+            ModelUsageBucketInput { start_at_ms: 0, end_at_ms: 10 },
+            ModelUsageBucketInput { start_at_ms: 11, end_at_ms: 20 },
+        ], None).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn usage_series_cost_is_unknown_for_incomplete_usage_or_missing_price() -> Result<()> {
+        let store = AppStore::in_memory()?;
+        store.record_model_turn(&ModelTurn { started_at_ms: 1, provider: "p".into(), model: "unknown".into(), output_tokens: Some(2), ..Default::default() })?;
+        let rows = store.measured_model_usage_series(&[ModelUsageBucketInput { start_at_ms: 0, end_at_ms: 2 }], None)?;
+        assert_eq!(rows[0].unknown_usage_turns, 1);
+        assert_eq!(rows[0].estimated_cost, None);
+        assert_eq!(rows[0].price_coverage_turns, 0);
+        Ok(())
+    }
+
     #[test]
     fn unknown_usage_and_median() {
         let r = TurnMeasurement::new("c".into(), "p".into(), "m".into(), "rlm", false, None).finish();
