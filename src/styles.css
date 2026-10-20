@@ -3542,6 +3542,57 @@ textarea {
   color: var(--text-0);
 }
 
+button.settings-pane__about-link {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.settings-pane__about-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-pane__about-update {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, var(--bg-2));
+}
+
+.settings-pane__about-update-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-pane__about-update-version {
+  color: var(--text-1, var(--text-2));
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-pane__about-update-msg {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.settings-pane__about-update-msg[data-tone="accent"] {
+  color: var(--text-0);
+  font-weight: 500;
+}
+
+.settings-pane__about-update-msg[data-tone="error"] {
+  color: var(--danger, #c2410c);
+}
+
 .settings-pane__provider-card {
   min-width: 0;
   display: flex;

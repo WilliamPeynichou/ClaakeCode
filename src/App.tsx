@@ -18,7 +18,33 @@ const startsEmpty =
 /// Maximum time we wait on the boot updater check before falling through to
 /// the normal flow. Keeps the app responsive on flaky networks — if the
 /// update endpoint is unreachable we don't trap the user on a black canvas.
-const BOOT_CHECK_TIMEOUT_MS = 4000;
+const BOOT_CHECK_TIMEOUT_MS = 10000;
+/// Delay before the single retry when the first boot check throws (DNS not
+/// ready yet right after wake/login, transient 5xx…).
+const BOOT_CHECK_RETRY_DELAY_MS = 1500;
+
+/// Boot updater check: one retry on error, all bounded by
+/// `BOOT_CHECK_TIMEOUT_MS`. Resolves `null` on timeout or double failure.
+async function bootUpdateCheck(): Promise<UpdateInfo | null> {
+  const attempt = async (): Promise<UpdateInfo | null> => {
+    try {
+      return await api.checkForUpdate();
+    } catch {
+      await new Promise((r) => window.setTimeout(r, BOOT_CHECK_RETRY_DELAY_MS));
+      try {
+        return await api.checkForUpdate();
+      } catch {
+        return null;
+      }
+    }
+  };
+  return Promise.race<UpdateInfo | null>([
+    attempt(),
+    new Promise<null>((resolve) =>
+      window.setTimeout(() => resolve(null), BOOT_CHECK_TIMEOUT_MS),
+    ),
+  ]);
+}
 
 export default function App() {
   const [state, setState] = useState<AppState>({ kind: "boot" });
@@ -49,12 +75,7 @@ export default function App() {
     (async () => {
       // 1. Updater gate.
       try {
-        const info = await Promise.race<UpdateInfo | null>([
-          api.checkForUpdate(),
-          new Promise<null>((resolve) =>
-            window.setTimeout(() => resolve(null), BOOT_CHECK_TIMEOUT_MS),
-          ),
-        ]);
+        const info = await bootUpdateCheck();
         if (cancelled) return;
         if (info && info.available && info.version) {
           setState({ kind: "update_required", info, autoInstall: false });

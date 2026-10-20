@@ -97,6 +97,7 @@ import type {
   ThinkingLevel,
   ToolConfig,
   ToolSettings,
+  UpdateInfo,
   WebSearchProvider,
 } from "../types";
 
@@ -2639,6 +2640,103 @@ function AboutSection() {
           <span>GitHub</span>
         </a>
       </div>
+
+      <UpdateCheckPanel />
+    </div>
+  );
+}
+
+type UpdateCheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "upToDate"; checkedAt: number }
+  | { kind: "available"; info: UpdateInfo }
+  | { kind: "error"; message: string };
+
+/// Manual "Check for updates" control. Unlike the silent background poll in
+/// <UpdateBadge />, every outcome (up to date, available, error) is shown.
+function UpdateCheckPanel() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [state, setState] = useState<UpdateCheckState>({ kind: "idle" });
+
+  useEffect(() => {
+    api
+      .currentAppVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
+  }, []);
+
+  const onCheck = useCallback(async () => {
+    setState({ kind: "checking" });
+    try {
+      const info = await api.checkForUpdate();
+      if (info.currentVersion) setVersion(info.currentVersion);
+      if (info.available && info.version) {
+        setState({ kind: "available", info });
+      } else {
+        setState({ kind: "upToDate", checkedAt: Date.now() });
+      }
+    } catch (err) {
+      setState({ kind: "error", message: String(err) });
+    }
+  }, []);
+
+  const onInstall = useCallback(() => {
+    if (state.kind !== "available") return;
+    // Same hand-off as <UpdateBadge />: <App /> swaps to the lock screen
+    // and runs download → install → restart.
+    window.dispatchEvent(
+      new CustomEvent<{ info: UpdateInfo }>("claakecode:install-update", {
+        detail: { info: state.info },
+      }),
+    );
+  }, [state]);
+
+  return (
+    <div className="settings-pane__about-update">
+      <div className="settings-pane__about-update-row">
+        <span className="settings-pane__about-update-version">
+          Version {version ?? "—"}
+        </span>
+        <button
+          type="button"
+          className="settings-pane__about-link"
+          onClick={() => void onCheck()}
+          disabled={state.kind === "checking"}
+        >
+          <Icon
+            icon="solar:refresh-linear"
+            width={13}
+            height={13}
+          />
+          <span>
+            {state.kind === "checking" ? "Recherche…" : "Rechercher une mise à jour"}
+          </span>
+        </button>
+      </div>
+      {state.kind === "upToDate" ? (
+        <p className="settings-pane__about-update-msg" data-tone="ok">
+          Claake Code est à jour.
+        </p>
+      ) : state.kind === "available" ? (
+        <div className="settings-pane__about-update-row">
+          <p className="settings-pane__about-update-msg" data-tone="accent">
+            Version {state.info.version} disponible.
+          </p>
+          <button
+            type="button"
+            className="settings-pane__about-link"
+            onClick={onInstall}
+          >
+            <Icon icon="solar:download-linear" width={13} height={13} />
+            <span>Installer et redémarrer</span>
+          </button>
+        </div>
+      ) : state.kind === "error" ? (
+        <p className="settings-pane__about-update-msg" data-tone="error">
+          Échec de la vérification : {state.message}
+        </p>
+      ) : null}
     </div>
   );
 }
