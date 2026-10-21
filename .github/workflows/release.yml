@@ -97,7 +97,8 @@ jobs:
         platform:
           # macOS universal binary — one .dmg / .app.tar.gz that runs on Intel + Apple Silicon.
           - name: macos-universal
-            os: macos-latest
+            # Use the explicit Intel pool to avoid ARM64 runner capacity failures.
+            os: macos-15-intel
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
             # tauri.prime.conf.json = ripgrep + prime-agent + uv (RLM chat engine).
             tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.prime.conf.json --ignore-version-mismatches"
