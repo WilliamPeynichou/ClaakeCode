@@ -107,9 +107,36 @@ pub struct ChatChoice {
 #[derive(Debug, Default, Deserialize)]
 pub struct ChatDelta {
     #[serde(default)]
-    pub content: Option<String>,
+    pub content: Option<DeltaContent>,
     #[serde(default)]
     pub tool_calls: Vec<ToolCallDelta>,
+}
+
+/// Mistral may stream plain text or structured text/thinking fragments.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum DeltaContent {
+    Text(String),
+    Blocks(Vec<DeltaContentBlock>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DeltaContentBlock {
+    Text {
+        text: String,
+    },
+    Thinking {
+        thinking: Vec<ThinkingText>,
+    },
+    // Metadata and future non-text fragments are not answer text.
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThinkingText {
+    pub text: String,
 }
 
 #[derive(Debug, Deserialize)]

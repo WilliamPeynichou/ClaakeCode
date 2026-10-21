@@ -8,7 +8,7 @@ use claakecode_core::{
     AppError, PartKind, ProviderStream, StopReason, StreamEvent, ToolCallIntro, Usage,
 };
 
-use crate::wire::ChatChunk;
+use crate::wire::{ChatChunk, DeltaContent, DeltaContentBlock};
 
 pub fn map_stream<S, E>(body: S, model: String) -> ProviderStream
 where
@@ -153,10 +153,25 @@ impl EventParser {
 
         let mut out = Vec::new();
         for choice in chunk.choices {
-            if let Some(text) = choice.delta.content.filter(|value| !value.is_empty()) {
-                self.ensure_started(&mut out);
-                let index = self.ensure_open(PartKind::Text, &mut out);
-                out.push(StreamEvent::TextDelta { index, delta: text });
+            if let Some(content) = choice.delta.content {
+                match content {
+                    DeltaContent::Text(text) => self.push_text(text, PartKind::Text, &mut out),
+                    DeltaContent::Blocks(blocks) => {
+                        for block in blocks {
+                            match block {
+                                DeltaContentBlock::Text { text } => {
+                                    self.push_text(text, PartKind::Text, &mut out);
+                                }
+                                DeltaContentBlock::Thinking { thinking } => {
+                                    for fragment in thinking {
+                                        self.push_text(fragment.text, PartKind::Thinking, &mut out);
+                                    }
+                                }
+                                DeltaContentBlock::Other => {}
+                            }
+                        }
+                    }
+                }
             }
             for call in choice.delta.tool_calls {
                 self.push_tool_delta(call, &mut out);
@@ -168,6 +183,18 @@ impl EventParser {
         }
 
         out
+    }
+
+    fn push_text(&mut self, text: String, kind: PartKind, out: &mut Vec<StreamEvent>) {
+        if text.is_empty() {
+            return;
+        }
+        self.ensure_started(out);
+        let index = self.ensure_open(kind, out);
+        out.push(match kind {
+            PartKind::Thinking => StreamEvent::ThinkingDelta { index, delta: text },
+            _ => StreamEvent::TextDelta { index, delta: text },
+        });
     }
 
     fn push_tool_delta(&mut self, call: crate::wire::ToolCallDelta, out: &mut Vec<StreamEvent>) {
@@ -326,5 +353,111 @@ fn map_stop_reason(raw: &str, saw_tool_call: bool) -> StopReason {
         "error" => StopReason::Other,
         _ if saw_tool_call => StopReason::ToolUse,
         _ => StopReason::Other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn push(parser: &mut EventParser, value: Value) -> Vec<StreamEvent> {
+        parser.push(serde_json::from_value(value).unwrap())
+    }
+
+    #[test]
+    fn accepts_legacy_text_null_and_empty_content() {
+        let mut parser = EventParser::new("codestral".into());
+        for content in [Value::Null, json!(""), json!([])] {
+            assert!(push(
+                &mut parser,
+                json!({"choices": [{"delta": {"content": content}}]})
+            )
+            .is_empty());
+        }
+        let events = push(
+            &mut parser,
+            json!({"choices": [{"delta": {"content": "Hello"}}]}),
+        );
+        assert!(
+            matches!(&events[2], StreamEvent::TextDelta { index: 0, delta } if delta == "Hello")
+        );
+    }
+
+    #[test]
+    fn separates_thinking_and_text_in_order() {
+        let mut parser = EventParser::new("mistral-large-4".into());
+        let events = push(
+            &mut parser,
+            json!({"choices": [{"delta": {"content": [
+            {"type": "thinking", "thinking": [{"type": "text", "text": "Let me "}, {"type": "text", "text": "think."}]},
+            {"type": "text", "text": "Answer"},
+            {"type": "citation", "id": "metadata"}
+        ]}, "finish_reason": "stop"}]}),
+        );
+        assert!(matches!(
+            &events[1],
+            StreamEvent::PartStart {
+                index: 0,
+                kind: PartKind::Thinking,
+                ..
+            }
+        ));
+        assert!(
+            matches!(&events[2], StreamEvent::ThinkingDelta { index: 0, delta } if delta == "Let me ")
+        );
+        assert!(
+            matches!(&events[3], StreamEvent::ThinkingDelta { index: 0, delta } if delta == "think.")
+        );
+        assert!(matches!(&events[4], StreamEvent::PartStop { index: 0 }));
+        assert!(matches!(
+            &events[5],
+            StreamEvent::PartStart {
+                index: 1,
+                kind: PartKind::Text,
+                ..
+            }
+        ));
+        assert!(
+            matches!(&events[6], StreamEvent::TextDelta { index: 1, delta } if delta == "Answer")
+        );
+        assert!(matches!(
+            events.last(),
+            Some(StreamEvent::MessageStop {
+                stop_reason: StopReason::EndTurn,
+                ..
+            })
+        ));
+        assert!(parser.finish().is_empty());
+    }
+
+    #[test]
+    fn structured_content_preserves_tools_and_usage() {
+        let mut parser = EventParser::new("mistral-large-4".into());
+        let events = push(
+            &mut parser,
+            json!({
+                "choices": [{"delta": {
+                    "content": [{"type": "text", "text": "Searching"}],
+                    "tool_calls": [{"index": 0, "id": "call_1", "function": {"name": "search", "arguments": "{}"}}]
+                }, "finish_reason": "tool_calls"}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+            }),
+        );
+        assert!(events.iter().any(
+            |event| matches!(event, StreamEvent::ToolJsonDelta { chunk, .. } if chunk == "{}")
+        ));
+        assert!(
+            matches!(events.last(), Some(StreamEvent::MessageStop { stop_reason: StopReason::ToolUse, usage }) if usage.total_tokens == 30)
+        );
+    }
+
+    #[test]
+    fn malformed_known_content_is_not_silently_discarded() {
+        assert!(
+            serde_json::from_value::<ChatChunk>(json!({"choices": [{"delta": {
+                "content": [{"type": "text", "text": 42}]
+            }}]}))
+            .is_err()
+        );
     }
 }

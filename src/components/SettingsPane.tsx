@@ -5403,6 +5403,7 @@ function SkillsSection({
               type="search"
               value={filter}
               onChange={(event) => onFilterChange(event.target.value)}
+              aria-label="Search skills"
               placeholder={total ? `Search ${total} skills` : "Search skills"}
             />
           </div>
@@ -5414,8 +5415,7 @@ function SkillsSection({
             </div>
           )}
 
-          <RepositorySkillsSection workspacePath={workspacePath} onChanged={onRefresh} blocked={dirty || saving || deleting} />
-          <div className="settings-pane__detail-section">Manual skills</div>
+          <div className="settings-pane__detail-section">My skills · {total}</div>
           <div className="settings-pane__skill-scroll">
             {skills.map((skill) => (
               <div
@@ -5512,6 +5512,7 @@ function SkillsSection({
           )}
         </div>
       </div>
+      <RepositorySkillsSection workspacePath={workspacePath} onChanged={onRefresh} blocked={dirty || saving || deleting} />
     </>
   );
 }
@@ -5582,7 +5583,12 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
     }
   };
   return (
-    <section className="settings-pane__repositories" aria-label="Git skill repositories" aria-busy={busy}>
+    <details className="settings-pane__repositories" aria-busy={busy}>
+      <summary className="settings-pane__repositories-summary">
+        <span>Git repositories · {repositories.length}</span>
+        <span className="settings-pane__muted">Import and manage skills</span>
+      </summary>
+      <div className="settings-pane__repositories-content">
       <div className="settings-pane__nav-list-head">
         <span>Git repositories · {repositories.length}</span>
         <button type="button" className="settings-pane__btn" disabled={disabled}
@@ -5629,7 +5635,7 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
       )}
       <div className="settings-pane__repository-list">
         {repositories.map((repository) => (
-          <details key={repository.id} className="settings-pane__tool" open>
+          <details key={repository.id} className="settings-pane__tool">
             <summary className="settings-pane__tool-name">{repository.name} · {repository.enabled ? "enabled" : "disabled"} · {repository.skills.length} skills</summary>
             <div className="settings-pane__tool-body">
               <code className="settings-pane__skill-path">{repository.url}</code>
@@ -5688,7 +5694,8 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
         ))}
       </div>
       <p className="settings-pane__muted">Disabling affects future skill loads; instructions already loaded in a conversation remain.</p>
-    </section>
+      </div>
+    </details>
   );
 }
 
