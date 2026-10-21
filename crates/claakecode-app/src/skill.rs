@@ -59,9 +59,10 @@ pub struct SkillTool {
 }
 
 #[derive(Debug, Clone)]
-struct SkillEntry {
-    name: String,
-    path: PathBuf,
+pub(crate) struct SkillEntry {
+    pub(crate) name: String,
+    #[allow(dead_code)]
+    pub(crate) path: PathBuf,
 }
 
 impl SkillTool {
@@ -137,33 +138,23 @@ impl SkillTool {
         let content = fs::read_to_string(&skill.path)
             .with_context(|| format!("unable to read skill `{name}`"))?;
         Ok(format!(
-            "Loaded skill `{name}`:\n\n<skill name=\"{name}\">\n{}\n</skill>",
+            "Loaded skill `{name}`:\nSkill instructions: {}\nSkill directory: {}\nUse these absolute paths to read associated references, scripts and resources on demand. Relative resource paths resolve from the skill directory; shared resources may be in parent directories. Loading a skill does not authorize executing scripts or installing dependencies; normal tool permissions still apply.\n\n<skill name=\"{name}\">\n{}\n</skill>",
+            skill.path.display(),
+            skill.path.parent().unwrap_or(&skill.path).display(),
             content.trim()
         ))
     }
 
     fn discover(&self) -> Vec<SkillEntry> {
-        let mut roots = vec![
-            self.workspace_root.join(".agents/skills"),
-            self.workspace_root.join(".claakecode/skills"),
-        ];
-        if let Some(base_dirs) = BaseDirs::new() {
-            let home = base_dirs.home_dir();
-            roots.push(home.join(".agents/skills"));
-            roots.push(home.join(".claakecode/skills"));
-        }
-
-        let mut seen = HashSet::new();
-        let mut skills = Vec::new();
-        for root in roots {
-            for skill in scan_skill_root(&root) {
-                if self.settings.is_enabled(&skill.name) && seen.insert(skill.name.clone()) {
-                    skills.push(skill);
-                }
-            }
-        }
-        skills.sort_by(|left, right| left.name.cmp(&right.name));
-        skills
+        // Conflicting names are never handed to the agent: choosing one would be silent and arbitrary.
+        list_installed_skills(&self.workspace_root, &self.settings)
+            .into_iter()
+            .filter(|skill| skill.enabled && !skill.conflict)
+            .map(|skill| SkillEntry {
+                name: skill.name,
+                path: PathBuf::from(skill.absolute_path),
+            })
+            .collect()
     }
 }
 
@@ -208,7 +199,7 @@ impl SkillSettings {
     }
 }
 
-fn scan_skill_root(root: &Path) -> Vec<SkillEntry> {
+pub(crate) fn scan_skill_root(root: &Path) -> Vec<SkillEntry> {
     let Ok(entries) = fs::read_dir(root) else {
         return Vec::new();
     };
@@ -250,7 +241,7 @@ fn parse_skill_name(content: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-fn parse_frontmatter(content: &str) -> HashMap<String, String> {
+pub(crate) fn parse_frontmatter(content: &str) -> HashMap<String, String> {
     let mut fields = HashMap::new();
     let mut lines = content.lines();
     if lines.next().map(str::trim) != Some("---") {
@@ -277,6 +268,7 @@ fn parse_frontmatter(content: &str) -> HashMap<String, String> {
 pub enum SkillSource {
     Workspace,
     Global,
+    Repository,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -290,11 +282,23 @@ pub struct InstalledSkill {
     pub absolute_path: String,
     pub content: String,
     pub enabled: bool,
+    pub repository_id: Option<String>,
+    pub conflict: bool,
 }
 
 pub fn list_installed_skills(
     workspace_root: impl AsRef<Path>,
     settings: &SkillSettings,
+) -> Vec<InstalledSkill> {
+    list_installed_skills_with(workspace_root, settings, None)
+}
+
+/// `repository_root` overrides the managed repository storage (tests); `None` uses the default.
+/// `conflict` is set on every enabled skill whose name is shared with another enabled skill.
+pub(crate) fn list_installed_skills_with(
+    workspace_root: impl AsRef<Path>,
+    settings: &SkillSettings,
+    repository_root: Option<&Path>,
 ) -> Vec<InstalledSkill> {
     let workspace_root = workspace_root.as_ref();
     let home_dir = BaseDirs::new().map(|base| base.home_dir().to_path_buf());
@@ -311,6 +315,7 @@ pub fn list_installed_skills(
         roots.push((SkillSource::Global, home.join(".claakecode/skills")));
     }
 
+    // Manual skills keep their historical precedence: workspace before home, first name wins.
     let mut seen = HashSet::new();
     let mut skills = Vec::new();
 
@@ -363,10 +368,42 @@ pub fn list_installed_skills(
                 absolute_path: skill_path.display().to_string(),
                 content,
                 enabled,
+                repository_id: None,
+                conflict: false,
             });
         }
     }
 
+    let repositories = match repository_root {
+        Some(root) => crate::skill_repository::catalog_in(root).unwrap_or_default(),
+        None => crate::skill_repository::storage_root()
+            .and_then(|root| crate::skill_repository::catalog_in(&root))
+            .unwrap_or_default(),
+    };
+    for repository in repositories {
+        for skill in repository.skills {
+            let content = fs::read_to_string(&skill.absolute_path).unwrap_or_default();
+            skills.push(InstalledSkill {
+                name: skill.name,
+                description: skill.description,
+                source: SkillSource::Repository,
+                root_label: repository.name.clone(),
+                absolute_path: skill.absolute_path,
+                content,
+                enabled: repository.enabled,
+                repository_id: Some(repository.id.clone()),
+                conflict: false,
+            });
+        }
+    }
+
+    let mut counts = HashMap::<String, usize>::new();
+    for skill in skills.iter().filter(|skill| skill.enabled) {
+        *counts.entry(skill.name.clone()).or_default() += 1;
+    }
+    for skill in &mut skills {
+        skill.conflict = skill.enabled && counts.get(&skill.name).copied().unwrap_or_default() > 1;
+    }
     skills.sort_by(|left, right| left.name.cmp(&right.name));
     skills
 }

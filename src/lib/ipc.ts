@@ -22,6 +22,8 @@ import type {
   GitRepositorySnapshot,
   GoogleProviderStatus,
   InstalledSkill,
+  SkillRepository,
+  SkillRepositoryUpstreamStatus,
   KimiProviderStatus,
   MistralProviderStatus,
   MistralModel,
@@ -367,6 +369,24 @@ export const api = {
     return invoke<FileDocument>("read_external_file_command", {
       input: { path },
     });
+  },
+  listSkillRepositories(workspacePath: string) {
+    return invoke<SkillRepository[]>("list_skill_repositories_command", { input: { workspacePath } });
+  },
+  addSkillRepository(url: string) {
+    return invoke<SkillRepository>("add_skill_repository_command", { input: { url } });
+  },
+  updateSkillRepository(id: string) {
+    return invoke<SkillRepository>("update_skill_repository_command", { input: { id } });
+  },
+  checkSkillRepositoryUpstream(id: string) {
+    return invoke<SkillRepositoryUpstreamStatus>("check_skill_repository_upstream_command", { input: { id } });
+  },
+  setSkillRepositoryEnabled(id: string, enabled: boolean) {
+    return invoke<void>("set_skill_repository_enabled_command", { input: { id, enabled } });
+  },
+  removeSkillRepository(id: string) {
+    return invoke<void>("remove_skill_repository_command", { input: { id } });
   },
   deleteSkill(workspacePath: string, path: string) {
     return invoke<void>("delete_skill_command", {

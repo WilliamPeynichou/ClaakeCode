@@ -20,6 +20,8 @@ pub mod question;
 pub mod read;
 mod ripgrep;
 pub mod skill;
+pub mod bundled_skills;
+pub mod skill_repository;
 pub mod store;
 pub mod subagent;
 pub mod team;

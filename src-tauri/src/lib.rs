@@ -276,6 +276,20 @@ pub fn run() {
                 }
             }
 
+            // Install the skills shipped with the app (once per skill, never overwriting).
+            if let Ok(resources) = app.path().resource_dir() {
+                let bundled = resources.join("bundled-skills");
+                std::thread::spawn(move || {
+                    match claakecode_app::bundled_skills::seed_bundled_skills(&bundled) {
+                        Ok(report) if !report.installed.is_empty() => {
+                            tracing::info!(installed = ?report.installed, "installed bundled skills");
+                        }
+                        Ok(_) => {}
+                        Err(err) => tracing::warn!(error = %err, "bundled skills setup failed"),
+                    }
+                });
+            }
+
             #[cfg(target_os = "macos")]
             {
                 install_macos_dock_menu(app.handle());
@@ -429,6 +443,12 @@ pub fn run() {
             conversations::cancel_mcp_oauth_login,
             conversations::disconnect_mcp_oauth,
             conversations::list_installed_skills_command,
+            conversations::list_skill_repositories_command,
+            conversations::add_skill_repository_command,
+            conversations::update_skill_repository_command,
+            conversations::check_skill_repository_upstream_command,
+            conversations::set_skill_repository_enabled_command,
+            conversations::remove_skill_repository_command,
             conversations::save_skill_settings,
             turns::check_rewrite_workspace_restore,
             turns::send_message,

@@ -71,6 +71,7 @@ import type {
   GoogleProviderStatus,
   ImageProvider,
   InstalledSkill,
+  SkillRepository,
   KimiProviderStatus,
   MistralProviderStatus,
   McpAuthConfig,
@@ -91,6 +92,7 @@ import type {
   ProdSettings,
   TypeSafeSettings,
   SkillSettings,
+  SkillRepositoryUpstreamStatus,
   SubAgentConfig,
   SubAgentSettings,
   SwarmSettings,
@@ -1862,7 +1864,7 @@ export function SettingsPane({ workspacePath }: Props) {
     setSkillsError(null);
     setSkillsStatus(null);
     try {
-      const list = await api.listInstalledSkills(workspacePath);
+      const list = (await api.listInstalledSkills(workspacePath)).filter((skill) => !skill.repositoryId);
       setSkills(list);
       setSavedSkillsJson(skillsFingerprint(list));
       setSelectedSkillName((current) => {
@@ -1941,8 +1943,8 @@ export function SettingsPane({ workspacePath }: Props) {
     setSkillsStatus(null);
     try {
       const saved = await api.saveSkillSettings(workspacePath, settingsFromSkills(skills));
-      setSkills(saved);
-      setSavedSkillsJson(skillsFingerprint(saved));
+      setSkills(saved.filter((skill) => !skill.repositoryId));
+      setSavedSkillsJson(skillsFingerprint(saved.filter((skill) => !skill.repositoryId)));
       setSelectedSkillName((current) => {
         if (current && saved.some((skill) => skill.name === current)) return current;
         return saved[0]?.name ?? null;
@@ -1987,8 +1989,8 @@ export function SettingsPane({ workspacePath }: Props) {
             workspacePath,
             settingsFromSkills(nextSkills),
           );
-          setSkills(saved);
-          setSavedSkillsJson(skillsFingerprint(saved));
+          setSkills(saved.filter((skill) => !skill.repositoryId));
+          setSavedSkillsJson(skillsFingerprint(saved.filter((skill) => !skill.repositoryId)));
         }
         setSelectedSkillName((current) => {
           if (current !== skill.name) return current;
@@ -2021,7 +2023,7 @@ export function SettingsPane({ workspacePath }: Props) {
     setSkillsStatus(null);
     try {
       await api.createSkill(workspacePath, baseName, template, "global");
-      const refreshed = await api.listInstalledSkills(workspacePath);
+      const refreshed = (await api.listInstalledSkills(workspacePath)).filter((skill) => !skill.repositoryId);
       setSkills(refreshed);
       setSavedSkillsJson(skillsFingerprint(refreshed));
       setSelectedSkillName(baseName);
@@ -2042,7 +2044,7 @@ export function SettingsPane({ workspacePath }: Props) {
       setSkillsStatus(null);
       try {
         await api.updateSkill(workspacePath, skill.absolutePath, content);
-        const refreshed = await api.listInstalledSkills(workspacePath);
+        const refreshed = (await api.listInstalledSkills(workspacePath)).filter((skill) => !skill.repositoryId);
         setSkills(refreshed);
         setSavedSkillsJson(skillsFingerprint(refreshed));
         setSkillsStatus("Saved");
@@ -2524,6 +2526,7 @@ export function SettingsPane({ workspacePath }: Props) {
           />
         ) : section === "skills" ? (
           <SkillsSection
+            workspacePath={workspacePath}
             skills={filteredSkills}
             allSkills={skills}
             loading={skillsLoading}
@@ -5283,6 +5286,7 @@ function SubAgentEditor({
 // ---- Skills section ----------------------------------------------------
 
 type SkillsSectionProps = {
+  workspacePath: string;
   skills: InstalledSkill[];
   allSkills: InstalledSkill[] | null;
   loading: boolean;
@@ -5305,6 +5309,7 @@ type SkillsSectionProps = {
 };
 
 function SkillsSection({
+  workspacePath,
   skills,
   allSkills,
   loading,
@@ -5409,10 +5414,12 @@ function SkillsSection({
             </div>
           )}
 
+          <RepositorySkillsSection workspacePath={workspacePath} onChanged={onRefresh} blocked={dirty || saving || deleting} />
+          <div className="settings-pane__detail-section">Manual skills</div>
           <div className="settings-pane__skill-scroll">
             {skills.map((skill) => (
               <div
-                key={skill.name}
+                key={skill.absolutePath}
                 className="settings-pane__skill-item"
                 data-active={selectedSkill?.name === skill.name ? "true" : "false"}
                 role="button"
@@ -5437,7 +5444,7 @@ function SkillsSection({
                       className="settings-pane__skill-state"
                       data-enabled={skill.enabled ? "true" : "false"}
                     >
-                      {skill.enabled ? "enabled" : "off"}
+                      {skill.conflict ? "name conflict — unavailable" : skill.enabled ? "enabled" : "off"}
                     </span>
                   </div>
                   <button
@@ -5506,6 +5513,182 @@ function SkillsSection({
         </div>
       </div>
     </>
+  );
+}
+
+const RECOMMENDED_REPOSITORIES: { name: string; url: string; description: string }[] = [
+  {
+    name: "data-analytics-skills",
+    url: "https://github.com/nimrodfisher/data-analytics-skills.git",
+    description: "33 skills d'analyse de données (MIT) : audit qualité, documentation, storytelling, visualisation, communication.",
+  },
+];
+
+function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
+  workspacePath: string;
+  onChanged: () => void;
+  blocked: boolean;
+}) {
+  const [repositories, setRepositories] = useState<SkillRepository[]>([]);
+  const [url, setUrl] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    setRepositories(await api.listSkillRepositories(workspacePath));
+  }, [workspacePath]);
+
+  useEffect(() => {
+    let active = true;
+    setRepositories([]);
+    setError(null);
+    void api.listSkillRepositories(workspacePath).then((items) => {
+      if (active) setRepositories(items);
+    }).catch((err: unknown) => {
+      if (active) setError(String(err));
+    });
+    return () => { active = false; };
+  }, [workspacePath]);
+
+  const run = async (operation: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await operation();
+      await refresh();
+      setConfirmation(null);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disabled = busy || blocked;
+  const [upstream, setUpstream] = useState<Record<string, SkillRepositoryUpstreamStatus | "checking">>({});
+  const checkUpstream = async (id: string) => {
+    setUpstream((current) => ({ ...current, [id]: "checking" }));
+    setError(null);
+    try {
+      const status = await api.checkSkillRepositoryUpstream(id);
+      setUpstream((current) => ({ ...current, [id]: status }));
+    } catch (err) {
+      setUpstream((current) => {
+        const { [id]: _removed, ...rest } = current;
+        return rest;
+      });
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <section className="settings-pane__repositories" aria-label="Git skill repositories" aria-busy={busy}>
+      <div className="settings-pane__nav-list-head">
+        <span>Git repositories · {repositories.length}</span>
+        <button type="button" className="settings-pane__btn" disabled={disabled}
+          onClick={() => setAdding(!adding)} aria-expanded={adding}>Add repository</button>
+      </div>
+      <p className="settings-pane__muted">One switch enables the entire repository. Cloning never runs scripts or installs dependencies.</p>
+      {blocked && <p className="settings-pane__muted">Save manual skill changes before managing repositories.</p>}
+      {adding && (
+        <form className="settings-pane__field" onSubmit={(event) => {
+          event.preventDefault();
+          if (!url.trim() || disabled) return;
+          void run(async () => {
+            await api.addSkillRepository(url.trim());
+            setUrl("");
+            setAdding(false);
+          });
+        }}>
+          <label className="settings-pane__field-label" htmlFor="skill-repository-url">Git URL</label>
+          <input id="skill-repository-url" className="settings-pane__field-input" type="text"
+            placeholder="https://github.com/owner/skills.git" value={url}
+            onChange={(event) => setUrl(event.target.value)} disabled={disabled} required />
+          <button className="settings-pane__btn" type="submit" disabled={disabled || !url.trim()}>
+            {busy ? "Installing…" : "Clone repository"}
+          </button>
+        </form>
+      )}
+      {error && <div role="alert" className="settings-pane__editor-error">{error}</div>}
+      {RECOMMENDED_REPOSITORIES.length > 0 && !repositories.some((repository) => RECOMMENDED_REPOSITORIES.some((recommended) =>
+        repository.url.replace(/\/?(\.git)?$/, "") === recommended.url.replace(/\/?(\.git)?$/, ""))) && (
+        <div className="settings-pane__field">
+          <p className="settings-pane__muted">Recommended repositories:</p>
+          {RECOMMENDED_REPOSITORIES.map((recommended) => (
+            <div key={recommended.url} className="settings-pane__field-actions">
+              <div>
+                <strong>{recommended.name}</strong>
+                <p className="settings-pane__muted">{recommended.description}</p>
+                <code className="settings-pane__skill-path">{recommended.url}</code>
+              </div>
+              <button type="button" className="settings-pane__btn" disabled={disabled}
+                onClick={() => void run(async () => { await api.addSkillRepository(recommended.url); })}>Add</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="settings-pane__repository-list">
+        {repositories.map((repository) => (
+          <details key={repository.id} className="settings-pane__tool" open>
+            <summary className="settings-pane__tool-name">{repository.name} · {repository.enabled ? "enabled" : "disabled"} · {repository.skills.length} skills</summary>
+            <div className="settings-pane__tool-body">
+              <code className="settings-pane__skill-path">{repository.url}</code>
+              <code className="settings-pane__skill-path" title={repository.absolutePath}>Revision: {repository.revision.slice(0, 12)}</code>
+              {(() => {
+                const status = upstream[repository.id];
+                if (!status || status === "checking") return null;
+                return status.updateAvailable
+                  ? <p className="settings-pane__muted" role="status">Update available upstream: {status.installedRevision.slice(0, 12)} → {status.remoteRevision.slice(0, 12)}</p>
+                  : <p className="settings-pane__muted" role="status">Up to date with upstream.</p>;
+              })()}
+              <div className="settings-pane__field-actions">
+                <button type="button" className="settings-pane__switch" role="switch"
+                  aria-label={`Enable all skills from ${repository.name}`} aria-checked={repository.enabled}
+                  data-on={repository.enabled ? "true" : "false"} disabled={disabled}
+                  onClick={() => void run(() => api.setSkillRepositoryEnabled(repository.id, !repository.enabled))}>
+                  <span className="settings-pane__switch-thumb" />
+                </button>
+                <button type="button" className="settings-pane__btn"
+                  disabled={disabled || upstream[repository.id] === "checking"}
+                  onClick={() => void checkUpstream(repository.id)}>
+                  {upstream[repository.id] === "checking" ? "Checking…" : "Check upstream"}
+                </button>
+                <button type="button" className="settings-pane__btn" disabled={disabled}
+                  data-tone={(upstream[repository.id] as SkillRepositoryUpstreamStatus | undefined)?.updateAvailable ? "primary" : undefined}
+                  onClick={() => void run(async () => {
+                    await api.updateSkillRepository(repository.id);
+                    setUpstream((current) => {
+                      const { [repository.id]: _removed, ...rest } = current;
+                      return rest;
+                    });
+                  })}>Update</button>
+                <button type="button" className="settings-pane__btn" data-tone="danger-ghost" disabled={disabled}
+                  onClick={() => setConfirmation(repository.id)}>Remove</button>
+              </div>
+              {confirmation === repository.id && <div className="settings-pane__field">
+                <p className="settings-pane__muted">Remove {repository.name} and its installed files? Manual skills are not affected.</p>
+                <div className="settings-pane__field-actions">
+                  <button type="button" className="settings-pane__btn" data-tone="danger" disabled={disabled}
+                    onClick={() => void run(() => api.removeSkillRepository(repository.id))}>Confirm removal</button>
+                  <button type="button" className="settings-pane__btn" disabled={busy}
+                    onClick={() => setConfirmation(null)}>Cancel</button>
+                </div>
+              </div>}
+              {repository.warnings.map((warning, index) => <p key={index} className="settings-pane__editor-error">{warning}</p>)}
+              <ul className="settings-pane__repository-skills">
+                {repository.skills.map((skill) => <li key={skill.relativePath}>
+                  <strong>{skill.name}</strong>
+                  {skill.conflict && <span className="settings-pane__editor-error">Name conflict — unavailable until resolved</span>}
+                  <p className="settings-pane__muted">{skill.description || "No description provided."}</p>
+                  <code className="settings-pane__skill-path">{skill.relativePath}</code>
+                </li>)}
+              </ul>
+            </div>
+          </details>
+        ))}
+      </div>
+      <p className="settings-pane__muted">Disabling affects future skill loads; instructions already loaded in a conversation remain.</p>
+    </section>
   );
 }
 
@@ -5743,7 +5926,7 @@ function subAgentSettingsFingerprint(settings: SubAgentSettings): string {
 
 function settingsFromSkills(skills: InstalledSkill[]): SkillSettings {
   return {
-    skills: skills.map((skill) => ({
+    skills: skills.filter((skill) => !skill.repositoryId).map((skill) => ({
       name: skill.name,
       enabled: skill.enabled,
     })),

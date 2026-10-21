@@ -645,6 +645,72 @@ fn mcp_login_error_html(message: &str) -> String {
     openai_login_error_html(message)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct SkillRepositoryInput {
+    pub(super) id: String,
+    #[serde(default)]
+    pub(super) enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SkillRepositoryUrlInput {
+    pub(super) url: String,
+}
+
+#[tauri::command]
+pub(super) async fn list_skill_repositories_command(
+    state: State<'_, DesktopState>,
+    input: WorkspaceInput,
+) -> std::result::Result<Vec<claakecode_app::skill_repository::SkillRepository>, String> {
+    let root = normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let settings = state.store.load_skill_settings().map_err(error_to_string)?;
+    claakecode_app::skill_repository::list_skill_repositories(&root, &settings).map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn add_skill_repository_command(
+    input: SkillRepositoryUrlInput,
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepository, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::add_skill_repository(&input.url).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn update_skill_repository_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepository, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::update_skill_repository(&input.id).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn check_skill_repository_upstream_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<claakecode_app::skill_repository::UpstreamStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::check_skill_repository_upstream(&input.id).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn set_skill_repository_enabled_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<(), String> {
+    claakecode_app::skill_repository::set_skill_repository_enabled(&input.id, input.enabled).map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) async fn remove_skill_repository_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::remove_skill_repository(&input.id).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 pub(super) async fn list_installed_skills_command(
     state: State<'_, DesktopState>,

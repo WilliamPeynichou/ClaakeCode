@@ -655,7 +655,7 @@ export type StartMcpOAuthLoginOutput = {
   authUrl: string;
 };
 
-export type SkillSource = "workspace" | "global";
+export type SkillSource = "workspace" | "global" | "repository";
 
 export type InstalledSkill = {
   name: string;
@@ -665,6 +665,34 @@ export type InstalledSkill = {
   absolutePath: string;
   content: string;
   enabled: boolean;
+  repositoryId?: string | null;
+  conflict?: boolean;
+};
+
+export type RepositorySkill = {
+  name: string;
+  description?: string | null;
+  relativePath: string;
+  absolutePath: string;
+  conflict: boolean;
+};
+
+export type SkillRepositoryUpstreamStatus = {
+  id: string;
+  updateAvailable: boolean;
+  installedRevision: string;
+  remoteRevision: string;
+};
+
+export type SkillRepository = {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  revision: string;
+  absolutePath: string;
+  skills: RepositorySkill[];
+  warnings: string[];
 };
 
 export type SkillConfig = {
