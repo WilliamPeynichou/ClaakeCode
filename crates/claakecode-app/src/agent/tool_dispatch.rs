@@ -77,6 +77,8 @@ pub(super) async fn run_tool(
         glob.run(input).await
     } else if canonical_name == tool_names::GREP {
         grep.run(input).await
+    } else if canonical_name == "mgrep" {
+        grep.run_mgrep(input).await
     } else if canonical_name == tool_names::READ {
         read.run(input).await
     } else if canonical_name == tool_names::EDIT_FILE {
@@ -142,6 +144,7 @@ fn ask_mode_tool_allowed(name: &str) -> bool {
     matches!(
         name,
         tool_names::GLOB
+            | "mgrep"
             | tool_names::GREP
             | tool_names::READ
             | tool_names::WEB_SEARCH

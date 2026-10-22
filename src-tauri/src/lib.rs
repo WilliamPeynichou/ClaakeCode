@@ -226,6 +226,7 @@ pub fn run() {
 
     let state = DesktopState {
         providers: Arc::new(StdMutex::new(providers)),
+        anthropic_quota: Arc::new(StdMutex::new(None)),
         store,
         default_model,
         system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
@@ -403,6 +404,7 @@ pub fn run() {
             remote::remote_stop_pairing,
             remote::remote_revoke_device,
             providers::list_configured_model_providers,
+            providers::get_provider_quota_remaining,
             providers::get_openai_provider_status,
             providers::start_openai_oauth_login,
             providers::cancel_openai_oauth_login,

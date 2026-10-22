@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use serde::Serialize;
 use claakecode_core::{
-    AppError, ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider, ProviderRequest,
-    ProviderStream, Result, Role, TokenEstimate, ToolDescriptor,
+    AppError, ChatMessage, Effort, ModelCapabilities, ModelRef, Part, Provider,
+    ProviderQuotaObservation, ProviderRequest, ProviderStream, Result, Role, TokenEstimate,
+    ToolDescriptor,
 };
+use serde::Serialize;
 
 use crate::{
     auth::{Credential, ANTHROPIC_RECONNECT_MESSAGE},
@@ -284,7 +285,38 @@ impl Provider for AnthropicProvider {
             return Err(read_http_error(response, true).await);
         }
 
-        Ok(map_stream(response.bytes_stream()))
+        let observation = quota_observation(response.headers());
+        Ok(map_stream(response.bytes_stream(), observation))
+    }
+}
+
+fn quota_observation(headers: &reqwest::header::HeaderMap) -> Option<ProviderQuotaObservation> {
+    fn get(headers: &reqwest::header::HeaderMap, name: &str) -> Option<String> {
+        headers.get(name)?.to_str().ok().map(str::to_owned)
+    }
+    let observation = ProviderQuotaObservation {
+        requests_remaining: get(headers, "anthropic-ratelimit-requests-remaining"),
+        requests_limit: get(headers, "anthropic-ratelimit-requests-limit"),
+        requests_reset: get(headers, "anthropic-ratelimit-requests-reset"),
+        input_tokens_remaining: get(headers, "anthropic-ratelimit-input-tokens-remaining"),
+        input_tokens_limit: get(headers, "anthropic-ratelimit-input-tokens-limit"),
+        input_tokens_reset: get(headers, "anthropic-ratelimit-input-tokens-reset"),
+        output_tokens_remaining: get(headers, "anthropic-ratelimit-output-tokens-remaining"),
+        output_tokens_limit: get(headers, "anthropic-ratelimit-output-tokens-limit"),
+        output_tokens_reset: get(headers, "anthropic-ratelimit-output-tokens-reset"),
+        observed_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string(),
+    };
+    if observation.requests_remaining.is_none()
+        && observation.input_tokens_remaining.is_none()
+        && observation.output_tokens_remaining.is_none()
+    {
+        None
+    } else {
+        Some(observation)
     }
 }
 
@@ -639,6 +671,26 @@ mod tests {
     use claakecode_core::{ChatMessage, Part, Role, ToolResultImage};
 
     use super::*;
+
+    #[test]
+    fn quota_observation_reads_only_official_anthropic_headers() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            "anthropic-ratelimit-requests-remaining",
+            "42".parse().unwrap(),
+        );
+        headers.insert("anthropic-ratelimit-requests-limit", "100".parse().unwrap());
+        let observation = quota_observation(&headers).unwrap();
+        assert_eq!(observation.requests_remaining.as_deref(), Some("42"));
+        assert_eq!(observation.requests_limit.as_deref(), Some("100"));
+        assert!(!observation.observed_at.is_empty());
+        assert!(observation.input_tokens_remaining.is_none());
+    }
+
+    #[test]
+    fn quota_observation_is_absent_without_official_headers() {
+        assert!(quota_observation(&reqwest::header::HeaderMap::new()).is_none());
+    }
 
     #[test]
     fn oversized_tool_result_images_are_replaced_with_text_note() {

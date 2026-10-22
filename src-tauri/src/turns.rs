@@ -294,6 +294,7 @@ pub(super) async fn send_message(
     let plan_requested = policy.attach_plan;
     let before_turn_snapshot_for_checkpoint = before_turn_snapshot;
     let mut partial_checkpoint = event_pump::PartialTurnCheckpoint::new(conversation.clone());
+    let quota_state = state.anthropic_quota.clone();
 
     tauri::async_runtime::spawn(async move {
         let mut engine = Box::pin(tauri::async_runtime::spawn(async move {
@@ -308,6 +309,12 @@ pub(super) async fn send_message(
                 event = event_rx.recv(), if !events_done => {
                     match event {
                         Some(event) => {
+                            if let AgentEvent::QuotaObservation { observation } = &event {
+                                if let Ok(mut quota) = quota_state.lock() {
+                                    *quota = Some(observation.clone());
+                                }
+                                continue;
+                            }
                             if matches!(event, AgentEvent::TurnFinished { .. }) {
                                 continue;
                             }
@@ -1560,6 +1567,7 @@ pub(super) fn tool_descriptors_for_workspace(
         vec![
             GlobTool::new(workspace_root).descriptor(),
             GrepTool::new(workspace_root).descriptor(),
+            claakecode_app::mgrep::descriptor(),
             ReadTool::new(workspace_root).descriptor(),
             clean_context_descriptor(),
             WebSearchTool::new().descriptor(),
@@ -1573,6 +1581,7 @@ pub(super) fn tool_descriptors_for_workspace(
             PythonTool::new(workspace_root).descriptor(),
             GlobTool::new(workspace_root).descriptor(),
             GrepTool::new(workspace_root).descriptor(),
+            claakecode_app::mgrep::descriptor(),
             ReadTool::new(workspace_root).descriptor(),
             clean_context_descriptor(),
             ToDoListTool::new().descriptor(),

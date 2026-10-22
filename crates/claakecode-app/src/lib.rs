@@ -6,6 +6,7 @@ pub mod database_tool;
 pub mod edit;
 pub mod glob;
 pub mod grep;
+pub mod mgrep;
 pub mod image;
 pub mod mcp;
 pub mod model_stats;

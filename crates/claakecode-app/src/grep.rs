@@ -47,6 +47,10 @@ impl GrepTool {
         }
     }
 
+    pub async fn run_mgrep(&self, input: Value) -> ToolRunResult {
+        crate::mgrep::run(&self.workspace_root, input).await
+    }
+
     pub fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: tool_names::GREP.into(),

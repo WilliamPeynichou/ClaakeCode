@@ -2326,7 +2326,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 fn default_tool_enabled(name: &str) -> bool {
-    !matches!(name, tool_names::CREATE_IMAGE | tool_names::WEB_SEARCH)
+    !matches!(name, "mgrep" | tool_names::CREATE_IMAGE | tool_names::WEB_SEARCH)
 }
 
 fn normalize_openrouter_models(models: Vec<OpenRouterModelRecord>) -> Vec<OpenRouterModelRecord> {

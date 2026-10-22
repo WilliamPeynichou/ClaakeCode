@@ -9,5 +9,5 @@ pub use error::{AppError, Result};
 pub use message::{ChatMessage, Part, Role, StopReason, ToolResultImage, Usage};
 pub use model::{Effort, EffortMode, ModelCapabilities, ModelRef};
 pub use provider::{Provider, ProviderRequest, ServiceTier, TokenEstimate};
-pub use stream::{PartKind, ProviderStream, StreamEvent, ToolCallIntro};
+pub use stream::{PartKind, ProviderQuotaObservation, ProviderStream, StreamEvent, ToolCallIntro};
 pub use tool::{ToolDescriptor, ToolResultPayload};
