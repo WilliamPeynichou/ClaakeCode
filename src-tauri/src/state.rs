@@ -34,9 +34,12 @@ pub(super) struct TerminalProcess {
     pub(super) killer: Arc<StdMutex<Box<dyn ChildKiller + Send + Sync>>>,
 }
 
+use claakecode_core::ProviderQuotaObservation;
+
 #[derive(Clone)]
 pub(super) struct DesktopState {
     pub(super) providers: Arc<StdMutex<HashMap<String, Arc<dyn Provider>>>>,
+    pub(super) anthropic_quota: Arc<StdMutex<Option<ProviderQuotaObservation>>>,
     pub(super) store: AppStore,
     pub(super) default_model: ModelRef,
     pub(super) system_prompt: String,

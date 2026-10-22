@@ -3,23 +3,28 @@ use futures::{stream::Stream, StreamExt};
 use serde_json::json;
 
 use claakecode_core::{
-    AppError, PartKind, ProviderStream, StopReason, StreamEvent, ToolCallIntro, Usage,
+    AppError, PartKind, ProviderQuotaObservation, ProviderStream, StopReason, StreamEvent,
+    ToolCallIntro, Usage,
 };
 
 use crate::wire::{self, SseEvent};
 
 const SSE_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
-pub fn map_stream<S, E>(body: S) -> ProviderStream
+pub fn map_stream<S, E>(body: S, observation: Option<ProviderQuotaObservation>) -> ProviderStream
 where
     S: Stream<Item = std::result::Result<bytes::Bytes, E>> + Send + 'static,
     E: std::error::Error + Send + Sync + 'static,
 {
     let source = Box::pin(body.eventsource());
     let parser = EventParser::default();
+    let mut initial = observation
+        .map(|observation| vec![StreamEvent::QuotaObservation { observation }])
+        .unwrap_or_default();
+    initial.reverse();
 
     futures::stream::unfold(
-        (source, parser, Vec::<StreamEvent>::new(), false, false),
+        (source, parser, initial, false, false),
         |(mut source, mut parser, mut pending, done, mut saw_any_event)| async move {
             loop {
                 if let Some(next) = pending.pop() {

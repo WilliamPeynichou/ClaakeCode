@@ -645,6 +645,14 @@ export const api = {
       input: { settings },
     });
   },
+  getProviderQuotaRemaining() {
+    return invoke<Array<{ provider: string; available: boolean; observation: null | {
+      requestsRemaining: string | null; requestsLimit: string | null; requestsReset: string | null;
+      inputTokensRemaining: string | null; inputTokensLimit: string | null; inputTokensReset: string | null;
+      outputTokensRemaining: string | null; outputTokensLimit: string | null; outputTokensReset: string | null;
+      observedAt: string;
+    } }>>("get_provider_quota_remaining");
+  },
   listConfiguredModelProviders() {
     return invoke<string[]>("list_configured_model_providers");
   },

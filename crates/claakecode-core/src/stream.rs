@@ -59,4 +59,23 @@ pub enum StreamEvent {
         stop_reason: StopReason,
         usage: Usage,
     },
+    /// Provider response metadata; consumed by the app and not surfaced as content.
+    QuotaObservation {
+        observation: ProviderQuotaObservation,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderQuotaObservation {
+    pub requests_remaining: Option<String>,
+    pub requests_limit: Option<String>,
+    pub requests_reset: Option<String>,
+    pub input_tokens_remaining: Option<String>,
+    pub input_tokens_limit: Option<String>,
+    pub input_tokens_reset: Option<String>,
+    pub output_tokens_remaining: Option<String>,
+    pub output_tokens_limit: Option<String>,
+    pub output_tokens_reset: Option<String>,
+    pub observed_at: String,
 }

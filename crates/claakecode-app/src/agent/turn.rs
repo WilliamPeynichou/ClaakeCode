@@ -116,6 +116,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             vec![
                 glob.descriptor(),
                 grep.descriptor(),
+                crate::mgrep::descriptor(),
                 read.descriptor(),
                 clean_context_descriptor(),
                 web_search.descriptor(),
@@ -128,6 +129,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 python.descriptor(),
                 glob.descriptor(),
                 grep.descriptor(),
+                crate::mgrep::descriptor(),
                 read.descriptor(),
                 clean_context_descriptor(),
                 web_search.descriptor(),
@@ -333,6 +335,9 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             measurement.first_token();
                         }
                         match event {
+                            StreamEvent::QuotaObservation { observation } => {
+                                send_event(&event_tx, event_scope.as_ref(), AgentEvent::QuotaObservation { observation });
+                            }
                             StreamEvent::MessageStart { .. } => {}
                             StreamEvent::PartStart { index, kind, tool } => {
                                 message_builder.open(index, kind);

@@ -242,6 +242,10 @@ export function SettingsPane({ workspacePath }: Props) {
   const [providersBusy, setProvidersBusy] = useState(false);
   const [providersMessage, setProvidersMessage] = useState<string | null>(null);
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+  const [quotaRows, setQuotaRows] = useState<Array<{ provider: string; available: boolean; observation: null | {
+    requestsRemaining: string | null; inputTokensRemaining: string | null; outputTokensRemaining: string | null; observedAt: string;
+  } }>>([]);
+
 
   useEffect(() => {
     setToolSettings(null);
@@ -1117,11 +1121,13 @@ export function SettingsPane({ workspacePath }: Props) {
 
   const loadConfiguredProviders = useCallback(async () => {
     try {
-      const [providers, models, mModels] = await Promise.all([
+      const [providers, models, mModels, quota] = await Promise.all([
         api.listConfiguredModelProviders(),
         api.listOpenRouterModels().catch(() => []),
         api.listMistralModels().catch(() => []),
+        api.getProviderQuotaRemaining().catch(() => []),
       ]);
+      setQuotaRows(quota);
       setConfiguredProviders(providers);
       setOpenRouterModels(models);
       setMistralModels(mModels);
@@ -2417,6 +2423,7 @@ export function SettingsPane({ workspacePath }: Props) {
             onOpenRouterStatusChange={setOpenRouterStatus}
             onOpenRouterModelsChange={setOpenRouterModels}
             onOpenRouterChanged={handleOpenRouterChanged}
+            quotaRows={quotaRows}
           />
         ) : section === "tools" ? (
           <ToolsSection
@@ -2782,6 +2789,9 @@ type ProvidersSectionProps = {
   onOpenRouterStatusChange: (status: OpenRouterProviderStatus) => void;
   onOpenRouterModelsChange: (models: OpenRouterModel[]) => void;
   onOpenRouterChanged: () => void;
+  quotaRows: Array<{ provider: string; available: boolean; observation: null | {
+    requestsRemaining: string | null; inputTokensRemaining: string | null; outputTokensRemaining: string | null; observedAt: string;
+  } }>;
 };
 
 function ProvidersSection({
@@ -2820,6 +2830,7 @@ function ProvidersSection({
   onOpenRouterStatusChange,
   onOpenRouterModelsChange,
   onOpenRouterChanged,
+  quotaRows,
 }: ProvidersSectionProps) {
   return (
     <>
@@ -2852,6 +2863,21 @@ function ProvidersSection({
       </header>
 
       <div className="settings-pane__body settings-pane__body--providers">
+        <section className="provider-quota" aria-labelledby="provider-quota-title">
+          <div className="provider-quota__heading">
+            <h2 id="provider-quota-title">Rate limit remaining</h2>
+            <p>Anthropic values are from the latest official Messages response observed. They describe enforced rate limits, not plan balances. No usage is estimated.</p>
+          </div>
+          {quotaRows.length === 0 && <p className="provider-quota__unavailable">No configured providers.</p>}
+          {quotaRows.map(({ provider, available, observation }) => (
+            <div className="provider-quota__row" key={provider}>
+              <span>{provider}</span>
+              <span className="provider-quota__unavailable">{available && observation
+                ? `${provider}: requests ${observation.requestsRemaining ?? "—"}; input tokens ${observation.inputTokensRemaining ?? "—"}; output tokens ${observation.outputTokensRemaining ?? "—"}${observation.observedAt ? ` (observed ${new Date(Number(observation.observedAt) * 1000).toLocaleString()})` : ""}`
+                : "Unavailable — no live quota observation available"}</span>
+            </div>
+          ))}
+        </section>
         <ProviderCard
           name="Anthropic"
           icon="simple-icons:anthropic"

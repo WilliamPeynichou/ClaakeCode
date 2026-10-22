@@ -46,6 +46,33 @@ pub(super) fn provider_from_registry(
         .ok_or_else(|| format!("provider `{provider_id}` is not configured or missing credentials"))
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProviderQuotaStatus {
+    pub provider: String,
+    pub available: bool,
+    pub observation: Option<claakecode_core::ProviderQuotaObservation>,
+}
+
+#[tauri::command]
+pub(super) fn get_provider_quota_remaining(
+    state: State<'_, DesktopState>,
+) -> std::result::Result<Vec<ProviderQuotaStatus>, String> {
+    let providers = state.providers.lock()
+        .map_err(|_| "provider registry is unavailable".to_string())?;
+    let observed = state.anthropic_quota.lock()
+        .map_err(|_| "quota observation is unavailable".to_string())?.clone();
+    Ok(["anthropic", "openai", "google", "xai", "kimi", "mistral", "openrouter"]
+        .into_iter()
+        .filter(|provider| providers.contains_key(*provider))
+        .map(|provider| ProviderQuotaStatus {
+            provider: provider.into(),
+            available: provider == "anthropic" && observed.is_some(),
+            observation: if provider == "anthropic" { observed.clone() } else { None },
+        })
+        .collect())
+}
+
 #[tauri::command]
 pub(super) fn list_configured_model_providers(
     state: State<'_, DesktopState>,
