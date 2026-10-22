@@ -56,7 +56,7 @@
       "alternateName": "ClaakeCode",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS, Windows, Linux",
-      "softwareVersion": "0.1.82",
+      "softwareVersion": "0.1.85",
       "license": "https://opensource.org/license/mit/",
       "isAccessibleForFree": true,
       "url": "https://claakecode-web.vercel.app/",
@@ -73,7 +73,13 @@
         "Multi-provider AI models",
         "Database source inspection with safeguards",
         "Sub-agents and team workflows",
-        "Experimental RLM chat (Prime Agent) with a persistent Python kernel",
+        "Mistral Large 4 model support",
+        "Measured model usage benchmark with optional user-configured cost estimates",
+        "Skill repositories managed from Settings",
+        "Optional cloud-backed mgrep semantic search alongside ripgrep",
+        "Anthropic rate-limit headers observed from official API responses",
+        "Windows skill Reveal opens containing folder in Explorer",
+        "Experimental macOS RLM Auto Compute powered by Prime Agent with persistent Python kernel",
         "Rollback and context cleaning",
         "No telemetry"
       ],
@@ -110,7 +116,7 @@
       <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
     </picture>
     <strong>claake <em>code</em></strong>
-    <span class="version">v0.1.82</span>
+    <span class="version">v0.1.85</span>
   </a>
   <div class="nav-links" id="navlinks">
     <a href="/features">Features</a>
@@ -134,7 +140,7 @@
       <a class="btn btn-ghost" aria-label="Download Claake Code for Linux AppImage" href="/download/linux">Linux ↓</a>
       <a class="btn btn-ghost" aria-label="Open Claake Code source code on GitHub" href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub ↗</a>
     </div>
-    <p class="meta">Latest <span>v0.1.82</span> · macOS · Windows · Linux · MIT licensed</p>
+    <p class="meta">Latest <span>v0.1.85</span> · macOS · Windows · Linux · MIT licensed</p>
   </div>
 </header>
 
@@ -161,9 +167,9 @@
        tilt on .rlm-tilt is pointer-driven, outside rlmRender.                          -->
   <section class="rlm" id="rlm" aria-labelledby="rlm-title">
     <div class="wrap rlm-intro reveal">
-      <span class="eyebrow">New in v0.1.68 · experimental</span>
+      <span class="eyebrow">Experimental · macOS only</span>
       <h2 id="rlm-title">A second chat that <em>keeps its state</em>.</h2>
-      <p>The RLM chat runs the open-source Prime Agent engine in its own tab, next to Chat: an agent with a persistent Python kernel, working in its own git worktree. One click on <b>Auto Compute</b> hands any agent chat over to it.</p>
+      <p>The RLM chat runs the open-source Prime Agent engine in its own tab, next to Chat: an agent with a persistent Python kernel, working in its own git worktree. On macOS, one click on <b>Auto Compute</b> hands any agent chat over to it.</p>
     </div>
 
     <div class="rlm-track" id="rlm-track">
@@ -308,7 +314,7 @@
     <div class="wrap rlm-foot reveal">
       <div class="glass rlm-facts">
         <div><span class="rlm-k">Engine</span><p>Prime Agent 0.9.8, open source, pinned to a reviewed commit and bundled with the app.</p></div>
-        <div><span class="rlm-k">Platforms</span><p>macOS and Linux. Windows shows the RLM chat as unavailable for now.</p></div>
+        <div><span class="rlm-k">Platforms</span><p>macOS only. Windows and Linux do not currently bundle the Prime Agent sidecar.</p></div>
         <div><span class="rlm-k">Providers</span><p>Anthropic, OpenAI, OpenRouter, Mistral. Google sign-in is not supported in RLM yet.</p></div>
         <div><span class="rlm-k">Status</span><p>Experimental. Needs a git repository with at least one commit. Auto Compute hands over the text of the chat, not tool results.</p></div>
       </div>
@@ -326,7 +332,7 @@
             <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="/download/windows">Windows · .exe ↓</a>
             <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="/download/linux">Linux · AppImage ↓</a>
           </div>
-          <p class="meta" style="text-align:center">Latest v0.1.82 · open source · MIT</p>
+          <p class="meta" style="text-align:center">Latest v0.1.85 · open source · MIT</p>
         </div>
       </div>
     </div>

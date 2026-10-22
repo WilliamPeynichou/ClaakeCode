@@ -15,7 +15,7 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Platforms: macOS, Windows, Linux
 - License: MIT
 - Source code: https://github.com/WilliamPeynichou/ClaakeCode
-- Latest release: v0.1.82
+- Latest release: v0.1.85
 - Website: https://claakecode-web.vercel.app/
 - Downloads: https://github.com/WilliamPeynichou/ClaakeCode/releases/latest
 - Telemetry: no telemetry; no training on transcripts
@@ -31,8 +31,13 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Database source inspection with read-only mode, row limits and destructive-operation confirmations.
 - Sub-agents and team workflows for parallel workstreams.
 - Rollback checkpoints, context cleaning and conversation compaction.
-- Experimental RLM chat (macOS and Linux) powered by the open-source Prime Agent engine, opened from its own "RLM" tab next to "Chat" with a separate history; an "Auto Compute" button hands an agent chat over to a new RLM chat on the same model. Same providers as the classic chat (Anthropic, OpenAI, OpenRouter, Mistral; not Google), a persistent Python kernel shown in Settings, one isolated git worktree per conversation, and resume after a connection cut.
-- Local model performance page in Settings ("Performance"): measured turns per model, median duration, time to first token, tokens per second, errors, interruptions, rewrites, cache rate, optional cost estimate from user-entered prices. Local only, no prompt or answer text stored; a measure of your own usage, not a quality ranking.
+- Experimental RLM chat powered by open-source Prime Agent, with separate history, a persistent Python kernel and isolated git worktrees. On macOS, Auto Compute hands a chat to a new RLM conversation. Python state and variables persist between executions. Experimental and requires a git repository with at least one commit.
+- Model usage benchmark: measured turns, durations, token usage and cache metrics, with optional costs from user-configured rates. Not a provider invoice or model quality ranking.
+- Skill Git repositories: add recognized repositories, inspect skills and update deliberately; installation does not execute scripts.
+- Optional mgrep semantic search in natural language, alongside ripgrep for exact text and regex. Cloud indexing must be started manually.
+- Anthropic quota panel: latest official API rate-limit headers observed, not subscription balances. Other providers show unavailable if no supported live quota data is exposed.
+- Mistral Large 4 is in the model catalog; Mistral structured streaming support has been improved.
+- Windows Reveal opens the containing skill folder in Explorer, including paths with spaces.
 - macOS, Windows and Linux downloads.
 
 ## Recommended citation
