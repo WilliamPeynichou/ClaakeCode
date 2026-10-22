@@ -169,7 +169,11 @@ pub(super) fn focus_existing_window(app: &AppHandle) -> bool {
 /// never shows a blank entry.
 pub(super) fn apply_window_title(window: &tauri::WebviewWindow, folder_name: &str) {
     let trimmed = folder_name.trim();
-    let title = if trimmed.is_empty() { "Claake Code" } else { trimmed };
+    let title = if trimmed.is_empty() {
+        "Claake Code"
+    } else {
+        trimmed
+    };
     if let Err(err) = window.set_title(title) {
         tracing::warn!(%err, label = %window.label(), "unable to update window title");
     }
@@ -309,12 +313,13 @@ pub(super) fn reveal_path(path: &Path) -> Result<()> {
 
     #[cfg(target_os = "windows")]
     {
+        let target = reveal_directory(path);
         let status = Command::new("explorer")
-            .arg(format!("/select,{}", path.display()))
+            .arg(target)
             .status()
-            .context("unable to reveal item in Explorer")?;
+            .context("unable to open directory in Explorer")?;
         if !status.success() {
-            anyhow::bail!("Explorer reveal failed");
+            anyhow::bail!("Explorer open failed");
         }
         return Ok(());
     }
@@ -338,6 +343,26 @@ pub(super) fn reveal_path(path: &Path) -> Result<()> {
 
     #[allow(unreachable_code)]
     Ok(())
+}
+
+fn reveal_directory(path: &Path) -> &Path {
+    if path.is_dir() {
+        path
+    } else {
+        path.parent().unwrap_or(path)
+    }
+}
+
+#[cfg(test)]
+mod reveal_path_tests {
+    use super::reveal_directory;
+    use std::path::Path;
+
+    #[test]
+    fn reveal_targets_parent_directory_for_skill_file() {
+        let file = Path::new(r"C:\Users\ayman\.claakecode\skills\algorithmic-art\SKILL.md");
+        assert_eq!(reveal_directory(file), file.parent().unwrap());
+    }
 }
 
 pub(super) fn delete_installed_skill(workspace_root: &Path, skill_md: &Path) -> Result<PathBuf> {
