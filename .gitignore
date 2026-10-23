@@ -2,6 +2,7 @@
 # Tauri updater signing keys — NEVER commit private keys
 *.key
 *.log
+.docs
 .DS_Store
 .env
 .env.*
@@ -36,3 +37,4 @@ node_modules/
 .e2e/videos/
 films/claaky/out/sub_*/
 films/claaky/out/video_*.mp4
+__pycache__/
