@@ -149,6 +149,15 @@ La table de chevet de la scène fixe et celle de la scène animée ont maintenan
 - `npx tsc --noEmit` et `npm run build` passent après le réexport.
 - Salle du swarm : rendus de prévisualisation frames 1 et 200 avec `camera_scale` 12,5. La pièce est entière, le tableau, le compteur et les personnages sont lisibles, aucun ajustement nécessaire.
 
+### Bouche et ambiance cosy (23/10)
+
+- Bouche reprise du Claaky 2D (`M55 66 Q60 70.5 65 66`) : petit sourire en « U », étroit, nettement sous les yeux et entre les joues, collé à la surface de la tête (`claaky_rig.py` et `claaky_bureau.py`).
+- Éclairage chaud et tamisé dans `setup_render()` : lumières principale et arrière ambrées et moins fortes, fenêtre discrète, fond plus sombre et chaud.
+- Nouvelles lumières ponctuelles orangées (`point_light`) dans les lanternes (chevet et étagère) et sous l’abat-jour du bureau ; émission des ampoules (`glow`) renforcée. `claaky_etats.py` supprime aussi l’ancienne lueur du chevet avant de recréer celui-ci.
+- Table de chevet inchangée.
+- Vérifié : rendu frame 190 face caméra, réexport complet des 20 planches, `decor.png` et `clips.json` (manifeste cohérent), `npx tsc --noEmit` et `npm run build`.
+- Non vérifié : la salle du swarm avec le nouvel éclairage, et les planches une à une dans l’IDE.
+
 ### Vérifié / non vérifié
 
 Génération testée sous Blender 4.5 en arrière-plan ; rendus contrôlés pour le clavier, l’autorisation, le tableau, le sommeil, le réveil, la célébration, l’arrivée des agents et la remise de dossier.

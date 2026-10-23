@@ -69,7 +69,9 @@ def build_room():
     # accessories() a déjà construit le lit et le chevet à leur emplacement final.
     # Ne supprimer que le chevet ancien, sans toucher au lit ni à sa couette.
     for obj in list(cb.COL.objects):
-        if obj.name.startswith(('Table de chevet', 'Tiroir chevet', 'Poignée chevet')) or obj.name in {
+        if obj.name.startswith(('Table de chevet', 'Tiroir chevet', 'Poignée chevet')) or (
+            obj.name.startswith('Lueur lanterne') and obj.location.z < 2
+        ) or obj.name in {
             'Lanterne socle', 'Lanterne diffuseur', 'Lanterne chapeau',
             'Lanterne cadre', 'Lanterne cadre.001', 'Lanterne cadre.002', 'Lanterne cadre.003'
         }:

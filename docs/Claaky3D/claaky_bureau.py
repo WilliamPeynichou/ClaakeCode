@@ -186,6 +186,16 @@ def lantern(x,y,z,size=.26):
         for dy in [-1,1]:
             cube('Lanterne cadre',(x+dx*size*.48,y+dy*size*.48,z+size/2+.05),(.022,.022,size+.02),'wood')
     cube('Lanterne chapeau',(x,y,z+size+.07),(size*1.1,size*1.1,.04),'wood',.008)
+    point_light('Lueur lanterne',(x,y,z+size/2+.05),90,(1,.58,.28),.08)
+
+
+def point_light(name, loc, energy, color, radius=.1):
+    d = bpy.data.lights.new(name, 'POINT')
+    d.energy, d.color, d.shadow_soft_size = energy, color, radius
+    o = bpy.data.objects.new(name, d)
+    COL.objects.link(o)
+    o.location = loc
+    return o
 
 
 def wall_group(name, pos, angle=0):
@@ -357,6 +367,7 @@ def desk():
     bpy.ops.mesh.primitive_cone_add(vertices=12,radius1=.14,radius2=.06,depth=.15,location=(-.53,2.32,2.10))
     finish(bpy.context.object,'Abat-jour','metal')
     cyl('Ampoule bureau',(-.53,2.32,2.018),.10,.012,'glow')
+    point_light('Lueur lampe bureau',(-.53,2.32,1.95),130,(1,.60,.30),.1)
 
 
 def chair_and_character():
@@ -411,8 +422,9 @@ def chair_and_character():
     mouth.dimensions = '3D'; mouth.resolution_u = 16; mouth.bevel_depth = .024; mouth.bevel_resolution = 4
     spline = mouth.splines.new('POLY'); spline.points.add(12)
     for i, point in enumerate(spline.points):
-        x = -.12 + .24 * i / 12
-        point.co = (x, .403, .81 + .075 * (x / .12) ** 2, 1)
+        # Petit sourire « U » du Claaky 2D : étroit, sous les yeux, entre les joues.
+        x = -.075 + .15 * i / 12
+        point.co = (x, .403, .80 + .05 * (x / .075) ** 2, 1)
     smile = bpy.data.objects.new('Sourire joyeux', mouth)
     COL.objects.link(smile); smile.data.materials.append(MAT['eye']); smile.parent = ROOT
     # Joues plus larges et chaudes.
@@ -480,12 +492,13 @@ def setup_render(preview=False):
     bg=nodes.new('ShaderNodeBackground')
     output=nodes.new('ShaderNodeOutputWorld')
     S.world.node_tree.links.new(bg.outputs[0],output.inputs['Surface'])
-    bg.inputs['Color'].default_value=(.12,.23,.24,1)
-    bg.inputs['Strength'].default_value=.42
+    bg.inputs['Color'].default_value=(.16,.14,.12,1)
+    bg.inputs['Strength'].default_value=.30
     cube('Fond teal',(0,0,-.49),(200,200,.08),'background')
-    area('Grande lumière chaude',(0,-3,8),1100,(1,.83,.63),5,(0,0,0))
-    area('Remplissage fenêtre',(-4,-1,5),700,(.77,.89,1),4,(0,1,1))
-    area('Lumière arrière',(1,4,7),900,(1,.88,.70),3,(0,0,1))
+    # Ambiance cosy : lumière principale ambrée, fenêtre de fin de journée discrète, lampes chaudes (point_light).
+    area('Grande lumière chaude',(0,-3,8),620,(1,.66,.40),5,(0,0,0))
+    area('Remplissage fenêtre',(-4,-1,5),180,(.90,.80,.80),4,(0,1,1))
+    area('Lumière arrière',(1,4,7),420,(1,.62,.36),3,(0,0,1))
     area('Éclairage écran',(.2,2.13,2.2),14,(.43,1,.73),1,(.15,1.1,1.5))
     camera_data=bpy.data.cameras.new('Caméra isométrique')
     camera=bpy.data.objects.new('Caméra isométrique',camera_data)
@@ -522,7 +535,7 @@ def palette():
         'glow':(1,.57,.16),'window':(1,.82,.48),
     }
     for name,color in colors.items():
-        material(name,color,emission=(3 if name=='glow' else 1.1 if name in ['code','code_gold','window'] else 0))
+        material(name,color,emission=(5 if name=='glow' else 1.1 if name in ['code','code_gold','window'] else 0))
 
 
 def unique_path(folder, stem, suffix):

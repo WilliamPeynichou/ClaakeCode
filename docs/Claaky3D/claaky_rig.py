@@ -148,18 +148,20 @@ class Claaky:
                 p.use_smooth = True
             cb.sphere('Reflet œil', (d * .17, .399, .42), (.030, .008, .037), 'paper', 16, 10)
             cb.sphere('Joue', (d * .33, .312, .21), (.074, .018, .042), 'pink', 20, 12)
-        # Sourire en arc ouvert (et non un petit ovale), visible même à la taille du sprite.
+        # Petit sourire « U » comme le Claaky 2D (M55 66 Q60 70.5 65 66) : bien sous les yeux,
+        # étroit (≈ 1/3 de l'écart des yeux), entre les joues ; collé à la surface de la tête.
         smile_curve = bpy.data.curves.new(self.name + ' · sourire joyeux', 'CURVE')
         smile_curve.dimensions = '3D'
         smile_curve.resolution_u = 16
-        smile_curve.bevel_depth = .032
+        smile_curve.bevel_depth = .022
         smile_curve.bevel_resolution = 5
         spline = smile_curve.splines.new('POLY')
         spline.points.add(12)
         for i, point in enumerate(spline.points):
-            x = -.145 + .29 * i / 12
-            z = .255 + .09 * (x / .145) ** 2
-            point.co = (x, .407, z, 1)
+            x = -.075 + .15 * i / 12
+            z = .18 + .05 * (x / .075) ** 2
+            y = .015 + .38 * math.sqrt(max(0, 1 - (x / .49) ** 2 - ((z - .32) / .46) ** 2)) + .012
+            point.co = (x, y, z, 1)
         smile = bpy.data.objects.new(self.name + ' · sourire', smile_curve)
         self.col.objects.link(smile)
         smile.data.materials.append(cb.MAT['eye'])
