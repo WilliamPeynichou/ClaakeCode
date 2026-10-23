@@ -65,20 +65,23 @@ Le script construit notamment :
 - un lit, un tapis, des plantes, des bibliothèques et quelques accessoires ;
 - une caméra orthographique, un éclairage et des réglages de rendu.
 
-## Vérification à faire
+## Vérification visuelle de la scène (23/10)
 
-Les modifications du script ont été effectuées, mais le rendu Blender n’a pas été vérifié visuellement après ces changements. Relancer `claaky_bureau.py` dans Blender, puis inspecter le rendu à la taille de caméra pour confirmer :
+Contrôlée sur des rendus Blender 4.5 de `claaky_etats.py` (frame 100 en 1000 px, frame 190 du clip `attente` en 320 px) et sur le `decor.png` exporté en 640 px :
 
-- que le lit est bien placé en bas à gauche et reste lisible ;
-- que la plante au sol ne chevauche ni le lit ni le mobilier ;
-- que les oreilles arrondies ont une silhouette et une taille satisfaisantes ;
-- que la suppression du meuble sous la fenêtre laisse une composition équilibrée.
+- lit en bas à gauche : lisible ;
+- table de chevet et lanterne à côté de l’oreiller : confirmé sur `decor.png` ;
+- oreilles arrondies : silhouette lisible ;
+- composition sous la fenêtre : équilibrée ;
+- sourire face caméra (clip `attente`, frame 190) : net, bouche courbée et joues roses.
 
-Après validation, enregistrer une version `.blend` de référence et conserver le script dans Git.
+Non confirmé : la plante au sol `plant(-2.55,-1.25,.12,.72)` n’est pas visible sur `decor.png` ni sur les rendus. Elle est probablement masquée par le lit vu de la caméra. Il faut trancher : la déplacer ou la supprimer.
 
-## Prochaine étape suggérée
+Aucun `.blend` de référence n’a encore été enregistré (`Sans nom.blend`, non suivi par Git, n’est pas validé comme référence).
 
-Valider visuellement cette scène de base, puis ajouter les états et animations nécessaires (travail, planification, attente, repos) avant de connecter le comportement aux événements réels de l’agent.
+## Prochaines étapes
+
+Les états, les animations et l’intégration IDE existent déjà (voir plus bas). Restent : décider du sort de la plante au sol, contrôler une par une les planches réexportées dans l’IDE, puis brancher la salle du swarm aux événements réels.
 
 ## Scènes ajoutées (scripts Python)
 
@@ -142,12 +145,16 @@ La table de chevet de la scène fixe et celle de la scène animée ont maintenan
 - Blender 4.5 génère la scène du bureau (978 objets, 864 frames) sans erreur.
 - Prévisualisation Cycles du lit et du mobilier rendue ; plateau de chevet relevé.
 - `npx tsc --noEmit` et `git diff --check` passent.
-- Les planches de `public/claaky3d/bureau/` sont celles de l’export antérieur aux derniers changements de forme/chevet ; réexport nécessaire pour que l’IDE affiche les corrections.
-- `npm run build` passe après les corrections récentes.
-- La salle du swarm et son cadrage n’ont pas été retestés après les modifications.
+- Réexport complet du 23/10 (`export_ide.sh`, 640 px, 24 échantillons, GPU, ≈ 1 h 20) : `public/claaky3d/bureau/` contient `decor.png`, les 20 planches et `clips.json`. Le manifeste liste exactement ces 20 clips.
+- `npx tsc --noEmit` et `npm run build` passent après le réexport.
+- Salle du swarm : rendus de prévisualisation frames 1 et 200 avec `camera_scale` 12,5. La pièce est entière, le tableau, le compteur et les personnages sont lisibles, aucun ajustement nécessaire.
 
 ### Vérifié / non vérifié
 
 Génération testée sous Blender 4.5 en arrière-plan ; rendus contrôlés pour le clavier, l’autorisation, le tableau, le sommeil, le réveil, la célébration, l’arrivée des agents et la remise de dossier.
 
-Non vérifié : le nouveau cadrage du swarm (`camera_scale` 14,5 → 12,5). Limite connue : l’ombre du personnage n’apparaît pas sur le décor dans les sprites exportés.
+Non vérifié : les planches réexportées n’ont pas été contrôlées une à une, et l’affichage dans l’IDE n’a pas été relancé (redémarrer `npm run tauri dev` pour vider le cache).
+
+**Prévisualisations :** les variables `SAMPLES` et `SIZE` ne sont lues que par `export_ide.sh`. Pour un rendu `--render` rapide, régler `cb.CONFIG` dans un petit script appelant (taille et échantillons) au lieu de compter sur ces variables d’environnement.
+
+**Limite connue, ombre :** l’ombre du personnage n’apparaît pas sur le décor dans les sprites. Un test avec shadow catcher sur le clip `erreur` n’a produit qu’une trace pâle au sol, sans ombre de contact nette ; il a été abandonné. Piste possible : une passe d’ombre séparée composée par `ClaakyRoom.tsx`, ou une ombre de contact dessinée sous le personnage dans le canvas.
