@@ -158,6 +158,20 @@ La table de chevet de la scène fixe et celle de la scène animée ont maintenan
 - Vérifié : rendu frame 190 face caméra, réexport complet des 20 planches, `decor.png` et `clips.json` (manifeste cohérent), `npx tsc --noEmit` et `npm run build`.
 - Non vérifié : la salle du swarm avec le nouvel éclairage, et les planches une à une dans l’IDE.
 
+### Reprise du décor et machine de test
+
+- Bibliothèque déplacée sous la fenêtre ; buffet ajouté sous le tableau. Meuble retiré devant la porte. Retour du bureau replacé à gauche, sans encombrer l’accès à la porte.
+- Machine de test distincte du PC sur le prolongement gauche du bureau ; décor éteint `decor.png` et décor allumé `decor_tests.png` générés avec la même caméra. L’écran allumé émet une vraie lumière verte. Le manifeste exporte son ancrage depuis les coins projetés de l’objet (et non un rayon arbitraire).
+- Oreilles effilées en feuille dans le rig et la scène fixe ; Claaky regarde le moniteur pendant la frappe et à la fin des trajets qui y mènent.
+- Végétation et lanternes renforcées, support ajouté sous la plante d’angle auparavant flottante ; lumière de fenêtre dorée.
+- Suppression de la double construction du chevet dans `claaky_etats.py` : le lit et le chevet sont construits une seule fois.
+- Détection des commandes de tests exécutées (`pytest`, `python -m pytest`, `npm test`, `vitest`, `cargo test`, etc.), sans activation sur une simple mention dans `echo`/`grep`. Une commande de test parallèle encore active est prioritaire ; les sessions shell longues restent actives jusqu’au résultat. Extinction à l’interruption du tour.
+- Le canvas charge le décor allumé facultativement et le compose avant le personnage ; si absent, il conserve le décor normal et un petit halo local de repli.
+- Réexport complet terminé (20 clips, `decor.png`, `decor_tests.png`, manifeste validé par le script) ; `decor.png` et la planche `travail_clavier` contrôlés visuellement (oreilles pointues visibles) ; `npm run build` passe.
+- Vérifié lors de la reprise : aperçu frame 1, 14 tests unitaires (`./node_modules/.bin/tsx --test src/components/claaky/claakyTestRun.test.ts`) et `npx tsc --noEmit`.
+- `export_ide.sh` échoue désormais sur une erreur Blender, valide les fichiers avant copie et publie le manifeste en dernier ; variables `SIZE`, `SAMPLES` et `EXPORT_TMP` disponibles.
+- La scène reste une interprétation 3D simplifiée de l’illustration, pas une reproduction pixel pour pixel. Le contrôle interactif dans Tauri reste à effectuer.
+
 ### Vérifié / non vérifié
 
 Génération testée sous Blender 4.5 en arrière-plan ; rendus contrôlés pour le clavier, l’autorisation, le tableau, le sommeil, le réveil, la célébration, l’arrivée des agents et la remise de dossier.

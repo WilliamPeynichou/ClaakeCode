@@ -136,7 +136,7 @@ class Claaky:
         for p in ball.data.polygons:
             p.use_smooth = True
         for s, d in SIDES:
-            ear = cb.sphere('Oreille arrondie', (d * .56, .015, .76), (.27, .14, .40), accent, 24, 12)
+            ear = cb.pointed_ear('Oreille pointue', (d * .56, .015, .76), (.25, .13, .44), accent, 24, 12)
             ear.rotation_euler.y = math.radians(-d * 22)
             for p in ear.data.polygons:
                 p.use_smooth = True
@@ -539,11 +539,34 @@ def export(scene, characters, segments, waypoints, out, args):
     data = json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() and wanted else {}
     data.update({'scene': scene.name, 'fps': FPS, 'taille': args.export_size, 'decor': 'decor.png',
                  'points': {k: _pixel(scene, v) for k, v in waypoints.items()}})
+    ecran = scene.objects.get('Machine test écran')
+    if ecran is not None:  # repère de la machine de test : centre de l'écran et rayon du halo (px)
+        cx, cy = _pixel(scene, ecran.matrix_world.translation)
+        corners = [_pixel(scene, ecran.matrix_world @ Vector(v)) for v in ecran.bound_box]
+        radius = max(math.hypot(x-cx, y-cy) for x, y in corners)
+        data['machine'] = {'x': cx, 'y': cy, 'r': round(radius, 1), 'decor': 'decor_tests.png'}
+    else:
+        data.pop('machine', None)
     data.setdefault('clips', {})
     if not wanted or 'decor' in wanted:
         scene.frame_set(1)
         r.filepath = str(out / 'decor.png')
         bpy.ops.render.render(write_still=True, scene=scene.name)
+        if ecran is not None:
+            old_material = ecran.data.materials[0]
+            cb.material('test_active', (.30, 1, .38), emission=5)
+            ecran.data.materials[0] = cb.MAT['test_active']
+            light_data = bpy.data.lights.new('Machine test lumière active', 'POINT')
+            light_data.energy, light_data.color, light_data.shadow_soft_size = 35, (.40, 1, .48), .10
+            light = bpy.data.objects.new('Machine test lumière active', light_data)
+            scene.collection.objects.link(light)
+            light.location = ecran.matrix_world.translation + Vector((0, -.10, .04))
+            r.filepath = str(out / 'decor_tests.png')
+            bpy.ops.render.render(write_still=True, scene=scene.name)
+            ecran.data.materials[0] = old_material
+            bpy.data.objects.remove(light, do_unlink=True)
+            bpy.data.lights.remove(light_data)
+        manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
 
     perso.use, decor.use = True, False
     total = len([s for s in segments if not wanted or s['nom'] in wanted])

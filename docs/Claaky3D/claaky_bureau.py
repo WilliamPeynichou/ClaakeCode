@@ -107,6 +107,18 @@ def sphere(name, loc, scale, mat, segments=16, rings=8):
     return o
 
 
+def pointed_ear(name, loc, scale, mat, segments=24, rings=12):
+    """Ellipsoïde dont la moitié haute se resserre en pointe (oreille en feuille)."""
+    o = sphere(name, loc, (1, 1, 1), mat, segments, rings)
+    for v in o.data.vertices:
+        if v.co.z > 0:
+            k = max(.22, 1 - .78 * v.co.z)
+            v.co.x *= k
+            v.co.y *= k
+    o.scale = scale
+    return o
+
+
 def cyl(name, loc, radius, depth, mat, vertices=12):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
     return finish(bpy.context.object, name, mat)
@@ -325,6 +337,10 @@ def desk():
     for x in [-.78,1.64]:
         for y in [1.80,2.45]:
             cube('Pied bureau',(x,y,.69),(.09,.09,1.24),'wood_dark',.012)
+    # Retour du bureau en L, le long du côté droit de la pièce (comme sur l'illustration).
+    cube('Retour bureau en L',(-1.45,2.12,1.32),(.58,.92,.13),'wood',.035)
+    for y in [1.80,2.45]:
+        cube('Pied retour bureau',(-1.68,y,.69),(.09,.09,1.24),'wood_dark',.012)
     cube('Caisson bureau',(-.55,2.16,.65),(.59,.70,1.10),'metal',.025)
     for z in [.35,.67,.99]:
         cube('Tiroir bureau',(-.55,1.79,z),(.52,.035,.26),'base',.012)
@@ -397,12 +413,12 @@ def chair_and_character():
     ball = sphere('Boule sur tête',(0,.015,1.43),(.14,.14,.14),'green',40,28)
     for polygon in ball.data.polygons:
         polygon.use_smooth = True
-    # Oreilles arrondies en forme de feuilles : ellipsoïde doux avec une pointe discrète.
+    # Oreilles en feuille : ellipsoïde doux qui se termine en pointe.
     for side in [-1,1]:
-        ear = sphere(
-            'Oreille arrondie',
+        ear = pointed_ear(
+            'Oreille pointue',
             (side*.56,.015,1.38),
-            (.27,.14,.40),
+            (.25,.13,.44),
             'green',
             24,
             12,
@@ -456,21 +472,49 @@ def chair_and_character():
 def accessories():
     global ROOT
     collection('07 · Bibliothèques, végétation et accessoires')
-    bookcase(1.92,2.47,.65,1.18)
-    plant(1.92,2.28,1.37,.68)
+    # Bibliothèque contre le mur gauche, sous la fenêtre, en retrait du lit (coordonnées locales : x = y monde).
+    ROOT = empty('Bibliothèque mur gauche', (-2.70, -.12, 0), math.pi / 2)
+    bookcase(0, 0, 1.05, 1.35)
+    plant(0, -.12, 1.50, .85)
+    ROOT = None
+    # Buffet sous le tableau : en retrait de la zone de réflexion.
+    cube('Buffet gauche',(-2.65,1.23,.66),(.60,1.10,1.15),'wood_dark',.025)
+    cube('Plateau buffet',(-2.65,1.23,1.26),(.67,1.18,.08),'wood',.018)
+    lantern(-2.40,.92,1.30,.24)
+    plant(-2.63,1.52,1.30,.65)
+    # Retiré : la bibliothèque devant la porte (ancien bookcase(1.92,2.47)).
     # Retirer le meuble bas sous la fenêtre : supprimer également son groupe parent.
-    plant(-2.62,2.56,2.65,.66,True)
-    cube('Étagère plante angle',(-2.62,2.57,2.60),(.61,.63,.09),'wood')
-    # Plante en pot posée au sol près du lit.
-    plant(-2.55,-1.25,.12,.72)
-    # Coffre / sac près du mur.
-    cube('Sac à dos',(-2.54,1.50,.45),(.43,.35,.73),'sage',.10)
-    cube('Poche sac',(-2.30,1.50,.40),(.07,.25,.30),'green',.025)
-    line('Anse sac',(-2.64,1.50,.83),(-2.44,1.50,.83),.025,'wood_dark')
+    plant(-2.75,2.70,2.65,1.0,True)
+    cube('Étagère plante angle',(-2.75,2.70,2.60),(.61,.63,.09),'wood')
+    # La seconde plante doit reposer sur un support (pas flotter dans l'air).
+    cube('Étagère angle basse',(-2.15,2.65,2.56),(.52,.50,.08),'wood',.012)
+    plant(-2.15,2.56,2.60,.65,True)
+    plant(-2.63,-.64,.12,.70)
+    # Sac contre le buffet, hors du trajet centre-tableau.
+    cube('Sac à dos',(-2.12,1.47,.45),(.43,.35,.73),'sage',.10)
+    cube('Poche sac',(-1.88,1.47,.40),(.07,.25,.30),'green',.025)
+    line('Anse sac',(-2.22,1.47,.83),(-2.02,1.47,.83),.025,'wood_dark')
     # Petit banc au pied du lit.
     cube('Banc pied du lit',(-1.77,-2.86,.39),(1.70,.35,.10),'wood',.015)
     for x in [-2.44,-1.10]:
         cube('Pied banc',(x,-2.86,.23),(.09,.25,.32),'wood_dark')
+    test_machine()
+
+
+def test_machine(x=-1.40, y=2.15):
+    """Machine de test à gauche du bureau. Éteinte dans le décor ; l'IDE la fait s'allumer (halo).
+    Le centre de l'écran (« Machine test écran ») sert de repère au clip."""
+    collection('07b · Machine de test')
+    cube('Machine test corps', (x, y, 1.68), (.46, .42, .60), 'metal', .03)
+    cube('Machine test cadre', (x, y-.215, 1.68), (.39, .025, .51), 'wood_dark', .015)
+    cube('Machine test écran', (x, y-.235, 1.78), (.30, .012, .20), 'screen', .006)
+    cube('Machine test voyant', (x, y-.242, 1.55), (.09, .012, .035), 'screen', .004)
+    for i in range(3):
+        cube('Machine test grille', (x, y-.235, 1.44+i*.025), (.30, .012, .009), 'base')
+    # Libellé géométrique : marque de tube / éprouvette, distincte du PC à droite.
+    line('Machine test tube', (x-.045,y-.248,1.73), (x-.045,y-.248,1.83), .008, 'sage')
+    line('Machine test tube', (x+.045,y-.248,1.73), (x+.045,y-.248,1.83), .008, 'sage')
+    line('Machine test tube', (x-.045,y-.248,1.73), (x+.045,y-.248,1.73), .008, 'sage')
 
 
 def setup_render(preview=False):
@@ -496,10 +540,11 @@ def setup_render(preview=False):
     bg.inputs['Strength'].default_value=.30
     cube('Fond teal',(0,0,-.49),(200,200,.08),'background')
     # Ambiance cosy : lumière principale ambrée, fenêtre de fin de journée discrète, lampes chaudes (point_light).
-    area('Grande lumière chaude',(0,-3,8),620,(1,.66,.40),5,(0,0,0))
+    area('Grande lumière chaude',(0,-3,8),500,(1,.66,.36),5,(0,0,0))
     area('Remplissage fenêtre',(-4,-1,5),180,(.90,.80,.80),4,(0,1,1))
     area('Lumière arrière',(1,4,7),420,(1,.62,.36),3,(0,0,1))
     area('Éclairage écran',(.2,2.13,2.2),14,(.43,1,.73),1,(.15,1.1,1.5))
+    point_light('Fenêtre soleil doré',(-2.55,-.90,2.4),100,(1,.68,.30),.5)
     camera_data=bpy.data.cameras.new('Caméra isométrique')
     camera=bpy.data.objects.new('Caméra isométrique',camera_data)
     COL.objects.link(camera)

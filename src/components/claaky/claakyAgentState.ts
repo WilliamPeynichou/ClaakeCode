@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ClaakyState } from "./Claaky";
 import type { ChatViewState } from "../chat/stream";
+import { latestTestRun, type TestRun } from "./claakyTestRun";
 
 /**
  * What the agent is doing, as Claaky shows it. ChatPane publishes it; every Claaky on screen
@@ -50,6 +51,8 @@ export type ClaakyActivity = {
   tool?: string;
   awaitingUser: boolean;
   toolErrors: number;
+  /** Latest real test run (bash command of a test runner). Only "running" while the turn streams. */
+  testRun?: TestRun;
 };
 
 let activity: ClaakyActivity = { state: "idle", awaitingUser: false, toolErrors: 0 };
@@ -60,7 +63,8 @@ function publishClaakyActivity(next: ClaakyActivity) {
     next.state === activity.state &&
     next.tool === activity.tool &&
     next.awaitingUser === activity.awaitingUser &&
-    next.toolErrors === activity.toolErrors
+    next.toolErrors === activity.toolErrors &&
+    next.testRun === activity.testRun
   ) {
     return;
   }
@@ -89,7 +93,10 @@ function activityFromView(view: ChatViewState, state: ClaakyState): ClaakyActivi
       if (b.name === "question" && !b.answered) awaitingUser = true;
     }
   }
-  return { state, tool, awaitingUser, toolErrors };
+  let testRun = latestTestRun(view.blocks);
+  // A test left "running" by an interrupted turn must not keep the machine lit.
+  if (testRun === "running" && view.status !== "streaming") testRun = undefined;
+  return { state, tool, awaitingUser, toolErrors, testRun };
 }
 
 const DONE_MS = 3200;

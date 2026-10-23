@@ -66,22 +66,7 @@ def build_room():
     cb.COL = char_collection
     cb.ROOT = char_root
     cb.accessories()
-    # accessories() a déjà construit le lit et le chevet à leur emplacement final.
-    # Ne supprimer que le chevet ancien, sans toucher au lit ni à sa couette.
-    for obj in list(cb.COL.objects):
-        if obj.name.startswith(('Table de chevet', 'Tiroir chevet', 'Poignée chevet')) or (
-            obj.name.startswith('Lueur lanterne') and obj.location.z < 2
-        ) or obj.name in {
-            'Lanterne socle', 'Lanterne diffuseur', 'Lanterne chapeau',
-            'Lanterne cadre', 'Lanterne cadre.001', 'Lanterne cadre.002', 'Lanterne cadre.003'
-        }:
-            bpy.data.objects.remove(obj, do_unlink=True)
-    cb.collection('03b · Chevet corrigé')
-    # Oreiller centré en (-1.95,-1.02). Chevet à sa droite, contre le côté du lit.
-    cb.cube('Table de chevet', (-1.03,-1.02,.79), (.48,.48,.24), 'wood', .025)
-    cb.cube('Tiroir chevet', (-1.03,-1.27,.79), (.38,.035,.17), 'wood_dark', .01)
-    cb.cube('Poignée chevet', (-1.03,-1.30,.79), (.12,.03,.025), 'ochre')
-    cb.lantern(-1.03,-1.02,.91,.22)
+    # Le chevet est déjà construit une seule fois par bed_and_rug().
     cb.collection('09 · Accessoires des états')
     return cb.cube('Couverture Claaky (sommeil)', (-1.95,-1.93,1.02), (1.05,1.30,.52), 'teal', .2)
 
@@ -104,8 +89,8 @@ class Clips:
         for o in self.mug:
             rig.set_visible(o, f, True)
         if lieu == 'bureau':
-            # Le visage reste orienté vers la caméra même pendant la frappe (expression lisible).
-            c.place(f, P['bureau_assis'], rig.CAMERA_YAW, 0, 0); c.pose(f, **POSE_CLAVIER)
+            # En travaillant, Claaky regarde bien le moniteur (+Y).
+            c.place(f, P['bureau_assis'], 0, 0, 0); c.pose(f, **POSE_CLAVIER)
         elif lieu == 'tableau':
             c.place(f, P['tableau_regard'], YAW_TABLEAU, 0, 0); c.pose(f, **POSE_REFLEXION)
         elif lieu == 'lit':
@@ -168,7 +153,7 @@ class Clips:
             c.look_at_camera(f, 16, .5, sh_D=(20, -30))
             c.wave(f + 16, 12, neck=neck_to_camera(c))
             c.hold(f + 28, 8, neck=neck_to_camera(c))
-            c.place(f + 40, yaw=rig.CAMERA_YAW)
+            c.place(f + 40, yaw=0)
             c.pose(f + 40, **POSE_CLAVIER)
             return f + 40
         self.clip('autorisation', 'bureau', autorisation, lieu_fin='bureau')
@@ -224,7 +209,7 @@ class Clips:
                     path = [P[DEBOUT[b]]] if 'centre' in (a, b) else [P['centre'], P[DEBOUT[b]]]
                     f = c.walk(f, path, speed=1.25)
                     if b == 'bureau':
-                        c.cut(f + 2, P['bureau_assis'], rig.CAMERA_YAW)
+                        c.cut(f + 2, P['bureau_assis'], 0)
                         c.pose(f + 2, **POSE_CLAVIER)
                         return f + 2
                     if b == 'lit':

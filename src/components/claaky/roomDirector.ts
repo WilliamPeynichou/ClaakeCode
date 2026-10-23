@@ -1,4 +1,5 @@
 import type { ClaakyActivity } from "./claakyAgentState";
+import type { TestRun } from "./claakyTestRun";
 
 /**
  * Directs the 3D room: turns the agent activity into a sequence of Blender clips.
@@ -27,7 +28,21 @@ export type ClipInfo = {
   lieu: Place;
   lieu_fin: Place;
 };
-export type ClipManifest = { fps: number; taille: number; decor: string; clips: Record<string, ClipInfo> };
+/** Centre and radius of the test machine's screen in decor pixels (optional, from clips.json). */
+export type MachineAnchor = { x: number; y: number; r: number; decor?: string };
+export type ClipManifest = {
+  fps: number;
+  taille: number;
+  decor: string;
+  clips: Record<string, ClipInfo>;
+  machine?: MachineAnchor;
+};
+
+/** Light shown by the test machine: steady while a run is going, then a short flash for its result. */
+export type MachineLight = { color: string; alpha: number };
+
+export const MACHINE_FLASH_MS = 2500;
+const MACHINE_COLOR = { running: "#b8ff8a", passed: "#7dffa0", failed: "#ff7a4a" } as const;
 
 type Goal = { place: Place; loop: string; label: string };
 
@@ -66,6 +81,8 @@ export class RoomDirector {
   private quietSince = 0;
   private finishedTurn = false;
   private queue: string[] = [];
+  private testRun: TestRun | undefined = undefined;
+  private flash: { result: "passed" | "failed"; until: number } | null = null;
 
   constructor(private manifest: ClipManifest, now: number) {
     this.wantedSince = now;
@@ -87,6 +104,14 @@ export class RoomDirector {
   update(next: ClaakyActivity, now: number) {
     const prev = this.activity;
     this.activity = next;
+    // Machine: driven by real transitions only, so a stale result never re-triggers a flash.
+    if (next.testRun !== prev.testRun) {
+      if (next.testRun === "running") this.flash = null;
+      else if (prev.testRun === "running" && (next.testRun === "passed" || next.testRun === "failed")) {
+        this.flash = { result: next.testRun, until: now + MACHINE_FLASH_MS };
+      }
+    }
+    this.testRun = next.testRun;
     if (next.toolErrors > prev.toolErrors && next.state !== "idle") this.queueOnce("erreur");
     if (next.state === "done" && prev.state !== "done") {
       this.finishedTurn = true;
@@ -104,12 +129,31 @@ export class RoomDirector {
     if (this.has(clip) && !this.queue.includes(clip)) this.queue.push(clip);
   }
 
+  /** Light of the test machine at `now`, or null when it is off. */
+  machineLight(now: number, machine?: MachineAnchor): MachineLight | null {
+    if (!machine) return null;
+    if (this.testRun === "running") {
+      // Gentle breathing while the run lasts.
+      const pulse = 0.75 + 0.25 * Math.sin(now / 350);
+      return { color: MACHINE_COLOR.running, alpha: pulse };
+    }
+    if (this.flash && now < this.flash.until) {
+      const left = (this.flash.until - now) / MACHINE_FLASH_MS;
+      return { color: MACHINE_COLOR[this.flash.result], alpha: 0.9 * left };
+    }
+    return null;
+  }
+
   private goalFor(now: number): Goal {
     const a = this.activity;
     if (a.awaitingUser) return { place: "bureau", loop: "autorisation", label: "Attend ta réponse" };
     switch (a.state) {
       case "working":
-        return { place: "bureau", loop: "travail_clavier", label: toolLabel(a.tool) };
+        return {
+          place: "bureau",
+          loop: "travail_clavier",
+          label: a.testRun === "running" ? "Lance les tests" : toolLabel(a.tool),
+        };
       case "thinking":
       case "planning":
         return { place: "tableau", loop: "reflechir_tableau", label: a.state === "planning" ? "Planifie" : "Réfléchit" };

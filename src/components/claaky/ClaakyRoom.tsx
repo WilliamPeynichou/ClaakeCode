@@ -6,7 +6,7 @@ import { RoomDirector, type ClipManifest } from "./roomDirector";
 /** Exported by sinew/docs/Claaky3D/export_ide.sh (Blender). */
 const BASE = "/claaky3d/bureau/";
 
-type Assets = { manifest: ClipManifest; decor: HTMLImageElement; sheets: Map<string, HTMLImageElement> };
+type Assets = { manifest: ClipManifest; decor: HTMLImageElement; testDecor: HTMLImageElement | null; sheets: Map<string, HTMLImageElement> };
 
 let assetsPromise: Promise<Assets> | null = null;
 
@@ -34,7 +34,10 @@ function loadAssets(): Promise<Assets> {
           sheets.set(name, await loadImage(BASE + clip.planche));
         }),
       );
-      return { manifest, decor, sheets };
+      const testDecor = manifest.machine?.decor
+        ? await loadImage(BASE + manifest.machine.decor).catch(() => null)
+        : null;
+      return { manifest, decor, testDecor, sheets };
     })();
     assetsPromise.catch(() => {
       assetsPromise = null;
@@ -74,7 +77,7 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
     if (!assets || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const { manifest, decor, sheets } = assets;
+    const { manifest, decor, testDecor, sheets } = assets;
     const director = new RoomDirector(manifest, performance.now());
     const unsubscribe = subscribeClaakyActivity((a) => director.update(a, performance.now()));
 
@@ -99,11 +102,36 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
       const sheet = sheets.get(director.clip);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(background, 0, 0);
+      const light = manifest.machine ? director.machineLight(performance.now(), manifest.machine) : null;
+      if (light && testDecor) {
+        ctx.save();
+        ctx.globalAlpha = light.alpha;
+        ctx.drawImage(testDecor, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+      }
       if (clip && sheet) {
         const i = Math.min(director.frame, clip.images - 1);
         const sx = (i % clip.colonnes) * clip.l;
         const sy = Math.floor(i / clip.colonnes) * clip.h;
         ctx.drawImage(sheet, sx, sy, clip.l, clip.h, clip.x * scale, clip.y * scale, clip.l * scale, clip.h * scale);
+      }
+      // Test machine glow: additive halo over the decor, only while a real test run lights it.
+      if (light && manifest.machine && !testDecor) {
+        const m = manifest.machine;
+        const cx = m.x * scale;
+        const cy = m.y * scale;
+        const radius = m.r * scale;
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        glow.addColorStop(0, light.color);
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = Math.max(0, Math.min(1, light.alpha));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     };
 
