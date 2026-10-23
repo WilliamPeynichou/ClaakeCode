@@ -1,0 +1,274 @@
+{
+ "scene": "Claaky · États animés",
+ "fps": 12,
+ "taille": 640,
+ "decor": "decor.png",
+ "points": {
+  "bureau_assis": [
+   373.3,
+   316.3
+  ],
+  "bureau_approche": [
+   389.9,
+   383.6
+  ],
+  "centre": [
+   313.9,
+   391.8
+  ],
+  "tableau_regard": [
+   303.9,
+   336.7
+  ],
+  "lit_bord": [
+   234.9,
+   397.0
+  ],
+  "lit_couche": [
+   157.6,
+   347.8
+  ]
+ },
+ "clips": {
+  "travail_clavier": {
+   "planche": "travail_clavier.png",
+   "x": 326,
+   "y": 220,
+   "l": 122,
+   "h": 101,
+   "colonnes": 33,
+   "images": 49,
+   "boucle": true,
+   "lieu": "bureau",
+   "lieu_fin": "bureau"
+  },
+  "reflechir_tableau": {
+   "planche": "reflechir_tableau.png",
+   "x": 267,
+   "y": 234,
+   "l": 181,
+   "h": 110,
+   "colonnes": 22,
+   "images": 49,
+   "boucle": true,
+   "lieu": "tableau",
+   "lieu_fin": "tableau"
+  },
+  "dormir": {
+   "planche": "dormir.png",
+   "x": 115,
+   "y": 263,
+   "l": 333,
+   "h": 113,
+   "colonnes": 12,
+   "images": 73,
+   "boucle": true,
+   "lieu": "lit",
+   "lieu_fin": "lit"
+  },
+  "attente": {
+   "planche": "attente.png",
+   "x": 263,
+   "y": 263,
+   "l": 185,
+   "h": 141,
+   "colonnes": 22,
+   "images": 49,
+   "boucle": true,
+   "lieu": "centre",
+   "lieu_fin": "centre"
+  },
+  "autorisation": {
+   "planche": "autorisation.png",
+   "x": 322,
+   "y": 193,
+   "l": 126,
+   "h": 135,
+   "colonnes": 32,
+   "images": 41,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "bureau"
+  },
+  "erreur": {
+   "planche": "erreur.png",
+   "x": 328,
+   "y": 193,
+   "l": 120,
+   "h": 128,
+   "colonnes": 25,
+   "images": 25,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "bureau"
+  },
+  "cafe": {
+   "planche": "cafe.png",
+   "x": 330,
+   "y": 211,
+   "l": 118,
+   "h": 110,
+   "colonnes": 34,
+   "images": 49,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "bureau"
+  },
+  "celebrer": {
+   "planche": "celebrer.png",
+   "x": 262,
+   "y": 263,
+   "l": 186,
+   "h": 141,
+   "colonnes": 22,
+   "images": 28,
+   "boucle": false,
+   "lieu": "centre",
+   "lieu_fin": "centre"
+  },
+  "bureau__tableau": {
+   "planche": "bureau__tableau.png",
+   "x": 253,
+   "y": 215,
+   "l": 195,
+   "h": 188,
+   "colonnes": 21,
+   "images": 39,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "tableau"
+  },
+  "bureau__lit": {
+   "planche": "bureau__lit.png",
+   "x": 115,
+   "y": 215,
+   "l": 333,
+   "h": 193,
+   "colonnes": 12,
+   "images": 34,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "lit"
+  },
+  "bureau__centre": {
+   "planche": "bureau__centre.png",
+   "x": 263,
+   "y": 215,
+   "l": 185,
+   "h": 191,
+   "colonnes": 22,
+   "images": 23,
+   "boucle": false,
+   "lieu": "bureau",
+   "lieu_fin": "centre"
+  },
+  "tableau__bureau": {
+   "planche": "tableau__bureau.png",
+   "x": 252,
+   "y": 217,
+   "l": 196,
+   "h": 190,
+   "colonnes": 20,
+   "images": 35,
+   "boucle": false,
+   "lieu": "tableau",
+   "lieu_fin": "bureau"
+  },
+  "tableau__lit": {
+   "planche": "tableau__lit.png",
+   "x": 115,
+   "y": 230,
+   "l": 333,
+   "h": 178,
+   "colonnes": 12,
+   "images": 37,
+   "boucle": false,
+   "lieu": "tableau",
+   "lieu_fin": "lit"
+  },
+  "tableau__centre": {
+   "planche": "tableau__centre.png",
+   "x": 252,
+   "y": 230,
+   "l": 196,
+   "h": 175,
+   "colonnes": 20,
+   "images": 26,
+   "boucle": false,
+   "lieu": "tableau",
+   "lieu_fin": "centre"
+  },
+  "lit__bureau": {
+   "planche": "lit__bureau.png",
+   "x": 115,
+   "y": 217,
+   "l": 333,
+   "h": 191,
+   "colonnes": 12,
+   "images": 47,
+   "boucle": false,
+   "lieu": "lit",
+   "lieu_fin": "bureau"
+  },
+  "lit__tableau": {
+   "planche": "lit__tableau.png",
+   "x": 115,
+   "y": 236,
+   "l": 333,
+   "h": 172,
+   "colonnes": 12,
+   "images": 54,
+   "boucle": false,
+   "lieu": "lit",
+   "lieu_fin": "tableau"
+  },
+  "lit__centre": {
+   "planche": "lit__centre.png",
+   "x": 115,
+   "y": 263,
+   "l": 333,
+   "h": 145,
+   "colonnes": 12,
+   "images": 38,
+   "boucle": false,
+   "lieu": "lit",
+   "lieu_fin": "centre"
+  },
+  "centre__bureau": {
+   "planche": "centre__bureau.png",
+   "x": 263,
+   "y": 217,
+   "l": 185,
+   "h": 189,
+   "colonnes": 19,
+   "images": 19,
+   "boucle": false,
+   "lieu": "centre",
+   "lieu_fin": "bureau"
+  },
+  "centre__tableau": {
+   "planche": "centre__tableau.png",
+   "x": 253,
+   "y": 236,
+   "l": 195,
+   "h": 168,
+   "colonnes": 21,
+   "images": 26,
+   "boucle": false,
+   "lieu": "centre",
+   "lieu_fin": "tableau"
+  },
+  "centre__lit": {
+   "planche": "centre__lit.png",
+   "x": 115,
+   "y": 263,
+   "l": 333,
+   "h": 145,
+   "colonnes": 12,
+   "images": 21,
+   "boucle": false,
+   "lieu": "centre",
+   "lieu_fin": "lit"
+  }
+ }
+}

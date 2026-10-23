@@ -1,15 +1,13 @@
-import { Claaky } from "./Claaky";
-import { useClaakyAgentState } from "./claakyAgentState";
+import { ClaakyRoom } from "./ClaakyRoom";
 
-/** Editor empty state: Claaky asks what we do next, with two quick starts. */
+/** Editor empty state: Claaky's 3D room (reacts to the agent), with two quick starts. */
 export function ClaakyEmpty() {
-  const agentState = useClaakyAgentState();
   const act = (action: "new-chat" | "new-rlm-chat") =>
     window.dispatchEvent(new CustomEvent("claakecode:claaky-action", { detail: action }));
 
   return (
     <div className="editor-empty claaky-empty">
-      <Claaky state={agentState} size={168} />
+      <ClaakyRoom size={400} />
       <span className="editor-empty__title">Que faisons-nous ?</span>
       <span className="editor-empty__sub">
         Dites-le moi dans le chat, ou ouvrez un fichier dans la barre latérale.

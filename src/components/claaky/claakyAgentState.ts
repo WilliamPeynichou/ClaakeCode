@@ -41,6 +41,57 @@ export function claakyStateFromView(view: ChatViewState): ClaakyState {
   return "idle";
 }
 
+/**
+ * Finer view for the 3D room: which tool runs, whether the agent waits for the user, how many
+ * tool calls failed in the turn (a rising count triggers the "error" reaction).
+ */
+export type ClaakyActivity = {
+  state: ClaakyState;
+  tool?: string;
+  awaitingUser: boolean;
+  toolErrors: number;
+};
+
+let activity: ClaakyActivity = { state: "idle", awaitingUser: false, toolErrors: 0 };
+const activityListeners = new Set<(a: ClaakyActivity) => void>();
+
+function publishClaakyActivity(next: ClaakyActivity) {
+  if (
+    next.state === activity.state &&
+    next.tool === activity.tool &&
+    next.awaitingUser === activity.awaitingUser &&
+    next.toolErrors === activity.toolErrors
+  ) {
+    return;
+  }
+  activity = next;
+  activityListeners.forEach((listener) => listener(next));
+}
+
+/** Subscribe without React (the 3D room runs its own frame loop). */
+export function subscribeClaakyActivity(listener: (a: ClaakyActivity) => void): () => void {
+  activityListeners.add(listener);
+  listener(activity);
+  return () => {
+    activityListeners.delete(listener);
+  };
+}
+
+function activityFromView(view: ChatViewState, state: ClaakyState): ClaakyActivity {
+  let tool: string | undefined;
+  let awaitingUser = false;
+  let toolErrors = 0;
+  for (const b of view.blocks) {
+    if (b.kind !== "tool") continue;
+    if (b.status === "error" || b.isError) toolErrors += 1;
+    if (b.status === "running") {
+      tool = b.name;
+      if (b.name === "question" && !b.answered) awaitingUser = true;
+    }
+  }
+  return { state, tool, awaitingUser, toolErrors };
+}
+
 const DONE_MS = 3200;
 
 /**
@@ -73,5 +124,8 @@ export function useClaakyFromView(view: ChatViewState, active: boolean) {
   useEffect(() => {
     if (active) publishClaakyState(state);
   }, [active, state]);
+  useEffect(() => {
+    if (active) publishClaakyActivity(activityFromView(view, state));
+  }, [active, state, view]);
   return state;
 }

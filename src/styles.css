@@ -10897,6 +10897,9 @@ button.settings-pane__about-link:disabled {
 
 .claaky-loader { width: 26px; height: 26px; margin: -3px 2px -3px 0; }
 .claaky-empty { gap: 10px; }
+.claaky-room { display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: 100%; }
+.claaky-room__canvas { display: block; max-width: 100%; height: auto !important; aspect-ratio: 1; transition: opacity .4s ease; }
+.claaky-room__label { min-height: 1.4em; font-size: var(--fs-xs); color: var(--text-2, var(--text-1)); letter-spacing: .01em; }
 .claaky-empty__actions { display: flex; gap: 8px; margin-top: 8px; }
 .claaky-empty__btn { font: inherit; font-size: var(--fs-xs); color: var(--text-1); background: var(--bg-2); border: 1px solid var(--border, rgba(127,127,127,.25)); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .claaky-empty__btn:hover { color: var(--text-0); border-color: var(--accent-hi); }
