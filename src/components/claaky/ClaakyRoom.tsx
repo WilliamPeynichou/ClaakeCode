@@ -82,13 +82,23 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
     const scale = canvas.width / manifest.taille;
-    ctx.imageSmoothingEnabled = false; // pixel-art net si les sprites Blender 320 px sont agrandis
+    const background = document.createElement("canvas");
+    background.width = canvas.width;
+    background.height = canvas.height;
+    const backgroundContext = background.getContext("2d");
+    if (!backgroundContext) return unsubscribe;
+    // These are softly shaded Blender renders, not pixel art. Filter when resizing on Retina.
+    backgroundContext.imageSmoothingEnabled = true;
+    backgroundContext.imageSmoothingQuality = "high";
+    backgroundContext.drawImage(decor, 0, 0, background.width, background.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     const draw = () => {
       const clip = manifest.clips[director.clip];
       const sheet = sheets.get(director.clip);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(decor, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(background, 0, 0);
       if (clip && sheet) {
         const i = Math.min(director.frame, clip.images - 1);
         const sx = (i % clip.colonnes) * clip.l;
@@ -99,12 +109,15 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
 
     // Frame loop at the export rate; stops when the room is off-screen or the window is hidden.
     let raf = 0;
+    let timer = 0;
+    let disposed = false;
     let last = performance.now();
     let visible = true;
     const period = 1000 / manifest.fps;
     let shown = "";
     const tick = (now: number) => {
       raf = 0;
+      if (disposed || !visible || document.hidden) return;
       let steps = 0;
       while (now - last >= period && steps < 4) {
         director.step(now);
@@ -122,10 +135,18 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
       schedule();
     };
     const schedule = () => {
-      if (!raf && visible && !document.hidden) raf = requestAnimationFrame(tick);
+      if (!disposed && !raf && !timer && visible && !document.hidden) {
+        timer = window.setTimeout(() => {
+          timer = 0;
+          if (!disposed && visible && !document.hidden) raf = requestAnimationFrame(tick);
+        }, Math.max(0, period - (performance.now() - last) - 4));
+      }
     };
     const onVisibility = () => {
       last = performance.now();
+      if (raf) cancelAnimationFrame(raf);
+      if (timer) window.clearTimeout(timer);
+      raf = timer = 0;
       schedule();
     };
     const observer = new IntersectionObserver(([entry]) => {
@@ -137,6 +158,8 @@ export function ClaakyRoom({ size = 420 }: { size?: number }) {
     draw();
     schedule();
     return () => {
+      disposed = true;
+      if (timer) window.clearTimeout(timer);
       if (raf) cancelAnimationFrame(raf);
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);

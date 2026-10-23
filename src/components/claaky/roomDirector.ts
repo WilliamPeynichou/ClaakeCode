@@ -92,7 +92,10 @@ export class RoomDirector {
       this.finishedTurn = true;
       this.queueOnce("celebrer");
     }
-    if (next.state !== "idle" && next.state !== "done") this.finishedTurn = false;
+    if (next.state !== "idle" && next.state !== "done") {
+      this.finishedTurn = false;
+      this.queue = this.queue.filter((clip) => clip !== "celebrer");
+    }
     if (next.state !== "idle") this.quietSince = now;
     this.retarget(now);
   }
@@ -164,8 +167,9 @@ export class RoomDirector {
     this.retarget(now);
     const info = this.info(this.clip);
     const atEnd = this.frame >= info.images - 1;
-    // Loops can be left at any frame (their poses stay close to the start pose); walks and reactions finish.
-    const leaveLoop = info.boucle && !atEnd && this.wantsChange(now);
+    // Leave at the loop boundary to avoid jumping from a mid-gesture pose.
+    // User requests remain urgent; walks and reactions always finish.
+    const leaveLoop = info.boucle && !atEnd && this.activity.awaitingUser && this.wantsChange(now);
     if (atEnd || leaveLoop) {
       const next = this.next(now);
       if (next !== this.clip || atEnd) {

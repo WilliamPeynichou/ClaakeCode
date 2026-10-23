@@ -46,7 +46,7 @@ YAW_TABLEAU = rig.yaw_towards(-1, 0)
 YAW_LIT = rig.yaw_towards(-1, 0)
 LIEUX = ('bureau', 'tableau', 'lit', 'centre')
 DEBOUT = {'bureau': 'bureau_approche', 'tableau': 'tableau_regard', 'lit': 'lit_bord', 'centre': 'centre'}
-POSE_CLAVIER = dict(sh_G=(80, 0), sh_D=(80, 0), hips=(3, 0, 0))
+POSE_CLAVIER = dict(sh_G=(76, 0), sh_D=(76, 0), neck=(1, 0, 0), hips=(2, 0, 0))
 POSE_REFLEXION = dict(sh_D=(135, 15), sh_G=(60, -20), neck=(14, 0, 0))
 
 
@@ -57,9 +57,13 @@ def build_room():
     cb.desk()
     cb.CONFIG['animation'] = False
     cb.chair_and_character()
-    for o in list(cb.COL.objects):  # retire le Claaky statique d'origine
+    char_collection = cb.COL
+    char_root = cb.ROOT
+    for o in list(char_collection.objects):  # retire le Claaky statique d'origine
         bpy.data.objects.remove(o)
-    bpy.data.collections.remove(cb.COL)
+    bpy.data.collections.remove(char_collection)
+    cb.COL = char_collection
+    cb.ROOT = char_root
     cb.accessories()
     cb.collection('09 · Accessoires des états')
     return cb.cube('Couverture Claaky (sommeil)', (-1.95, -1.93, 1.02), (1.05, 1.30, .52), 'teal', .2)
@@ -83,7 +87,8 @@ class Clips:
         for o in self.mug:
             rig.set_visible(o, f, True)
         if lieu == 'bureau':
-            c.place(f, P['bureau_assis'], 0, 0, 0); c.pose(f, **POSE_CLAVIER)
+            # Le visage reste orienté vers la caméra même pendant la frappe (expression lisible).
+            c.place(f, P['bureau_assis'], rig.CAMERA_YAW, 0, 0); c.pose(f, **POSE_CLAVIER)
         elif lieu == 'tableau':
             c.place(f, P['tableau_regard'], YAW_TABLEAU, 0, 0); c.pose(f, **POSE_REFLEXION)
         elif lieu == 'lit':
@@ -110,9 +115,11 @@ class Clips:
             # main au menton, tête levée vers le tableau, balancement, hochement de temps en temps
             for i in range(0, 49, 4):
                 sway = math.sin(i / 48 * math.tau)
-                nod = 6 if i in (20, 40) else 0
-                c.pose(f + i, sh_D=(135, 15), sh_G=(60, -20), neck=(14 - nod, 0, 8 * sway),
-                       hips=(0, 3 * sway, .01 * sway))
+                nod = 4 if i in (20, 40) else 0
+                pose = dict(POSE_REFLEXION)
+                pose['neck'] = (10 - nod, 0, 7 * sway)
+                pose['hips'] = (0, 3 * sway, .015 * sway)
+                c.pose(f + i, **pose)
             c.place(f + 48)
             return f + 48
         self.clip('reflechir_tableau', 'tableau', reflechir, True)
@@ -144,7 +151,7 @@ class Clips:
             c.look_at_camera(f, 16, .5, sh_D=(20, -30))
             c.wave(f + 16, 12, neck=neck_to_camera(c))
             c.hold(f + 28, 8, neck=neck_to_camera(c))
-            c.place(f + 40, yaw=0)
+            c.place(f + 40, yaw=rig.CAMERA_YAW)
             c.pose(f + 40, **POSE_CLAVIER)
             return f + 40
         self.clip('autorisation', 'bureau', autorisation, lieu_fin='bureau')
@@ -200,7 +207,7 @@ class Clips:
                     path = [P[DEBOUT[b]]] if 'centre' in (a, b) else [P['centre'], P[DEBOUT[b]]]
                     f = c.walk(f, path, speed=1.25)
                     if b == 'bureau':
-                        c.cut(f + 2, P['bureau_assis'], 0)
+                        c.cut(f + 2, P['bureau_assis'], rig.CAMERA_YAW)
                         c.pose(f + 2, **POSE_CLAVIER)
                         return f + 2
                     if b == 'lit':
@@ -232,6 +239,7 @@ def main():
     cover = build_room()
     desk_mug = [o for o in scene.objects if o.name.split('.')[0] in ('Tasse', 'Café', 'Anse tasse')]
     c = rig.Claaky('Claaky', POINTS['bureau_assis'])
+    c.root.rotation_euler.z = rig.yaw_towards(0, -1)  # visage tourné vers l'avant de la caméra
     c.bubble('?', '?', 'warn')
     c.bubble('!', '!', 'red')
     c.bubble('Zzz', 'Zzz', 'bubble', .4)

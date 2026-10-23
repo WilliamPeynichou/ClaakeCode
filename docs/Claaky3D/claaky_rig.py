@@ -148,10 +148,44 @@ class Claaky:
                 p.use_smooth = True
             cb.sphere('Reflet œil', (d * .17, .399, .42), (.030, .008, .037), 'paper', 16, 10)
             cb.sphere('Joue', (d * .33, .312, .21), (.074, .018, .042), 'pink', 20, 12)
-        smile = cb.sphere('Sourire', (0, .386, .19), (.11, .018, .055), 'eye', 24, 16)
-        smile.rotation_euler.y = math.radians(8)
-        for p in smile.data.polygons:
-            p.use_smooth = True
+        # Sourire en arc ouvert (et non un petit ovale), visible même à la taille du sprite.
+        smile_curve = bpy.data.curves.new(self.name + ' · sourire joyeux', 'CURVE')
+        smile_curve.dimensions = '3D'
+        smile_curve.resolution_u = 16
+        smile_curve.bevel_depth = .032
+        smile_curve.bevel_resolution = 5
+        spline = smile_curve.splines.new('POLY')
+        spline.points.add(12)
+        for i, point in enumerate(spline.points):
+            x = -.145 + .29 * i / 12
+            z = .255 + .09 * (x / .145) ** 2
+            point.co = (x, .407, z, 1)
+        smile = bpy.data.objects.new(self.name + ' · sourire', smile_curve)
+        self.col.objects.link(smile)
+        smile.data.materials.append(cb.MAT['eye'])
+        smile.parent = self.neck
+        # Sourcils légèrement relevés : expression chaleureuse, sans étonnement excessif.
+        for direction in (-1, 1):
+            brow_curve = bpy.data.curves.new(self.name + ' · sourcil joyeux', 'CURVE')
+            brow_curve.dimensions = '3D'
+            brow_curve.resolution_u = 10
+            brow_curve.bevel_depth = .014
+            brow_curve.bevel_resolution = 3
+            brow = brow_curve.splines.new('POLY')
+            brow.points.add(4)
+            for i, p in enumerate(brow.points):
+                x = direction * (.12 + .12 * i / 4)
+                z = .53 + .035 * math.sin(i / 4 * math.pi)
+                p.co = (x, .36, z, 1)
+            brow_obj = bpy.data.objects.new(self.name + ' · sourcil', brow_curve)
+            self.col.objects.link(brow_obj)
+            brow_obj.data.materials.append(cb.MAT['green'])
+            brow_obj.parent = self.neck
+        # Expression lumineuse : joues chaudes, pupilles légèrement agrandies et reflets nets.
+        for side, direction in SIDES:
+            cheek = cb.sphere('Joue rosée', (direction * .33, .319, .21), (.09, .02, .055), 'pink', 24, 16)
+            for p in cheek.data.polygons:
+                p.use_smooth = True
 
         for s, d in SIDES:
             cb.ROOT = self.sh[s]
@@ -265,7 +299,8 @@ class Claaky:
     def idle(self, f, n):
         for i in range(0, n + 1, 6):
             b = math.sin(i / 12 * math.tau)
-            self.pose(f + i, hips=(0, 0, .015 * b), neck=(2 * b, 0, 0), sh_G=(0, 4 + 3 * b), sh_D=(0, -4 - 3 * b))
+            self.pose(f + i, hips=(0, 0, .022 * b), neck=(3 * b, 0, 0),
+                      sh_G=(0, 8 + 4 * b), sh_D=(0, -8 - 4 * b))
         self.place(f); self.place(f + n)
         return f + n
 
@@ -292,7 +327,9 @@ class Claaky:
     def type_loop(self, f, n, phase=0):
         for i in range(0, n + 1, 2):
             a = 1 if (i // 2 + phase) % 2 else -1
-            self.pose(f + i, sh_G=(80 + 7 * a, 0), sh_D=(80 - 7 * a, 0), neck=(6, 0, 3 * a), hips=(3, 0, 0))
+            b = math.sin(i / 12 * math.tau)
+            self.pose(f + i, sh_G=(82 + 6 * a, 0), sh_D=(82 - 6 * a, 0),
+                      neck=(2 + 3 * b, 0, 2 * a), hips=(3, 0, .012 * b))
         self.place(f); self.place(f + n)
         return f + n
 
@@ -333,7 +370,8 @@ class Claaky:
             for i, h in [(0, 0), (3, .30), (6, 0)]:
                 self.place(f + i, base + Vector((0, 0, h)))
                 up = 160 if h else 120
-                self.pose(f + i, sh_G=(10, up), sh_D=(10, -up), foot_G=(0, h * .2), foot_D=(0, h * .2), neck=(-10, 0, 0))
+                self.pose(f + i, sh_G=(10, up), sh_D=(10, -up),
+                          foot_G=(0, h * .2), foot_D=(0, h * .2), neck=(-4, 0, 0), hips=(0, 0, .035 if h else 0))
             f += 8
         self.pose(f)
         self.place(f, base)

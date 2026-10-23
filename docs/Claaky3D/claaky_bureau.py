@@ -406,16 +406,19 @@ def chair_and_character():
             for frame,dz in [(1,0),(5,.045 if side==1 else -.015),(9,0),(13,.045 if side==-1 else -.015),(17,0)]:
                 hand.location.z=.50+dz
                 hand.keyframe_insert('location',frame=frame)
-    # Visage tourné vers l'écran (+Y). La bouche est un sourire courbe bien visible.
-    for side in [-1,1]:
-        sphere('Œil',(side*.19,.354,.99),(.105,.035,.14),'eye',16,8)
-        sphere('Iris',(side*.19,.384,.96),(.070,.012,.075),'green')
-        sphere('Reflet œil',(side*.17,.399,1.04),(.030,.008,.037),'paper')
-        sphere('Joue',(side*.33,.312,.83),(.074,.018,.042),'pink')
-    smile = sphere('Sourire',(0,.386,.81),(.11,.018,.055),'eye',24,16)
-    smile.rotation_euler.y = math.radians(8)
-    for polygon in smile.data.polygons:
-        polygon.use_smooth = True
+    # Sourire joyeux courbe, placé sur la face (+Y) et parenté au Claaky.
+    mouth = bpy.data.curves.new('Bouche sourire', 'CURVE')
+    mouth.dimensions = '3D'; mouth.resolution_u = 16; mouth.bevel_depth = .024; mouth.bevel_resolution = 4
+    spline = mouth.splines.new('POLY'); spline.points.add(12)
+    for i, point in enumerate(spline.points):
+        x = -.12 + .24 * i / 12
+        point.co = (x, .403, .81 + .075 * (x / .12) ** 2, 1)
+    smile = bpy.data.objects.new('Sourire joyeux', mouth)
+    COL.objects.link(smile); smile.data.materials.append(MAT['eye']); smile.parent = ROOT
+    # Joues plus larges et chaudes.
+    for side in [-1, 1]:
+        cheek = sphere('Joue rosée',(side*.33,.318,.83),(.09,.022,.055),'pink',24,16)
+        for p in cheek.data.polygons: p.use_smooth = True
     # Motif ventral constitué d'une spirale géométrique verte.
     points=[]
     for i in range(26):
@@ -424,7 +427,9 @@ def chair_and_character():
         points.append((math.cos(a)*r,.272,.31+math.sin(a)*r))
     for a,b in zip(points,points[1:]):
         line('Spirale ventre',a,b,.045,'green')
-    ROOT=None
+    char_root = ROOT
+    char_root.rotation_euler.z = math.atan2(-10, -13)
+    ROOT = None
     if CONFIG['animation']:
         for o in COL.objects:
             if o.animation_data and o.animation_data.action:
