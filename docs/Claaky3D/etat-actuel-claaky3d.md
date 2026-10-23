@@ -131,7 +131,7 @@ Plus tard : Claaky compagnon hors de l’IDE, puis extension VS Code (`roomDirec
 
 ### Dernières corrections visuelles
 
-La table de chevet est à côté de l’oreiller, plateau à sa hauteur ; position vérifiée visuellement au rendu Blender. La tête, la petite boule du crâne, les yeux et le sourire ont davantage de subdivisions et des normales lissées. Les trajets sont ralentis, les rotations adoucies et les poses intermédiaires étalées.
+La table de chevet de la scène fixe et celle de la scène animée ont maintenant leurs propres coordonnées explicites, à côté de l’oreiller. La prévisualisation de `claaky_etats.py` a confirmé que le lit est intact et que le chevet n’est plus au pied du lit.
 
 **Sourire dans la scène animée :** le rig affiche un sourire plus large et lissé. Le rendu de prévisualisation de la frame 1 montre Claaky de dos, donc l’expression doit être validée dans un clip où il fait face à la caméra.
 

@@ -299,11 +299,11 @@ def bed_and_rug():
     # Couverture retombant au pied du lit.
     for i in range(8):
         cube('Couette retombée',(bx-.70+i*.20,by-1.235,.62),(.20,.045,.44),'teal',.01)
-    # Table de chevet accolée au côté de l'oreiller, plateau à z=.91.
-    cube('Table de chevet',(-2.78,-1.02,.79),(.42,.52,.24),'wood',.025)
-    cube('Tiroir chevet',(-2.78,-1.29,.79),(.34,.035,.17),'wood_dark',.01)
-    cube('Poignée chevet',(-2.78,-1.32,.79),(.12,.03,.025),'ochre')
-    lantern(-2.78,-1.02,.91,.22)
+    # Chevet à côté de l'oreiller, au niveau de la tête du lit (pas au pied).
+    cube('Table de chevet',(-1.03,-1.02,.79),(.48,.48,.24),'wood',.025)
+    cube('Tiroir chevet',(-1.03,-1.27,.79),(.38,.035,.17),'wood_dark',.01)
+    cube('Poignée chevet',(-1.03,-1.30,.79),(.12,.03,.025),'ochre')
+    lantern(-1.03,-1.02,.91,.22)
     cube('Paillasson porte',(2.39,2.34,.10),(.91,.65,.035),'teal',.025)
     cube('Paillasson centre',(2.39,2.34,.123),(.77,.51,.012),'sage')
 

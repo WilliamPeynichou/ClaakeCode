@@ -20,6 +20,7 @@ Ligne de commande :
 import importlib
 import math
 import os
+import random
 import sys
 
 import bpy
@@ -65,8 +66,22 @@ def build_room():
     cb.COL = char_collection
     cb.ROOT = char_root
     cb.accessories()
+    # accessories() a déjà construit le lit et le chevet à leur emplacement final.
+    # Ne supprimer que le chevet ancien, sans toucher au lit ni à sa couette.
+    for obj in list(cb.COL.objects):
+        if obj.name.startswith(('Table de chevet', 'Tiroir chevet', 'Poignée chevet')) or obj.name in {
+            'Lanterne socle', 'Lanterne diffuseur', 'Lanterne chapeau',
+            'Lanterne cadre', 'Lanterne cadre.001', 'Lanterne cadre.002', 'Lanterne cadre.003'
+        }:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    cb.collection('03b · Chevet corrigé')
+    # Oreiller centré en (-1.95,-1.02). Chevet à sa droite, contre le côté du lit.
+    cb.cube('Table de chevet', (-1.03,-1.02,.79), (.48,.48,.24), 'wood', .025)
+    cb.cube('Tiroir chevet', (-1.03,-1.27,.79), (.38,.035,.17), 'wood_dark', .01)
+    cb.cube('Poignée chevet', (-1.03,-1.30,.79), (.12,.03,.025), 'ochre')
+    cb.lantern(-1.03,-1.02,.91,.22)
     cb.collection('09 · Accessoires des états')
-    return cb.cube('Couverture Claaky (sommeil)', (-1.95, -1.93, 1.02), (1.05, 1.30, .52), 'teal', .2)
+    return cb.cube('Couverture Claaky (sommeil)', (-1.95,-1.93,1.02), (1.05,1.30,.52), 'teal', .2)
 
 
 def mug_builder():
