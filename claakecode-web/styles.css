@@ -288,7 +288,7 @@ button { font: inherit; color: inherit; }
 .release-slim-tags { display:flex; flex-wrap:wrap; gap: 8px; flex: 2 1 420px; }
 .release-slim .tag-chip { font-size: 12.5px; padding: 7px 13px; }
 .release-slim .btn { flex: 0 0 auto; }
-@media (max-width: 760px) { .release-slim { flex-direction: column; align-items: flex-start; } .release-slim .btn { width: 100%; } }
+@media (max-width: 760px) { .release-slim { flex-direction: column; align-items: flex-start; } .release-slim-text, .release-slim-tags { flex: 0 0 auto; } .release-slim .btn { width: 100%; } }
 
 .loop { display:flex; flex-wrap:wrap; gap: 14px; align-items:stretch; }
 .node { flex: 1 1 0; min-width: 155px; padding: 25px 22px; }
@@ -543,3 +543,22 @@ html.rlm-static .rlm-scene { position: static; visibility: visible !important; m
 html.rlm-static .rlm-scene *, html.rlm-static .rlm-scene .ln > span { opacity: 1 !important; transform: none !important; filter: none !important; }
 html.rlm-static .rlm-tilt { display: none; }
 html.rlm-static .rlm-caret { animation: none; }
+
+/* ── What's new page ─────────────────────────────────────────────── */
+.wn-split { gap: 48px; }
+.wn-split--rev { grid-template-columns: .92fr 1.08fr; }
+@media (max-width: 900px) { .wn-split--rev { grid-template-columns: 1fr; } }
+.wn-h2 { font-family: var(--serif); font-weight: 300; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spacing: -.02em; margin: 16px 0 0; text-wrap: balance; }
+.wn-h2 em { color: var(--accent); font-style: italic; }
+.wn-p { margin: 18px 0 22px; color: var(--ink-soft); font-size: 16.5px; font-weight: 300; text-wrap: pretty; }
+.wn-figure { position: relative; margin: 0; padding: 28px; display: flex; justify-content: center; }
+.wn-figure img { width: 100%; height: auto; max-width: 520px; }
+.wn-figure--companion { padding: 64px 28px 28px; }
+.wn-figure--companion img { max-width: 280px; animation: wn-float 5s ease-in-out infinite; }
+.wn-bubble { position: absolute; right: 22px; top: 22px; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; font-size: 13.5px; max-width: 230px; }
+.wn-mode { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.wn-mode b { color: var(--accent); font-weight: 600; }
+.wn-cards { margin-top: 44px; }
+kbd { font-family: var(--mono); font-size: .8em; padding: 2px 9px; border-radius: 8px; border: 1px solid var(--glass-brd); background: var(--glass-bg-strong); }
+@keyframes wn-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .wn-figure--companion img { animation: none; } }
