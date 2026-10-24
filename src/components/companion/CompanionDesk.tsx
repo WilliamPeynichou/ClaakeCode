@@ -32,15 +32,21 @@ export function CompanionDesk() {
   const [state, setState] = useState<ClaakyState>("idle");
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [side, setSide] = useState<"left" | "right">("left");
+  /** Fondu vers opacité 0 pendant que Rust applique la nouvelle géométrie (anti-flash). */
+  const [fading, setFading] = useState(false);
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
 
   useEffect(() => {
     const offState = listen<CompanionStateEvent>(COMPANION_EVENTS.state, (event) => {
       if (isClaakyState(event.payload.state)) setState(event.payload.state);
     });
+    const offFading = listen<CompanionBubbleEvent>(COMPANION_EVENTS.fading, () => {
+      setFading(true);
+    });
     const offBubble = listen<CompanionBubbleEvent>(COMPANION_EVENTS.bubbleChanged, (event) => {
       setBubbleOpen(Boolean(event.payload.open));
       if (event.payload.side) setSide(event.payload.side);
+      setFading(false);
     });
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") run(COMPANION_COMMANDS.setBubbleOpen, { open: false });
@@ -48,6 +54,7 @@ export function CompanionDesk() {
     window.addEventListener("keydown", onKey);
     return () => {
       void offState.then((off) => off());
+      void offFading.then((off) => off());
       void offBubble.then((off) => off());
       window.removeEventListener("keydown", onKey);
     };
@@ -75,7 +82,7 @@ export function CompanionDesk() {
   };
 
   return (
-    <div className="cd" data-open={bubbleOpen} data-side={side}>
+    <div className="cd" data-open={bubbleOpen} data-side={side} data-fading={fading || undefined}>
       <div className="cd__dock">
         <button
           type="button"

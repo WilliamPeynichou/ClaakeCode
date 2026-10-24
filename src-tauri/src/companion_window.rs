@@ -23,10 +23,16 @@ const COMPANION_POSITION_KEY: &str = "companion_position";
 /// Événements (contrat companionContract.ts).
 const COMPANION_STATE_EVENT: &str = "companion-state";
 const COMPANION_BUBBLE_EVENT: &str = "companion-bubble-changed";
+/// Pré-transition : le front fondu le contenu AVANT que la géométrie de la fenêtre ne change,
+/// pour ne jamais peindre de frame intermédiaire (Claaky qui saute à gauche au clic).
+const COMPANION_BUBBLE_FADING_EVENT: &str = "companion-bubble-fading";
 /// Case de Claaky = taille de la fenêtre repliée.
 const COLLAPSED_SIZE: (f64, f64) = (120.0, 120.0);
 /// Taille de la fenêtre quand la bulle est ouverte.
 const EXPANDED_SIZE: (f64, f64) = (250.0, 330.0);
+/// Durée du fondu CSS côté front (voir .cd[data-fading]) + marge : la géométrie n'est
+/// appliquée qu'une fois le contenu totalement transparent.
+const GEOMETRY_DELAY_MS: u64 = 150;
 /// Marge gardée avec les bords de l'écran.
 const SCREEN_MARGIN: f64 = 12.0;
 /// Délai avant d'écrire la position (un glissement émet beaucoup d'événements Moved).
@@ -46,6 +52,9 @@ pub(crate) struct CompanionPosition {
 static BUBBLE_OPEN: AtomicBool = AtomicBool::new(false);
 /// Bulle ouverte vers la gauche (Claaky collé au bord droit de la fenêtre).
 static BUBBLE_TO_LEFT: AtomicBool = AtomicBool::new(true);
+/// Génération de la transition en cours : un clic rapide annule la géométrie planifiée
+/// de la génération précédente.
+static GEOMETRY_GENERATION: AtomicU64 = AtomicU64::new(0);
 static SAVE_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// Sérialise les déplacements programmés (bulle) pour que les événements Moved restent cohérents.
 static LAYOUT_LOCK: StdMutex<()> = StdMutex::new(());
@@ -279,7 +288,14 @@ pub(crate) fn toggle_companion_visibility(app: &AppHandle) -> Result<()> {
 }
 
 /// Ouvre ou ferme la bulle. La fenêtre change de taille ; l'ancre de Claaky reste en place
-/// (écran permettant), puis est enregistrée.
+/// Ouvre ou ferme la bulle. La fenêtre change de taille et de position ; l'ancre de Claaky
+/// reste en place (écran permettant), puis est enregistrée.
+///
+/// Déroulé en deux temps pour éviter le flash d'une frame intermédiaire (Claaky peint à
+/// gauche de sa position tant que le front n'a pas re-rendu après le déplacement) :
+///   1. on émet `companion-bubble-fading` — le front fond le contenu à opacité 0 ;
+///   2. après GEOMETRY_DELAY_MS, on applique taille + position puis on émet
+///      `companion-bubble-changed` — le front révèle la nouvelle disposition en fondu.
 pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
     let window = ensure_companion_window(app)?;
     let _guard = LAYOUT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -309,18 +325,34 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
     let final_anchor = (target.0 + after.0, target.1 + after.1);
 
     BUBBLE_OPEN.store(open, Ordering::SeqCst);
-    window
-        .set_size(LogicalSize::new(size.0, size.1))
-        .context("unable to resize companion window")?;
-    window
-        .set_position(LogicalPosition::new(target.0, target.1))
-        .context("unable to move companion window")?;
-    schedule_position_save(app, final_anchor);
+    let generation = GEOMETRY_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let side = if to_left { "left" } else { "right" };
+    let payload = serde_json::json!({ "open": open, "side": side });
+    let _ = app.emit(COMPANION_BUBBLE_FADING_EVENT, &payload);
 
-    let _ = app.emit(
-        COMPANION_BUBBLE_EVENT,
-        serde_json::json!({ "open": open, "side": if to_left { "left" } else { "right" } }),
-    );
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(GEOMETRY_DELAY_MS));
+        if GEOMETRY_GENERATION.load(Ordering::SeqCst) != generation {
+            return; // une transition plus récente a pris le relais
+        }
+        let window = match ensure_companion_window(&app) {
+            Ok(window) => window,
+            Err(err) => {
+                tracing::warn!(error = %err, "companion window gone during bubble transition");
+                return;
+            }
+        };
+        let _guard = LAYOUT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        if let Err(err) = window.set_size(LogicalSize::new(size.0, size.1)) {
+            tracing::warn!(error = %err, "unable to resize companion window");
+        }
+        if let Err(err) = window.set_position(LogicalPosition::new(target.0, target.1)) {
+            tracing::warn!(error = %err, "unable to move companion window");
+        }
+        schedule_position_save(&app, final_anchor);
+        let _ = app.emit(COMPANION_BUBBLE_EVENT, &payload);
+    });
     Ok(())
 }
 

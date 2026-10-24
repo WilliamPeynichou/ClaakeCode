@@ -26,7 +26,9 @@ export const COMPANION_EVENTS = {
   state: "companion-state",
   /** Rust -> fenêtre compagnon : progression d'un tour Ask (delta, fin, erreur). */
   turn: "companion-turn",
-  /** Rust -> fenêtre compagnon : bulle ouverte ou fermée. */
+  /** Rust -> fenêtre compagnon : début de transition (le contenu doit fondre avant le changement de géométrie). */
+  fading: "companion-bubble-fading",
+  /** Rust -> fenêtre compagnon : bulle ouverte ou fermée (géométrie déjà appliquée). */
   bubbleChanged: "companion-bubble-changed",
   /** Rust -> toutes fenêtres : réglages modifiés. */
   settingsChanged: "companion-settings-changed",

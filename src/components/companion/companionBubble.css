@@ -26,7 +26,11 @@
   -webkit-user-select: none;
   font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
+  /* Anti-flash : le contenu fond pendant que Rust déplace/redimensionne la fenêtre,
+     puis réapparaît sur la nouvelle géométrie (voir set_bubble_open). */
+  transition: opacity 130ms var(--ease);
 }
+.cd[data-fading] { opacity: 0; }
 /* Bulle vers la gauche : Claaky collé à droite, la bulle s'étire sous lui vers la gauche. */
 .cd[data-side="left"] { align-items: flex-end; }
 
@@ -286,4 +290,5 @@
 @media (prefers-reduced-motion: reduce) {
   .cd__drop, .companion-bubble__message { animation: none; }
   .cd__claaky, .cd__hide { transition: none; }
+  .cd { transition: none; }
 }
