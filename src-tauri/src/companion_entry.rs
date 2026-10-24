@@ -6,7 +6,8 @@ use std::{str::FromStr, sync::Mutex};
 
 use anyhow::{anyhow, Result};
 use claakecode_app::companion::{
-    companion_history_load, CompanionAskInput, CompanionAttachment, CompanionConversation, CompanionMode,
+    companion_history_load, CompanionAskInput, CompanionAttachment, CompanionConversation,
+    CompanionMode,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -14,7 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State,
 };
-use tauri_plugin_autostart::{ManagerExt as AutostartManagerExt, MacosLauncher};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 use crate::companion_window;
@@ -127,7 +128,10 @@ fn load_settings(app: &AppHandle) -> Result<CompanionSettings> {
 /// rester sans raccourci si la nouvelle combinaison est refusée par le système.
 fn apply_shortcut(app: &AppHandle, shortcut: &str) -> Result<()> {
     let slot = app.state::<CompanionShortcutSlot>();
-    let mut current = slot.0.lock().map_err(|_| anyhow!("verrou du raccourci indisponible"))?;
+    let mut current = slot
+        .0
+        .lock()
+        .map_err(|_| anyhow!("verrou du raccourci indisponible"))?;
     if current.as_deref() == Some(shortcut) {
         return Ok(());
     }
@@ -174,7 +178,8 @@ pub(crate) fn shortcut_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 }
 
 fn install_tray(app: &AppHandle) -> Result<()> {
-    let toggle = MenuItemBuilder::with_id(TRAY_TOGGLE_ID, "Afficher / masquer Claaky").build(app)?;
+    let toggle =
+        MenuItemBuilder::with_id(TRAY_TOGGLE_ID, "Afficher / masquer Claaky").build(app)?;
     let open = MenuItemBuilder::with_id(TRAY_OPEN_ID, "Ouvrir Claake Code").build(app)?;
     let quit = MenuItemBuilder::with_id(TRAY_QUIT_ID, "Quitter Claake Code").build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -243,7 +248,10 @@ pub(crate) fn setup(app: &AppHandle) -> Result<()> {
 /// Claaky est toujours là), Tauri demande une sortie sans code. On refuse : Claaky et le mode Ask
 /// restent actifs. Les sorties explicites (Quitter de la barre des menus, Cmd+Q) passent avec un code.
 pub(crate) fn keep_alive_without_windows(event: &tauri::RunEvent) {
-    if let tauri::RunEvent::ExitRequested { code: None, api, .. } = event {
+    if let tauri::RunEvent::ExitRequested {
+        code: None, api, ..
+    } = event
+    {
         api.prevent_exit();
     }
 }
@@ -271,12 +279,12 @@ fn open_claake_code(app: &AppHandle) {
 }
 
 /// Pose une tâche en attente puis la diffuse. Les fenêtres la réclament via companion_take_pending_forward.
-fn queue_forward(app: &AppHandle, pending: CompanionPendingForward, event: &str) -> Result<(), String> {
-    {
-        let slot = app.state::<CompanionPendingSlot>();
-        let mut guard = slot.0.lock().map_err(|_| "verrou de la tâche indisponible".to_string())?;
-        *guard = Some(pending.clone());
-    }
+fn queue_forward(
+    app: &AppHandle,
+    pending: CompanionPendingForward,
+    event: &str,
+) -> Result<(), String> {
+    app.state::<CompanionPendingSlot>().put(pending.clone())?;
     app.emit(event, &pending).map_err(error_to_string)
 }
 
@@ -314,6 +322,16 @@ pub(crate) fn companion_forward_to_claake_code(
     app: AppHandle,
     input: CompanionAskInput,
 ) -> std::result::Result<(), String> {
+    let pending = forward_from_input(input)?;
+    queue_forward(&app, pending, FORWARD_TASK_EVENT)?;
+    open_claake_code(&app);
+    Ok(())
+}
+
+/// Valide une demande du mode code et la convertit en tâche à transmettre.
+fn forward_from_input(
+    input: CompanionAskInput,
+) -> std::result::Result<CompanionPendingForward, String> {
     if !matches!(input.mode, CompanionMode::Code) {
         return Err("le transfert vers Claake Code exige le mode code".into());
     }
@@ -321,26 +339,48 @@ pub(crate) fn companion_forward_to_claake_code(
     if text.is_empty() && input.attachments.is_empty() {
         return Err("la tâche est vide".into());
     }
-    let pending = CompanionPendingForward {
+    Ok(CompanionPendingForward {
         text,
         attachments: input.attachments,
         model: input.model,
         source_conversation_id: input.conversation_id,
-    };
-    queue_forward(&app, pending, FORWARD_TASK_EVENT)?;
-    open_claake_code(&app);
-    Ok(())
+    })
+}
+
+/// Tâche de reprise d'une conversation compagnon dans Claake Code.
+fn forward_from_conversation(conversation: &CompanionConversation) -> CompanionPendingForward {
+    CompanionPendingForward {
+        text: continuation_prompt(conversation),
+        attachments: Vec::new(),
+        model: Some(conversation.model.clone()),
+        source_conversation_id: Some(conversation.id.clone()),
+    }
+}
+
+impl CompanionPendingSlot {
+    fn put(&self, pending: CompanionPendingForward) -> std::result::Result<(), String> {
+        let mut guard = self
+            .0
+            .lock()
+            .map_err(|_| "verrou de la tâche indisponible".to_string())?;
+        *guard = Some(pending);
+        Ok(())
+    }
+
+    fn take(&self) -> std::result::Result<Option<CompanionPendingForward>, String> {
+        let mut guard = self
+            .0
+            .lock()
+            .map_err(|_| "verrou de la tâche indisponible".to_string())?;
+        Ok(guard.take())
+    }
 }
 
 #[tauri::command]
 pub(crate) fn companion_take_pending_forward(
     slot: State<'_, CompanionPendingSlot>,
 ) -> std::result::Result<Option<CompanionPendingForward>, String> {
-    let mut guard = slot
-        .0
-        .lock()
-        .map_err(|_| "verrou de la tâche indisponible".to_string())?;
-    Ok(guard.take())
+    slot.take()
 }
 
 #[tauri::command]
@@ -359,12 +399,7 @@ pub(crate) fn companion_continue_in_app(
     let conversation = companion_history_load(&state.store, &conversation_id)
         .map_err(error_to_string)?
         .ok_or_else(|| "conversation compagnon introuvable".to_string())?;
-    let pending = CompanionPendingForward {
-        text: continuation_prompt(&conversation),
-        attachments: Vec::new(),
-        model: Some(conversation.model.clone()),
-        source_conversation_id: Some(conversation.id.clone()),
-    };
+    let pending = forward_from_conversation(&conversation);
     queue_forward(&app, pending, CONTINUE_REQUESTED_EVENT)?;
     open_claake_code(&app);
     Ok(())
@@ -372,7 +407,10 @@ pub(crate) fn companion_continue_in_app(
 
 /// Pose de Claaky relayée par la fenêtre principale (ex. tâche code en cours).
 #[tauri::command]
-pub(crate) fn companion_report_state(app: AppHandle, state: String) -> std::result::Result<(), String> {
+pub(crate) fn companion_report_state(
+    app: AppHandle,
+    state: String,
+) -> std::result::Result<(), String> {
     if !CLAAKY_STATES.contains(&state.as_str()) {
         return Err(format!("état Claaky inconnu : {state}"));
     }
@@ -386,7 +424,11 @@ fn continuation_prompt(conversation: &CompanionConversation) -> String {
         .messages
         .iter()
         .map(|message| {
-            let role = if message.role == "user" { "Utilisateur" } else { "Claaky" };
+            let role = if message.role == "user" {
+                "Utilisateur"
+            } else {
+                "Claaky"
+            };
             format!("{role} : {}", message.text.trim())
         })
         .collect::<Vec<_>>()
@@ -394,4 +436,135 @@ fn continuation_prompt(conversation: &CompanionConversation) -> String {
     format!(
         "Voici une conversation menée avec le compagnon Claaky (mode Ask). Reprends-la à partir du dernier message et attends ma prochaine demande.\n\n{transcript}"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claakecode_app::companion::CompanionMessage;
+
+    fn input(
+        mode: CompanionMode,
+        text: &str,
+        attachments: Vec<CompanionAttachment>,
+    ) -> CompanionAskInput {
+        CompanionAskInput {
+            conversation_id: Some("conv-1".into()),
+            text: text.into(),
+            mode,
+            model: Some("anthropic:claude".into()),
+            attachments,
+        }
+    }
+
+    fn message(role: &str, text: &str) -> CompanionMessage {
+        CompanionMessage {
+            id: format!("{role}-{text}"),
+            role: role.into(),
+            text: text.into(),
+            attachment_names: Vec::new(),
+            created_at_ms: 1,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn forward_rejects_ask_mode() {
+        let err = forward_from_input(input(CompanionMode::Ask, "fais X", vec![])).unwrap_err();
+        assert!(err.contains("mode code"));
+    }
+
+    #[test]
+    fn forward_rejects_empty_task() {
+        let err = forward_from_input(input(CompanionMode::Code, "   \n", vec![])).unwrap_err();
+        assert!(err.contains("vide"));
+    }
+
+    #[test]
+    fn forward_accepts_attachment_only_and_keeps_context() {
+        let attachment = CompanionAttachment::Text {
+            name: "note.txt".into(),
+            text: "contenu".into(),
+        };
+        let pending =
+            forward_from_input(input(CompanionMode::Code, "  ", vec![attachment])).unwrap();
+        assert_eq!(pending.text, "");
+        assert_eq!(pending.attachments.len(), 1);
+        assert_eq!(pending.model.as_deref(), Some("anthropic:claude"));
+        assert_eq!(pending.source_conversation_id.as_deref(), Some("conv-1"));
+    }
+
+    #[test]
+    fn forward_trims_task_text() {
+        let pending =
+            forward_from_input(input(CompanionMode::Code, "  corrige le bug \n", vec![])).unwrap();
+        assert_eq!(pending.text, "corrige le bug");
+    }
+
+    #[test]
+    fn pending_slot_is_consumed_once() {
+        let slot = CompanionPendingSlot::default();
+        assert!(slot.take().unwrap().is_none());
+        slot.put(forward_from_input(input(CompanionMode::Code, "a", vec![])).unwrap())
+            .unwrap();
+        slot.put(forward_from_input(input(CompanionMode::Code, "b", vec![])).unwrap())
+            .unwrap();
+        assert_eq!(
+            slot.take().unwrap().unwrap().text,
+            "b",
+            "la dernière tâche remplace la précédente"
+        );
+        assert!(
+            slot.take().unwrap().is_none(),
+            "une tâche n'est remise qu'à une seule fenêtre"
+        );
+    }
+
+    #[test]
+    fn continuation_carries_transcript_model_and_source() {
+        let conversation = CompanionConversation {
+            id: "conv-42".into(),
+            title: "t".into(),
+            updated_at_ms: 2,
+            model: "openai:gpt".into(),
+            messages: vec![message("user", " Bonjour "), message("assistant", "Salut")],
+        };
+        let pending = forward_from_conversation(&conversation);
+        assert!(pending
+            .text
+            .ends_with("Utilisateur : Bonjour\n\nClaaky : Salut"));
+        assert!(pending.attachments.is_empty());
+        assert_eq!(pending.model.as_deref(), Some("openai:gpt"));
+        assert_eq!(pending.source_conversation_id.as_deref(), Some("conv-42"));
+    }
+
+    #[test]
+    fn pending_forward_serializes_camel_case() {
+        let pending = forward_from_input(input(CompanionMode::Code, "x", vec![])).unwrap();
+        let json = serde_json::to_value(&pending).unwrap();
+        assert_eq!(json["sourceConversationId"], "conv-1");
+        assert_eq!(json["model"], "anthropic:claude");
+    }
+
+    #[test]
+    fn settings_normalization() {
+        let settings = normalize_settings(CompanionSettings {
+            shortcut: "  Control+Alt+Space ".into(),
+            allowed_models: vec![" a:1 ".into(), "a:1".into(), "".into(), "b:2".into()],
+            default_model: Some("c:3".into()),
+            ..CompanionSettings::default()
+        })
+        .unwrap();
+        assert_eq!(settings.shortcut, "Control+Alt+Space");
+        assert_eq!(settings.allowed_models, vec!["a:1", "b:2"]);
+        assert_eq!(
+            settings.default_model, None,
+            "modèle par défaut hors liste blanche retiré"
+        );
+        assert!(normalize_settings(CompanionSettings {
+            shortcut: " ".into(),
+            ..CompanionSettings::default()
+        })
+        .is_err());
+    }
 }
