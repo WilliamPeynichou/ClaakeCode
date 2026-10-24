@@ -297,35 +297,39 @@ def wall_details():
     ROOT=None
 
 
+# Lit le long du bord avant, tête contre le mur gauche (comme sur l'illustration de référence).
+BED = (-1.65, -2.15)
+
+
 def bed_and_rug():
     collection('03 · Lit et tapis')
-    # Tapis à carreaux, suffisamment grand pour le fauteuil.
-    cube('Tapis bordure',(.10,-.35,.095),(3.55,3.65,.025),'teal',.015)
-    for i in range(12):
-        for j in range(12):
-            cube('Tapis carreau',(-1.52+i*.29,-2.02+j*.30,.113),(.288,.298,.012),random.choice(['rug1','rug2','rug3']))
-    # Lit placé dans l'angle inférieur gauche (vue de dessus : x négatif, y négatif).
-    bx,by=-1.95,-1.82
-    cube('Lit cadre',(bx,by,.33),(1.68,2.65,.41),'wood_dark',.045)
-    for xx in [-.66,.66]:
-        for yy in [-1.10,1.10]:
+    # Tapis à carreaux au centre : du pied du lit jusque sous le fauteuil.
+    cube('Tapis bordure',(.30,-.25,.095),(3.30,3.30,.025),'teal',.015)
+    for i in range(11):
+        for j in range(11):
+            cube('Tapis carreau',(-1.20+i*.29,-1.70+j*.29,.113),(.285,.285,.012),random.choice(['rug1','rug2','rug3']))
+    bx,by=BED
+    # Axe du lit selon X : tête à gauche (x négatif), pied vers le centre de la pièce.
+    cube('Lit cadre',(bx,by,.33),(2.65,1.68,.41),'wood_dark',.045)
+    for xx in [-1.10,1.10]:
+        for yy in [-.66,.66]:
             cube('Pied lit',(bx+xx,by+yy,.21),(.15,.15,.34),'wood')
-    cube('Matelas',(bx,by,.61),(1.57,2.52,.28),'cream',.09)
-    cube('Tête de lit',(bx,by+1.28,.73),(1.72,.12,1.10),'wood',.04)
-    # Oreiller
-    cube('Oreiller',(bx,by+.80,.81),(1.18,.58,.20),'paper',.09)
-    for i in range(8):
-        for j in range(9):
-            cube('Couette patchwork',(bx-.70+i*.20,by-1.08+j*.18,.82),(.205,.185,.16),random.choice(['green','sage','teal','rug2']),.025)
-    cube('Couette rabat',(bx,by+.53,.86),(1.60,.25,.15),'cream',.035)
-    # Couverture retombant au pied du lit.
-    for i in range(8):
-        cube('Couette retombée',(bx-.70+i*.20,by-1.235,.62),(.20,.045,.44),'teal',.01)
-    # Chevet à côté de l'oreiller, au niveau de la tête du lit (pas au pied).
-    cube('Table de chevet',(-1.03,-1.02,.79),(.48,.48,.24),'wood',.025)
-    cube('Tiroir chevet',(-1.03,-1.27,.79),(.38,.035,.17),'wood_dark',.01)
-    cube('Poignée chevet',(-1.03,-1.30,.79),(.12,.03,.025),'ochre')
-    lantern(-1.03,-1.02,.91,.22)
+    cube('Matelas',(bx,by,.61),(2.52,1.57,.28),'cream',.09)
+    cube('Tête de lit',(bx-1.28,by,.73),(.12,1.72,1.10),'wood',.04)
+    cube('Oreiller',(bx-.80,by,.81),(.58,1.18,.20),'paper',.09)
+    for i in range(9):
+        for j in range(8):
+            cube('Couette patchwork',(bx+1.08-i*.18,by-.70+j*.20,.82),(.185,.205,.16),random.choice(['green','sage','teal','rug2']),.025)
+    cube('Couette rabat',(bx-.53,by,.86),(.25,1.60,.15),'cream',.035)
+    # Couverture retombant côté pièce (bord avant visible).
+    for i in range(9):
+        cube('Couette retombée',(bx+1.08-i*.18,by-.815,.62),(.18,.045,.44),'teal',.01)
+    # Chevet posé au sol juste à côté de l'oreiller, contre le mur gauche.
+    nx,ny=bx-.95,by+1.15
+    cube('Table de chevet',(nx,ny,.40),(.50,.50,.66),'wood',.025)
+    cube('Tiroir chevet',(nx+.255,ny,.52),(.035,.40,.18),'wood_dark',.01)
+    cube('Poignée chevet',(nx+.28,ny,.52),(.025,.12,.03),'ochre')
+    lantern(nx,ny,.73,.22)
     cube('Paillasson porte',(2.39,2.34,.10),(.91,.65,.035),'teal',.025)
     cube('Paillasson centre',(2.39,2.34,.123),(.77,.51,.012),'sage')
 
@@ -472,32 +476,49 @@ def chair_and_character():
 def accessories():
     global ROOT
     collection('07 · Bibliothèques, végétation et accessoires')
-    # Bibliothèque contre le mur gauche, sous la fenêtre, en retrait du lit (coordonnées locales : x = y monde).
-    ROOT = empty('Bibliothèque mur gauche', (-2.70, -.12, 0), math.pi / 2)
-    bookcase(0, 0, 1.05, 1.35)
-    plant(0, -.12, 1.50, .85)
+    # Bibliothèque contre le mur gauche, sous la fenêtre, derrière le chevet (coordonnées locales : x = y monde).
+    ROOT = empty('Bibliothèque mur gauche', (-2.70, -.10, 0), math.pi / 2)
+    bookcase(0, 0, 1.00, 1.35)
+    plant(-.22, -.12, 1.50, .80)
+    plant(.25, -.12, 1.50, .55)
     ROOT = None
-    # Buffet sous le tableau : en retrait de la zone de réflexion.
-    cube('Buffet gauche',(-2.65,1.23,.66),(.60,1.10,1.15),'wood_dark',.025)
-    cube('Plateau buffet',(-2.65,1.23,1.26),(.67,1.18,.08),'wood',.018)
-    lantern(-2.40,.92,1.30,.24)
-    plant(-2.63,1.52,1.30,.65)
-    # Retiré : la bibliothèque devant la porte (ancien bookcase(1.92,2.47)).
-    # Retirer le meuble bas sous la fenêtre : supprimer également son groupe parent.
+    # Commode noire à tiroirs sous le tableau blanc, avec lampe articulée et lanterne.
+    kx, ky = -2.68, 1.00
+    cube('Commode noire', (kx, ky, .58), (.58, 1.00, 1.02), 'metal', .025)
+    cube('Plateau commode', (kx, ky, 1.12), (.64, 1.06, .07), 'wood', .015)
+    for z in [.30, .62, .92]:
+        cube('Tiroir commode', (kx+.295, ky, z), (.02, .86, .24), 'base', .008)
+        cube('Poignée commode', (kx+.315, ky, z+.04), (.02, .22, .03), 'ochre')
+    lantern(kx+.05, ky-.33, 1.155, .22)
+    cyl('Lampe commode base', (kx+.02, ky+.30, 1.18), .12, .04, 'metal')
+    line('Lampe commode bras 1', (kx+.02, ky+.30, 1.20), (kx-.05, ky+.30, 1.62), .022, 'metal')
+    line('Lampe commode bras 2', (kx-.05, ky+.30, 1.62), (kx+.20, ky+.18, 1.74), .022, 'metal')
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=.11, radius2=.05, depth=.12, location=(kx+.24, ky+.16, 1.69))
+    finish(bpy.context.object, 'Abat-jour commode', 'metal')
+    point_light('Lueur lampe commode', (kx+.26, ky+.15, 1.60), 45, (1, .62, .32), .08)
+    # Coin du fond : plantes tombantes sur deux étagères murales.
     plant(-2.75,2.70,2.65,1.0,True)
     cube('Étagère plante angle',(-2.75,2.70,2.60),(.61,.63,.09),'wood')
-    # La seconde plante doit reposer sur un support (pas flotter dans l'air).
     cube('Étagère angle basse',(-2.15,2.65,2.56),(.52,.50,.08),'wood',.012)
     plant(-2.15,2.56,2.60,.65,True)
-    plant(-2.63,-.64,.12,.70)
-    # Sac contre le buffet, hors du trajet centre-tableau.
-    cube('Sac à dos',(-2.12,1.47,.45),(.43,.35,.73),'sage',.10)
-    cube('Poche sac',(-1.88,1.47,.40),(.07,.25,.30),'green',.025)
-    line('Anse sac',(-2.22,1.47,.83),(-2.02,1.47,.83),.025,'wood_dark')
-    # Petit banc au pied du lit.
-    cube('Banc pied du lit',(-1.77,-2.86,.39),(1.70,.35,.10),'wood',.015)
-    for x in [-2.44,-1.10]:
-        cube('Pied banc',(x,-2.86,.23),(.09,.25,.32),'wood_dark')
+    # Sac à dos au sol, entre la commode et le bureau.
+    cube('Sac à dos',(-2.55,1.95,.45),(.35,.43,.73),'sage',.10)
+    cube('Poche sac',(-2.34,1.95,.40),(.07,.25,.30),'green',.025)
+    line('Anse sac',(-2.55,1.85,.83),(-2.55,2.05,.83),.025,'wood_dark')
+    # Meuble bas au pied du lit (bord avant) : livres, plante et lanterne, comme sur l'illustration.
+    fx, fy = .25, -2.62
+    cube('Meuble pied de lit fond', (fx, fy+.20, .38), (1.10, .08, .60), 'wood_dark')
+    for z in [.11, .66]:
+        cube('Meuble pied de lit plateau', (fx, fy, z), (1.10, .48, .06), 'wood', .012)
+    for side in [-1, 1]:
+        cube('Meuble pied de lit montant', (fx+side*.52, fy, .38), (.06, .48, .60), 'wood', .01)
+    for i in range(6):
+        book(fx-.36+i*.14, fy+.06, .14, random.uniform(.26,.36), .11)
+    plant(fx+.25, fy, .69, .55)
+    lantern(fx-.25, fy, .69, .20)
+    plant(1.15, -2.70, .075, .70)
+    cube('Tablette au sol', (1.55, -2.55, .085), (.45, .32, .02), 'metal', .008)
+    cube('Tablette écran', (1.55, -2.55, .097), (.39, .26, .006), 'sky')
     test_machine()
 
 

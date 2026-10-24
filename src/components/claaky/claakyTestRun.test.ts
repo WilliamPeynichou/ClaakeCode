@@ -68,10 +68,8 @@ const manifest: ClipManifest = {
   clips: {
     attente: { planche: "a.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: true, lieu: "centre", lieu_fin: "centre" },
     travail_clavier: { planche: "t.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: true, lieu: "bureau", lieu_fin: "bureau" },
-    celebrer: { planche: "c.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: false, lieu: "centre", lieu_fin: "centre" },
     erreur: { planche: "e.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: false, lieu: "bureau", lieu_fin: "bureau" },
-    autorisation: { planche: "u.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: true, lieu: "bureau", lieu_fin: "bureau" },
-    centre__bureau: { planche: "w.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: false, lieu: "centre", lieu_fin: "bureau" },
+    autorisation: { planche: "u.png", x: 0, y: 0, l: 10, h: 10, colonnes: 1, images: 4, boucle: false, lieu: "bureau", lieu_fin: "bureau" },
   },
 };
 
@@ -96,13 +94,11 @@ test("machine allumée pendant un test réel, éteinte sans test", () => {
   assert.ok(on && on.alpha > 0.4, "allumée pendant le test");
 });
 
-test("un test réussi déclenche un flash vert puis s'éteint", () => {
+test("un test réussi éteint la machine, sans flash", () => {
   const d = new RoomDirector(manifest, 0);
   d.update(act({ state: "working", testRun: "running" }), 0);
   d.update(act({ state: "working", testRun: "passed" }), 1000);
-  const flash = d.machineLight(1000, manifest.machine);
-  assert.equal(flash?.color, "#7dffa0");
-  assert.equal(d.machineLight(1000 + MACHINE_FLASH_MS + 1, manifest.machine), null);
+  assert.equal(d.machineLight(1000, manifest.machine), null);
 });
 
 test("un test échoué déclenche un flash orange", () => {
@@ -118,9 +114,45 @@ test("un ancien résultat déjà présent à l'ouverture ne déclenche aucun fla
   assert.equal(d.machineLight(0, manifest.machine), null);
 });
 
-test("le libellé annonce les tests quand un test tourne", () => {
+test("un échec de test garde un flash orange qui s'éteint", () => {
   const d = new RoomDirector(manifest, 0);
-  d.update(act({ state: "working", tool: "bash", testRun: "running" }), 0);
-  for (let t = 0; t < 40; t += 1) d.step(t * 100);
-  assert.equal(d.label, "Lance les tests");
+  d.update(act({ state: "working", testRun: "running" }), 0);
+  d.update(act({ state: "working", testRun: "failed" }), 500);
+  assert.equal(d.machineLight(500 + MACHINE_FLASH_MS + 1, manifest.machine), null);
+});
+
+test("changement de lieu = téléportation avec fondu, sans trajet", () => {
+  const d = new RoomDirector(manifest, 0);
+  assert.equal(d.clip, "attente");
+  d.update(act({ state: "working", tool: "bash" }), 3000);
+  let fadeSeen = false;
+  for (let t = 3000; t < 5000; t += 100) {
+    d.step(t);
+    if (d.fade?.clip === "attente") fadeSeen = true;
+  }
+  assert.equal(d.clip, "travail_clavier");
+  assert.ok(fadeSeen, "l'ancien sprite s'efface");
+  for (let t = 5000; t < 6000; t += 100) d.step(t);
+  assert.equal(d.fade, null);
+});
+
+test("fin de tour : pas de célébration, il attend au centre", () => {
+  const d = new RoomDirector(manifest, 0);
+  d.update(act({ state: "working" }), 3000);
+  for (let t = 3000; t < 5000; t += 100) d.step(t);
+  d.update(act({ state: "done" }), 5000);
+  const seen = new Set<string>();
+  for (let t = 5000; t < 12000; t += 100) {
+    d.step(t);
+    seen.add(d.clip);
+  }
+  assert.equal(d.clip, "attente");
+  assert.ok(!seen.has("celebrer"));
+});
+
+test("pas de téléportation tant que la planche cible n'est pas chargée", () => {
+  const d = new RoomDirector(manifest, 0);
+  d.update(act({ state: "working" }), 3000);
+  for (let t = 3000; t < 6000; t += 100) d.step(t, (clip) => clip !== "travail_clavier");
+  assert.equal(d.clip, "attente");
 });

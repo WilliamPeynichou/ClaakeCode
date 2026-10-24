@@ -6,12 +6,12 @@ import type { TestRun } from "./claakyTestRun";
  *
  * Clips come from sinew/docs/Claaky3D/claaky_etats.py (exported to public/claaky3d/bureau):
  *  - loops at a place: travail_clavier (bureau), reflechir_tableau (tableau), dormir (lit), attente (centre)
- *  - one-shots: autorisation, erreur, cafe (bureau) · celebrer (centre)
- *  - walks: "<from>__<to>" for every pair of places
- * Every clip starts in the exact pose the previous one ends with, so any chain plays without a jump.
+ *  - one-shots at the desk: autorisation, erreur, cafe
+ * There are no walks: changing place is a teleport with a short cross-fade (see `fade`),
+ * which keeps the exported sheets small and the room light to run.
  *
  * Rules (docs/Claaky3D/plansClaaky3DforBlender.md, section 11):
- *  - short bursts never make him cross the room: a new place must stay wanted for a moment;
+ *  - short bursts never make him change place: a new place must stay wanted for a moment;
  *  - waiting for the user reacts at once;
  *  - sleep only after a finished turn plus SLEEP_MS of quiet, never during a silent computation.
  */
@@ -38,51 +38,39 @@ export type ClipManifest = {
   machine?: MachineAnchor;
 };
 
-/** Light shown by the test machine: steady while a run is going, then a short flash for its result. */
+/** Light shown by the test machine: steady while a run is going, short orange flash if it failed. */
 export type MachineLight = { color: string; alpha: number };
+/** Previous sprite fading out after a teleport. */
+export type Fade = { clip: string; frame: number; start: number };
 
 export const MACHINE_FLASH_MS = 2500;
-const MACHINE_COLOR = { running: "#b8ff8a", passed: "#7dffa0", failed: "#ff7a4a" } as const;
+export const FADE_MS = 320;
+const MACHINE_COLOR = { running: "#b8ff8a", failed: "#ff7a4a" } as const;
 
-type Goal = { place: Place; loop: string; label: string };
+type Goal = { place: Place; loop: string };
 
 export const SLEEP_MS = 5 * 60_000;
-/** How long a new place must stay wanted before he walks there. */
+/** How long a new place must stay wanted before he goes there. */
 const SETTLE_MS: Record<Place, number> = { bureau: 900, tableau: 2500, centre: 1500, lit: 0 };
 /** Minimum time spent at a place before leaving it again (except for the user). */
 const DWELL_MS = 2500;
-
-const TOOL_LABELS: [RegExp, string][] = [
-  [/edit|write|apply_patch|multi_edit/i, "Modifie des fichiers"],
-  [/^(read|grep|glob|list|ls|search_files)/i, "Lit le projet"],
-  [/bash|shell|terminal|python/i, "Lance une commande"],
-  [/web_(search|fetch)|browse/i, "Cherche sur le web"],
-  [/todo/i, "Organise les tâches"],
-  [/team|subagent|agent/i, "Coordonne des agents"],
-  [/database/i, "Interroge la base"],
-  [/skill/i, "Ouvre une compétence"],
-];
-
-export function toolLabel(tool?: string): string {
-  if (!tool) return "Travaille";
-  for (const [re, label] of TOOL_LABELS) if (re.test(tool)) return label;
-  return "Travaille";
-}
+const LOOP_AT: Record<Place, string> = { bureau: "travail_clavier", tableau: "reflechir_tableau", lit: "dormir", centre: "attente" };
 
 export class RoomDirector {
-  clip = "travail_clavier";
+  clip = "attente";
   frame = 0;
-  label = "";
-  private place: Place = "bureau";
+  /** Set right after a teleport, while the old sprite fades out. */
+  fade: Fade | null = null;
+  private place: Place = "centre";
   private activity: ClaakyActivity = { state: "idle", awaitingUser: false, toolErrors: 0 };
-  private wanted: Goal = { place: "centre", loop: "attente", label: "Attend" };
+  private wanted: Goal = { place: "centre", loop: "attente" };
   private wantedSince = 0;
   private arrivedAt = 0;
   private quietSince = 0;
   private finishedTurn = false;
   private queue: string[] = [];
   private testRun: TestRun | undefined = undefined;
-  private flash: { result: "passed" | "failed"; until: number } | null = null;
+  private flashUntil = 0;
 
   constructor(private manifest: ClipManifest, now: number) {
     this.wantedSince = now;
@@ -90,7 +78,6 @@ export class RoomDirector {
     this.quietSince = now;
     this.clip = this.has("attente") ? "attente" : Object.keys(manifest.clips)[0];
     this.place = this.info(this.clip).lieu;
-    this.label = "Attend";
   }
 
   private has(name: string) {
@@ -100,27 +87,25 @@ export class RoomDirector {
     return this.manifest.clips[name];
   }
 
+  /** Clips that may play soon (current place loops first), for on-demand loading. */
+  likelyClips(): string[] {
+    const order = [this.clip, this.wanted.loop, ...Object.values(LOOP_AT), "erreur", "autorisation", "cafe"];
+    return [...new Set(order)].filter((name) => this.has(name));
+  }
+
   /** Feed the latest agent activity. */
   update(next: ClaakyActivity, now: number) {
     const prev = this.activity;
     this.activity = next;
     // Machine: driven by real transitions only, so a stale result never re-triggers a flash.
     if (next.testRun !== prev.testRun) {
-      if (next.testRun === "running") this.flash = null;
-      else if (prev.testRun === "running" && (next.testRun === "passed" || next.testRun === "failed")) {
-        this.flash = { result: next.testRun, until: now + MACHINE_FLASH_MS };
-      }
+      if (next.testRun === "running") this.flashUntil = 0;
+      else if (prev.testRun === "running" && next.testRun === "failed") this.flashUntil = now + MACHINE_FLASH_MS;
     }
     this.testRun = next.testRun;
     if (next.toolErrors > prev.toolErrors && next.state !== "idle") this.queueOnce("erreur");
-    if (next.state === "done" && prev.state !== "done") {
-      this.finishedTurn = true;
-      this.queueOnce("celebrer");
-    }
-    if (next.state !== "idle" && next.state !== "done") {
-      this.finishedTurn = false;
-      this.queue = this.queue.filter((clip) => clip !== "celebrer");
-    }
+    if (next.state === "done" && prev.state !== "done") this.finishedTurn = true;
+    if (next.state !== "idle" && next.state !== "done") this.finishedTurn = false;
     if (next.state !== "idle") this.quietSince = now;
     this.retarget(now);
   }
@@ -137,35 +122,29 @@ export class RoomDirector {
       const pulse = 0.75 + 0.25 * Math.sin(now / 350);
       return { color: MACHINE_COLOR.running, alpha: pulse };
     }
-    if (this.flash && now < this.flash.until) {
-      const left = (this.flash.until - now) / MACHINE_FLASH_MS;
-      return { color: MACHINE_COLOR[this.flash.result], alpha: 0.9 * left };
+    if (now < this.flashUntil) {
+      return { color: MACHINE_COLOR.failed, alpha: (0.9 * (this.flashUntil - now)) / MACHINE_FLASH_MS };
     }
     return null;
   }
 
   private goalFor(now: number): Goal {
     const a = this.activity;
-    if (a.awaitingUser) return { place: "bureau", loop: "autorisation", label: "Attend ta réponse" };
+    if (a.awaitingUser) return { place: "bureau", loop: "autorisation" };
     switch (a.state) {
       case "working":
-        return {
-          place: "bureau",
-          loop: "travail_clavier",
-          label: a.testRun === "running" ? "Lance les tests" : toolLabel(a.tool),
-        };
+      case "error":
+        return { place: "bureau", loop: "travail_clavier" };
       case "thinking":
       case "planning":
-        return { place: "tableau", loop: "reflechir_tableau", label: a.state === "planning" ? "Planifie" : "Réfléchit" };
-      case "error":
-        return { place: "bureau", loop: "travail_clavier", label: "Une erreur est survenue" };
-      case "done":
-        return { place: "centre", loop: "attente", label: "Terminé" };
+        return { place: "tableau", loop: "reflechir_tableau" };
       case "sleeping":
-        return { place: "lit", loop: "dormir", label: "Dort" };
+        return { place: "lit", loop: "dormir" };
+      case "done":
+        return { place: "centre", loop: "attente" };
       default:
-        if (this.finishedTurn && now - this.quietSince >= SLEEP_MS) return { place: "lit", loop: "dormir", label: "Dort" };
-        return { place: "centre", loop: "attente", label: "Attend" };
+        if (this.finishedTurn && now - this.quietSince >= SLEEP_MS) return { place: "lit", loop: "dormir" };
+        return { place: "centre", loop: "attente" };
     }
   }
 
@@ -177,71 +156,56 @@ export class RoomDirector {
 
   /** Should he act on `wanted` now, or keep doing what he does? */
   private committed(now: number) {
-    const urgent = this.activity.awaitingUser || this.wanted.place === this.place;
-    if (urgent) return true;
+    if (this.activity.awaitingUser || this.wanted.place === this.place) return true;
     if (now - this.arrivedAt < DWELL_MS) return false;
     return now - this.wantedSince >= SETTLE_MS[this.wanted.place];
   }
 
-  /** Picks what plays after the current clip (or interrupts a loop). */
-  private next(now: number): string {
-    const loopInfo = this.info(this.clip);
-    if (this.queue.length) {
-      const clip = this.queue[0];
-      if (this.info(clip).lieu === this.place) {
-        this.queue.shift();
-        return clip;
-      }
-      // Reaction belongs elsewhere: keep it if he is heading there, otherwise forget it
-      // rather than walk across the room for it.
-      if (this.info(clip).lieu !== this.wanted.place) this.queue.shift();
-    }
-    if (this.committed(now) && this.wanted.place !== this.place) {
-      const walk = `${this.place}__${this.wanted.place}`;
-      if (this.has(walk)) return walk;
+  private teleportDue(now: number) {
+    return this.wanted.place !== this.place && this.committed(now) && this.has(this.wanted.loop);
+  }
+
+  /** Picks what plays after the current clip at the same place. */
+  private next(): string {
+    const clip = this.queue[0];
+    if (clip) {
+      this.queue.shift();
+      // Reactions belong to their place; never teleport just for one.
+      if (this.info(clip).lieu === this.place) return clip;
     }
     if (this.wanted.place === this.place && this.has(this.wanted.loop)) return this.wanted.loop;
-    // Not committed yet: keep the current place's loop.
-    const fallback = { bureau: "travail_clavier", tableau: "reflechir_tableau", lit: "dormir", centre: "attente" }[this.place];
-    return loopInfo.boucle && loopInfo.lieu === this.place ? this.clip : fallback;
+    const loop = LOOP_AT[this.place];
+    return this.has(loop) ? loop : this.clip;
   }
 
-  /** Advance one animation frame. */
-  step(now: number) {
+  /** Advance one animation frame. `ready(clip)` tells whether its sprite sheet is loaded. */
+  step(now: number, ready: (clip: string) => boolean = () => true) {
     this.retarget(now);
+    if (this.fade && now - this.fade.start >= FADE_MS) this.fade = null;
     const info = this.info(this.clip);
     const atEnd = this.frame >= info.images - 1;
-    // Leave at the loop boundary to avoid jumping from a mid-gesture pose.
-    // User requests remain urgent; walks and reactions always finish.
-    const leaveLoop = info.boucle && !atEnd && this.activity.awaitingUser && this.wantsChange(now);
-    if (atEnd || leaveLoop) {
-      const next = this.next(now);
-      if (next !== this.clip || atEnd) {
-        const prevPlace = this.place;
-        this.clip = next;
-        this.frame = 0;
-        this.place = this.info(next).lieu;
-        if (this.place !== prevPlace) this.arrivedAt = now;
-      } else {
-        this.frame += 1;
-      }
-    } else {
-      this.frame += 1;
-    }
-    const cur = this.info(this.clip);
-    if (!cur.boucle && cur.lieu !== cur.lieu_fin && this.frame === cur.images - 1) {
-      this.place = cur.lieu_fin;
+    // Teleport from a loop at any frame (the fade hides the cut); a gesture finishes first unless the user waits.
+    if (this.teleportDue(now) && (info.boucle || atEnd || this.activity.awaitingUser) && ready(this.wanted.loop)) {
+      this.fade = { clip: this.clip, frame: this.frame, start: now };
+      this.clip = this.wanted.loop;
+      this.frame = 0;
+      this.place = this.wanted.place;
       this.arrivedAt = now;
+      return;
     }
-    const clipLabel: Record<string, string> = { erreur: "Un outil a échoué", celebrer: "Terminé !", cafe: "Petite pause café" };
-    this.label =
-      clipLabel[this.clip] ??
-      (cur.lieu !== cur.lieu_fin ? "Se déplace" : this.wanted.place === this.place ? this.wanted.label : this.label);
-  }
-
-  private wantsChange(now: number) {
-    if (this.queue.length && this.info(this.queue[0]).lieu === this.place) return true;
-    if (this.wanted.place !== this.place) return this.committed(now);
-    return this.wanted.loop !== this.clip && this.has(this.wanted.loop);
+    if (atEnd) {
+      const next = this.next();
+      // Sheet still loading: replay the current clip meanwhile.
+      if (ready(next)) this.clip = next;
+      this.frame = 0;
+      return;
+    }
+    // A loop at the right place gives way to a wanted gesture (permission request) at once.
+    if (info.boucle && this.activity.awaitingUser && this.wanted.loop !== this.clip && ready(this.wanted.loop)) {
+      this.clip = this.wanted.loop;
+      this.frame = 0;
+      return;
+    }
+    this.frame += 1;
   }
 }

@@ -8,10 +8,6 @@
    373.3,
    316.3
   ],
-  "bureau_approche": [
-   389.9,
-   383.6
-  ],
   "centre": [
    313.9,
    391.8
@@ -20,13 +16,9 @@
    303.9,
    336.7
   ],
-  "lit_bord": [
-   242.0,
-   399.8
-  ],
   "lit_couche": [
-   157.6,
-   347.8
+   171.4,
+   360.4
   ]
  },
  "machine": {
@@ -62,11 +54,11 @@
   },
   "dormir": {
    "planche": "dormir.png",
-   "x": 141,
-   "y": 268,
-   "l": 106,
-   "h": 76,
-   "colonnes": 38,
+   "x": 77,
+   "y": 311,
+   "l": 139,
+   "h": 77,
+   "colonnes": 29,
    "images": 73,
    "boucle": true,
    "lieu": "lit",
@@ -87,9 +79,9 @@
   "autorisation": {
    "planche": "autorisation.png",
    "x": 322,
-   "y": 193,
+   "y": 213,
    "l": 102,
-   "h": 135,
+   "h": 115,
    "colonnes": 40,
    "images": 41,
    "boucle": false,
@@ -99,9 +91,9 @@
   "erreur": {
    "planche": "erreur.png",
    "x": 328,
-   "y": 193,
+   "y": 210,
    "l": 99,
-   "h": 127,
+   "h": 110,
    "colonnes": 25,
    "images": 25,
    "boucle": false,
@@ -119,162 +111,6 @@
    "boucle": false,
    "lieu": "bureau",
    "lieu_fin": "bureau"
-  },
-  "celebrer": {
-   "planche": "celebrer.png",
-   "x": 263,
-   "y": 264,
-   "l": 102,
-   "h": 140,
-   "colonnes": 28,
-   "images": 28,
-   "boucle": false,
-   "lieu": "centre",
-   "lieu_fin": "centre"
-  },
-  "bureau__tableau": {
-   "planche": "bureau__tableau.png",
-   "x": 254,
-   "y": 217,
-   "l": 164,
-   "h": 187,
-   "colonnes": 24,
-   "images": 54,
-   "boucle": false,
-   "lieu": "bureau",
-   "lieu_fin": "tableau"
-  },
-  "bureau__lit": {
-   "planche": "bureau__lit.png",
-   "x": 141,
-   "y": 217,
-   "l": 277,
-   "h": 195,
-   "colonnes": 14,
-   "images": 39,
-   "boucle": false,
-   "lieu": "bureau",
-   "lieu_fin": "lit"
-  },
-  "bureau__centre": {
-   "planche": "bureau__centre.png",
-   "x": 263,
-   "y": 217,
-   "l": 155,
-   "h": 189,
-   "colonnes": 26,
-   "images": 34,
-   "boucle": false,
-   "lieu": "bureau",
-   "lieu_fin": "centre"
-  },
-  "tableau__bureau": {
-   "planche": "tableau__bureau.png",
-   "x": 253,
-   "y": 219,
-   "l": 164,
-   "h": 185,
-   "colonnes": 24,
-   "images": 42,
-   "boucle": false,
-   "lieu": "tableau",
-   "lieu_fin": "bureau"
-  },
-  "tableau__lit": {
-   "planche": "tableau__lit.png",
-   "x": 141,
-   "y": 232,
-   "l": 223,
-   "h": 180,
-   "colonnes": 18,
-   "images": 43,
-   "boucle": false,
-   "lieu": "tableau",
-   "lieu_fin": "lit"
-  },
-  "tableau__centre": {
-   "planche": "tableau__centre.png",
-   "x": 253,
-   "y": 232,
-   "l": 112,
-   "h": 172,
-   "colonnes": 36,
-   "images": 38,
-   "boucle": false,
-   "lieu": "tableau",
-   "lieu_fin": "centre"
-  },
-  "lit__bureau": {
-   "planche": "lit__bureau.png",
-   "x": 141,
-   "y": 219,
-   "l": 278,
-   "h": 191,
-   "colonnes": 14,
-   "images": 52,
-   "boucle": false,
-   "lieu": "lit",
-   "lieu_fin": "bureau"
-  },
-  "lit__tableau": {
-   "planche": "lit__tableau.png",
-   "x": 141,
-   "y": 235,
-   "l": 224,
-   "h": 175,
-   "colonnes": 18,
-   "images": 68,
-   "boucle": false,
-   "lieu": "lit",
-   "lieu_fin": "tableau"
-  },
-  "lit__centre": {
-   "planche": "lit__centre.png",
-   "x": 141,
-   "y": 287,
-   "l": 224,
-   "h": 123,
-   "colonnes": 18,
-   "images": 48,
-   "boucle": false,
-   "lieu": "lit",
-   "lieu_fin": "centre"
-  },
-  "centre__bureau": {
-   "planche": "centre__bureau.png",
-   "x": 263,
-   "y": 219,
-   "l": 156,
-   "h": 187,
-   "colonnes": 22,
-   "images": 22,
-   "boucle": false,
-   "lieu": "centre",
-   "lieu_fin": "bureau"
-  },
-  "centre__tableau": {
-   "planche": "centre__tableau.png",
-   "x": 254,
-   "y": 235,
-   "l": 111,
-   "h": 169,
-   "colonnes": 36,
-   "images": 38,
-   "boucle": false,
-   "lieu": "centre",
-   "lieu_fin": "tableau"
-  },
-  "centre__lit": {
-   "planche": "centre__lit.png",
-   "x": 141,
-   "y": 286,
-   "l": 224,
-   "h": 126,
-   "colonnes": 18,
-   "images": 23,
-   "boucle": false,
-   "lieu": "centre",
-   "lieu_fin": "lit"
   }
  }
 }

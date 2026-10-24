@@ -7,8 +7,8 @@ les enchaîner dans n'importe quel ordre sans saut.
 
   Lieux : bureau (assis) · tableau (debout, réfléchit) · lit (couché) · centre (attend, face à toi)
   Boucles   : travail_clavier · reflechir_tableau · dormir · attente
-  Ponctuels : autorisation · erreur · cafe (au bureau) · celebrer (au centre)
-  Trajets   : <lieu>__<lieu> pour les 12 couples (ex. bureau__tableau, lit__centre)
+  Ponctuels : autorisation · erreur · cafe (au bureau)
+  Pas de trajets ni de bulles : l'IDE téléporte Claaky d'un lieu à l'autre avec un fondu (plus léger).
 
 UTILISATION (Blender 4.2+) : les fichiers claaky_*.py dans le même dossier,
 Scripting > Open > claaky_etats.py > Run Script. Espace : lecture.
@@ -34,19 +34,16 @@ rig = importlib.reload(rig)
 cb = rig.cb
 
 FLOOR, RUG = .075, .12
-# Points de passage (monde). Les trajets passent par le centre pour éviter les meubles.
+# Positions des lieux (monde).
 POINTS = {
     'bureau_assis': (.15, 1.28, .88),
-    'bureau_approche': (.95, .70, RUG),
     'centre': (.10, -.30, RUG),
     'tableau_regard': (-1.15, 1.05, RUG),  # en retrait : il regarde le tableau sans le toucher
-        'lit_bord': (-.70, -1.25, RUG),
-    'lit_couche': (-1.95, -1.96, 1.02),
+    # Lit le long du bord avant, tête contre le mur gauche : origine à 0,94 de la tête (sur l'oreiller).
+    'lit_couche': (cb.BED[0] + .14, cb.BED[1], 1.02),
 }
 YAW_TABLEAU = rig.yaw_towards(-1, 0)
-YAW_LIT = rig.yaw_towards(-1, 0)
-LIEUX = ('bureau', 'tableau', 'lit', 'centre')
-DEBOUT = {'bureau': 'bureau_approche', 'tableau': 'tableau_regard', 'lit': 'lit_bord', 'centre': 'centre'}
+YAW_LIT = math.pi / 2  # tête vers -X (mur gauche), visage vers le plafond
 POSE_CLAVIER = dict(sh_G=(76, 0), sh_D=(76, 0), neck=(1, 0, 0), hips=(2, 0, 0))
 POSE_REFLEXION = dict(sh_D=(135, 15), sh_G=(60, -20), neck=(14, 0, 0))
 
@@ -68,7 +65,8 @@ def build_room():
     cb.accessories()
     # Le chevet est déjà construit une seule fois par bed_and_rug().
     cb.collection('09 · Accessoires des états')
-    return cb.cube('Couverture Claaky (sommeil)', (-1.95,-1.93,1.02), (1.05,1.30,.52), 'teal', .2)
+    bx, by = cb.BED
+    return cb.cube('Couverture Claaky (sommeil)', (bx + .11, by, 1.02), (1.30, 1.05, .52), 'teal', .2)
 
 
 def mug_builder():
@@ -94,7 +92,7 @@ class Clips:
         elif lieu == 'tableau':
             c.place(f, P['tableau_regard'], YAW_TABLEAU, 0, 0); c.pose(f, **POSE_REFLEXION)
         elif lieu == 'lit':
-            c.place(f, P['lit_couche'], 0, -math.pi / 2, math.pi); c.pose(f)
+            c.place(f, P['lit_couche'], YAW_LIT, -math.pi / 2, math.pi); c.pose(f)
         else:
             c.place(f, P['centre'], rig.CAMERA_YAW, 0, 0); c.pose(f)
 
@@ -131,7 +129,6 @@ class Clips:
                 c.pose(f + i, hips=(0, 0, 0))
                 c.pose(f + i + 6, hips=(0, 0, .03))
             c.pose(f + 72)
-            c.show_bubble('Zzz', f, f + 72, loc=(-1.75, -1.0, 1.95))
             c.place(f + 72)
             return f + 72
         self.clip('dormir', 'lit', dormir, True)
@@ -149,7 +146,6 @@ class Clips:
         c = self.c
 
         def autorisation(f):
-            c.show_bubble('?', f + 4, f + 40, 2.1)
             c.look_at_camera(f, 16, .5, sh_D=(20, -30))
             c.wave(f + 16, 12, neck=neck_to_camera(c))
             c.hold(f + 28, 8, neck=neck_to_camera(c))
@@ -159,7 +155,6 @@ class Clips:
         self.clip('autorisation', 'bureau', autorisation, lieu_fin='bureau')
 
         def erreur(f):
-            c.show_bubble('!', f, f + 22, 2.1)
             c.shake(f, 18)
             c.pose(f + 24, **POSE_CLAVIER)
             c.place(f + 24)
@@ -178,57 +173,6 @@ class Clips:
             return f + 48
         self.clip('cafe', 'bureau', cafe, lieu_fin='bureau')
 
-        def celebrer(f):
-            c.show_bubble('OK', f + 1, f + 26, 2.2)
-            end = c.celebrate(f + 1, 3)
-            c.pose(end + 2)
-            c.place(end + 2)
-            return end + 2
-        self.clip('celebrer', 'centre', celebrer, lieu_fin='centre')
-
-    # ---- trajets entre lieux
-    def trajets(self):
-        c, P = self.c, POINTS
-        for a in LIEUX:
-            for b in LIEUX:
-                if a == b:
-                    continue
-
-                def go(f, a=a, b=b):
-                    if a == 'bureau':  # se lever : coupe nette derrière le fauteuil
-                        c.cut(f + 3, P['bureau_approche'], rig.yaw_towards(-1, -1))
-                        c.pose(f + 3)
-                        f += 3
-                    elif a == 'lit':  # sortir du lit puis s'étirer
-                        rig.set_visible(self.cover, f + 2, False)
-                        c.cut(f + 2, P['lit_bord'], YAW_LIT)
-                        f = c.stretch(f + 2, 16)
-                    else:
-                        c.pose(f + 2)
-                        f += 2
-                    path = [P[DEBOUT[b]]] if 'centre' in (a, b) else [P['centre'], P[DEBOUT[b]]]
-                    f = c.walk(f, path, speed=1.25)
-                    if b == 'bureau':
-                        c.cut(f + 2, P['bureau_assis'], 0)
-                        c.pose(f + 2, **POSE_CLAVIER)
-                        return f + 2
-                    if b == 'lit':
-                        c.place(f + 2, yaw=YAW_LIT)
-                        c.cut(f + 4, P['lit_couche'], 0, rx=-math.pi / 2, ry=math.pi)
-                        rig.set_visible(self.cover, f + 4, True)
-                        return f + 4
-                    yaw = YAW_TABLEAU if b == 'tableau' else rig.CAMERA_YAW
-                    c.place(f + 3, yaw=yaw)
-                    c.place(f + 5, yaw=yaw)
-                    for j in range(0, 9, 2):
-                        blend = j / 8
-                        pose = dict(POSE_REFLEXION) if b == 'tableau' else {}
-                        if b == 'tableau':
-                            pose['neck'] = (14 * blend, 0, 0)
-                        c.pose(f + 5 + j, **pose)
-                    return f + 13
-                self.clip(f'{a}__{b}', a, go, lieu_fin=b)
-
 
 def neck_to_camera(c):
     target = c.yaw + (rig.CAMERA_YAW - c.yaw + math.pi) % math.tau - math.pi
@@ -242,16 +186,15 @@ def main():
     desk_mug = [o for o in scene.objects if o.name.split('.')[0] in ('Tasse', 'Café', 'Anse tasse')]
     c = rig.Claaky('Claaky', POINTS['bureau_assis'])
     c.root.rotation_euler.z = rig.yaw_towards(0, -1)  # visage tourné vers l'avant de la caméra
-    c.bubble('?', '?', 'warn')
-    c.bubble('!', '!', 'red')
-    c.bubble('Zzz', 'Zzz', 'bubble', .4)
-    c.bubble('OK', 'OK', 'code')
     c.prop('tasse', mug_builder)
+    # La couverture n'existe que pendant le sommeil : elle doit être rendue avec le sprite, pas en holdout.
+    for col in list(cover.users_collection):
+        col.objects.unlink(cover)
+    c.col.objects.link(cover)
     cb.setup_render(args.preview)
     clips = Clips(c, cover, desk_mug)
     clips.loops()
     clips.one_shots()
-    clips.trajets()
     rig.finalize(scene, [c], clips.seg)
     # Change uniquement les axes racine : chaque déplacement conserve l'orientation et l'inclinaison.
     for fc in rig.fcurves(c.root):

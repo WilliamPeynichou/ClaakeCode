@@ -16,7 +16,7 @@ fi
 # Do not hide Blender failures behind grep/`|| true`, nor copy stale renders on error.
 "$BLENDER" --background --factory-startup --python claaky_etats.py -- \
   --output "$TMP" --export --gpu --export-size "${SIZE:-640}" --export-samples "${SAMPLES:-24}" ${ARGS[@]+"${ARGS[@]}"}
-python3 - "$DEST" <<'PY'
+FILES="$(python3 - "$DEST" <<'PY'
 import json, pathlib, struct, sys
 folder = pathlib.Path(sys.argv[1])
 data = json.loads((folder / 'clips.json').read_text())
@@ -28,9 +28,18 @@ for name in files:
     assert raw[:8] == b'\x89PNG\r\n\x1a\n', name
     w, h = struct.unpack('>II', raw[16:24])
     assert w > 0 and h > 0, name
-print('VALIDÉ :', len(data['clips']), 'clips et décors')
+print(' '.join(sorted(set(files))))
 PY
-cp "$DEST"/*.png "$OUT/"
+)"
+echo "VALIDÉ : $FILES"
+# Copy only what the manifest uses (the temp folder may hold sheets of removed clips).
+for f in $FILES; do cp "$DEST/$f" "$OUT/"; done
+# Full export: drop sheets no longer in the manifest.
+if [ -z "${1:-}" ]; then
+  for f in "$OUT"/*.png; do
+    case " $FILES " in *" $(basename "$f") "*) ;; *) rm -f "$f"; echo "Supprimé : $(basename "$f")" ;; esac
+  done
+fi
 # Publish manifest last, only after all assets exist.
 cp "$DEST/clips.json" "$OUT/clips.json"
 echo "Copié dans $OUT"

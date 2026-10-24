@@ -96,8 +96,8 @@ Les 4 scripts doivent rester dans le même dossier (`claaky_etats.py` et `claaky
 
 Clips du bureau : 4 lieux (`bureau` assis, `tableau` debout en retrait, `lit` couché, `centre` face à l’utilisateur).
 - Boucles : `travail_clavier`, `reflechir_tableau`, `dormir`, `attente`.
-- Ponctuels : `autorisation`, `erreur`, `cafe` (bureau), `celebrer` (centre).
-- Trajets : `<lieu>__<lieu>` pour les 12 couples (ex. `bureau__tableau`), via le centre.
+- Ponctuels : `autorisation`, `erreur`, `cafe` (bureau).
+- Plus de trajets, de bulles (`?`, `!`, `Zzz`, `OK`) ni de clip `celebrer` : l’IDE téléporte Claaky d’un lieu à l’autre avec un fondu de 320 ms.
 
 Segments du swarm : `principal_entre`, `reunion_ouverte`, `agents_arrivent`, `travail_swarm`, `agent_remet_dossier`, `agent_leve_la_main`, `agents_terminent`, `reunion_close`.
 
@@ -109,7 +109,7 @@ Segments du swarm : `principal_entre`, `reunion_ouverte`, `agents_arrivent`, `tr
 ### Commandes
 
 ```bash
-./export_ide.sh                     # tout le bureau → IDE (≈ 1 h)
+./export_ide.sh                     # tout le bureau → IDE (≈ 30 min, 335 images)
 ./export_ide.sh erreur,cafe         # seulement ces clips
 blender --background --python claaky_etats.py -- --render --frame 100   # image fixe
 blender --background --python claaky_swarm.py -- --save-blend
@@ -124,11 +124,11 @@ La pièce remplace le Claaky 2D de l’écran d’accueil de l’éditeur (aucun
 | Fichier (`sinew/src/components/claaky/`) | Rôle |
 |---|---|
 | `claakyAgentState.ts` | Publie en plus une « activité » : état, outil en cours, attente de réponse (outil `question`), nombre d’outils en échec. |
-| `roomDirector.ts` | Machine à états : activité → lieu + boucle + libellé, enchaînement des clips, anti-aller-retour (lieu stable 0,9 à 2,5 s, 2,5 s minimum sur place), autorisation immédiate, sommeil après 5 min de calme suivant une tâche terminée. |
-| `ClaakyRoom.tsx` | Canvas : décor + planche du clip en cours à 12 i/s, pause hors écran ou fenêtre cachée, libellé sous la pièce ; retombe sur le Claaky 2D si les images manquent. |
+| `roomDirector.ts` | Machine à états : activité → lieu + boucle, téléportation avec fondu (seulement quand la planche cible est chargée), anti-aller-retour (lieu stable 0,9 à 2,5 s, 2,5 s minimum sur place), autorisation immédiate, sommeil après 5 min de calme suivant une tâche terminée. |
+| `ClaakyRoom.tsx` | Canvas : décor + planche du clip en cours à 12 i/s, redessin limité à la zone qui change, aucun dessin si rien ne bouge, planches chargées à la demande (attente d’abord, le reste en tâche de fond), halo de la machine recadré sur les pixels qui changent, pause hors écran ou fenêtre cachée, sans libellé ; retombe sur le Claaky 2D si les images manquent. |
 | `ClaakyEmpty.tsx` | Affiche `ClaakyRoom` à la place du Claaky 2D. |
 
-Correspondance : outil en cours → bureau, clavier (libellé selon l’outil) ; réflexion / plan → tableau ; `question` → autorisation ; outil en échec → réaction `erreur` ; fin de tour → `celebrer` puis attente au centre ; 5 min sans activité → lit.
+Correspondance : outil en cours → bureau, clavier ; réflexion / plan → tableau ; `question` → autorisation ; outil en échec → réaction `erreur` ; fin de tour → attente au centre (sans célébration) ; 5 min sans activité → lit.
 
 Plus tard : Claaky compagnon hors de l’IDE, puis extension VS Code (`roomDirector.ts` et les planches se réutilisent tels quels).
 
@@ -181,3 +181,12 @@ Non vérifié : les planches réexportées n’ont pas été contrôlées une à
 **Prévisualisations :** les variables `SAMPLES` et `SIZE` ne sont lues que par `export_ide.sh`. Pour un rendu `--render` rapide, régler `cb.CONFIG` dans un petit script appelant (taille et échantillons) au lieu de compter sur ces variables d’environnement.
 
 **Limite connue, ombre :** l’ombre du personnage n’apparaît pas sur le décor dans les sprites. Un test avec shadow catcher sur le clip `erreur` n’a produit qu’une trace pâle au sol, sans ombre de contact nette ; il a été abandonné. Piste possible : une passe d’ombre séparée composée par `ClaakyRoom.tsx`, ou une ombre de contact dessinée sous le personnage dans le canvas.
+
+### Allègement et disposition fidèle à l’illustration (24/10)
+
+- Retirés : bulles, clip `celebrer`, les 12 trajets, libellé sous la pièce et flash vert de réussite de la machine de test (il reste la lueur pendant le test et un flash orange en cas d’échec).
+- Export : 7 planches au lieu de 20, 335 images au lieu de 864, `public/claaky3d/bureau/` passe de 13 Mo à 3 Mo. `export_ide.sh` ne copie plus que les fichiers du manifeste et, en export complet, supprime les anciennes planches.
+- Disposition : lit le long du bord avant, tête contre le mur gauche (`BED` dans `claaky_bureau.py`), chevet à côté de l’oreiller, commode noire à tiroirs avec lampe articulée et lanterne sous le tableau blanc, sac à dos entre commode et bureau, meuble bas au pied du lit (livres, plante, lanterne), tablette au sol, tapis centré. Machine de test conservée à gauche du bureau.
+- La couverture du sommeil est rendue avec le sprite (plus en holdout).
+- Vérifié : aperçus Blender des quatre lieux, export complet, contrôle visuel de `decor.png` et `dormir.png`, 17 tests unitaires, `npx tsc --noEmit`, `npm run build`.
+- Non vérifié : rendu dans Tauri (relancer `npm run tauri dev`), téléportation et fondu à l’écran.
