@@ -1,0 +1,289 @@
+/*
+ * Compagnon Claaky : une goutte d'eau posée sur le bureau.
+ * Principe : verre clair et flou, une seule bordure fine, aucune couleur criarde,
+ * mouvements courts. Le flou fait le travail ; le reste s'efface.
+ */
+
+/* ── Fenêtre ─────────────────────────────────────────────── */
+.cd {
+  --glass: rgba(250, 250, 248, 0.025);
+  --glass-strong: rgba(250, 250, 248, 0.12);
+  --edge: rgba(255, 255, 255, 0.28);
+  --edge-soft: rgba(255, 255, 255, 0.12);
+  --ink: rgba(255, 255, 255, 0.94);
+  --ink-2: rgba(255, 255, 255, 0.62);
+  --ink-3: rgba(255, 255, 255, 0.4);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --drop: cubic-bezier(0.32, 1.2, 0.4, 1);
+
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+/* Bulle vers la gauche : Claaky collé à droite, la bulle s'étire sous lui vers la gauche. */
+.cd[data-side="left"] { align-items: flex-end; }
+
+/* ── Claaky ──────────────────────────────────────────────── */
+.cd__dock {
+  position: relative;
+  flex: 0 0 auto;
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+}
+.cd__claaky {
+  all: unset;
+  display: block;
+  line-height: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 320ms var(--ease);
+}
+.cd__claaky:hover { transform: translateY(-2px); }
+.cd__claaky:active { transform: scale(0.96); transition-duration: 120ms; }
+.cd__claaky:focus-visible { outline: 1px solid var(--edge); outline-offset: 6px; }
+
+/* Croix discrète : n'apparaît qu'au survol de Claaky. */
+.cd__hide {
+  all: unset;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--ink-2);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 0 0.5px var(--edge);
+  opacity: 0;
+  transition: opacity 200ms var(--ease), color 200ms var(--ease);
+}
+.cd__hide svg { width: 8px; height: 8px; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; fill: none; }
+.cd__dock:hover .cd__hide,
+.cd__hide:focus-visible { opacity: 1; }
+.cd__hide:hover { color: var(--ink); }
+.cd[data-open="true"] .cd__hide { display: none; }
+
+/* ── Goutte : conteneur de la bulle ──────────────────────── */
+.cd__drop {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  transform-origin: 90% 0;
+  animation: cd-drop 460ms var(--drop) both;
+}
+.cd[data-side="right"] .cd__drop { transform-origin: 10% 0; }
+.cd__drop > .companion-bubble { flex: 1 1 auto; min-height: 0; }
+
+/* La goutte tombe de Claaky : petite et ronde, puis s'étale. */
+@keyframes cd-drop {
+  0%   { opacity: 0; transform: translateY(-14px) scale(0.86, 0.7); border-radius: 50%; }
+  60%  { opacity: 1; transform: translateY(2px) scale(1.01, 1.02); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ── Bulle ───────────────────────────────────────────────── */
+.companion-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  padding: 8px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+  border-radius: 15px;
+  background:
+    radial-gradient(120% 50% at 50% 0%, rgba(255, 255, 255, 0.035), transparent 60%),
+    var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    inset 0 0 0 0.5px var(--edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 22px -14px rgba(0, 0, 0, 0.18);
+}
+
+/* En-tête : zone de glissement de la fenêtre. */
+.companion-bubble__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: grab;
+}
+.companion-bubble__head:active { cursor: grabbing; }
+.companion-bubble__title { display: flex; flex-direction: column; min-width: 0; }
+.companion-bubble__title strong {
+  font-weight: 550;
+  font-size: 11px;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.companion-bubble__muted { color: var(--ink-3); font-size: 12px; margin: 0; }
+
+.companion-bubble__actions,
+.companion-bubble__controls,
+.companion-bubble__mode,
+.companion-bubble__attachments li,
+.companion-bubble__history li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.companion-bubble__controls { flex-wrap: wrap; gap: 6px; }
+.companion-bubble__controls > .companion-bubble__send { margin-left: auto; }
+
+/* Contrôles : texte nu, le survol éclaircit seulement. */
+.companion-bubble button,
+.companion-bubble select,
+.companion-bubble__file {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 10px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: background-color 180ms var(--ease), color 180ms var(--ease);
+}
+.companion-bubble button:hover:not(:disabled),
+.companion-bubble select:hover,
+.companion-bubble__file:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.companion-bubble button:focus-visible,
+.companion-bubble select:focus-visible { outline: 1px solid var(--edge); outline-offset: 1px; }
+.companion-bubble button:disabled { opacity: 0.35; cursor: default; }
+.companion-bubble select { max-width: 150px; text-overflow: ellipsis; }
+.companion-bubble select option { color: #111; }
+.companion-bubble__file input { display: none; }
+
+/* Sélecteur Ask / Code : piste unique, l'actif est une pastille claire. */
+.companion-bubble__mode {
+  padding: 2px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 0.5px var(--edge-soft);
+}
+.companion-bubble__mode button { padding: 3px 10px; }
+.companion-bubble button[aria-pressed="true"] { color: var(--ink); background: var(--glass-strong); }
+
+.companion-bubble__send {
+  color: #1a1a1a !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  font-weight: 550;
+  padding: 3px 9px !important;
+}
+.companion-bubble__send:hover:not(:disabled) { background: #fff !important; }
+
+/* Historique */
+.companion-bubble__history {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 140px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: 0.5px solid var(--edge-soft);
+  border-bottom: 0.5px solid var(--edge-soft);
+}
+.companion-bubble__history li button:first-child {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 8px;
+}
+
+/* Messages */
+.companion-bubble__messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: none;
+}
+.companion-bubble__messages::-webkit-scrollbar { display: none; }
+.companion-bubble__message { max-width: 88%; animation: cd-fade 240ms var(--ease) both; }
+.companion-bubble__message p { margin: 0; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
+.companion-bubble__message--user {
+  align-self: flex-end;
+  padding: 4px 8px;
+  border-radius: 14px 14px 4px 14px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.companion-bubble__message--assistant { align-self: flex-start; color: var(--ink); }
+@keyframes cd-fade { from { opacity: 0; transform: translateY(3px); } }
+
+.companion-bubble__error { color: #ffb4a6; font-size: 12px; margin: 0; }
+.companion-bubble__notice { color: var(--ink-2); font-size: 12px; margin: 0; }
+
+.companion-bubble__attachments { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.companion-bubble__attachments li {
+  font-size: 11px;
+  color: var(--ink-2);
+  padding: 2px 2px 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Saisie */
+.companion-bubble__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 7px 5px;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.03);
+  box-shadow: inset 0 0 0 0.5px var(--edge-soft);
+  transition: box-shadow 200ms var(--ease);
+}
+.companion-bubble__composer:focus-within { box-shadow: inset 0 0 0 0.5px var(--edge); }
+.companion-bubble textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.companion-bubble textarea::placeholder { color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cd__drop, .companion-bubble__message { animation: none; }
+  .cd__claaky, .cd__hide { transition: none; }
+}

@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { CompanionDesk } from "./components/companion/CompanionDesk";
 import "./styles.css";
 import "./lib/customIcons";
 import { api } from "./lib/ipc";
@@ -66,8 +67,15 @@ const openAnchorExternally = (event: MouseEvent) => {
 window.addEventListener("click", openAnchorExternally);
 window.addEventListener("auxclick", openAnchorExternally);
 
+// Fenêtre compagnon (index.html?companion=1) : seulement Claaky, sans l'app principale.
+const isCompanion = new URLSearchParams(window.location.search).get("companion") === "1";
+if (isCompanion) {
+  document.documentElement.classList.add("companion-window");
+  document.body.classList.add("companion-window");
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    {isCompanion ? <CompanionDesk /> : <App />}
   </React.StrictMode>,
 );

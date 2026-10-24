@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod bash;
+pub mod companion;
 pub mod compact;
 pub mod database;
 pub mod database_tool;

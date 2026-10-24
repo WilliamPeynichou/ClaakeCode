@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Claaky, type ClaakyState } from "./Claaky";
 import { setClaakyEnabled, useClaakyEnabled } from "./useClaakyEnabled";
+import { CompanionSettingsBlock } from "../companion/CompanionSettingsBlock";
 
 const STATES: { state: ClaakyState; label: string }[] = [
   { state: "idle", label: "Attend" },
@@ -69,6 +70,7 @@ export function ClaakySettingsSection() {
             </button>
           ))}
         </div>
+        <CompanionSettingsBlock />
       </div>
     </>
   );

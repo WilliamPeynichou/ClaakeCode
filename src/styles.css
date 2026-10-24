@@ -10910,3 +10910,12 @@ button.settings-pane__about-link:disabled {
 .claaky-settings__state[data-active="true"] { border-color: var(--accent-hi); background: var(--bg-2); }
 .chat-head__claaky { margin-left: auto; margin-right: -2px; }
 .chat-head__claaky + .chat-head__dot { margin-left: 0; }
+
+
+/* Compagnon Claaky2D sur le bureau : fenêtre transparente, aucun fond d'application. */
+html.companion-window,
+html.companion-window body,
+html.companion-window #root {
+  background: transparent !important;
+  overflow: hidden;
+}

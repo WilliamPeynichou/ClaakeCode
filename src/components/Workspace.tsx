@@ -11,7 +11,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Icon } from "@iconify/react";
 import { api } from "../lib/ipc";
-import { modelRefWithThinking, thinkingFromRef } from "../lib/models";
+import { modelRefFromId, modelRefWithThinking, thinkingFromRef } from "../lib/models";
+import {
+  openCompanionBubble,
+  useCompanionStateReport,
+  useCompanionTaskIntake,
+} from "./companion/companionDesktop";
+import type { CompanionPendingForward } from "./companion/companionContract";
 import { recordRecent } from "../lib/recents";
 import { Splitter } from "./Splitter";
 import { FileTree, type FileTreeHandle } from "./FileTree";
@@ -1547,6 +1553,61 @@ export function Workspace({
     ],
   );
 
+  // Tâche transmise par le compagnon Claaky (mode code). Une conversation neuve est créée dans ce
+  // projet ; le message part une fois qu'elle est active, car sendMessage lit la conversation active.
+  const companionSendRef = useRef<{
+    conversationId: string;
+    text: string;
+    attachments: { path: string; name?: string }[];
+    model: SavedConversation["model"];
+  } | null>(null);
+  const forwardCompanionTask = useCallback(
+    async (task: CompanionPendingForward) => {
+      try {
+        let text = task.text;
+        const attachments: { path: string; name?: string }[] = [];
+        for (const attachment of task.attachments) {
+          if (attachment.kind === "text") {
+            text = `${text}\n\n[${attachment.name}]\n${attachment.text}`.trim();
+          } else {
+            const saved = await api.saveClipboardImage(
+              workspacePath,
+              attachment.name,
+              attachment.mime,
+              attachment.dataBase64,
+            );
+            attachments.push({ path: saved.path, name: saved.name });
+          }
+        }
+        const next = await api.createConversation(workspacePath);
+        if (next.workspace.path !== workspacePath) return;
+        activeConvIdRef.current = next.activeConversation.id;
+        setConversations(next.conversations);
+        setActiveConv(next.activeConversation);
+        setGlobalModeModelSettings(next.modeModelSettings);
+        companionSendRef.current = {
+          conversationId: next.activeConversation.id,
+          text,
+          attachments,
+          model: task.model ? modelRefFromId(task.model) : next.activeConversation.model,
+        };
+      } catch (err) {
+        console.error("[companion] unable to forward task", err);
+      }
+    },
+    [workspacePath],
+  );
+
+  useCompanionTaskIntake(forwardCompanionTask);
+  useCompanionStateReport();
+
+  useEffect(() => {
+    const pending = companionSendRef.current;
+    if (!pending || pending.conversationId !== activeConv.id) return;
+    companionSendRef.current = null;
+    void sendMessage(pending.text, pending.attachments, pending.model, thinkingFromRef(pending.model), "act");
+  }, [activeConv.id, sendMessage]);
+
   const compactConversation = useCallback(
     async (
       model: SavedConversation["model"],
@@ -2178,6 +2239,14 @@ export function Workspace({
           >
             <Icon icon="solar:settings-linear" width={12} height={12} />
             Settings
+          </button>
+          <button
+            className="titlebar__btn"
+            onClick={() => void openCompanionBubble()}
+            title="Ouvrir Claaky sur le bureau"
+          >
+            <Icon icon="solar:ghost-smile-linear" width={12} height={12} />
+            Claaky
           </button>
           <button
             className="titlebar__btn"

@@ -128,6 +128,9 @@ use tokio::{
 };
 
 mod benchmark;
+mod companion_chat;
+mod companion_entry;
+mod companion_window;
 mod context;
 mod conversations;
 mod event_pump;
@@ -249,6 +252,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(companion_entry::shortcut_plugin())
+        .plugin(companion_entry::autostart_plugin())
         // Updater plugin is desktop-only (no iOS / Android support upstream).
         .plugin({
             #[cfg(desktop)]
@@ -301,9 +306,13 @@ pub fn run() {
                 install_desktop_menu(app.handle())?;
             }
             start_remote_if_enabled(app.handle());
+            companion_entry::setup(app.handle())?;
             Ok(())
         })
         .on_window_event(|window, event| match event {
+            _ if window.label() == companion_window::COMPANION_WINDOW_LABEL => {
+                companion_window::on_window_event(window, event);
+            }
             tauri::WindowEvent::Destroyed => {
                 remove_window_workspace(&window.app_handle(), window.label().to_string());
             }
@@ -463,6 +472,23 @@ pub fn run() {
             rlm::list_rlm_memories,
             rlm::get_claaky_enabled,
             rlm::set_claaky_enabled,
+            companion_window::companion_get_position,
+            companion_window::companion_set_bubble_open,
+            companion_window::companion_toggle_bubble,
+            companion_window::companion_hide,
+            companion_chat::companion_ask,
+            companion_chat::companion_cancel,
+            companion_chat::companion_history_list,
+            companion_chat::companion_history_load,
+            companion_chat::companion_history_delete,
+            companion_chat::companion_capture_region,
+            companion_entry::companion_get_settings,
+            companion_entry::companion_save_settings,
+            companion_entry::companion_forward_to_claake_code,
+            companion_entry::companion_take_pending_forward,
+            companion_entry::companion_open_claake_code,
+            companion_entry::companion_continue_in_app,
+            companion_entry::companion_report_state,
             rlm::edit_rlm_memory,
             rlm::delete_rlm_memory,
             stats::get_model_stats,
@@ -507,6 +533,7 @@ pub fn run() {
         .expect("error while building claakecode desktop")
         .run(|app, event| {
             // No Prime daemon may outlive the app.
+            companion_entry::keep_alive_without_windows(&event);
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<DesktopState>() {
                     let rlm = state.rlm.clone();

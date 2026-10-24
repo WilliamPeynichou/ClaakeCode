@@ -345,6 +345,7 @@ pub(super) fn reveal_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "windows", all(unix, not(target_os = "macos")), test))]
 fn reveal_directory(path: &Path) -> &Path {
     if path.is_dir() {
         path
