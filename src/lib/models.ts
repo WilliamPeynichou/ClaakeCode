@@ -279,6 +279,13 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "off",
   },
   {
+    value: "kimi:kimi-3.1-pro",
+    provider: "kimi",
+    label: "Kimi 3.1 Pro",
+    thinking: ["off", "high"],
+    defaultThinking: "high",
+  },
+  {
     value: "kimi:kimi-k2.7-code",
     provider: "kimi",
     label: "Kimi K2.7 Code",

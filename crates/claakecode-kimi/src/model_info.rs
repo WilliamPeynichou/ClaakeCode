@@ -21,6 +21,13 @@ const MODELS: &[KimiModelInfo] = &[
         thinking_only: true,
     },
     KimiModelInfo {
+        id: "kimi-3.1-pro",
+        context_window: MODEL_WINDOW,
+        preferred_window: 230_000,
+        max_output_tokens: MODEL_MAX_OUTPUT,
+        thinking_only: false,
+    },
+    KimiModelInfo {
         id: "kimi-for-coding",
         context_window: MODEL_WINDOW,
         preferred_window: 230_000,
