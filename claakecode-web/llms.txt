@@ -15,8 +15,8 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Platforms: macOS, Windows, Linux
 - License: MIT
 - Source code: https://github.com/WilliamPeynichou/ClaakeCode
-- Latest release: v0.2.0
-- What's new in v0.2.0: https://claakecode-web.vercel.app/whats-new
+- Latest release: v0.2.1
+- What's new in v0.2.1: https://claakecode-web.vercel.app/whats-new
 - Website: https://claakecode-web.vercel.app/
 - Downloads: https://github.com/WilliamPeynichou/ClaakeCode/releases/latest
 - Telemetry: no telemetry; no training on transcripts
@@ -37,9 +37,9 @@ Claake Code is designed for developers and technical teams that want a powerful 
 - Skill Git repositories: add recognized repositories, inspect skills and update deliberately; installation does not execute scripts.
 - Optional mgrep semantic search in natural language, alongside ripgrep for exact text and regex. Cloud indexing must be started manually.
 - Anthropic quota panel: latest official API rate-limit headers observed, not subscription balances. Other providers show unavailable if no supported live quota data is exposed.
-- v0.2.0: Claaky desktop companion — an always-on-top mascot with a glass chat bubble, Ask mode (answers without tools, even with the main window closed), Code mode (hands the task to Claake Code), pasted text and screen-area capture on macOS, its own history, a global shortcut (Control+Option+Space), a menu bar icon and settings.
-- v0.2.0: animated Claaky 3D room inside the IDE that shows what the agent is doing (desk, whiteboard, bed), with a fade teleport and lighter assets.
-- v0.2.0: Kimi 3.1 Pro model (256k context window, thinking off or high).
+- v0.2.1: Claaky desktop companion — an always-on-top mascot with a glass chat bubble, Ask mode (answers without tools, even with the main window closed), Code mode (hands the task to Claake Code), pasted text and screen-area capture on macOS, its own history, a global shortcut (Control+Option+Space), a menu bar icon and settings.
+- v0.2.1: animated Claaky 3D room inside the IDE that shows what the agent is doing (desk, whiteboard, bed), with a fade teleport and lighter assets.
+- v0.2.1: Kimi 3.1 Pro model (256k context window, thinking off or high).
 - Mistral Large 4 is in the model catalog; Mistral structured streaming support has been improved.
 - Windows Reveal opens the containing skill folder in Explorer, including paths with spaces.
 - macOS, Windows and Linux downloads.
