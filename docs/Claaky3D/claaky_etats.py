@@ -38,7 +38,7 @@ FLOOR, RUG = .075, .12
 POINTS = {
     'bureau_assis': (.15, 1.28, .88),
     'centre': (.10, -.30, RUG),
-    'tableau_regard': (-1.15, 1.05, RUG),  # en retrait : il regarde le tableau sans le toucher
+    'tableau_regard': (-1.80, 1.05, RUG),  # devant la commode, face au tableau blanc
     # Lit le long du bord avant, tête contre le mur gauche : origine à 0,94 de la tête (sur l'oreiller).
     'lit_couche': (cb.BED[0] + .14, cb.BED[1], 1.02),
 }
@@ -66,7 +66,7 @@ def build_room():
     # Le chevet est déjà construit une seule fois par bed_and_rug().
     cb.collection('09 · Accessoires des états')
     bx, by = cb.BED
-    return cb.cube('Couverture Claaky (sommeil)', (bx + .11, by, 1.02), (1.30, 1.05, .52), 'teal', .2)
+    return cb.cube('Couverture Claaky (sommeil)', (bx + .22, by, .97), (1.40, 1.50, .42), 'teal', .16)
 
 
 def mug_builder():

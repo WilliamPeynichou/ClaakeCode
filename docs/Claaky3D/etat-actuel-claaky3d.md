@@ -190,3 +190,11 @@ Non vérifié : les planches réexportées n’ont pas été contrôlées une à
 - La couverture du sommeil est rendue avec le sprite (plus en holdout).
 - Vérifié : aperçus Blender des quatre lieux, export complet, contrôle visuel de `decor.png` et `dormir.png`, 17 tests unitaires, `npx tsc --noEmit`, `npm run build`.
 - Non vérifié : rendu dans Tauri (relancer `npm run tauri dev`), téléportation et fondu à l’écran.
+
+### Contrôle des 7 animations sur le décor (24/10)
+
+Chaque planche a été superposée au décor (première image et image du milieu) :
+- `travail_clavier`, `autorisation`, `erreur`, `cafe` : Claaky était 15 cm devant l'assise et semblait flotter derrière le dossier. Le fauteuil est maintenant centré sous lui (`cx,cy = .15, 1.28`), vérifié de profil et en isométrique.
+- `reflechir_tableau` : il était planté au milieu de la pièce. Il se tient maintenant devant la commode, face au tableau blanc (`tableau_regard = (-1.80, 1.05)`).
+- `dormir` : la couverture formait un pavé flottant. C'est maintenant une couette arrondie sur toute la largeur du lit, avec les mains posées dessus.
+- `attente` : rien à corriger.

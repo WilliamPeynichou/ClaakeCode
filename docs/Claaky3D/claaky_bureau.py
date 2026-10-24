@@ -393,7 +393,7 @@ def desk():
 def chair_and_character():
     global ROOT
     collection('05 · Fauteuil')
-    cx,cy=.15,1.13
+    cx,cy=.15,1.28  # sous Claaky assis (POINTS bureau_assis)
     cyl('Fauteuil vérin',(cx,cy,.42),.065,.60,'metal')
     for i in range(5):
         a=i*math.tau/5
