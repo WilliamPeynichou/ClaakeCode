@@ -475,6 +475,7 @@ pub fn run() {
             companion_window::companion_get_position,
             companion_window::companion_set_bubble_open,
             companion_window::companion_toggle_bubble,
+            companion_window::companion_set_bubble_height,
             companion_window::companion_hide,
             companion_chat::companion_ask,
             companion_chat::companion_cancel,

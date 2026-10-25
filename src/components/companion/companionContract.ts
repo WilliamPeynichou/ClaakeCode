@@ -133,6 +133,8 @@ export type CompanionBubbleEvent = { open: boolean; side?: "left" | "right" };
  *     (redimensionne la fenêtre, ancre Claaky, émet companion-bubble-changed)
  *   companion_toggle_bubble() -> void                        [bureau]
  *     (même effet que le clic sur Claaky, le raccourci et la barre des menus)
+ *   companion_set_bubble_height(height: number) -> void      [bureau]
+ *     (bulle ouverte uniquement : borne 200-560, ancre Claaky conservée)
  *
  * Conversation Ask / historique / capture [bulle] :
  *   companion_ask(input: CompanionAskInput) -> CompanionAskStarted
@@ -159,6 +161,8 @@ export const COMPANION_COMMANDS = {
   getPosition: "companion_get_position",
   setBubbleOpen: "companion_set_bubble_open",
   toggleBubble: "companion_toggle_bubble",
+  /** Redimensionne la hauteur de la bulle selon le contenu mesuré (min 200, max 560). */
+  setBubbleHeight: "companion_set_bubble_height",
   hide: "companion_hide",
   ask: "companion_ask",
   cancel: "companion_cancel",

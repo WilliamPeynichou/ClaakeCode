@@ -43,6 +43,8 @@ type Props = {
 type PendingMessage = CompanionMessage & { pending?: boolean };
 
 const TEXT_FILE_ACCEPT = ".txt,.md,.json,.csv,.log,.ts,.tsx,.js,.jsx,.py,.rs,.go,.html,.css,.yml,.yaml,.toml,.sql,text/*";
+/** Hauteur maximale de la zone de saisie avant défilement interne (~6 lignes à 12 px). */
+const COMPOSER_MAX_HEIGHT_PX = 96;
 
 /**
  * Bulle de chat du compagnon : mode Ask (réponse directe, sans Claake Code) ou Code (transmis à
@@ -64,6 +66,15 @@ export function CompanionBubble({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const turnRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /** Saisie auto-agrandissante (plafonnée : au-delà, le textarea défile). */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT_PX)}px`;
+  }, [text]);
 
   const busy = turnId !== null;
 
@@ -405,12 +416,13 @@ export function CompanionBubble({ onClose }: Props) {
 
       <div className="companion-bubble__composer">
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           onPaste={(event) => void onPaste(event)}
           placeholder={mode === "ask" ? "Demandez à Claaky…" : "Décrivez la tâche pour Claake Code…"}
-          rows={2}
+          rows={1}
           aria-label="Message"
         />
         <div className="companion-bubble__controls">

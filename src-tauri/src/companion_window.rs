@@ -28,8 +28,13 @@ const COMPANION_BUBBLE_EVENT: &str = "companion-bubble-changed";
 const COMPANION_BUBBLE_FADING_EVENT: &str = "companion-bubble-fading";
 /// Case de Claaky = taille de la fenêtre repliée.
 const COLLAPSED_SIZE: (f64, f64) = (120.0, 120.0);
-/// Taille de la fenêtre quand la bulle est ouverte.
-const EXPANDED_SIZE: (f64, f64) = (250.0, 330.0);
+/// Largeur de la fenêtre quand la bulle est ouverte.
+const EXPANDED_WIDTH: f64 = 250.0;
+/// Hauteur par défaut de la fenêtre quand la bulle est ouverte.
+const DEFAULT_EXPANDED_HEIGHT: f64 = 330.0;
+/// Bornes de la hauteur de bulle adaptative (le front mesure son contenu).
+const MIN_EXPANDED_HEIGHT: f64 = 200.0;
+const MAX_EXPANDED_HEIGHT: f64 = 560.0;
 /// Durée du fondu CSS côté front (voir .cd[data-fading]) + marge : la géométrie n'est
 /// appliquée qu'une fois le contenu totalement transparent.
 const GEOMETRY_DELAY_MS: u64 = 150;
@@ -55,9 +60,17 @@ static BUBBLE_TO_LEFT: AtomicBool = AtomicBool::new(true);
 /// Génération de la transition en cours : un clic rapide annule la géométrie planifiée
 /// de la génération précédente.
 static GEOMETRY_GENERATION: AtomicU64 = AtomicU64::new(0);
+/// Vrai tant qu'une géométrie de transition (fondu) n'a pas encore été appliquée.
+static GEOMETRY_PENDING: AtomicBool = AtomicBool::new(false);
+/// Hauteur courante de la bulle (bits f64) : le front la pilote pour suivre son contenu.
+static EXPANDED_HEIGHT_BITS: AtomicU64 = AtomicU64::new(DEFAULT_EXPANDED_HEIGHT.to_bits());
 static SAVE_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// Sérialise les déplacements programmés (bulle) pour que les événements Moved restent cohérents.
 static LAYOUT_LOCK: StdMutex<()> = StdMutex::new(());
+/// Géométrie planifiée par une transition en cours (la fenêtre n'y est pas encore) :
+/// traitée comme la vérité pour les calculs d'ancre, afin qu'un second clic pendant
+/// le fondu ne décale pas Claaky.
+static PENDING_LAYOUT: StdMutex<Option<Rect>> = StdMutex::new(None);
 
 #[derive(Clone, Copy)]
 struct Rect {
@@ -87,15 +100,20 @@ const FALLBACK_SCREEN: Rect = Rect {
 /// gauche, sinon à gauche. La bulle occupe l'espace dessous.
 fn claaky_offset(open: bool, to_left: bool) -> (f64, f64) {
     if open && to_left {
-        (EXPANDED_SIZE.0 - COLLAPSED_SIZE.0, 0.0)
+        (EXPANDED_WIDTH - COLLAPSED_SIZE.0, 0.0)
     } else {
         (0.0, 0.0)
     }
 }
 
+/// Hauteur de bulle courante (persistante en mémoire pour la session).
+fn expanded_height() -> f64 {
+    f64::from_bits(EXPANDED_HEIGHT_BITS.load(Ordering::SeqCst))
+}
+
 fn window_size(open: bool) -> (f64, f64) {
     if open {
-        EXPANDED_SIZE
+        (EXPANDED_WIDTH, expanded_height())
     } else {
         COLLAPSED_SIZE
     }
@@ -143,6 +161,28 @@ fn clamp_origin(origin: (f64, f64), size: (f64, f64), screen: Rect) -> (f64, f64
         clamp_axis(origin.0, screen.x, screen.w, size.0),
         clamp_axis(origin.1, top, height, size.1),
     )
+}
+
+/// Origine et état visuels à prendre en compte : la géométrie planifiée d'une transition
+/// en cours si elle existe (double clic rapide), sinon la fenêtre réelle.
+fn current_origin_and_state(window: &WebviewWindow) -> Result<((f64, f64), bool, bool)> {
+    let pending = PENDING_LAYOUT.lock().map(|guard| *guard).unwrap_or(None);
+    let origin = match pending {
+        Some(rect) => (rect.x, rect.y),
+        None => logical_origin(window)?,
+    };
+    Ok((
+        origin,
+        BUBBLE_OPEN.load(Ordering::SeqCst),
+        BUBBLE_TO_LEFT.load(Ordering::SeqCst),
+    ))
+}
+
+/// Enregistre la géométrie planifiée après application effective.
+fn record_applied_layout(x: f64, y: f64, w: f64, h: f64) {
+    if let Ok(mut guard) = PENDING_LAYOUT.lock() {
+        *guard = Some(Rect { x, y, w, h });
+    }
 }
 
 /// Coin bas-droit de l'écran, au-dessus du Dock.
@@ -300,9 +340,8 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
     let window = ensure_companion_window(app)?;
     let _guard = LAYOUT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
-    let was_open = BUBBLE_OPEN.load(Ordering::SeqCst);
-    let origin = logical_origin(&window)?;
-    let before = claaky_offset(was_open, BUBBLE_TO_LEFT.load(Ordering::SeqCst));
+    let (origin, was_open, to_left_before) = current_origin_and_state(&window)?;
+    let before = claaky_offset(was_open, to_left_before);
     let anchor = (origin.0 + before.0, origin.1 + before.1);
 
     let size = window_size(open);
@@ -317,7 +356,7 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
     let to_left = if open {
         anchor.0 + COLLAPSED_SIZE.0 / 2.0 > screen.x + screen.w / 2.0
     } else {
-        BUBBLE_TO_LEFT.load(Ordering::SeqCst)
+        to_left_before
     };
     BUBBLE_TO_LEFT.store(to_left, Ordering::SeqCst);
     let after = claaky_offset(open, to_left);
@@ -326,6 +365,7 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
 
     BUBBLE_OPEN.store(open, Ordering::SeqCst);
     let generation = GEOMETRY_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    GEOMETRY_PENDING.store(true, Ordering::SeqCst);
     let side = if to_left { "left" } else { "right" };
     let payload = serde_json::json!({ "open": open, "side": side });
     let _ = app.emit(COMPANION_BUBBLE_FADING_EVENT, &payload);
@@ -350,9 +390,50 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
         if let Err(err) = window.set_position(LogicalPosition::new(target.0, target.1)) {
             tracing::warn!(error = %err, "unable to move companion window");
         }
+        record_applied_layout(target.0, target.1, size.0, size.1);
+        GEOMETRY_PENDING.store(false, Ordering::SeqCst);
         schedule_position_save(&app, final_anchor);
         let _ = app.emit(COMPANION_BUBBLE_EVENT, &payload);
     });
+    Ok(())
+}
+
+/// Hauteur de bulle demandée par le front (contenu mesuré). Bornée, ancre de Claaky
+/// conservée, fenêtre maintenue dans l'écran. Sans effet quand la bulle est fermée.
+fn set_bubble_height(app: &AppHandle, height: f64) -> Result<()> {
+    if !BUBBLE_OPEN.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let window = ensure_companion_window(app)?;
+    let height = height.clamp(MIN_EXPANDED_HEIGHT, MAX_EXPANDED_HEIGHT);
+    EXPANDED_HEIGHT_BITS.store(height.to_bits(), Ordering::SeqCst);
+    // Annule une géométrie de transition encore planifiée (clic récent) ; sans effet
+    // en régime stable, où aucun thread ne consomme la génération.
+    if GEOMETRY_PENDING.swap(false, Ordering::SeqCst) {
+        GEOMETRY_GENERATION.fetch_add(1, Ordering::SeqCst);
+    }
+
+    let _guard = LAYOUT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let size = (EXPANDED_WIDTH, height);
+    let (origin, _, to_left_before) = current_origin_and_state(&window)?;
+    let offset = claaky_offset(true, to_left_before);
+    let anchor = (origin.0 + offset.0, origin.1 + offset.1);
+    let screen = screen_for(
+        &window,
+        (
+            anchor.0 + COLLAPSED_SIZE.0 / 2.0,
+            anchor.1 + COLLAPSED_SIZE.1 / 2.0,
+        ),
+    );
+    let target = clamp_origin((anchor.0 - offset.0, anchor.1 - offset.1), size, screen);
+    window
+        .set_size(LogicalSize::new(size.0, size.1))
+        .context("unable to resize companion window")?;
+    window
+        .set_position(LogicalPosition::new(target.0, target.1))
+        .context("unable to move companion window")?;
+    record_applied_layout(target.0, target.1, size.0, size.1);
+    schedule_position_save(app, (target.0 + offset.0, target.1 + offset.1));
     Ok(())
 }
 
@@ -427,6 +508,14 @@ pub(super) fn companion_set_bubble_open(
     open: bool,
 ) -> std::result::Result<(), String> {
     set_bubble_open(&app, open).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub(super) fn companion_set_bubble_height(
+    app: AppHandle,
+    height: f64,
+) -> std::result::Result<(), String> {
+    set_bubble_height(&app, height).map_err(|err| err.to_string())
 }
 
 #[tauri::command]

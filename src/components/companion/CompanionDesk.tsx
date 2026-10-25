@@ -35,6 +35,29 @@ export function CompanionDesk() {
   /** Fondu vers opacité 0 pendant que Rust applique la nouvelle géométrie (anti-flash). */
   const [fading, setFading] = useState(false);
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const lastSentHeight = useRef(0);
+
+  /**
+   * Hauteur de fenêtre adaptative : la bulle étant dimensionnée par son contenu (CSS
+   * height: auto), on mesure ce contenu et on demande à Rust d'ajuster la fenêtre
+   * (bornes et clamp à l'écran côté backend). ResizeObserver couvre messages,
+   * historique, saisie multi-lignes et streaming des réponses.
+   */
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || !bubbleOpen) return;
+    const send = () => {
+      const height = Math.ceil(el.scrollHeight);
+      if (height === lastSentHeight.current) return;
+      lastSentHeight.current = height;
+      run(COMPANION_COMMANDS.setBubbleHeight, { height });
+    };
+    send();
+    const observer = new ResizeObserver(() => window.requestAnimationFrame(send));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [bubbleOpen]);
 
   useEffect(() => {
     const offState = listen<CompanionStateEvent>(COMPANION_EVENTS.state, (event) => {
@@ -82,7 +105,7 @@ export function CompanionDesk() {
   };
 
   return (
-    <div className="cd" data-open={bubbleOpen} data-side={side} data-fading={fading || undefined}>
+    <div ref={rootRef} className="cd" data-open={bubbleOpen} data-side={side} data-fading={fading || undefined}>
       <div className="cd__dock">
         <button
           type="button"
