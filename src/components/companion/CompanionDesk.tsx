@@ -34,6 +34,8 @@ export function CompanionDesk() {
   const [side, setSide] = useState<"left" | "right">("left");
   /** Fondu vers opacité 0 pendant que Rust applique la nouvelle géométrie (anti-flash). */
   const [fading, setFading] = useState(false);
+  /** Animation de repli vers Claaky jouée avant la fermeture de la fenêtre. */
+  const [closing, setClosing] = useState(false);
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastSentHeight = useRef(0);
@@ -63,13 +65,21 @@ export function CompanionDesk() {
     const offState = listen<CompanionStateEvent>(COMPANION_EVENTS.state, (event) => {
       if (isClaakyState(event.payload.state)) setState(event.payload.state);
     });
-    const offFading = listen<CompanionBubbleEvent>(COMPANION_EVENTS.fading, () => {
-      setFading(true);
+    const offFading = listen<CompanionBubbleEvent>(COMPANION_EVENTS.fading, (event) => {
+      if (event.payload.open) {
+        setFading(true);
+        setClosing(false);
+      } else {
+        // Fermeture : la bulle se replie (cd-close), le fondu global n'est pas utilisé.
+        setFading(false);
+        setClosing(true);
+      }
     });
     const offBubble = listen<CompanionBubbleEvent>(COMPANION_EVENTS.bubbleChanged, (event) => {
       setBubbleOpen(Boolean(event.payload.open));
       if (event.payload.side) setSide(event.payload.side);
       setFading(false);
+      setClosing(false);
     });
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") run(COMPANION_COMMANDS.setBubbleOpen, { open: false });
@@ -105,7 +115,14 @@ export function CompanionDesk() {
   };
 
   return (
-    <div ref={rootRef} className="cd" data-open={bubbleOpen} data-side={side} data-fading={fading || undefined}>
+    <div
+      ref={rootRef}
+      className="cd"
+      data-open={bubbleOpen}
+      data-side={side}
+      data-fading={fading || undefined}
+      data-closing={closing || undefined}
+    >
       <div className="cd__dock">
         <button
           type="button"

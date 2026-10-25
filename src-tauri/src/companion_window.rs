@@ -38,6 +38,9 @@ const MAX_EXPANDED_HEIGHT: f64 = 560.0;
 /// Durée du fondu CSS côté front (voir .cd[data-fading]) + marge : la géométrie n'est
 /// appliquée qu'une fois le contenu totalement transparent.
 const GEOMETRY_DELAY_MS: u64 = 150;
+/// Durée de l'animation de repli de la bulle (voir cd-close dans companionBubble.css,
+/// 210 ms) + marge : à la fermeture, la fenêtre attend la fin du repli avant de se réduire.
+const CLOSE_ANIMATION_MS: u64 = 235;
 /// Marge gardée avec les bords de l'écran.
 const SCREEN_MARGIN: f64 = 12.0;
 /// Délai avant d'écrire la position (un glissement émet beaucoup d'événements Moved).
@@ -371,8 +374,12 @@ pub(crate) fn set_bubble_open(app: &AppHandle, open: bool) -> Result<()> {
     let _ = app.emit(COMPANION_BUBBLE_FADING_EVENT, &payload);
 
     let app = app.clone();
+    // À la fermeture, la géométrie attend la fin de l'animation de repli (cd-close) :
+    // la bulle se replie vers Claaky dans la fenêtre encore grande, puis seulement
+    // la fenêtre se réduit.
+    let delay = if open { GEOMETRY_DELAY_MS } else { CLOSE_ANIMATION_MS };
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(GEOMETRY_DELAY_MS));
+        std::thread::sleep(Duration::from_millis(delay));
         if GEOMETRY_GENERATION.load(Ordering::SeqCst) != generation {
             return; // une transition plus récente a pris le relais
         }

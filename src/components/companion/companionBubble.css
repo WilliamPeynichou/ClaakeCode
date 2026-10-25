@@ -34,6 +34,13 @@
   transition: opacity 130ms var(--ease);
 }
 .cd[data-fading] { opacity: 0; }
+/* Fermeture : la bulle se replie vers Claaky avant que la fenêtre ne se réduise
+   (la géométrie attend la fin de l'animation, voir CLOSE_ANIMATION_MS côté Rust). */
+.cd[data-closing] .cd__drop { animation: cd-close 210ms var(--ease) both; }
+@keyframes cd-close {
+  0%   { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.88, 0.72); border-radius: 50%; }
+}
 /* Bulle vers la gauche : Claaky collé à droite, la bulle s'étire sous lui vers la gauche. */
 .cd[data-side="left"] { align-items: flex-end; }
 
@@ -109,6 +116,10 @@
   gap: 6px;
   width: 100%;
   height: auto;
+  /* Plafond = MAX_EXPANDED_HEIGHT (560, companion_window.rs) - dock (120) - gap (8) :
+     au-delà, la zone de messages défile au lieu de pousser le composer hors de
+     la fenêtre. */
+  max-height: 432px;
   box-sizing: border-box;
   padding: 10px;
   color: var(--ink);
@@ -132,6 +143,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-shrink: 0;
   cursor: grab;
 }
 .companion-bubble__head:active { cursor: grabbing; }
@@ -211,6 +223,7 @@
   padding: 4px 0;
   max-height: 140px;
   overflow: auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -227,10 +240,11 @@
 }
 
 /* Messages */
+/* Messages : consomment l'espace disponible ; au-delà du plafond de la bulle,
+   ils défilent au lieu de dépasser. */
 .companion-bubble__messages {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 64px;
-  max-height: 280px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -261,11 +275,12 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Saisie */
+/* Saisie : toujours visible, jamais écrasée par les messages. */
 .companion-bubble__composer {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
   padding: 7px 8px 6px;
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.05);
@@ -293,6 +308,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cd__drop, .companion-bubble__message { animation: none; }
+  .cd[data-closing] .cd__drop { animation: none; }
   .cd__claaky, .cd__hide { transition: none; }
   .cd { transition: none; }
 }
