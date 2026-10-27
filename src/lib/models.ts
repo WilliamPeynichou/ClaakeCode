@@ -179,6 +179,14 @@ export const MODELS: ModelEntry[] = [
     supportsFast: true,
   },
   {
+    value: "openai:gpt-6.1-terra",
+    provider: "openai",
+    label: "GPT-6.1 Terra",
+    thinking: ["off", "low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+    supportsFast: true,
+  },
+  {
     value: "openai:gpt-6-sol",
     provider: "openai",
     label: "GPT-6 Sol",
@@ -548,6 +556,7 @@ function supportsOpenAiMaxEffort(modelName: string): boolean {
   return (
     modelName === "gpt-6" ||
     modelName.startsWith("gpt-6-") ||
+    modelName.startsWith("gpt-6.") ||
     modelName === "gpt-5.6" ||
     modelName.startsWith("gpt-5.6-")
   );
