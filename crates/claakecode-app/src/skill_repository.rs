@@ -316,8 +316,26 @@ fn ensure_repository_has_skill_files(target: &Path, allow_local: bool) -> Result
     Ok(())
 }
 
+/// A valid skill found during the walk, before duplicate resolution.
+struct Candidate {
+    skill: RepositorySkill,
+    /// Inside a folder whose name starts with `.` (e.g. `.openclaw/`, `.claude/`).
+    hidden: bool,
+    depth: usize,
+}
+
+/// True when a folder between the repository root and the file starts with `.`.
+fn is_hidden_path(path: &Path, root: &Path) -> bool {
+    let relative = path.strip_prefix(root).unwrap_or(path);
+    relative
+        .parent()
+        .into_iter()
+        .flat_map(|parent| parent.components())
+        .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+}
+
 fn scan_repository(root: &Path, repository_name: &str) -> Result<(Vec<RepositorySkill>, Vec<String>)> {
-    let mut skills = Vec::new();
+    let mut candidates: Vec<Candidate> = Vec::new();
     let mut warnings = Vec::new();
     let mut visited = 0usize;
     let walker = walkdir::WalkDir::new(root)
@@ -377,16 +395,47 @@ fn scan_repository(root: &Path, repository_name: &str) -> Result<(Vec<Repository
             warnings.push(format!("Skill name contains control characters, skipped: {relative}"));
             continue;
         }
-        skills.push(RepositorySkill {
-            name,
-            description: fields
-                .get("description")
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty()),
-            relative_path: relative,
-            absolute_path: entry.path().display().to_string(),
-            conflict: false,
+        let hidden = is_hidden_path(entry.path(), root);
+        let depth = entry.path().strip_prefix(root).map(|path| path.components().count()).unwrap_or(usize::MAX);
+        candidates.push(Candidate {
+            skill: RepositorySkill {
+                name,
+                description: fields
+                    .get("description")
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty()),
+                relative_path: relative,
+                absolute_path: entry.path().display().to_string(),
+                conflict: false,
+            },
+            hidden,
+            depth,
         });
+    }
+
+    // Hidden folders mirror visible skills (ponytail: skills/ and .openclaw/skills/). They are
+    // ignored when visible skills exist; they are kept only when the repository has nothing else.
+    let visible_exists = candidates.iter().any(|candidate| !candidate.hidden);
+    // Winner order inside a name: visible first, then shallowest, then path.
+    candidates.sort_by(|left, right| {
+        (left.hidden, left.depth, &left.skill.relative_path).cmp(&(right.hidden, right.depth, &right.skill.relative_path))
+    });
+    let mut kept_names: HashSet<String> = HashSet::new();
+    let mut skills = Vec::new();
+    for candidate in candidates {
+        let name = candidate.skill.name.clone();
+        let relative = candidate.skill.relative_path.clone();
+        if visible_exists && candidate.hidden {
+            if kept_names.contains(&name) {
+                warnings.push(format!("doublon ignoré : {name} ({relative})"));
+            }
+            continue;
+        }
+        if !kept_names.insert(name.clone()) {
+            warnings.push(format!("doublon ignoré : {name} ({relative})"));
+            continue;
+        }
+        skills.push(candidate.skill);
     }
     skills.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     Ok((skills, warnings))
