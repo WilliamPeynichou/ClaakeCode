@@ -13,6 +13,26 @@ export type MockOptions = {
   seedRlm?: boolean;
   /** Gives the classic chat a short history, so Auto Compute has something to hand over. */
   seedClassic?: boolean;
+  /** Skill repositories installed at start (empty by default). */
+  skillRepositories?: SeedRepository[];
+  /** When true, check_skill_repository_upstream_command fails like an unreachable remote. */
+  upstreamUnreachable?: boolean;
+  /** Remote revisions by repository id, used by upstream checks and updates. */
+  remoteRevisions?: Record<string, string>;
+};
+
+export type SeedRepository = {
+  id: string;
+  name: string;
+  url: string;
+  enabled?: boolean;
+  autoUpdate?: boolean;
+  revision?: string;
+  /** Skills as [name, description, relativePath]. */
+  skills: Array<[string, string, string]>;
+  /** Skill names that conflict with another source. */
+  conflicts?: string[];
+  warnings?: string[];
 };
 
 export function installTauriMock(options: MockOptions) {
@@ -61,6 +81,25 @@ export function installTauriMock(options: MockOptions) {
   let prices: any[] = [];
   let claakyOn = true;
   let stopRequested = false;
+
+  // Skill repositories: in-memory state mirroring the backend manifest.
+  type MockRepo = SeedRepository & { enabled: boolean; autoUpdate: boolean; revision: string };
+  const repos: MockRepo[] = (options.skillRepositories ?? []).map((r) => ({
+    enabled: true, autoUpdate: false, revision: "09c434ab73ca43761c5d8b0c5d341926c2fba710", ...r,
+  }));
+  const repoView = (r: MockRepo) => ({
+    id: r.id, name: r.name, url: r.url, enabled: r.enabled, autoUpdate: r.autoUpdate, revision: r.revision,
+    absolutePath: `/tmp/skill-repositories/${r.id}`,
+    skills: r.skills.map(([name, description, relativePath]) => ({
+      name, description, relativePath,
+      absolutePath: `/tmp/skill-repositories/${r.id}/${relativePath}`,
+      // A conflict exists only between two enabled repositories (both copies are flagged).
+      conflict: r.enabled && repos.some((o) => o !== r && o.enabled && o.skills.some(([n]) => n === name)),
+    })),
+    warnings: r.warnings ?? [],
+  });
+  const findRepo = (id: string) => repos.find((r) => r.id === id);
+
   const callbacks = new Map<number, (payload: unknown) => void>();
   const listeners = new Map<string, number[]>();
   let nextId = 1;
@@ -89,6 +128,51 @@ export function installTauriMock(options: MockOptions) {
     list_active_turns: () => [],
     list_configured_model_providers: () => ["anthropic"],
     list_installed_skills_command: () => [],
+    list_skill_repositories_command: () => repos.map(repoView),
+    set_skill_repository_enabled_command: ({ input }) => {
+      const r = findRepo(input.id);
+      if (r) r.enabled = input.enabled;
+      return null;
+    },
+    set_skill_repository_auto_update_command: ({ input }) => {
+      const r = findRepo(input.id);
+      if (r) r.autoUpdate = input.autoUpdate;
+      return null;
+    },
+    check_skill_repository_upstream_command: ({ input }) => {
+      if (options.upstreamUnreachable) throw "Unable to reach the remote repository: network is unreachable";
+      const r = findRepo(input.id)!;
+      const remote = options.remoteRevisions?.[input.id] ?? r.revision;
+      return { id: r.id, updateAvailable: remote !== r.revision, installedRevision: r.revision, remoteRevision: remote };
+    },
+    update_skill_repository_command: ({ input }) => {
+      const r = findRepo(input.id)!;
+      const previousRevision = r.revision;
+      r.revision = options.remoteRevisions?.[input.id] ?? r.revision;
+      return { repository: repoView(r), previousRevision, newRevision: r.revision, addedSkills: [], removedSkills: [], updated: previousRevision !== r.revision };
+    },
+    update_all_skill_repositories_command: () => {
+      const reports: unknown[] = [];
+      for (const r of repos.filter((x) => x.enabled)) {
+        const remote = options.remoteRevisions?.[r.id] ?? r.revision;
+        if (remote === r.revision) continue;
+        const previousRevision = r.revision;
+        r.revision = remote;
+        reports.push({ repository: repoView(r), previousRevision, newRevision: remote, addedSkills: [], removedSkills: [], updated: true });
+      }
+      return { reports, errors: [] };
+    },
+    remove_skill_repository_command: ({ input }) => {
+      const i = repos.findIndex((r) => r.id === input.id);
+      if (i >= 0) repos.splice(i, 1);
+      return null;
+    },
+    add_skill_repository_command: ({ input }) => {
+      const id = `repo-${repos.length + 1}`;
+      repos.push({ id, name: input.url.split("/").pop()!.replace(/\.git$/, ""), url: input.url, enabled: true, autoUpdate: false,
+        revision: "09c434ab73ca43761c5d8b0c5d341926c2fba710", skills: [] });
+      return repoView(repos[repos.length - 1]);
+    },
     list_mistral_models: () => [],
     list_openrouter_models: () => [],
     list_workspace_entries_command: () => [],

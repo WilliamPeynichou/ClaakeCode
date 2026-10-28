@@ -5044,6 +5044,19 @@ button.settings-pane__about-link:disabled {
   outline-offset: 3px;
 }
 
+.settings-pane__badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 12px;
+}
+
+.settings-pane__badge[data-tone="primary"] {
+  font-weight: 600;
+}
+
 .settings-pane__repositories-content {
   max-height: min(32vh, 280px);
   overflow-y: auto;

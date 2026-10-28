@@ -288,7 +288,7 @@ Code map:
 │       ├── platform.rs
 │       ├── providers.rs
 │       ├── remote.rs
-│       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM (onglet RLM, état vide, Auto Compute, Stop, réouverture), `npm run test:e2e`)
+│       ├── (tests/e2e/ — e2e.config.ts, tauriMock.ts, rlm-chat.e2e.ts : tests navigateur du chat RLM (onglet RLM, état vide, Auto Compute, Stop, réouverture), skill-repositories.e2e.ts : dépôts de skills (ajout ponytail 6 skills, conflit, mise à jour auto, « Tout mettre à jour », erreur réseau, suppression), `npm run test:e2e`)
 │       ├── rlm.rs — commandes Tauri du chat RLM : worktree isolé par conversation, sidecar Prime, credentials partagés avec le chat de base (OAuth Anthropic/OpenAI rafraîchis par Claake + clés API), modèle (set_model), tour unique (active_turns), historique persisté, reprise via sessionPath obligatoire ; politique appendSystemPrompt native de mémoire locale/globale et refinement evidence-gated (sans fine-tuning ni moteur mémoire parallèle), Stop, get_rlm_binding
 │       ├── state.rs
 │               ├── stats.rs — `get_model_stats` / `get_model_usage_series` exactes par buckets / export / effacement / prix
