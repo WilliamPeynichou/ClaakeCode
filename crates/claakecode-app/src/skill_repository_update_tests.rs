@@ -239,3 +239,52 @@ fn concurrent_updates_do_not_corrupt_and_clean_the_old_generation() {
     assert_eq!(catalog[0].skills.len(), 2);
     assert_eq!(entries_of(&root, &added.id).len(), 1, "previous and partial generations removed");
 }
+
+/// Recipe on a local copy of the real ponytail fixture: automatic update after a new commit that
+/// adds one skill and removes another (both copies), with the report, skills and conflicts checked.
+#[test]
+fn ponytail_auto_update_reports_added_and_removed_skills_without_conflict() {
+    let tmp = Dir::new();
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ponytail");
+    let repo = tmp.0.join("ponytail");
+    fs::create_dir_all(&repo).unwrap();
+    let copy = Command::new("cp").arg("-R").arg(fixture.join(".")).arg(&repo).status().unwrap();
+    assert!(copy.success());
+    git(&repo, &["init", "-q"]);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "ponytail"]);
+
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    let mut names: Vec<&str> = added.skills.iter().map(|s| s.name.as_str()).collect();
+    names.sort();
+    assert_eq!(names, vec!["ponytail", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help", "ponytail-review"]);
+    assert!(added.skills.iter().all(|s| !s.conflict));
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : ")).count(), 6);
+    set_auto_update_in(&root, &added.id, true).unwrap();
+
+    // Upstream change: one skill added, one removed from both copies.
+    write_skill(&repo.join("skills").join("ponytail-new"), "ponytail-new");
+    fs::remove_dir_all(repo.join("skills").join("ponytail-gain")).unwrap();
+    fs::remove_dir_all(repo.join(".openclaw").join("skills").join("ponytail-gain")).unwrap();
+    git(&repo, &["add", "-A"]);
+    git(&repo, &["commit", "-qm", "upstream change"]);
+    let new_head = head(&repo);
+
+    let outcome = update_all_in(&root, true, true).unwrap();
+    assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+    assert_eq!(outcome.reports.len(), 1);
+    let report = &outcome.reports[0];
+    assert!(report.updated);
+    assert_eq!(report.previous_revision, added.revision);
+    assert_eq!(report.new_revision, new_head);
+    assert_eq!(report.added_skills, vec!["ponytail-new".to_string()]);
+    assert_eq!(report.removed_skills, vec!["ponytail-gain".to_string()]);
+    assert!(report.repository.enabled && report.repository.auto_update);
+    assert_eq!(report.repository.skills.len(), 6);
+    assert!(report.repository.skills.iter().all(|s| !s.conflict));
+    let ponytail = report.repository.skills.iter().find(|s| s.name == "ponytail").unwrap();
+    assert!(ponytail.description.as_deref().unwrap_or_default().ends_with("Levels: lite, full (default), ultra."));
+    assert_eq!(catalog_in(&root).unwrap()[0].revision, new_head);
+    assert_eq!(entries_of(&root, &added.id).len(), 1, "old generation removed");
+}
