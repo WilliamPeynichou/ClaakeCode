@@ -23,6 +23,10 @@ async function openApp(app: { open: (path: string) => Promise<unknown> }, option
 const openRlmTab = (browser: any) => browser.locator('.chat-surface-tab[data-surface="rlm"]').first().tap();
 const openChatTab = (browser: any) => browser.locator('.chat-surface-tab[data-surface="chat"]').first().tap();
 
+// The title bar also has a "Claaky" button (desktop companion): target the Settings section.
+const openClaakySettings = () =>
+  surfaceOf(engine)!.page().locator('nav[aria-label="Settings sections"] button', { hasText: /^\s*Claaky\s*$/ }).click();
+
 const calls = (browser: any, cmd: string) =>
   browser.evaluate(
     (name: string) => (window as any).__mock.calls.filter((c: any) => c.cmd === name).map((c: any) => c.args),
@@ -253,11 +257,12 @@ test('Claaky: empty editor greets, quick start opens a chat, Settings can turn h
   expect(await calls(browser, 'create_rlm_conversation')).toHaveLength(1);
 
   await browser.locator('[title="Settings"]').first().tap();
-  await screen.getByRole('button', 'Claaky', { exact: true }).tap();
+  await openClaakySettings();
   await expect(screen.getByText('Afficher Claaky', { exact: false })).toBeVisible();
   await new Promise((r) => setTimeout(r, 1200));
   await surfaceOf(engine)!.page().screenshot({ path: '.e2e/shots/claaky-settings.png' });
-  await browser.locator('.claaky-settings__toggle input').tap();
+  // The companion block below reuses the toggle class: target Claaky's own checkbox by its label.
+  await surfaceOf(engine)!.page().getByRole('checkbox', { name: 'Afficher Claaky et lui donner la parole' }).click();
   expect(await calls(browser, 'set_claaky_enabled')).toEqual([{ enabled: false }]);
 });
 
@@ -292,7 +297,7 @@ test('Claaky follows the agent: working during a turn, done after, and every pos
   expect(head.filters).toBe(0);
 
   await browser.locator('[title="Settings"]').first().tap();
-  await screen.getByRole('button', 'Claaky', { exact: true }).tap();
+  await openClaakySettings();
   const thumbnails = await page.evaluate(() => ({
     static: document.querySelectorAll('.claaky-settings__states svg[data-static="true"]').length,
     filters: document.querySelectorAll('.claaky-settings__states filter').length,
@@ -307,20 +312,23 @@ test('Claaky follows the agent: working during a turn, done after, and every pos
   }
 });
 
-test('Claaky 2D: clay SVG on the empty screen (no WebGL), animation stays smooth', async ({ app }) => {
+test('Claaky 3D room: sprite canvas on the empty screen (no WebGL, no SVG filter), animation stays smooth', async ({ app }) => {
   await openApp(app);
   const page = surfaceOf(engine)!.page();
-  await page.waitForFunction(() => document.querySelectorAll('.claaky-empty svg.claaky').length === 1);
-  // No SVG filter anywhere (CPU-rendered, very slow in WebKit) and no canvas; the big Claaky gets its
-  // volume from gradient overlays instead.
+  // Since the 3D room (311f530) the empty screen draws pre-rendered sprite sheets on a 2D canvas;
+  // it becomes visible once its assets are loaded (otherwise it falls back to the SVG Claaky).
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('.claaky-empty canvas.claaky-room__canvas') as HTMLCanvasElement | null;
+    return !!canvas && canvas.style.opacity === '1';
+  });
   const dom = await page.evaluate(() => ({
-    filters: document.querySelectorAll('svg.claaky filter').length,
-    canvases: document.querySelectorAll('.claaky-empty canvas').length,
-    overlays: document.querySelectorAll('.claaky-empty svg.claaky radialGradient').length,
+    canvases: document.querySelectorAll('.claaky-empty canvas.claaky-room__canvas').length,
+    fallback: document.querySelectorAll('.claaky-empty svg.claaky').length,
+    filters: document.querySelectorAll('.claaky-empty filter').length,
   }));
+  expect(dom.canvases).toBe(1);
+  expect(dom.fallback).toBe(0);
   expect(dom.filters).toBe(0);
-  expect(dom.canvases).toBe(0);
-  expect(dom.overlays).toBeGreaterThan(8);
   // Frame pacing while Claaky animates: count rAF frames for 3 s.
   // Passed as a string: the test bundler injects a `__name` helper into named functions, absent in the page.
   const stats: { fps: number; long: number } = await page.evaluate(`new Promise((resolve) => {
@@ -335,18 +343,6 @@ test('Claaky 2D: clay SVG on the empty screen (no WebGL), animation stays smooth
     }
     requestAnimationFrame(tick);
   })`);
-  console.log('claaky 2D frame pacing', JSON.stringify(stats));
+  console.log('claaky 3D room frame pacing', JSON.stringify(stats));
   expect(stats.fps).toBeGreaterThan(20);
-  // Off-screen characters pause, then resume on return (no React/frame-loop work).
-  await page.evaluate(() => {
-    const el = document.querySelector('.claaky-empty svg.claaky') as SVGElement;
-    el.style.transform = 'translateY(2000px)';
-  });
-  await page.waitForFunction(() => document.querySelector('.claaky-empty svg.claaky')?.getAttribute('data-paused') === 'true');
-  const paused = await page.evaluate(() => getComputedStyle(document.querySelector('.claaky-empty .claaky__squash')!).animationPlayState);
-  expect(paused).toBe('paused');
-  await page.evaluate(() => {
-    (document.querySelector('.claaky-empty svg.claaky') as SVGElement).style.transform = '';
-  });
-  await page.waitForFunction(() => document.querySelector('.claaky-empty svg.claaky')?.getAttribute('data-paused') === 'false');
 });

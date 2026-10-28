@@ -287,6 +287,11 @@ export function installTauriMock(options: MockOptions) {
       return { rows, measured, prices, totalResponses: rows.reduce((s, r) => s + r.responses, 0), minReliable: 20, sinceMs: null };
     },
     clear_model_stats: () => { statsCleared = true; return null; },
+    get_active_benchmark_runs: () => [],
+    // Desktop companion settings (Settings > Claaky): the backend always returns a full object.
+    companion_get_settings: () => ({
+      shortcut: "Control+Alt+Space", defaultMode: "ask", allowedModels: [], defaultModel: null, launchAtLogin: false,
+    }),
     save_model_prices: ({ prices: next }) => { prices = next; return null; },
     "plugin:event|listen": ({ event, handler }) => {
       listeners.set(event, [...(listeners.get(event) ?? []), handler]);
