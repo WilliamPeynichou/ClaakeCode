@@ -677,13 +677,57 @@ pub(super) async fn add_skill_repository_command(
     }).await.map_err(|error| error.to_string())?
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct SkillRepositoryAutoUpdateInput {
+    pub(super) id: String,
+    #[serde(default)]
+    pub(super) auto_update: bool,
+}
+
+/// Emitted after a background run that changed at least one repository.
+pub(super) const SKILL_REPOSITORIES_UPDATED_EVENT: &str = "skill-repositories-updated";
+
 #[tauri::command]
 pub(super) async fn update_skill_repository_command(
     input: SkillRepositoryInput,
-) -> std::result::Result<claakecode_app::skill_repository::SkillRepository, String> {
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepositoryUpdateReport, String> {
     tauri::async_runtime::spawn_blocking(move || {
         claakecode_app::skill_repository::update_skill_repository(&input.id).map_err(error_to_string)
     }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn update_all_skill_repositories_command(
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepositoryUpdateAllReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::update_all_skill_repositories().map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn set_skill_repository_auto_update_command(
+    input: SkillRepositoryAutoUpdateInput,
+) -> std::result::Result<(), String> {
+    claakecode_app::skill_repository::set_skill_repository_auto_update(&input.id, input.auto_update)
+        .map_err(error_to_string)
+}
+
+/// Background task: once at startup, then every 6 hours. Only enabled repositories with auto-update.
+/// Blocking git work runs on its own thread. Errors are dropped silently by design.
+pub(crate) fn spawn_skill_repository_auto_update(app: tauri::AppHandle) {
+    const INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+    std::thread::spawn(move || loop {
+        if let Ok(outcome) = claakecode_app::skill_repository::update_automatic_skill_repositories() {
+            if !outcome.reports.is_empty() {
+                let _ = app.emit(
+                    SKILL_REPOSITORIES_UPDATED_EVENT,
+                    json!({ "reports": outcome.reports }),
+                );
+            }
+        }
+        std::thread::sleep(INTERVAL);
+    });
 }
 
 #[tauri::command]

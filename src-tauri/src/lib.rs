@@ -306,6 +306,7 @@ pub fn run() {
                 install_desktop_menu(app.handle())?;
             }
             start_remote_if_enabled(app.handle());
+            conversations::spawn_skill_repository_auto_update(app.handle().clone());
             companion_entry::setup(app.handle())?;
             Ok(())
         })
@@ -457,6 +458,8 @@ pub fn run() {
             conversations::list_skill_repositories_command,
             conversations::add_skill_repository_command,
             conversations::update_skill_repository_command,
+            conversations::update_all_skill_repositories_command,
+            conversations::set_skill_repository_auto_update_command,
             conversations::check_skill_repository_upstream_command,
             conversations::set_skill_repository_enabled_command,
             conversations::remove_skill_repository_command,

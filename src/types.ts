@@ -689,10 +689,31 @@ export type SkillRepository = {
   name: string;
   url: string;
   enabled: boolean;
+  autoUpdate: boolean;
   revision: string;
   absolutePath: string;
   skills: RepositorySkill[];
   warnings: string[];
+};
+
+export type SkillRepositoryUpdateReport = {
+  repository: SkillRepository;
+  previousRevision: string;
+  newRevision: string;
+  addedSkills: string[];
+  removedSkills: string[];
+  updated: boolean;
+};
+
+export type SkillRepositoryUpdateError = {
+  id: string;
+  name: string;
+  message: string;
+};
+
+export type SkillRepositoryUpdateAllReport = {
+  reports: SkillRepositoryUpdateReport[];
+  errors: SkillRepositoryUpdateError[];
 };
 
 export type SkillConfig = {
