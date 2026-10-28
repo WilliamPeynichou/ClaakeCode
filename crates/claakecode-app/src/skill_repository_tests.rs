@@ -320,10 +320,13 @@ fn ponytail_real_repository_yields_six_skills_without_conflict() {
     let duplicates: Vec<&String> = added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : ")).collect();
     assert_eq!(duplicates.len(), 6, "one warning per ignored mirror copy: {:?}", added.warnings);
 
-    // The visible `skills/` copy wins. Its description is the folded `>` block, which
-    // parse_frontmatter does not read yet (yaml-frontmatter task), so only the winner is checked here.
+    // The visible `skills/` copy wins, and its folded `>` description is read in full, never as ">".
     let ponytail = added.skills.iter().find(|s| s.name == "ponytail").unwrap();
     assert!(ponytail.relative_path.starts_with("skills"), "{}", ponytail.relative_path);
+    let description = ponytail.description.clone().unwrap_or_default();
+    assert!(description.starts_with("Lazy senior dev mode"), "{description}");
+    assert!(description.ends_with("Levels: lite, full (default), ultra."), "{description}");
+    assert_ne!(description.trim(), ">");
 
     let workspace = tmp.0.join("ws");
     fs::create_dir_all(&workspace).unwrap();
