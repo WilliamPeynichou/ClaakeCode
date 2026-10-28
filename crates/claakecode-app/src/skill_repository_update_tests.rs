@@ -288,3 +288,58 @@ fn ponytail_auto_update_reports_added_and_removed_skills_without_conflict() {
     assert_eq!(catalog_in(&root).unwrap()[0].revision, new_head);
     assert_eq!(entries_of(&root, &added.id).len(), 1, "old generation removed");
 }
+
+/// Manual recipe against the real GitHub repository (network). Run with:
+/// `cargo test -p claakecode-app real_ponytail -- --ignored --nocapture`
+#[test]
+#[ignore = "network: clones https://github.com/DietrichGebert/ponytail"]
+fn real_ponytail_from_github_installs_cleanly_and_updates() {
+    let dir = Dir::new();
+    let root = dir.0.join("store");
+    let workspace = dir.0.join("workspace");
+    fs::create_dir_all(&workspace).unwrap();
+
+    // 1. Real HTTPS clone (allow_local = false, the production path).
+    let added = add_in(&root, "https://github.com/DietrichGebert/ponytail", false).unwrap();
+    let mut names: Vec<&str> = added.skills.iter().map(|s| s.name.as_str()).collect();
+    names.sort();
+    assert_eq!(names, vec!["ponytail", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help", "ponytail-review"]);
+    assert!(added.skills.iter().all(|s| s.relative_path.starts_with("skills/")), "visible copy wins");
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : ")).count(), 6, "{:?}", added.warnings);
+    for skill in &added.skills {
+        let description = skill.description.as_deref().unwrap_or_default();
+        assert!(description.len() > 40 && !description.starts_with('>') && !description.contains('\n'), "{}: {description}", skill.name);
+        println!("{:<16} {}", skill.name, description);
+    }
+
+    // 2. Every skill reaches the agent: enabled, no conflict, content loaded.
+    let visible = list_installed_skills_with(&workspace, &SkillSettings::default(), Some(&root));
+    let help = visible
+        .iter()
+        .find(|s| s.name == "ponytail-help" && s.enabled && !s.conflict)
+        .expect("ponytail-help handed to the agent");
+    assert!(help.content.contains("Ponytail Help"));
+    assert!(!visible.iter().any(|s| s.repository_id.as_deref() == Some(added.id.as_str()) && s.conflict));
+
+    // 3. Auto update: pretend the installed copy is older, then run the automatic batch.
+    set_auto_update_in(&root, &added.id, true).unwrap();
+    let real_revision = added.revision.clone();
+    let mut manifest = read_manifest(&root).unwrap();
+    manifest.repositories[0].revision = "0000000000000000000000000000000000000000".into();
+    save_manifest(&root, &manifest).unwrap();
+    let outcome = update_all_in(&root, true, false).unwrap();
+    assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+    assert_eq!(outcome.reports.len(), 1);
+    let report = &outcome.reports[0];
+    println!(
+        "report: {} {} -> {} added={:?} removed={:?}",
+        report.repository.name, &report.previous_revision[..7], &report.new_revision[..7], report.added_skills, report.removed_skills
+    );
+    assert!(report.updated && report.repository.enabled && report.repository.auto_update);
+    assert_eq!(report.new_revision, real_revision);
+    assert!(report.added_skills.is_empty() && report.removed_skills.is_empty());
+    assert_eq!(entries_of(&root, &added.id).len(), 1, "old generation removed");
+
+    // 4. Nothing new upstream: the next batch is a no-op.
+    assert!(update_all_in(&root, true, false).unwrap().reports.is_empty());
+}
