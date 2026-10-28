@@ -2,9 +2,9 @@
 <html lang="en" data-theme="forest">
 <head>
 <meta charset="utf-8" />
-<title>What&#39;s New in Claake Code 0.2.0 - Desktop Companion, 3D Room, Kimi 3.1 Pro</title>
+<title>What&#39;s New in Claake Code 0.2.5 - Git Skill Repositories, Auto-Update, Desktop Companion</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Claake Code 0.2.0 adds Claaky, a desktop companion with a glass chat bubble, an animated 3D room for Claaky inside the IDE, and the Kimi 3.1 Pro model." />
+<meta name="description" content="Claake Code 0.2.5 lets you share skills from any Git repository: clone, dedupe and auto-update skill repos with no self-conflicts. Plus the Claaky desktop companion, 3D room and Kimi 3.1 Pro." />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 <meta name="author" content="Claake Code" />
 <meta name="theme-color" content="#0c1f17" />
@@ -12,12 +12,12 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Claake Code" />
 <meta property="og:url" content="https://claakecode-web.vercel.app/whats-new" />
-<meta property="og:title" content="What&#39;s New in Claake Code 0.2.0 - Desktop Companion, 3D Room, Kimi 3.1 Pro" />
-<meta property="og:description" content="Claake Code 0.2.0 adds Claaky, a desktop companion with a glass chat bubble, an animated 3D room for Claaky inside the IDE, and the Kimi 3.1 Pro model." />
+<meta property="og:title" content="What&#39;s New in Claake Code 0.2.5 - Git Skill Repositories, Auto-Update" />
+<meta property="og:description" content="Claake Code 0.2.5 lets you share skills from any Git repository: clone, dedupe and auto-update skill repos with no self-conflicts. Plus the Claaky desktop companion, 3D room and Kimi 3.1 Pro." />
 <meta property="og:image" content="https://claakecode-web.vercel.app/assets/social-preview.png" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="What&#39;s New in Claake Code 0.2.0 - Desktop Companion, 3D Room, Kimi 3.1 Pro" />
-<meta name="twitter:description" content="Claake Code 0.2.0 adds Claaky, a desktop companion with a glass chat bubble, an animated 3D room for Claaky inside the IDE, and the Kimi 3.1 Pro model." />
+<meta name="twitter:title" content="What&#39;s New in Claake Code 0.2.5 - Git Skill Repositories, Auto-Update" />
+<meta name="twitter:description" content="Claake Code 0.2.5 lets you share skills from any Git repository: clone, dedupe and auto-update skill repos with no self-conflicts. Plus the Claaky desktop companion, 3D room and Kimi 3.1 Pro." />
 <meta name="twitter:image" content="https://claakecode-web.vercel.app/assets/social-preview.png" />
 <link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
 <link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
@@ -50,7 +50,7 @@
       <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
     </picture>
     <strong>claake <em>code</em></strong>
-    <span class="version">v0.2.3</span>
+    <span class="version">v0.2.5</span>
   </a>
   <div class="nav-links" id="navlinks">
     <a href="/whats-new" class="active">What's new</a>
@@ -65,17 +65,38 @@
 </nav>
 <header class="page-hero" id="top">
   <div class="wrap reveal in">
-    <span class="eyebrow">§ what's new · v0.2.3</span>
-    <h1>Claaky leaves the sidebar and <em>moves onto your desktop</em>.</h1>
-    <p>Version 0.2.0 is the biggest update yet: a desktop companion you can ask anything without opening the IDE, a cosy 3D room where Claaky shows what the agent is doing, and Kimi 3.1 Pro in the model list.</p>
+    <span class="eyebrow">§ what's new · v0.2.5</span>
+    <h1>Share skills from any Git repo. <em>Claake Code keeps them fresh.</em></h1>
+    <p>Version 0.2.5 adds Git skill repositories: paste a repo URL and Claake Code clones it, reads every SKILL.md with a real YAML parser, dedupes mirror copies so a repo never conflicts with itself, and can auto-update by fresh clone. Below: the Claaky desktop companion, the 3D room and Kimi 3.1 Pro from 0.2.x.</p>
     <div class="hero-cta">
-      <a class="btn btn-primary" href="#companion">Desktop companion</a>
+      <a class="btn btn-primary" href="#skills">Git skill repositories</a>
+      <a class="btn btn-ghost" href="#companion">Desktop companion</a>
       <a class="btn btn-ghost" href="#room">3D room</a>
-      <a class="btn btn-ghost" href="#kimi">Kimi 3.1 Pro</a>
     </div>
   </div>
 </header>
 <main>
+  <section class="pad-lg" id="skills">
+    <div class="wrap">
+      <div class="split wn-split">
+        <div class="reveal">
+          <span class="eyebrow">01 · git skill repositories</span>
+          <h2 class="wn-h2">One URL. <em>Every skill in the repo.</em></h2>
+          <p class="wn-p">Point Claake Code at a Git repository of skills. It clones the repo, discovers every SKILL.md and lists the skills in Settings, ready to hand to the agent. No packaging, no registry - if it is a Git repo, it works.</p>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span><b>Real YAML parsing.</b> Multi-line <code>description: &gt;</code> and <code>|</code> blocks are read in full, never truncated to a stray <code>&gt;</code>.</span></li>
+            <li><span class="tick">✓</span><span><b>No self-conflicts.</b> A repo that keeps mirror copies (like <code>skills/</code> and <code>.openclaw/skills/</code>) is deduped: one copy wins, the rest become "duplicate ignored" warnings - never a name conflict.</span></li>
+            <li><span class="tick">✓</span><span><b>Auto-update by fresh clone.</b> Opt in per repo; Claake Code checks at launch and every 6 hours, then swaps in a clean clone only after it validates. A broken upstream never touches your working copy.</span></li>
+            <li><span class="tick">✓</span><span><b>Update all.</b> One button checks every enabled repo and updates only those with something new, then reports what changed.</span></li>
+          </ul>
+        </div>
+        <figure class="glass wn-figure reveal">
+          <img src="assets/whats-new/claaky-room.webp" width="560" height="520" alt="Claake Code Settings showing a cloned Git skill repository with its discovered skills" loading="lazy" />
+        </figure>
+      </div>
+    </div>
+  </section>
+
   <section class="pad-lg" id="companion">
     <div class="wrap">
       <div class="split wn-split">
@@ -152,11 +173,12 @@
       <div class="glass tag-panel reveal">
         <span class="ix">under the hood</span>
         <div class="tag-row">
-          <span class="tag-chip">New Rust tests for companion history and task handoff</span>
-          <span class="tag-chip">Companion conversations stored apart from main chats</span>
-          <span class="tag-chip">Lighter Claaky room assets</span>
+          <span class="tag-chip">serde_yaml front-matter parser for every SKILL.md</span>
+          <span class="tag-chip">Internal repo dedup - no more self-conflicts</span>
+          <span class="tag-chip">Auto-update by validated fresh clone, never git pull</span>
+          <span class="tag-chip">Update-all with per-repo added/removed skill report</span>
         </div>
-        <p>Full changelog and downloads are on the <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/tag/v0.2.3">v0.2.3 release page ↗</a>.</p>
+        <p>Full changelog and downloads are on the <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/tag/v0.2.5">v0.2.5 release page ↗</a>.</p>
       </div>
     </div>
   </section>
@@ -172,7 +194,7 @@
             <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="/download/windows">Windows · .exe ↓</a>
             <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="/download/linux">Linux · AppImage ↓</a>
           </div>
-          <p class="meta" style="text-align:center">Latest v0.2.3 · open source · MIT</p>
+          <p class="meta" style="text-align:center">Latest v0.2.5 · open source · MIT</p>
         </div>
       </div>
     </div>
@@ -206,8 +228,7 @@
   <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
 </div>
 
-<script defer src="/assets/vendor/three.min.js"></script>
-<script defer src="liquidglass.js"></script>
+<script defer src="bg-loader.js"></script>
 <script>
 (function(){
   const THEMES = {
