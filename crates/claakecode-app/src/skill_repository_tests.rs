@@ -1,6 +1,7 @@
 use std::{fs, path::{Path, PathBuf}, process::Command};
 
 use super::*;
+use crate::skill::InstalledSkill;
 
 struct Dir(PathBuf);
 impl Dir {
@@ -197,4 +198,188 @@ fn conflicting_names_are_marked_and_excluded_from_agent() {
     assert!(clashing.iter().all(|s| s.conflict));
     let tool = crate::skill::SkillTool::with_settings(&workspace, settings);
     let _ = tool; // agent exclusion is covered by skill::tests
+}
+
+/// Git repository from `(relative file, content)` pairs; the content is committed as-is.
+fn plain_repo(root: &Path, name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let repo = root.join(name);
+    fs::create_dir_all(&repo).unwrap();
+    git(&repo, &["init", "-q"]);
+    for (path, content) in files {
+        let file = repo.join(path);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, content).unwrap();
+    }
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "fixture"]);
+    repo
+}
+
+fn skill_text(name: &str) -> String {
+    format!("---\nname: {name}\ndescription: fixture {name}\n---\nBody\n")
+}
+
+#[test]
+fn hidden_mirror_copies_do_not_conflict_with_their_own_repository() {
+    let tmp = Dir::new();
+    let skills_a = skill_text("x");
+    let skills_b = skill_text("y");
+    let repo = plain_repo(
+        &tmp.0,
+        "mirror",
+        &[
+            ("skills/x/SKILL.md", &skills_a),
+            ("skills/y/SKILL.md", &skills_b),
+            (".openclaw/skills/x/SKILL.md", &skills_a),
+            (".openclaw/skills/y/SKILL.md", &skills_b),
+        ],
+    );
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    let names: Vec<&str> = added.skills.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, vec!["x", "y"], "one copy of each skill, visible folder wins");
+    assert!(added.skills[0].relative_path.starts_with("skills"));
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : x (")).count(), 1);
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : y (")).count(), 1);
+
+    let workspace = tmp.0.join("ws");
+    fs::create_dir_all(&workspace).unwrap();
+    let listed = list_installed_skills_with(&workspace, &SkillSettings::default(), Some(&root));
+    let repo_skills: Vec<_> = listed.iter().filter(|s| s.repository_id.is_some()).collect();
+    assert_eq!(repo_skills.len(), 2);
+    assert!(repo_skills.iter().all(|s| !s.conflict), "a repository never conflicts with itself");
+}
+
+#[test]
+fn skills_only_under_hidden_folders_are_detected() {
+    let tmp = Dir::new();
+    let repo = plain_repo(
+        &tmp.0,
+        "hidden-only",
+        &[
+            (".claude/skills/alpha/SKILL.md", &skill_text("alpha")),
+            (".claude/skills/beta/SKILL.md", &skill_text("beta")),
+        ],
+    );
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    let mut names: Vec<&str> = added.skills.iter().map(|s| s.name.as_str()).collect();
+    names.sort();
+    assert_eq!(names, vec!["alpha", "beta"]);
+    assert!(added.warnings.iter().all(|w| !w.starts_with("doublon ignoré")));
+}
+
+#[test]
+fn same_name_in_two_repositories_conflicts_until_one_is_disabled() {
+    let tmp = Dir::new();
+    let first = plain_repo(&tmp.0, "first", &[("skills/shared-name/SKILL.md", &skill_text("shared-name"))]);
+    let second = plain_repo(&tmp.0, "second", &[("skills/shared-name/SKILL.md", &skill_text("shared-name"))]);
+    let root = tmp.0.join("store");
+    let one = add_in(&root, &local_url(&first), true).unwrap();
+    add_in(&root, &local_url(&second), true).unwrap();
+    let workspace = tmp.0.join("ws");
+    fs::create_dir_all(&workspace).unwrap();
+    let settings = SkillSettings::default();
+
+    let clashing = |listed: &[InstalledSkill]| {
+        listed.iter().filter(|s| s.name == "shared-name" && s.repository_id.is_some() && s.conflict).count()
+    };
+    let listed = list_installed_skills_with(&workspace, &settings, Some(&root));
+    assert_eq!(clashing(&listed), 2, "both repositories' copies are in conflict");
+
+    set_enabled_in(&root, &one.id, false).unwrap();
+    let listed = list_installed_skills_with(&workspace, &settings, Some(&root));
+    assert_eq!(clashing(&listed), 0, "disabling one repository clears the conflict");
+}
+
+/// Copy of the real ponytail fixture (`tests/fixtures/ponytail`) into a git repository.
+fn ponytail_repo(root: &Path) -> PathBuf {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ponytail");
+    let repo = root.join("ponytail");
+    fs::create_dir_all(&repo).unwrap();
+    git(&repo, &["init", "-q"]);
+    let copy = Command::new("cp").arg("-R").arg(fixture.join(".")).arg(&repo).status().unwrap();
+    assert!(copy.success(), "copying the ponytail fixture failed");
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "ponytail"]);
+    repo
+}
+
+#[test]
+fn ponytail_real_repository_yields_six_skills_without_conflict() {
+    let tmp = Dir::new();
+    let repo = ponytail_repo(&tmp.0);
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+
+    let mut names: Vec<&str> = added.skills.iter().map(|s| s.name.as_str()).collect();
+    names.sort();
+    assert_eq!(names, vec!["ponytail", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help", "ponytail-review"]);
+    assert!(added.skills.iter().all(|s| s.relative_path.starts_with("skills/")), "the visible copy wins");
+
+    let duplicates: Vec<&String> = added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : ")).collect();
+    assert_eq!(duplicates.len(), 6, "one warning per ignored mirror copy: {:?}", added.warnings);
+
+    // The visible `skills/` copy wins. Its description is the folded `>` block, which
+    // parse_frontmatter does not read yet (yaml-frontmatter task), so only the winner is checked here.
+    let ponytail = added.skills.iter().find(|s| s.name == "ponytail").unwrap();
+    assert!(ponytail.relative_path.starts_with("skills"), "{}", ponytail.relative_path);
+
+    let workspace = tmp.0.join("ws");
+    fs::create_dir_all(&workspace).unwrap();
+    let listed = list_installed_skills_with(&workspace, &SkillSettings::default(), Some(&root));
+    let repo_skills: Vec<_> = listed.iter().filter(|s| s.repository_id.is_some()).collect();
+    assert_eq!(repo_skills.len(), 6);
+    assert!(repo_skills.iter().all(|s| !s.conflict));
+}
+
+#[test]
+fn visible_copy_wins_even_when_hidden_copy_is_shallower() {
+    let tmp = Dir::new();
+    let repo = plain_repo(
+        &tmp.0,
+        "depth",
+        &[
+            (".mirror/x/SKILL.md", &skill_text("x")),
+            ("deep/er/skills/x/SKILL.md", &skill_text("x")),
+        ],
+    );
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    assert_eq!(added.skills.len(), 1);
+    assert_eq!(added.skills[0].relative_path, format!("deep{0}er{0}skills{0}x{0}SKILL.md", std::path::MAIN_SEPARATOR));
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : x (")).count(), 1);
+}
+
+#[test]
+fn same_name_in_two_visible_folders_keeps_shallowest_once() {
+    let tmp = Dir::new();
+    let repo = plain_repo(
+        &tmp.0,
+        "visible-dup",
+        &[
+            ("skills/x/SKILL.md", &skill_text("x")),
+            ("other/skills/x/SKILL.md", &skill_text("x")),
+        ],
+    );
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    assert_eq!(added.skills.len(), 1);
+    assert_eq!(added.skills[0].relative_path, format!("skills{0}x{0}SKILL.md", std::path::MAIN_SEPARATOR));
+    assert_eq!(added.warnings.iter().filter(|w| w.starts_with("doublon ignoré : x (")).count(), 1);
+}
+
+#[test]
+fn manual_skill_and_repository_skill_with_same_name_still_conflict() {
+    let tmp = Dir::new();
+    let repo = plain_repo(&tmp.0, "manual-vs-repo", &[("skills/manual-clash/SKILL.md", &skill_text("manual-clash"))]);
+    let root = tmp.0.join("store");
+    add_in(&root, &local_url(&repo), true).unwrap();
+    let workspace = tmp.0.join("ws");
+    write_skill(&workspace.join(".agents/skills/manual-clash"), "manual-clash");
+
+    let listed = list_installed_skills_with(&workspace, &SkillSettings::default(), Some(&root));
+    let clashing: Vec<_> = listed.iter().filter(|s| s.name == "manual-clash").collect();
+    assert_eq!(clashing.len(), 2);
+    assert!(clashing.iter().all(|s| s.conflict), "manual and repository copies stay in conflict");
 }
