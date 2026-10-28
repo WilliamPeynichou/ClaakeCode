@@ -99,7 +99,7 @@ fn update_publishes_new_revision_and_keeps_enabled_state() {
     write_skill(&repo.join("added"), "upd-two");
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "-qm", "second"]);
-    let second = update_in(&root, &first.id, true).unwrap();
+    let second = update_in(&root, &first.id, true).unwrap().repository;
     assert_ne!(first.revision, second.revision);
     assert!(!second.enabled);
     assert_eq!(second.skills.len(), 2);

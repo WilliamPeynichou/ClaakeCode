@@ -1,7 +1,7 @@
 //! Managed skill repositories: full Git checkouts whose skills keep their resources.
 //! Cloning only reads the repository: hooks, scripts and dependency installers never run.
 use std::{
-    collections::HashSet,
+    collections::{BTreeSet, HashSet},
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -49,10 +49,40 @@ pub struct SkillRepository {
     pub name: String,
     pub url: String,
     pub enabled: bool,
+    /// Replace the installed copy automatically (at startup and every 6 hours).
+    pub auto_update: bool,
     pub revision: String,
     pub absolute_path: String,
     pub skills: Vec<RepositorySkill>,
     pub warnings: Vec<String>,
+}
+
+/// Outcome of one update: the repository as now installed, plus what changed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillRepositoryUpdateReport {
+    pub repository: SkillRepository,
+    pub previous_revision: String,
+    pub new_revision: String,
+    pub added_skills: Vec<String>,
+    pub removed_skills: Vec<String>,
+    pub updated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillRepositoryUpdateError {
+    pub id: String,
+    pub name: String,
+    pub message: String,
+}
+
+/// Batch update: `reports` lists only repositories that actually changed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillRepositoryUpdateAllReport {
+    pub reports: Vec<SkillRepositoryUpdateReport>,
+    pub errors: Vec<SkillRepositoryUpdateError>,
 }
 
 /// Result of comparing the installed revision with the remote default branch.
@@ -72,6 +102,8 @@ struct Record {
     name: String,
     url: String,
     enabled: bool,
+    #[serde(default)]
+    auto_update: bool,
     revision: String,
     checkout: String,
 }
@@ -454,6 +486,7 @@ fn describe(root: &Path, record: &Record) -> Result<SkillRepository> {
         name: record.name.clone(),
         url: record.url.clone(),
         enabled: record.enabled,
+        auto_update: record.auto_update,
         revision: record.revision.clone(),
         absolute_path: path.display().to_string(),
         skills,
@@ -467,6 +500,7 @@ fn unavailable(root: &Path, record: &Record, error: anyhow::Error) -> SkillRepos
         name: record.name.clone(),
         url: record.url.clone(),
         enabled: record.enabled,
+        auto_update: record.auto_update,
         revision: record.revision.clone(),
         absolute_path: checkout_path(root, record).display().to_string(),
         skills: Vec::new(),
@@ -535,6 +569,7 @@ fn install_in(root: &Path, url: &str, existing: Option<&Record>, allow_local: bo
             name,
             url: url.to_string(),
             enabled: existing.map(|record| record.enabled).unwrap_or(true),
+            auto_update: existing.map(|record| record.auto_update).unwrap_or(false),
             revision,
             checkout: generation.clone(),
         };
@@ -571,16 +606,87 @@ fn add_in(root: &Path, url: &str, allow_local: bool) -> Result<SkillRepository> 
     install_in(root, &url, None, allow_local)
 }
 
-fn update_in(root: &Path, id: &str, allow_local: bool) -> Result<SkillRepository> {
-    check_id(id)?;
-    let _guard = lock();
-    let record = read_manifest(root)?
+fn find_record(root: &Path, id: &str) -> Result<Record> {
+    read_manifest(root)?
         .repositories
         .into_iter()
         .find(|record| record.id == id)
-        .context("unknown skill repository")?;
+        .context("unknown skill repository")
+}
+
+fn set_auto_update_in(root: &Path, id: &str, auto_update: bool) -> Result<()> {
+    check_id(id)?;
+    let _guard = lock();
+    let mut manifest = read_manifest(root)?;
+    manifest
+        .repositories
+        .iter_mut()
+        .find(|record| record.id == id)
+        .context("unknown skill repository")?
+        .auto_update = auto_update;
+    save_manifest(root, &manifest)
+}
+
+fn skill_names(repository: &SkillRepository) -> BTreeSet<String> {
+    repository.skills.iter().map(|skill| skill.name.clone()).collect()
+}
+
+/// Caller holds the lock. Checks upstream read-only first; a fresh clone is made only when it moved.
+fn update_locked(root: &Path, record: &Record, allow_local: bool) -> Result<SkillRepositoryUpdateReport> {
     let url = normalized_url(&record.url, allow_local)?;
-    install_in(root, &url, Some(&record), allow_local)
+    let remote = remote_head(&url, allow_local)?;
+    if remote == record.revision {
+        let repository = describe(root, record)?;
+        return Ok(SkillRepositoryUpdateReport {
+            previous_revision: record.revision.clone(),
+            new_revision: record.revision.clone(),
+            added_skills: Vec::new(),
+            removed_skills: Vec::new(),
+            updated: false,
+            repository,
+        });
+    }
+    let before = describe(root, record).map(|repository| skill_names(&repository)).unwrap_or_default();
+    // Staged clone, validated, then published atomically; the previous generation is removed on success.
+    let repository = install_in(root, &url, Some(record), allow_local)?;
+    let after = skill_names(&repository);
+    Ok(SkillRepositoryUpdateReport {
+        previous_revision: record.revision.clone(),
+        new_revision: repository.revision.clone(),
+        added_skills: after.difference(&before).cloned().collect(),
+        removed_skills: before.difference(&after).cloned().collect(),
+        updated: repository.revision != record.revision,
+        repository,
+    })
+}
+
+fn update_in(root: &Path, id: &str, allow_local: bool) -> Result<SkillRepositoryUpdateReport> {
+    check_id(id)?;
+    let _guard = lock();
+    let record = find_record(root, id)?;
+    update_locked(root, &record, allow_local)
+}
+
+/// Updates every enabled repository (only those with `auto_update` when `only_auto`).
+/// Sequential. Errors are collected per repository; the others still run.
+fn update_all_in(root: &Path, only_auto: bool, allow_local: bool) -> Result<SkillRepositoryUpdateAllReport> {
+    let _guard = lock();
+    let mut outcome = SkillRepositoryUpdateAllReport::default();
+    for record in read_manifest(root)?.repositories {
+        if !record.enabled || (only_auto && !record.auto_update) {
+            continue;
+        }
+        match update_locked(root, &record, allow_local) {
+            Ok(report) if report.updated => outcome.reports.push(report),
+            Ok(_) => {}
+            Err(error) => outcome.errors.push(SkillRepositoryUpdateError {
+                id: record.id.clone(),
+                name: record.name.clone(),
+                message: format!("{error:#}"),
+            }),
+        }
+    }
+    Ok(outcome)
 }
 
 fn set_enabled_in(root: &Path, id: &str, enabled: bool) -> Result<()> {
@@ -619,12 +725,19 @@ fn remove_in(root: &Path, id: &str) -> Result<()> {
 /// Read-only check: ask the remote for its HEAD revision without downloading anything.
 fn check_upstream_in(root: &Path, id: &str, allow_local: bool) -> Result<UpstreamStatus> {
     check_id(id)?;
-    let record = read_manifest(root)?
-        .repositories
-        .into_iter()
-        .find(|record| record.id == id)
-        .context("unknown skill repository")?;
+    let record = find_record(root, id)?;
     let url = normalized_url(&record.url, allow_local)?;
+    let remote_revision = remote_head(&url, allow_local)?;
+    Ok(UpstreamStatus {
+        id: record.id,
+        update_available: remote_revision != record.revision,
+        installed_revision: record.revision,
+        remote_revision,
+    })
+}
+
+/// HEAD revision reported by the remote, read-only (`git ls-remote`).
+fn remote_head(url: &str, allow_local: bool) -> Result<String> {
     let mut child = git_command(allow_local)
         .args(["ls-remote", "--", &url, "HEAD"])
         .stdin(Stdio::null())
@@ -649,19 +762,13 @@ fn check_upstream_in(root: &Path, id: &str, allow_local: bool) -> Result<Upstrea
         let message: String = String::from_utf8_lossy(&output.stderr).chars().take(2000).collect();
         bail!("Unable to reach the remote repository: {}", message.trim());
     }
-    let remote_revision = String::from_utf8_lossy(&output.stdout)
+    String::from_utf8_lossy(&output.stdout)
         .lines()
         .next()
         .and_then(|line| line.split_whitespace().next())
         .filter(|value| !value.is_empty())
-        .context("the remote repository did not report a revision")?
-        .to_string();
-    Ok(UpstreamStatus {
-        id: record.id,
-        update_available: remote_revision != record.revision,
-        installed_revision: record.revision,
-        remote_revision,
-    })
+        .map(str::to_string)
+        .context("the remote repository did not report a revision")
 }
 
 /// Compare the installed revision with upstream. Never modifies anything.
@@ -674,13 +781,27 @@ pub fn add_skill_repository(url: &str) -> Result<SkillRepository> {
     add_in(&storage_root()?, url, false)
 }
 
-/// Manual update: fresh clone of the same URL, re-detection, activation state kept.
-pub fn update_skill_repository(id: &str) -> Result<SkillRepository> {
+/// Manual update: checks upstream, then fresh clone of the same URL if it moved. Activation state kept.
+pub fn update_skill_repository(id: &str) -> Result<SkillRepositoryUpdateReport> {
     update_in(&storage_root()?, id, false)
+}
+
+/// Manual "update all": every enabled repository, errors returned to the caller.
+pub fn update_all_skill_repositories() -> Result<SkillRepositoryUpdateAllReport> {
+    update_all_in(&storage_root()?, false, false)
+}
+
+/// Background run: enabled repositories with `auto_update` only. The caller drops the errors.
+pub fn update_automatic_skill_repositories() -> Result<SkillRepositoryUpdateAllReport> {
+    update_all_in(&storage_root()?, true, false)
 }
 
 pub fn set_skill_repository_enabled(id: &str, enabled: bool) -> Result<()> {
     set_enabled_in(&storage_root()?, id, enabled)
+}
+
+pub fn set_skill_repository_auto_update(id: &str, auto_update: bool) -> Result<()> {
+    set_auto_update_in(&storage_root()?, id, auto_update)
 }
 
 /// Unregister and delete the repository folder. Manual skills are never touched.
@@ -695,3 +816,7 @@ mod tests;
 #[cfg(test)]
 #[path = "skill_repository_security_tests.rs"]
 mod security_tests;
+
+#[cfg(test)]
+#[path = "skill_repository_update_tests.rs"]
+mod update_tests;

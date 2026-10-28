@@ -23,6 +23,8 @@ import type {
   GoogleProviderStatus,
   InstalledSkill,
   SkillRepository,
+  SkillRepositoryUpdateAllReport,
+  SkillRepositoryUpdateReport,
   SkillRepositoryUpstreamStatus,
   KimiProviderStatus,
   MistralProviderStatus,
@@ -377,7 +379,13 @@ export const api = {
     return invoke<SkillRepository>("add_skill_repository_command", { input: { url } });
   },
   updateSkillRepository(id: string) {
-    return invoke<SkillRepository>("update_skill_repository_command", { input: { id } });
+    return invoke<SkillRepositoryUpdateReport>("update_skill_repository_command", { input: { id } });
+  },
+  updateAllSkillRepositories() {
+    return invoke<SkillRepositoryUpdateAllReport>("update_all_skill_repositories_command");
+  },
+  setSkillRepositoryAutoUpdate(id: string, autoUpdate: boolean) {
+    return invoke<void>("set_skill_repository_auto_update_command", { input: { id, autoUpdate } });
   },
   checkSkillRepositoryUpstream(id: string) {
     return invoke<SkillRepositoryUpstreamStatus>("check_skill_repository_upstream_command", { input: { id } });
