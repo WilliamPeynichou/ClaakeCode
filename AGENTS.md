@@ -2,6 +2,7 @@ Code map:
 - `.github/workflows/release.yml` : build macOS universel sur `macos-15-intel` explicite pour contourner la saturation du parc ARM64 ; cibles Intel et Apple Silicon conservées.
 - Correctif Mistral streaming : `crates/claakecode-mistral/src/wire.rs` accepte texte ou fragments structurés ; `stream.rs` sépare thinking/texte et teste les formats, outils et usages.
 - Settings Skills : `src/components/SettingsPane.tsx` garde la bibliothèque et l’éditeur prioritaires, avec gestion Git repliable en pied de page ; `src/styles.css` borne son défilement indépendamment.
+- Dépôts de skills Git : `crates/claakecode-app/src/skill.rs` lit l’en-tête des SKILL.md avec `serde_yaml` (`>`/`|`, repli tolérant si YAML invalide) ; `skill_repository.rs` ignore les dossiers cachés (sauf dépôt qui n’a que ça), dédoublonne les copies internes (« doublon ignoré »), et met à jour par clone neuf validé (`auto_update` par dépôt, `update_all_in`) ; tests dans `skill_repository_{tests,security_tests,update_tests}.rs` (+ recette réseau ponytail `--ignored`) et fixtures `crates/claakecode-app/tests/fixtures/ponytail/` ; tâche de fond démarrage + 6 h et commandes dans `src-tauri/src/conversations.rs` / `lib.rs` (événement `skill-repositories-updated`) ; UI (interrupteur mise à jour auto, badge, « Tout mettre à jour », notification) dans `SettingsPane.tsx`.
 - L'agent doit garder à jour cette carte simple des fichiers à chaque création, suppression, renommage, déplacement ou modification.
 
 .
