@@ -93,6 +93,7 @@ import type {
   TypeSafeSettings,
   SkillSettings,
   SkillRepositoryUpstreamStatus,
+  SkillRepositoryUpdateReport,
   SubAgentConfig,
   SubAgentSettings,
   SwarmSettings,
@@ -5543,6 +5544,13 @@ function SkillsSection({
   );
 }
 
+function describeUpdateReport(report: SkillRepositoryUpdateReport): string {
+  if (!report.updated) return `${report.repository.name} : déjà à jour.`;
+  const added = report.addedSkills.length ? ` · ajoutés : ${report.addedSkills.join(", ")}` : "";
+  const removed = report.removedSkills.length ? ` · retirés : ${report.removedSkills.join(", ")}` : "";
+  return `${report.repository.name} : ${report.previousRevision.slice(0, 7)} → ${report.newRevision.slice(0, 7)}${added}${removed}`;
+}
+
 const RECOMMENDED_REPOSITORIES: { name: string; url: string; description: string }[] = [
   {
     name: "data-analytics-skills",
@@ -5594,6 +5602,59 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
   };
   const disabled = busy || blocked;
   const [upstream, setUpstream] = useState<Record<string, SkillRepositoryUpstreamStatus | "checking">>({});
+  const [notice, setNotice] = useState<string[]>([]);
+  const [updatingAll, setUpdatingAll] = useState(false);
+
+  // Automatic updates run in the background; the backend emits the result, shown here as a notice.
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined;
+    let cancelled = false;
+    void listen<{ reports: SkillRepositoryUpdateReport[] }>("skill-repositories-updated", (event) => {
+      setNotice(event.payload.reports.map(describeUpdateReport));
+      void refresh();
+      onChanged();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [refresh, onChanged]);
+
+  // One check per enabled repository, then an update only for those with something new.
+  const updateAll = async () => {
+    setUpdatingAll(true);
+    setError(null);
+    setNotice([]);
+    try {
+      const enabled = repositories.filter((repository) => repository.enabled);
+      const checks = await Promise.allSettled(enabled.map((repository) => api.checkSkillRepositoryUpstream(repository.id)));
+      const pending = enabled.filter((_, index) => {
+        const check = checks[index];
+        return check.status === "fulfilled" && check.value.updateAvailable;
+      });
+      const failures: string[] = checks.flatMap((check, index) => check.status === "rejected"
+        ? [`${enabled[index].name}: ${check.reason instanceof Error ? check.reason.message : String(check.reason)}`]
+        : []);
+      const reports: SkillRepositoryUpdateReport[] = [];
+      for (const repository of pending) {
+        try {
+          reports.push(await api.updateSkillRepository(repository.id));
+        } catch (err) {
+          failures.push(`${repository.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      setNotice(reports.length ? reports.map(describeUpdateReport) : ["Tous les dépôts sont à jour."]);
+      if (failures.length) setError(failures.join(" · "));
+      setUpstream({});
+      await refresh();
+      onChanged();
+    } finally {
+      setUpdatingAll(false);
+    }
+  };
   const checkUpstream = async (id: string) => {
     setUpstream((current) => ({ ...current, [id]: "checking" }));
     setError(null);
@@ -5621,6 +5682,11 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
           onClick={() => setAdding(!adding)} aria-expanded={adding}>Add repository</button>
       </div>
       <p className="settings-pane__muted">One switch enables the entire repository. Cloning never runs scripts or installs dependencies.</p>
+      <div className="settings-pane__field-actions">
+        <button type="button" className="settings-pane__btn" disabled={disabled || updatingAll || repositories.length === 0}
+          onClick={() => void updateAll()}>{updatingAll ? "Mise à jour…" : "Tout mettre à jour"}</button>
+      </div>
+      {notice.map((line, index) => <p key={index} className="settings-pane__muted" role="status">{line}</p>)}
       {blocked && <p className="settings-pane__muted">Save manual skill changes before managing repositories.</p>}
       {adding && (
         <form className="settings-pane__field" onSubmit={(event) => {
@@ -5665,6 +5731,22 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
             <summary className="settings-pane__tool-name">{repository.name} · {repository.enabled ? "enabled" : "disabled"} · {repository.skills.length} skills</summary>
             <div className="settings-pane__tool-body">
               <code className="settings-pane__skill-path">{repository.url}</code>
+              <div className="settings-pane__field-actions">
+                <button type="button" className="settings-pane__switch" role="switch"
+                  aria-label={`Mise à jour auto ${repository.name}`} aria-checked={repository.autoUpdate}
+                  data-on={repository.autoUpdate ? "true" : "false"} disabled={disabled}
+                  onClick={() => void run(() => api.setSkillRepositoryAutoUpdate(repository.id, !repository.autoUpdate))}>
+                  <span className="settings-pane__switch-thumb" />
+                </button>
+                <span>Mise à jour auto</span>
+              </div>
+              {repository.autoUpdate && <p className="settings-pane__muted">Vérifié au démarrage puis toutes les 6 heures. Un skill est un texte donné tel quel à l'agent : un dépôt tiers peut donc injecter des instructions. N'activez ce réglage que pour des dépôts de confiance.</p>}
+              {(() => {
+                const status = upstream[repository.id];
+                return status && status !== "checking" && status.updateAvailable
+                  ? <span className="settings-pane__badge" data-tone="primary">Mise à jour disponible</span>
+                  : null;
+              })()}
               <code className="settings-pane__skill-path" title={repository.absolutePath}>Revision: {repository.revision.slice(0, 12)}</code>
               {(() => {
                 const status = upstream[repository.id];
@@ -5688,7 +5770,8 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
                 <button type="button" className="settings-pane__btn" disabled={disabled}
                   data-tone={(upstream[repository.id] as SkillRepositoryUpstreamStatus | undefined)?.updateAvailable ? "primary" : undefined}
                   onClick={() => void run(async () => {
-                    await api.updateSkillRepository(repository.id);
+                    const report = await api.updateSkillRepository(repository.id);
+                    setNotice([describeUpdateReport(report)]);
                     setUpstream((current) => {
                       const { [repository.id]: _removed, ...rest } = current;
                       return rest;
