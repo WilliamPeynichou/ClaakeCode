@@ -5,6 +5,8 @@ import { CompanionDesk } from "./components/companion/CompanionDesk";
 import "./styles.css";
 import "./lib/customIcons";
 import { api } from "./lib/ipc";
+import { listen } from "@tauri-apps/api/event";
+import { applyModelCatalog, type CatalogModel } from "./lib/models";
 import { bootstrapTheme } from "./lib/theme";
 
 bootstrapTheme();
@@ -73,6 +75,17 @@ if (isCompanion) {
   document.documentElement.classList.add("companion-window");
   document.body.classList.add("companion-window");
 }
+
+// Model catalog: render immediately; the backend downloads models.json once per launch
+// in the background and emits `model-catalog-updated` (components re-render via
+// useModelCatalogVersion). Local read first so the cached catalog is used from frame one.
+void api
+  .listModelCatalog()
+  .then((catalog) => applyModelCatalog(catalog.models))
+  .catch(() => undefined);
+void listen<{ models: CatalogModel[] }>("model-catalog-updated", (event) =>
+  applyModelCatalog(event.payload.models),
+);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

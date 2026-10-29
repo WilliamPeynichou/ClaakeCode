@@ -49,9 +49,24 @@ function sanitizeOpenRouterName(name) {
   return raw.slice(colon + 1).trim() || raw;
 }
 
-function buildModelEntries(providers = [], openrouterModels = []) {
+// The desktop sends the already-merged catalog (Rust is the single source); hidden are dropped.
+function mergeModelCatalog(remote = []) {
+  if (!remote.length) return MODEL_CATALOG;
+  const fromCatalog = remote
+    .filter((m) => !m.hidden)
+    .map((m) => ({
+      value: `${m.provider}:${m.id}`,
+      provider: m.provider,
+      label: m.label,
+      thinking: m.thinking,
+      defaultThinking: m.defaultThinking,
+    }));
+  return fromCatalog;
+}
+
+function buildModelEntries(providers = [], openrouterModels = [], remoteCatalog = []) {
   const configured = new Set(providers);
-  const entries = MODEL_CATALOG.filter((entry) => configured.has(entry.provider));
+  const entries = mergeModelCatalog(remoteCatalog).filter((entry) => configured.has(entry.provider));
   if (configured.has("openrouter")) {
     for (const model of openrouterModels) {
       entries.push({
@@ -887,7 +902,7 @@ function App() {
   const showInstallHint = Boolean(session && !installHintDismissed && !isStandaloneDisplay());
   const currentModel = conv ? conv.modeModelSettings?.[mode] || conv.model : null;
   const modelEntries = useMemo(
-    () => buildModelEntries(modelOptions?.providers || [], modelOptions?.openrouterModels || []),
+    () => buildModelEntries(modelOptions?.providers || [], modelOptions?.openrouterModels || [], modelOptions?.modelCatalog || []),
     [modelOptions],
   );
   const currentEntry = modelEntryFor(modelEntries.length > 0 ? modelEntries : MODEL_CATALOG, currentModel);
@@ -1048,6 +1063,7 @@ function App() {
       setModelOptions({
         providers: Array.isArray(data.providers) ? data.providers : [],
         openrouterModels: Array.isArray(data.openrouterModels) ? data.openrouterModels : [],
+        modelCatalog: Array.isArray(data.modelCatalog) ? data.modelCatalog : [],
       });
     } catch (err) {
       setError(String(err.message || err));

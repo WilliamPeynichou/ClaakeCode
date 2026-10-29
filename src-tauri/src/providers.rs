@@ -2103,6 +2103,12 @@ fn catalog_to_mistral_records(catalog: &[MistralCatalogModel]) -> Vec<MistralMod
         .collect()
 }
 
+/// Merged model catalog (remote cache + built-in). Local only, never hits the network.
+#[tauri::command]
+pub(super) fn list_model_catalog() -> claakecode_core::catalog::Catalog {
+    claakecode_core::catalog::current()
+}
+
 #[tauri::command]
 pub(super) fn list_mistral_models(
     state: State<'_, DesktopState>,

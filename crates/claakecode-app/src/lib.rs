@@ -10,6 +10,7 @@ pub mod grep;
 pub mod mgrep;
 pub mod image;
 pub mod mcp;
+pub mod model_catalog;
 pub mod model_stats;
 pub mod model_turns;
 #[cfg(windows)]

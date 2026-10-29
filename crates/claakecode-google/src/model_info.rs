@@ -43,15 +43,9 @@ const MODELS: &[GoogleModelInfo] = &[
     },
 ];
 
-fn model_info(model_id: &str) -> &'static GoogleModelInfo {
-    MODELS
-        .iter()
-        .find(|info| info.id == model_id)
-        .unwrap_or(&MODELS[0])
-}
-
 fn is_known_model(model_id: &str) -> bool {
     MODELS.iter().any(|info| info.id == model_id)
+        || claakecode_core::catalog::lookup("google", model_id).is_some()
 }
 
 pub fn canonical_model(model: &ModelRef) -> ModelRef {
@@ -103,7 +97,12 @@ pub fn antigravity_model_and_thinking(
 
 pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
     let model = canonical_model(model);
-    let info = model_info(&model.name);
+    if let Some(caps) = claakecode_core::catalog::capabilities(&model, EffortMode::Tier) {
+        return caps;
+    }
+    let Some(info) = MODELS.iter().find(|info| info.id == model.name) else {
+        return claakecode_core::catalog::fallback_capabilities(&model, EffortMode::Tier);
+    };
     ModelCapabilities {
         model,
         context_window: info.context_window,

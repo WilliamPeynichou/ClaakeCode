@@ -767,6 +767,7 @@ impl RemoteRuntime {
                 Ok(json!({
                     "providers": providers,
                     "openrouterModels": openrouter_models,
+                    "modelCatalog": claakecode_core::catalog::current().models,
                 }))
             }
             RemotePhoneCommand::SetConversationModel {

@@ -1,0 +1,23 @@
+name: Models catalog
+
+on:
+  pull_request:
+    paths:
+      - models.json
+      - crates/claakecode-core/src/catalog.rs
+  push:
+    branches:
+      - main
+    paths:
+      - models.json
+      - crates/claakecode-core/src/catalog.rs
+
+jobs:
+  validate:
+    name: Validate models.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate catalog
+        run: cargo test -p claakecode-core catalog

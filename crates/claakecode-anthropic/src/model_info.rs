@@ -88,19 +88,24 @@ const MODELS: &[AnthropicModelInfo] = &[
     },
 ];
 
-fn model_info(model_id: &str) -> &'static AnthropicModelInfo {
-    MODELS
-        .iter()
-        .find(|info| info.id == model_id)
-        .unwrap_or(&MODELS[0])
+fn model_info(model_id: &str) -> Option<&'static AnthropicModelInfo> {
+    MODELS.iter().find(|info| info.id == model_id)
 }
 
 pub fn supports_1m_context_beta(model_name: &str) -> bool {
-    model_info(model_name).beta_1m_context_window.is_some()
+    match claakecode_core::catalog::lookup("anthropic", model_name) {
+        Some(m) => m.context_window_1m.is_some(),
+        None => model_info(model_name).is_some_and(|i| i.beta_1m_context_window.is_some()),
+    }
 }
 
 pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
-    let info = model_info(&model.name);
+    if let Some(caps) = claakecode_core::catalog::capabilities(model, EffortMode::Tier) {
+        return caps;
+    }
+    let Some(info) = model_info(&model.name) else {
+        return claakecode_core::catalog::fallback_capabilities(model, EffortMode::Tier);
+    };
     let use_1m = model.use_1m_context_enabled();
     let (context_window, preferred_window) = if use_1m {
         (

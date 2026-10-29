@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import type {
   AgentMode,
   MistralModel,
@@ -16,8 +17,11 @@ export type ModeModelSelection = {
 };
 export type ModeModelSelections = Record<AgentMode, ModeModelSelection>;
 
+const BUILTIN_1M_CONTEXT_BETA = ["anthropic:claude-opus-5-5"];
+let models1mContextBeta = new Set<ModelId>(BUILTIN_1M_CONTEXT_BETA);
+
 export function modelSupports1mContextBeta(model: ModelId): boolean {
-  return model === "anthropic:claude-opus-5-5";
+  return models1mContextBeta.has(model);
 }
 
 export function use1mContextFromRef(
@@ -322,6 +326,89 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "off",
   },
 ];
+
+/** Shape of one model in the remote `models.json` (see crates/claakecode-core/src/catalog.rs). */
+export type CatalogModel = {
+  provider: ProviderId;
+  id: string;
+  label: string;
+  thinking: string[];
+  defaultThinking: string;
+  supportsFast?: boolean;
+  contextWindow1m?: number | null;
+  hidden?: boolean;
+};
+
+const BUILTIN_MODELS: readonly ModelEntry[] = [...MODELS];
+
+// MODELS is mutated in place; this version lets React memos depend on it.
+let catalogVersion = 0;
+const catalogListeners = new Set<() => void>();
+
+export function subscribeModelCatalog(listener: () => void): () => void {
+  catalogListeners.add(listener);
+  return () => catalogListeners.delete(listener);
+}
+
+/** Re-renders the caller and changes identity whenever the model catalog changes. */
+export function useModelCatalogVersion(): number {
+  return useSyncExternalStore(subscribeModelCatalog, () => catalogVersion);
+}
+
+/**
+ * Replacement for a selection that is no longer available (e.g. hidden by the catalog):
+ * first available model of the same provider, else the first available model.
+ */
+export function fallbackModelEntry(
+  available: readonly ModelEntry[],
+  modelValue: ModelId,
+): ModelEntry | undefined {
+  const provider = modelRefFromId(modelValue).provider;
+  return (
+    available.find((m) => m.value === modelValue) ??
+    available.find((m) => m.provider === provider) ??
+    available[0]
+  );
+}
+
+/**
+ * Merge the remote catalog into MODELS in place (remote wins, hidden removed, catalog
+ * order first, built-ins not in the catalog kept after). Call before first render.
+ * No catalog => built-ins only (offline first launch).
+ */
+export function applyModelCatalog(catalog: readonly CatalogModel[] | null | undefined): void {
+  const levels = new Set(THINKING_LEVELS.map((l) => l.value as string));
+  const remote = (catalog ?? []).filter(
+    (m) => m.thinking.length > 0 && m.thinking.every((t) => levels.has(t)),
+  );
+  const known = new Set(remote.map((m) => modelId(m.provider, m.id)));
+  const fromCatalog: ModelEntry[] = remote
+    .filter((m) => !m.hidden)
+    .map((m) => ({
+      value: modelId(m.provider, m.id),
+      provider: m.provider,
+      label: m.label,
+      thinking: m.thinking as ThinkingLevel[],
+      defaultThinking: m.defaultThinking as ThinkingLevel,
+      supportsFast: m.supportsFast || undefined,
+    }));
+  MODELS.splice(
+    0,
+    MODELS.length,
+    ...fromCatalog,
+    ...BUILTIN_MODELS.filter((m) => !known.has(m.value)),
+  );
+  models1mContextBeta = new Set(
+    remote.length
+      ? [
+          ...remote.filter((m) => m.contextWindow1m).map((m) => modelId(m.provider, m.id)),
+          ...BUILTIN_1M_CONTEXT_BETA.filter((id) => !known.has(id)),
+        ]
+      : BUILTIN_1M_CONTEXT_BETA,
+  );
+  catalogVersion += 1;
+  for (const listener of catalogListeners) listener();
+}
 
 // Fallback Mistral models when no catalog is loaded
 const MISTRAL_FALLBACK_MODELS: ModelEntry[] = [

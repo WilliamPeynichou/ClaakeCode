@@ -51,6 +51,7 @@ import {
   PROVIDERS,
   THINKING_LEVELS,
   availableModelsForProviders,
+  useModelCatalogVersion,
   modelsWithMistralAndOpenRouter,
   modelIdFromRef,
   modelRefFromId,
@@ -1143,9 +1144,11 @@ export function SettingsPane({ workspacePath }: Props) {
     void loadConfiguredProviders();
   }, [loadConfiguredProviders]);
 
+  const catalogVersion = useModelCatalogVersion();
   const availableModels = useMemo(
     () => availableModelsForProviders(configuredProviders, openRouterModels, mistralModels),
-    [configuredProviders, openRouterModels, mistralModels],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [configuredProviders, openRouterModels, mistralModels, catalogVersion],
   );
 
   const loadOpenAiStatus = useCallback(async () => {

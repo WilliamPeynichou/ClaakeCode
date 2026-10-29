@@ -36,14 +36,10 @@ const MODELS: &[KimiModelInfo] = &[
     },
 ];
 
-fn model_info(model_id: &str) -> &'static KimiModelInfo {
-    MODELS
-        .iter()
-        .find(|info| info.id == model_id)
-        .unwrap_or(&MODELS[0])
-}
-
 pub fn is_thinking_only(model_id: &str) -> bool {
+    if let Some(m) = claakecode_core::catalog::lookup("kimi", model_id) {
+        return !m.thinking.iter().any(|t| t == "off");
+    }
     MODELS
         .iter()
         .find(|info| info.id == model_id)
@@ -52,7 +48,12 @@ pub fn is_thinking_only(model_id: &str) -> bool {
 }
 
 pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
-    let info = model_info(&model.name);
+    if let Some(caps) = claakecode_core::catalog::capabilities(model, EffortMode::Flag) {
+        return caps;
+    }
+    let Some(info) = MODELS.iter().find(|info| info.id == model.name) else {
+        return claakecode_core::catalog::fallback_capabilities(model, EffortMode::Flag);
+    };
     ModelCapabilities {
         model: model.clone(),
         context_window: info.context_window,

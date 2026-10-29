@@ -37,6 +37,8 @@ import {
   PROVIDERS,
   THINKING_LEVELS,
   availableModelsForProviders,
+  fallbackModelEntry,
+  useModelCatalogVersion,
   modelRefFromId,
   modelRefWithUse1mContext,
   modelSupports1mContextBeta,
@@ -335,9 +337,7 @@ function selectionForAvailableModels(
   selection: ModeModelSelection,
   availableModels: readonly ModelEntry[],
 ): ModeModelSelection {
-  const entry =
-    availableModels.find((model) => model.value === selection.model) ??
-    availableModels[0];
+  const entry = fallbackModelEntry(availableModels, selection.model);
   if (!entry) return selection;
   const supports1m = modelSupports1mContextBeta(entry.value);
   return {
@@ -687,13 +687,16 @@ export function ChatPane({
     return () => window.removeEventListener(TOOL_SETTINGS_CHANGED_EVENT, refresh);
   }, [loadAgentTeamsEnabled]);
 
+  const catalogVersion = useModelCatalogVersion();
   const allModels = useMemo(
     () => modelsWithMistralAndOpenRouter(mistralModels, openRouterModels),
-    [mistralModels, openRouterModels],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mistralModels, openRouterModels, catalogVersion],
   );
   const availableModels = useMemo(
     () => availableModelsForProviders(configuredProviders, openRouterModels, mistralModels),
-    [configuredProviders, openRouterModels, mistralModels],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [configuredProviders, openRouterModels, mistralModels, catalogVersion],
   );
 
   const baseModeSelections = useMemo(
@@ -2303,8 +2306,7 @@ export function ChatPane({
   const handleModelSelect = useCallback(
     (nextModel: ModelId) => {
       if (selectorLocked) return;
-      const nextEntry =
-        availableModels.find((m) => m.value === nextModel) ?? availableModels[0];
+      const nextEntry = fallbackModelEntry(availableModels, nextModel);
       if (!nextEntry) return;
       const nextThinking = nextEntry.thinking.includes(thinking)
         ? thinking

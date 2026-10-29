@@ -174,6 +174,7 @@ pub fn run() {
         .try_init();
 
     let store = AppStore::open_default().expect("unable to open app store");
+    claakecode_app::model_catalog::load_cached(&store);
     let openrouter_models = store.load_openrouter_models().unwrap_or_default();
     let mistral_models = store.load_mistral_models().unwrap_or_default();
     let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
@@ -308,6 +309,15 @@ pub fn run() {
             start_remote_if_enabled(app.handle());
             conversations::spawn_skill_repository_auto_update(app.handle().clone());
             companion_entry::setup(app.handle())?;
+
+            // Once per launch, off the startup path: fetch models.json, then tell the windows.
+            let handle = app.handle().clone();
+            let store = handle.state::<DesktopState>().store.clone();
+            tauri::async_runtime::spawn(async move {
+                if claakecode_app::model_catalog::refresh(&store).await {
+                    let _ = handle.emit("model-catalog-updated", claakecode_core::catalog::current());
+                }
+            });
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -441,6 +451,7 @@ pub fn run() {
             providers::validate_mistral_api_key,
             providers::disconnect_mistral_provider,
             providers::list_mistral_models,
+            providers::list_model_catalog,
             providers::refresh_mistral_models,
             providers::get_openrouter_provider_status,
             providers::validate_openrouter_api_key,

@@ -7,8 +7,14 @@ pub const MODEL_WINDOW: u32 = 256_000;
 pub const MODEL_MAX_OUTPUT: u32 = 128_000;
 
 pub fn capabilities(model: &ModelRef) -> Option<ModelCapabilities> {
-    if model.provider != PROVIDER_ID || model.name != MODEL_ID {
+    if model.provider != PROVIDER_ID {
         return None;
+    }
+    if let Some(caps) = claakecode_core::catalog::capabilities(model, EffortMode::Tier) {
+        return Some(caps);
+    }
+    if model.name != MODEL_ID {
+        return Some(claakecode_core::catalog::fallback_capabilities(model, EffortMode::Tier));
     }
 
     Some(ModelCapabilities {

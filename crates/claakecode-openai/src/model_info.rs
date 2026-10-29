@@ -99,15 +99,13 @@ const MODELS: &[OpenAiModelInfo] = &[
     },
 ];
 
-fn model_info(model_id: &str) -> &'static OpenAiModelInfo {
-    MODELS
-        .iter()
-        .find(|info| info.id == model_id)
-        .unwrap_or(&MODELS[0])
-}
-
 pub fn capabilities(model: &ModelRef) -> ModelCapabilities {
-    let info = model_info(&model.name);
+    if let Some(caps) = claakecode_core::catalog::capabilities(model, EffortMode::Tier) {
+        return caps;
+    }
+    let Some(info) = MODELS.iter().find(|info| info.id == model.name) else {
+        return claakecode_core::catalog::fallback_capabilities(model, EffortMode::Tier);
+    };
     ModelCapabilities {
         model: model.clone(),
         context_window: info.context_window,

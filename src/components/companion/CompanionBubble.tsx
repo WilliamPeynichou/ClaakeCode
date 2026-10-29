@@ -12,6 +12,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "../../lib/ipc";
 import {
   availableModelsForProviders,
+  useModelCatalogVersion,
   type ModelEntry,
 } from "../../lib/models";
 import type { OpenRouterModel, MistralModel } from "../../types";
@@ -86,7 +87,8 @@ export function CompanionBubble({ onClose }: Props) {
     }
   }, []);
 
-  // Réglages + modèles autorisés, chargés une fois à l'ouverture de la bulle.
+  // Réglages + modèles autorisés, chargés à l'ouverture de la bulle (et si le catalogue change).
+  const catalogVersion = useModelCatalogVersion();
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -110,7 +112,7 @@ export function CompanionBubble({ onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [refreshHistory]);
+  }, [refreshHistory, catalogVersion]);
 
   // Progression du tour Ask : deltas, fin et erreur. Filtrés sur le tour courant.
   useEffect(() => {

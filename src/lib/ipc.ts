@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { CatalogModel } from "./models";
 import type {
   AttachmentInput,
   ActiveTurnReplay,
@@ -740,6 +741,9 @@ export const api = {
   },
   disconnectMistralProvider() {
     return invoke<MistralProviderStatus>("disconnect_mistral_provider");
+  },
+  listModelCatalog() {
+    return invoke<{ format: number; models: CatalogModel[] }>("list_model_catalog");
   },
   listMistralModels() {
     return invoke<MistralModel[]>("list_mistral_models");

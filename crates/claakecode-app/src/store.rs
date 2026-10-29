@@ -41,6 +41,7 @@ const DATABASE_ACTIVITY_KEY: &str = "database_activity";
 const PROD_SETTINGS_KEY: &str = "prod_settings";
 const OPENROUTER_MODELS_KEY: &str = "openrouter_models";
 const MISTRAL_MODELS_KEY: &str = "mistral_models";
+const MODEL_CATALOG_KEY: &str = "model_catalog";
 const HIDDEN_TOOL_SETTING_NAMES: &[&str] = &["skill"];
 
 pub const DEFAULT_PLAN_MODE_PROMPT: &str = r#"You are in Plan mode.
@@ -1990,6 +1991,33 @@ impl AppStore {
             .filter(|model| model.id != id)
             .collect::<Vec<_>>();
         self.save_openrouter_models(&models)
+    }
+
+    /// Raw JSON of the last valid remote model catalog (validated by the caller).
+    pub fn load_model_catalog_json(&self) -> Option<String> {
+        self.connection()
+            .ok()?
+            .query_row(
+                "select value_json from app_settings where key = ?1",
+                params![MODEL_CATALOG_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .ok()?
+    }
+
+    pub fn save_model_catalog_json(&self, json: &str) -> Result<()> {
+        self.connection()?
+            .execute(
+                "insert into app_settings (key, value_json, updated_at_ms)
+                 values (?1, ?2, ?3)
+                 on conflict(key) do update set
+                    value_json = excluded.value_json,
+                    updated_at_ms = excluded.updated_at_ms",
+                params![MODEL_CATALOG_KEY, json, now_ms()],
+            )
+            .context("unable to save model catalog")?;
+        Ok(())
     }
 
     pub fn load_mistral_models(&self) -> Result<Vec<MistralModelRecord>> {

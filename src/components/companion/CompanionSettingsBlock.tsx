@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/ipc";
-import { availableModelsForProviders } from "../../lib/models";
+import { availableModelsForProviders, useModelCatalogVersion } from "../../lib/models";
 import type { MistralModel, OpenRouterModel } from "../../types";
 import {
   DEFAULT_COMPANION_SETTINGS,
@@ -46,9 +46,11 @@ export function CompanionSettingsBlock() {
     };
   }, []);
 
+  const catalogVersion = useModelCatalogVersion();
   const models = useMemo(
     () => availableModelsForProviders(configured, openRouterModels, mistralModels),
-    [configured, openRouterModels, mistralModels],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [configured, openRouterModels, mistralModels, catalogVersion],
   );
 
   const persist = async (next: CompanionSettings) => {

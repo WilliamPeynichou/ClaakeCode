@@ -1,3 +1,4 @@
+pub mod catalog;
 pub mod error;
 pub mod message;
 pub mod model;
