@@ -12,6 +12,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "../../lib/ipc";
 import {
   availableModelsForProviders,
+  fallbackModelEntry,
   useModelCatalogVersion,
   type ModelEntry,
 } from "../../lib/models";
@@ -87,8 +88,38 @@ export function CompanionBubble({ onClose }: Props) {
     }
   }, []);
 
-  // Réglages + modèles autorisés, chargés à l'ouverture de la bulle (et si le catalogue change).
+  // Réglages + modèles autorisés. Les réglages ne s'appliquent qu'à l'ouverture ; quand le
+  // catalogue change ensuite, on garde le mode et le modèle choisis (remplacés seulement si
+  // le modèle disparaît).
   const catalogVersion = useModelCatalogVersion();
+  const loadedRef = useRef<{
+    settings: CompanionSettings;
+    providers: string[];
+    openRouter: OpenRouterModel[];
+    mistral: MistralModel[];
+  } | null>(null);
+
+  const applyAvailable = useCallback((initial: boolean) => {
+    const data = loadedRef.current;
+    if (!data) return;
+    const available = availableModelsForProviders(data.providers, data.openRouter, data.mistral);
+    const allowed = data.settings.allowedModels;
+    const usable = allowed.length > 0 ? available.filter((m) => allowed.includes(m.value)) : available;
+    setModels(usable);
+    if (initial) {
+      setMode(data.settings.defaultMode);
+      setModel(
+        usable.find((m) => m.value === data.settings.defaultModel)?.value ?? usable[0]?.value ?? "",
+      );
+    } else {
+      setModel((current) => fallbackModelEntry(usable, current)?.value ?? "");
+    }
+  }, []);
+
+  useEffect(() => {
+    applyAvailable(false);
+  }, [catalogVersion, applyAvailable]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -99,20 +130,14 @@ export function CompanionBubble({ onClose }: Props) {
         api.listMistralModels().catch(() => [] as MistralModel[]),
       ]);
       if (cancelled) return;
-      const available = availableModelsForProviders(providers, openRouter, mistral);
-      const allowed = loaded.allowedModels;
-      const usable = allowed.length > 0 ? available.filter((m) => allowed.includes(m.value)) : available;
-      setMode(loaded.defaultMode);
-      setModels(usable);
-      setModel(
-        usable.find((m) => m.value === loaded.defaultModel)?.value ?? usable[0]?.value ?? "",
-      );
+      loadedRef.current = { settings: loaded, providers, openRouter, mistral };
+      applyAvailable(true);
     })();
     void refreshHistory();
     return () => {
       cancelled = true;
     };
-  }, [refreshHistory, catalogVersion]);
+  }, [refreshHistory, applyAvailable]);
 
   // Progression du tour Ask : deltas, fin et erreur. Filtrés sur le tour courant.
   useEffect(() => {
@@ -201,6 +226,10 @@ export function CompanionBubble({ onClose }: Props) {
   const send = async () => {
     const value = text.trim();
     if (busy || (!value && attachments.length === 0)) return;
+    if (models.length === 0) {
+      setError("Aucun modèle autorisé.");
+      return;
+    }
     setError(null);
     setNotice(null);
     const input: CompanionAskInput = {

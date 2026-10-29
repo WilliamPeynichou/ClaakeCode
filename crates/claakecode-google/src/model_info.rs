@@ -43,15 +43,26 @@ const MODELS: &[GoogleModelInfo] = &[
     },
 ];
 
-fn is_known_model(model_id: &str) -> bool {
-    MODELS.iter().any(|info| info.id == model_id)
-        || claakecode_core::catalog::lookup("google", model_id).is_some()
+/// Legacy / thinking-suffixed names that map onto a canonical model (mirrors `models.ts`).
+fn alias_target(name: &str) -> Option<&'static str> {
+    match name {
+        "gemini-3.1-pro-preview" | "gemini-3.1-pro-low" | "gemini-3.1-pro-high" => {
+            Some("gemini-3.1-pro")
+        }
+        "gemini-3-flash-preview" => Some("gemini-3-flash"),
+        "gemini-3.5-flash-low" | "gemini-3.5-flash-medium" | "gemini-3.5-flash-high" => {
+            Some("gemini-3.5-flash")
+        }
+        _ => None,
+    }
 }
 
+/// Resolves aliases; any other name is kept as requested (catalog models, or a model the
+/// provider will accept or reject itself) instead of being silently swapped for Pro.
 pub fn canonical_model(model: &ModelRef) -> ModelRef {
     let mut canonical = model.clone();
-    if !is_known_model(&canonical.name) {
-        canonical.name = MODEL_ID.into();
+    if let Some(target) = alias_target(&canonical.name) {
+        canonical.name = target.into();
     }
     canonical
 }
@@ -128,4 +139,35 @@ pub fn is_gemini3_model(model_id: &str) -> bool {
 
 fn is_gemini_pro_model(model_id: &str) -> bool {
     model_id.to_ascii_lowercase().contains("-pro")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aliases_resolve_and_unknown_names_are_kept() {
+        let name = |n: &str| canonical_model(&ModelRef::new("google", n)).name;
+        assert_eq!(name("gemini-3.1-pro-high"), "gemini-3.1-pro");
+        assert_eq!(name("gemini-3-flash-preview"), "gemini-3-flash");
+        assert_eq!(name("gemini-3.5-flash-medium"), "gemini-3.5-flash");
+        assert_eq!(name("gemini-3.5-flash"), "gemini-3.5-flash");
+        assert_eq!(name("gemini-9-future"), "gemini-9-future");
+    }
+
+    #[test]
+    fn unknown_model_gets_cautious_limits_and_keeps_its_id() {
+        let caps = capabilities(&ModelRef::new("google", "gemini-9-future"));
+        assert_eq!(caps.model.name, "gemini-9-future");
+        assert_eq!((caps.context_window, caps.max_output_tokens), (200_000, 32_000));
+        let known = capabilities(&ModelRef::new("google", "gemini-3.1-pro"));
+        assert_eq!(known.context_window, GEMINI_WINDOW);
+    }
+
+    #[test]
+    fn unknown_flash_model_passes_through_antigravity_unchanged() {
+        let (id, level) =
+            antigravity_model_and_thinking(&ModelRef::new("google", "gemini-9-flash"), None);
+        assert_eq!((id.as_str(), level), ("gemini-9-flash", Some("high")));
+    }
 }

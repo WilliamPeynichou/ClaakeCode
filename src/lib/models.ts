@@ -371,17 +371,25 @@ export function fallbackModelEntry(
   );
 }
 
+/** Providers whose models come from the catalog; others (mistral) keep their own source. */
+const CATALOG_PROVIDERS: ReadonlySet<string> = new Set([
+  "anthropic",
+  "openai",
+  "google",
+  "xai",
+  "kimi",
+]);
+
 /**
- * Merge the remote catalog into MODELS in place (remote wins, hidden removed, catalog
- * order first, built-ins not in the catalog kept after). Call before first render.
- * No catalog => built-ins only (offline first launch).
+ * Load the catalog sent by the backend, which is already merged in Rust (remote wins,
+ * hidden flagged, file order). Hidden entries are dropped here, nothing is re-merged.
+ * Empty/invalid catalog => TypeScript built-ins (only before the first IPC answer or if it fails).
  */
 export function applyModelCatalog(catalog: readonly CatalogModel[] | null | undefined): void {
   const levels = new Set(THINKING_LEVELS.map((l) => l.value as string));
   const remote = (catalog ?? []).filter(
     (m) => m.thinking.length > 0 && m.thinking.every((t) => levels.has(t)),
   );
-  const known = new Set(remote.map((m) => modelId(m.provider, m.id)));
   const fromCatalog: ModelEntry[] = remote
     .filter((m) => !m.hidden)
     .map((m) => ({
@@ -395,19 +403,43 @@ export function applyModelCatalog(catalog: readonly CatalogModel[] | null | unde
   MODELS.splice(
     0,
     MODELS.length,
-    ...fromCatalog,
-    ...BUILTIN_MODELS.filter((m) => !known.has(m.value)),
+    ...(remote.length
+      ? [...fromCatalog, ...BUILTIN_MODELS.filter((m) => !CATALOG_PROVIDERS.has(m.provider))]
+      : BUILTIN_MODELS),
   );
   models1mContextBeta = new Set(
     remote.length
-      ? [
-          ...remote.filter((m) => m.contextWindow1m).map((m) => modelId(m.provider, m.id)),
-          ...BUILTIN_1M_CONTEXT_BETA.filter((id) => !known.has(id)),
-        ]
+      ? remote.filter((m) => m.contextWindow1m).map((m) => modelId(m.provider, m.id))
       : BUILTIN_1M_CONTEXT_BETA,
   );
   catalogVersion += 1;
   for (const listener of catalogListeners) listener();
+}
+
+/**
+ * Keep MODELS in sync with the backend without blocking startup: subscribe to updates FIRST,
+ * then read the local state, and drop that read if an update already arrived (it is newer).
+ * Never throws: on any failure the built-in list stays.
+ */
+export async function startModelCatalogSync(
+  readLocal: () => Promise<{ models: CatalogModel[] }>,
+  subscribe: (onUpdate: (models: CatalogModel[]) => void) => Promise<unknown>,
+): Promise<void> {
+  let updated = false;
+  try {
+    await subscribe((models) => {
+      updated = true;
+      applyModelCatalog(models);
+    });
+  } catch {
+    // No live updates: the local read below still gives the cached catalog.
+  }
+  try {
+    const local = await readLocal();
+    if (!updated) applyModelCatalog(local.models);
+  } catch {
+    // Built-in list stays.
+  }
 }
 
 // Fallback Mistral models when no catalog is loaded
@@ -535,11 +567,11 @@ export function thinkingFromRef(
     return "high";
   }
   if (model?.provider === "kimi") {
-    if (model.name === "kimi-k2.7-code") return "high";
+    if (kimiThinkingOnly(model.name)) return "high";
     if (model.effort === "none") return "off";
     return "high";
   }
-  if (model?.provider === "mistral" || model?.provider === "xai") {
+  if (model?.provider === "mistral" || (model?.provider === "xai" && !xaiHasThinking(model.name))) {
     return "off";
   }
   if (model?.provider === "openrouter") {
@@ -600,7 +632,7 @@ export function modelRefWithThinking(
     if (thinking === "xhigh" || thinking === "max") return { ...model, name, effort: "high" };
     return { ...model, name, effort: thinking };
   }
-  if (model.provider === "kimi" && model.name === "kimi-k2.7-code") {
+  if (model.provider === "kimi" && kimiThinkingOnly(model.name)) {
     return { ...model, effort: "high" };
   }
   if (
@@ -612,7 +644,9 @@ export function modelRefWithThinking(
   }
   if (thinking === "off") return { ...model, effort: "none" };
   if (model.provider === "kimi") return { ...model, effort: "high" };
-  if (model.provider === "mistral" || model.provider === "xai") return { ...model, effort: "none" };
+  if (model.provider === "mistral" || (model.provider === "xai" && !xaiHasThinking(model.name))) {
+    return { ...model, effort: "none" };
+  }
   if (model.provider === "openrouter" && thinking === "max") {
     return { ...model, effort: "xhigh" };
   }
@@ -639,7 +673,24 @@ function modelId(provider: string, name: string): ModelId {
   return `${provider}:${name}`;
 }
 
+function catalogEntry(provider: string, name: string): ModelEntry | undefined {
+  return MODELS.find((entry) => entry.value === modelId(provider, name));
+}
+
+/** Catalog says "no off level" => thinking is always on (same rule as the Rust side). */
+function kimiThinkingOnly(name: string): boolean {
+  const entry = catalogEntry("kimi", name);
+  return entry ? !entry.thinking.includes("off") : name === "kimi-k2.7-code";
+}
+
+/** xAI models listed with more than "off" in the catalog really take a thinking level. */
+function xaiHasThinking(name: string): boolean {
+  return (catalogEntry("xai", name)?.thinking ?? []).some((level) => level !== "off");
+}
+
 function supportsOpenAiMaxEffort(modelName: string): boolean {
+  const entry = catalogEntry("openai", modelName);
+  if (entry) return entry.thinking.includes("max");
   return (
     modelName === "gpt-6" ||
     modelName.startsWith("gpt-6-") ||

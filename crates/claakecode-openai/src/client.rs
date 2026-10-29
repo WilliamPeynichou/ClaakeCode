@@ -366,8 +366,13 @@ fn effort_to_reasoning(model_id: &str, effort: Option<Effort>) -> Option<wire::R
 }
 
 fn supports_max_reasoning_effort(model_id: &str) -> bool {
+    // The catalog is authoritative; name rules only cover models it does not list.
+    if let Some(model) = claakecode_core::catalog::lookup("openai", model_id) {
+        return model.thinking.iter().any(|level| level == "max");
+    }
     model_id == "gpt-6"
         || model_id.starts_with("gpt-6-")
+        || model_id.starts_with("gpt-6.")
         || model_id == "gpt-5.6"
         || model_id.starts_with("gpt-5.6-")
 }
@@ -651,7 +656,7 @@ mod tests {
     };
     use serde_json::json;
 
-    use super::{build_responses_request, to_input_items};
+    use super::{build_responses_request, effort_to_reasoning, to_input_items};
 
     #[test]
     fn image_tool_result_uses_responses_input_block_types() {
@@ -692,6 +697,26 @@ mod tests {
                 }
             ])
         );
+    }
+
+    #[test]
+    fn catalog_decides_max_reasoning_effort() {
+        use claakecode_core::catalog;
+        let remote = catalog::parse(
+            r#"{"format":1,"models":[
+              {"provider":"openai","id":"zz-next","label":"N","contextWindow":100,"preferredWindow":90,"maxOutput":10,"thinking":["off","max"],"defaultThinking":"max"},
+              {"provider":"openai","id":"zz-nomax","label":"M","contextWindow":100,"preferredWindow":90,"maxOutput":10,"thinking":["off","high"],"defaultThinking":"high"},
+              {"provider":"openai","id":"gpt-6-sol","label":"S","contextWindow":100,"preferredWindow":90,"maxOutput":10,"thinking":["off","high"],"defaultThinking":"high"}]}"#,
+        )
+        .unwrap();
+        catalog::set(Some(remote));
+        let effort = |id| effort_to_reasoning(id, Some(Effort::Max)).unwrap().effort;
+        assert_eq!(effort("zz-next"), "max"); // catalog says max, name says nothing
+        assert_eq!(effort("zz-nomax"), "xhigh");
+        assert_eq!(effort("gpt-6-sol"), "xhigh"); // catalog overrides the name rule
+        assert_eq!(effort("gpt-6.1-sol"), "max"); // embedded catalog
+        assert_eq!(effort("gpt-5.5"), "xhigh");
+        catalog::set(None);
     }
 
     #[test]

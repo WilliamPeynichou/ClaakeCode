@@ -5,12 +5,16 @@ on:
     paths:
       - models.json
       - crates/claakecode-core/src/catalog.rs
+      - src/lib/models.ts
+      - scripts/check-models.mjs
   push:
     branches:
       - main
     paths:
       - models.json
       - crates/claakecode-core/src/catalog.rs
+      - src/lib/models.ts
+      - scripts/check-models.mjs
 
 jobs:
   validate:
@@ -19,5 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Validate catalog
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Validate catalog (Rust)
         run: cargo test -p claakecode-core catalog
+      - name: UI catalog checks
+        run: node scripts/check-models.mjs
