@@ -240,6 +240,7 @@ mod tests {
         let mut names = HashSet::new();
         for skill in &skills {
             assert!(names.insert(skill.name.clone()), "duplicate bundled skill name {}", skill.name);
+            assert_ne!(skill.name, "add-models", "add-models is a private maintainer skill, never bundled");
             let content = fs::read_to_string(&skill.path).unwrap();
             let description = content
                 .lines()

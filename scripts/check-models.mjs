@@ -6,13 +6,35 @@ import Module, { createRequire } from "node:module";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+function loadTs(rel) {
+  const src = fs.readFileSync(new URL(rel, import.meta.url), "utf8");
+  const out = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const m = new Module(rel);
+  m.require = require;
+  m._compile(out, rel);
+  return m.exports;
+}
+
+// models.ts writes announcements to localStorage; give it an in-memory one.
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (k) => store.get(k) ?? null,
+  setItem: (k, v) => void store.set(k, String(v)),
+};
+
 function load() {
   const source = fs.readFileSync(new URL("../src/lib/models.ts", import.meta.url), "utf8");
   const js = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const mod = new Module("models-under-test");
-  mod.require = (name) => (name === "react" ? { useSyncExternalStore: () => 0 } : require(name));
+  mod.require = (name) => {
+    if (name === "react") return { useSyncExternalStore: () => 0 };
+    if (name === "./modelAnnouncements") return loadTs("../src/lib/modelAnnouncements.ts");
+    return require(name);
+  };
   mod._compile(js, "models-under-test.js");
   return mod.exports;
 }
@@ -90,5 +112,34 @@ await m.startModelCatalogSync(async () => ({ models: stale }), async (cb) => { a
 assert.ok(!values().includes("openai:zz-fresh")); // local read applied
 after(fresh); // later event
 assert.ok(values().includes("openai:zz-fresh"));
+
+// applyModelCatalog feeds the popup: baseline silent, genuinely new model announced once.
+store.clear();
+m.applyModelCatalog(cat());
+const key = "claakecode:model-announcements:v1";
+assert.equal(JSON.parse(store.get(key)).pending.length, 0);
+m.applyModelCatalog(cat([entry("openai", "zz-popup", ["off"])]));
+assert.deepEqual(JSON.parse(store.get(key)).pending.map((x) => x.value), ["openai:zz-popup"]);
+
+// New-model announcements: only real additions, no repeats, no baseline flood.
+const am = { exports: loadTs("../src/lib/modelAnnouncements.ts") };
+const { updateModelAnnouncements: upd, parseModelAnnouncements: parseAnn } = am.exports;
+const mk = (v) => ({ value: v, label: v, provider: "openai" });
+let st = upd(null, ["a", "b"], [mk("a"), mk("b")]);
+assert.equal(st.pending.length, 0); // first run: baseline, nothing announced
+st = upd(st, [], [mk("a"), mk("b"), mk("c")]);
+assert.deepEqual(st.pending.map((x) => x.value), ["c"]);
+st = upd(st, [], [mk("a"), mk("b"), mk("c")]); // reload before dismissal: still pending, not duplicated
+assert.equal(st.pending.length, 1);
+st = upd({ ...st, pending: [] }, [], [mk("a"), mk("b"), mk("c")]); // dismissed: no repeat
+assert.equal(st.pending.length, 0);
+st = upd(st, [], [mk("a"), mk("b")]); // c hidden then back: not "new"
+st = upd(st, [], [mk("a"), mk("b"), mk("c")]);
+assert.equal(st.pending.length, 0);
+st = upd(st, [], [mk("a"), mk("b"), mk("c"), mk("d")]);
+st = upd(st, [], [mk("a"), mk("b"), mk("c")]); // d hidden before being seen: dropped
+assert.equal(st.pending.length, 0);
+assert.equal(parseAnn("{broken"), null);
+assert.equal(parseAnn('{"known":[1],"pending":[]}'), null);
 
 console.log("models checks ok");

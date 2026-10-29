@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { parseModelAnnouncements, updateModelAnnouncements } from "./modelAnnouncements";
 import type {
   AgentMode,
   MistralModel,
@@ -340,6 +341,9 @@ export type CatalogModel = {
 };
 
 const BUILTIN_MODELS: readonly ModelEntry[] = [...MODELS];
+export const MODEL_ANNOUNCEMENTS_KEY = "claakecode:model-announcements:v1";
+// Do not announce the whole pre-existing catalog when installing this feature.
+const announcementBaseline = BUILTIN_MODELS.filter((m) => m.provider !== "mistral").map((m) => m.value);
 
 // MODELS is mutated in place; this version lets React memos depend on it.
 let catalogVersion = 0;
@@ -412,6 +416,15 @@ export function applyModelCatalog(catalog: readonly CatalogModel[] | null | unde
       ? remote.filter((m) => m.contextWindow1m).map((m) => modelId(m.provider, m.id))
       : BUILTIN_1M_CONTEXT_BETA,
   );
+  if (remote.length && typeof localStorage !== "undefined") {
+    try {
+      const previous = parseModelAnnouncements(localStorage.getItem(MODEL_ANNOUNCEMENTS_KEY));
+      const next = updateModelAnnouncements(previous, announcementBaseline, fromCatalog);
+      localStorage.setItem(MODEL_ANNOUNCEMENTS_KEY, JSON.stringify(next));
+    } catch {
+      // Restricted/full browser storage must not prevent the catalog from loading.
+    }
+  }
   catalogVersion += 1;
   for (const listener of catalogListeners) listener();
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { NewModelsPopup } from "./components/NewModelsPopup";
 import { Welcome } from "./components/Welcome";
 import { Workspace } from "./components/Workspace";
 import { UpdaterLockScreen } from "./components/UpdaterLockScreen";
@@ -162,15 +163,20 @@ export default function App() {
 
   if (state.kind === "welcome") {
     return (
+      <>
+      <NewModelsPopup />
       <Welcome
         onPick={openWorkspace}
         error={bootError}
         deriveName={deriveName}
       />
+      </>
     );
   }
 
   return (
+    <>
+    <NewModelsPopup />
     <Workspace
       bootstrap={state.bootstrap}
       onSwitchWorkspace={backToWelcome}
@@ -178,5 +184,6 @@ export default function App() {
         setState({ kind: "workspace", bootstrap: b })
       }
     />
+    </>
   );
 }
