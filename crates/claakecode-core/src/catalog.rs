@@ -12,7 +12,19 @@ use crate::{EffortMode, ModelCapabilities, ModelRef};
 /// Highest `format` this build can read. Newer catalogs are rejected (cache is kept).
 pub const CATALOG_FORMAT: u32 = 1;
 pub const CATALOG_PROVIDERS: &[&str] = &["anthropic", "openai", "google", "xai", "kimi"];
-const THINKING_LEVELS: &[&str] = &["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+// Only levels preserved by both the UI and the provider request encoder are accepted.
+fn thinking_levels(provider: &str, id: &str) -> &'static [&'static str] {
+    match provider {
+        "anthropic" => &["off", "low", "medium", "high", "xhigh", "max"],
+        "openai" if id == "gpt-5.3-codex-spark" => &["low", "medium", "high", "xhigh", "max"],
+        "openai" => &["off", "low", "medium", "high", "xhigh", "max"],
+        "google" if id.contains("-pro") => &["low", "medium", "high"],
+        "google" => &["minimal", "low", "medium", "high"],
+        "xai" => &["off", "low", "medium", "high", "xhigh"],
+        "kimi" => &["off", "high"],
+        _ => &[],
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -69,9 +81,10 @@ pub fn parse(json: &str) -> Result<Catalog, String> {
         if m.context_window == 0 || m.max_output == 0 || m.preferred_window > m.context_window {
             return Err(format!("{name}: bad context/output windows"));
         }
-        if m.thinking.is_empty() || m.thinking.iter().any(|t| !THINKING_LEVELS.contains(&t.as_str()))
+        let allowed = thinking_levels(&m.provider, &m.id);
+        if m.thinking.is_empty() || m.thinking.iter().any(|t| !allowed.contains(&t.as_str()))
         {
-            return Err(format!("{name}: bad thinking levels"));
+            return Err(format!("{name}: thinking levels unsupported by this provider adapter"));
         }
         if !m.thinking.contains(&m.default_thinking) {
             return Err(format!("{name}: defaultThinking not in thinking"));
@@ -178,8 +191,9 @@ mod tests {
     use super::*;
 
     fn entry(provider: &str, id: &str, label: &str, hidden: bool) -> String {
+        let level = if provider == "kimi" { "high" } else { "low" };
         format!(
-            r#"{{"provider":"{provider}","id":"{id}","label":"{label}","contextWindow":100,"preferredWindow":90,"maxOutput":10,"thinking":["off","low"],"defaultThinking":"low","hidden":{hidden}}}"#
+            r#"{{"provider":"{provider}","id":"{id}","label":"{label}","contextWindow":100,"preferredWindow":90,"maxOutput":10,"thinking":["off","{level}"],"defaultThinking":"{level}","hidden":{hidden}}}"#
         )
     }
 
@@ -207,6 +221,42 @@ mod tests {
         assert!(parse(&one().replace("\"hidden\":false", "\"contextWindow1m\":5")).is_err());
         let dup = catalog(&[entry("openai", "x", "A", false), entry("openai", "x", "B", false)]);
         assert!(parse(&dup).is_err());
+    }
+
+    #[test]
+    fn rejects_levels_that_adapters_would_silently_convert() {
+        for (provider, id, rejected) in [
+            ("kimi", "future", "low"),
+            ("kimi", "future", "medium"),
+            ("google", "future", "off"),
+            ("google", "future-pro", "minimal"),
+            ("xai", "future", "max"),
+            ("anthropic", "future", "minimal"),
+            ("openai", "future", "minimal"),
+            ("openai", "gpt-5.3-codex-spark", "off"),
+        ] {
+            let mut value: serde_json::Value = serde_json::from_str(&one()).unwrap();
+            let model = &mut value["models"][0];
+            model["provider"] = provider.into();
+            model["id"] = id.into();
+            model["thinking"] = serde_json::json!([rejected]);
+            model["defaultThinking"] = rejected.into();
+            let error = parse(&value.to_string()).unwrap_err();
+            assert!(error.contains("unsupported by this provider adapter"), "{provider}: {error}");
+        }
+    }
+
+    #[test]
+    fn accepts_supported_provider_levels() {
+        for provider in CATALOG_PROVIDERS {
+            let mut value: serde_json::Value = serde_json::from_str(&one()).unwrap();
+            let model = &mut value["models"][0];
+            let levels = thinking_levels(provider, "future");
+            model["provider"] = (*provider).into();
+            model["thinking"] = serde_json::json!(levels);
+            model["defaultThinking"] = levels[0].into();
+            assert!(parse(&value.to_string()).is_ok(), "{provider}");
+        }
     }
 
     #[test]
