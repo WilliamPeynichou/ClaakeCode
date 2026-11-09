@@ -112,6 +112,13 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "medium",
   },
   {
+    value: "anthropic:claude-fable-5-2",
+    provider: "anthropic",
+    label: "Fable 5.2",
+    thinking: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "high",
+  },
+  {
     value: "anthropic:claude-fable-5-1",
     provider: "anthropic",
     label: "Fable 5.1",
