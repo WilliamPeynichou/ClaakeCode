@@ -16,7 +16,7 @@ use crate::{
 
 const BASE_URL: &str = "https://api.anthropic.com";
 const API_VERSION: &str = "2023-06-01";
-const USER_AGENT: &str = "claude-cli/2.1.280";
+const USER_AGENT: &str = "claude-cli/2.1.290";
 const CODE_SYSTEM_PREFIX: &str = "You are Claude Code, Anthropic's official CLI for Claude.";
 // Only models explicitly enabled through `use1mContext` advertise the long-context
 // beta. Sending it unconditionally previously caused server-side tier gating and
