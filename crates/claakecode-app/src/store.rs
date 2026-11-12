@@ -1858,6 +1858,36 @@ impl AppStore {
         Ok(())
     }
 
+    /// Learning and recall switch (D1): global flag, on by default.
+    pub fn learning_enabled(&self) -> bool {
+        self.load_json_setting::<bool>("learning_enabled").ok().flatten().unwrap_or(true)
+    }
+
+    pub fn set_learning_enabled(&self, enabled: bool) -> Result<()> {
+        self.save_json_setting("learning_enabled", &enabled)
+    }
+
+    /// Global switch on AND conversation not listed as disabled.
+    pub fn learning_enabled_for(&self, conversation_id: &str) -> bool {
+        self.learning_enabled() && !self.learning_disabled_conversations().iter().any(|id| id == conversation_id)
+    }
+
+    pub fn learning_disabled_conversations(&self) -> Vec<String> {
+        self.load_json_setting::<Vec<String>>("learning_disabled_conversations")
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+    }
+
+    pub fn set_conversation_learning(&self, conversation_id: &str, enabled: bool) -> Result<()> {
+        let mut ids = self.learning_disabled_conversations();
+        ids.retain(|id| id != conversation_id);
+        if !enabled {
+            ids.push(conversation_id.to_string());
+        }
+        self.save_json_setting("learning_disabled_conversations", &ids)
+    }
+
     /// Model usage stats (benchmark B1). Messages carry no timestamp, so the period keeps
     /// conversations active since `since_ms` (`updated_at_ms`): an approximation, shown as such.
     pub fn model_stats(
@@ -2589,6 +2619,26 @@ mod tests {
                 meta,
             }],
         }
+    }
+
+    #[test]
+    fn learning_switch_global_and_per_conversation() -> Result<()> {
+        let path = std::env::temp_dir().join(format!("claakecode-learning-{}.sqlite3", Uuid::new_v4()));
+        let store = AppStore { path: path.clone() };
+        let result = (|| -> Result<()> {
+            store.migrate()?;
+            assert!(store.learning_enabled_for("c1"));
+            store.set_conversation_learning("c1", false)?;
+            assert!(!store.learning_enabled_for("c1"));
+            assert!(store.learning_enabled_for("c2"));
+            store.set_conversation_learning("c1", true)?;
+            assert!(store.learning_enabled_for("c1"));
+            store.set_learning_enabled(false)?;
+            assert!(!store.learning_enabled_for("c2"));
+            Ok(())
+        })();
+        let _ = fs::remove_file(path);
+        result
     }
 
     #[test]

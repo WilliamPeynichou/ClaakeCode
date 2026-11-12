@@ -747,6 +747,24 @@ pub(super) async fn set_skill_repository_enabled_command(
 }
 
 #[tauri::command]
+pub(super) async fn accept_skill_repository_update_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepository, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::accept_skill_repository_update(&input.id).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn discard_skill_repository_update_command(
+    input: SkillRepositoryInput,
+) -> std::result::Result<claakecode_app::skill_repository::SkillRepository, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claakecode_app::skill_repository::discard_skill_repository_update(&input.id).map_err(error_to_string)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 pub(super) async fn remove_skill_repository_command(
     input: SkillRepositoryInput,
 ) -> std::result::Result<(), String> {

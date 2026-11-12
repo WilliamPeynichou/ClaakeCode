@@ -27,6 +27,7 @@ fn rlm_append_prompt(
     workspace_root: &std::path::Path,
     skills: &claakecode_app::skill::SkillSettings,
     claaky: bool,
+    learning: bool,
 ) -> String {
     let mut parts = Vec::new();
     if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skills) {
@@ -35,7 +36,11 @@ fn rlm_append_prompt(
     if claaky {
         parts.push(claakecode_app::skill::CLAAKY_PERSONA.to_string());
     }
-    parts.push(RLM_MEMORY_POLICY.to_string());
+    parts.push(if learning {
+        RLM_MEMORY_POLICY.to_string()
+    } else {
+        "Memory is disabled for this conversation: do not read, write or refine persistent harness memory.".to_string()
+    });
     parts.join("\n\n")
 }
 
@@ -47,6 +52,34 @@ pub(super) fn get_claaky_enabled(state: State<'_, DesktopState>) -> bool {
 #[tauri::command]
 pub(super) fn set_claaky_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
     state.store.set_claaky_enabled(enabled).map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) fn get_learning_enabled(state: State<'_, DesktopState>) -> bool {
+    state.store.learning_enabled()
+}
+
+#[tauri::command]
+pub(super) async fn set_learning_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
+    state.store.set_learning_enabled(enabled).map_err(error_to_string)?;
+    state.rlm.lock().await.sessions.clear();
+    Ok(())
+}
+
+#[tauri::command]
+pub(super) fn get_conversation_learning(state: State<'_, DesktopState>, conversation_id: String) -> bool {
+    state.store.learning_enabled_for(&conversation_id)
+}
+
+#[tauri::command]
+pub(super) async fn set_conversation_learning(
+    state: State<'_, DesktopState>,
+    conversation_id: String,
+    enabled: bool,
+) -> std::result::Result<(), String> {
+    state.store.set_conversation_learning(&conversation_id, enabled).map_err(error_to_string)?;
+    state.rlm.lock().await.sessions.remove(&conversation_id);
+    Ok(())
 }
 
 #[derive(Default)]
@@ -339,7 +372,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled()),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id)),
                 )
                 .await
                 .map_err(error_to_string)?;
@@ -569,5 +602,20 @@ pub(super) async fn shutdown_rlm(rlm: &SharedRlm) {
     runtime.providers.clear();
     if let Some(sidecar) = runtime.sidecar.take() {
         let _ = sidecar.stop().await;
+    }
+}
+
+#[cfg(test)]
+mod learning_tests {
+    use super::*;
+
+    #[test]
+    fn rlm_append_prompt_respects_learning_switch() {
+        let root = std::path::Path::new("/nonexistent");
+        let skills = claakecode_app::skill::SkillSettings::default();
+        let off = rlm_append_prompt(root, &skills, false, false);
+        assert!(!off.contains("continual-harness policy"));
+        assert!(off.contains("Memory is disabled"));
+        assert!(rlm_append_prompt(root, &skills, false, true).contains("continual-harness policy"));
     }
 }

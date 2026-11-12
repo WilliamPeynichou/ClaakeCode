@@ -25,6 +25,19 @@ function RlmMemoryList() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState({ title: "", content: "" });
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [learning, setLearning] = useState(true);
+  useEffect(() => {
+    void api.getLearningEnabled().then(setLearning).catch(() => {});
+  }, []);
+  const toggleLearning = async (enabled: boolean) => {
+    setLearning(enabled);
+    try {
+      await api.setLearningEnabled(enabled);
+    } catch (err) {
+      setLearning(!enabled);
+      setError(String(err));
+    }
+  };
   const keyOf = (e: RlmMemoryEntry) => `${e.scope}|${e.kind}|${e.id}`;
 
   const load = useCallback(async () => {
@@ -85,6 +98,13 @@ function RlmMemoryList() {
         Python, elles, disparaissent au redémarrage du noyau. Rien ici n'entraîne le modèle. « Apprendre
         de ce chat » (onglet RLM) demande une consolidation tout de suite ; sinon Prime consolide selon
         ses propres règles.
+      </p>
+      <label className="python-runtime__muted">
+        <input type="checkbox" checked={learning} onChange={(e) => void toggleLearning(e.target.checked)} />{" "}
+        Apprentissage et rappel Claake
+      </label>
+      <p className="python-runtime__muted">
+        Prime peut encore charger sa propre mémoire native. Les chats RLM déjà ouverts appliquent le changement au prochain message.
       </p>
       {error && <p className="python-runtime__error" role="alert">{error}</p>}
       {entries && shown.length === 0 && (

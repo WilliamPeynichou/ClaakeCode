@@ -5766,6 +5766,17 @@ function RepositorySkillsSection({ workspacePath, onChanged, blocked }: {
                   ? <span className="settings-pane__badge" data-tone="primary">Mise à jour disponible</span>
                   : null;
               })()}
+              {repository.pending && (
+                <div role="status">
+                  <span className="settings-pane__badge" data-tone="primary">Mise à jour en attente</span>
+                  <p className="settings-pane__muted">Fichiers modifiés ({repository.pending.changedFiles.length}) :</p>
+                  <ul>{repository.pending.changedFiles.map((file) => <li key={file}><code>{file}</code></li>)}</ul>
+                  <div className="settings-pane__field-actions">
+                    <button type="button" disabled={disabled} onClick={() => void run(() => api.acceptSkillRepositoryUpdate(repository.id))}>Accepter</button>
+                    <button type="button" disabled={disabled} onClick={() => void run(() => api.discardSkillRepositoryUpdate(repository.id))}>Ignorer</button>
+                  </div>
+                </div>
+              )}
               <code className="settings-pane__skill-path" title={repository.absolutePath}>Revision: {repository.revision.slice(0, 12)}</code>
               {(() => {
                 const status = upstream[repository.id];

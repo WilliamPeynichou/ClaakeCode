@@ -695,6 +695,7 @@ export type SkillRepository = {
   absolutePath: string;
   skills: RepositorySkill[];
   warnings: string[];
+  pending?: { checkout: string; revision: string; changedFiles: string[] } | null;
 };
 
 export type SkillRepositoryUpdateReport = {

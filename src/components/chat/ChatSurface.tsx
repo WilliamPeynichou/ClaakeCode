@@ -1,4 +1,6 @@
 import { Icon } from "@iconify/react";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/ipc";
 import type { ChatMessage } from "../../types";
 
 export type ChatSurface = "chat" | "rlm";
@@ -144,3 +146,52 @@ export const LEARN_PROMPT =
   "stale or duplicate ones instead of adding new ones. Never store secrets, tokens or raw private text. " +
   "Use global scope only for lessons useful in other chats. Then list what you actually saved, updated or " +
   "removed, or say plainly that nothing was worth keeping.";
+
+/** RLM header actions: per-chat "Apprentissage et rappel Claake" switch + "Apprendre de ce chat". */
+export function RlmLearnActions({
+  conversationId,
+  disabled,
+  onLearn,
+}: {
+  conversationId: string;
+  disabled: boolean;
+  onLearn: () => void;
+}) {
+  const [enabled, setEnabled] = useState(true);
+  useEffect(() => {
+    let live = true;
+    void api.getConversationLearning(conversationId).then((v) => live && setEnabled(v)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [conversationId]);
+  const toggle = async (next: boolean) => {
+    setEnabled(next);
+    try {
+      await api.setConversationLearning(conversationId, next);
+    } catch {
+      setEnabled(!next);
+    }
+  };
+  return (
+    <>
+      <label
+        className="chat-head__action"
+        title="Apprentissage et rappel Claake. Prime peut encore charger sa mémoire native. Appliqué au prochain message."
+      >
+        <input type="checkbox" checked={enabled} onChange={(e) => void toggle(e.target.checked)} />
+        <span>Apprentissage et rappel Claake</span>
+      </label>
+      <button
+        type="button"
+        className="chat-head__action"
+        onClick={onLearn}
+        disabled={disabled || !enabled}
+        title="Demande à l'agent de consolider ce qu'il a appris de ce chat dans sa mémoire (visible dans Settings > Python persistant)"
+      >
+        <Icon icon="solar:book-bookmark-linear" width={13} height={13} />
+        <span>Apprendre de ce chat</span>
+      </button>
+    </>
+  );
+}

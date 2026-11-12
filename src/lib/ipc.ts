@@ -176,6 +176,18 @@ export const api = {
   exportModelStatsCsv(filter: ModelStatsFilter, path: string) {
     return invoke<void>("export_model_stats_csv", { input: { ...filter, path } });
   },
+  getLearningEnabled() {
+    return invoke<boolean>("get_learning_enabled");
+  },
+  setLearningEnabled(enabled: boolean) {
+    return invoke<void>("set_learning_enabled", { enabled });
+  },
+  getConversationLearning(conversationId: string) {
+    return invoke<boolean>("get_conversation_learning", { conversationId });
+  },
+  setConversationLearning(conversationId: string, enabled: boolean) {
+    return invoke<void>("set_conversation_learning", { conversationId, enabled });
+  },
   listRlmMemories() {
     return invoke<RlmMemoryEntry[]>("list_rlm_memories");
   },
@@ -393,6 +405,12 @@ export const api = {
   },
   setSkillRepositoryEnabled(id: string, enabled: boolean) {
     return invoke<void>("set_skill_repository_enabled_command", { input: { id, enabled } });
+  },
+  acceptSkillRepositoryUpdate(id: string) {
+    return invoke<SkillRepository>("accept_skill_repository_update_command", { input: { id } });
+  },
+  discardSkillRepositoryUpdate(id: string) {
+    return invoke<SkillRepository>("discard_skill_repository_update_command", { input: { id } });
   },
   removeSkillRepository(id: string) {
     return invoke<void>("remove_skill_repository_command", { input: { id } });

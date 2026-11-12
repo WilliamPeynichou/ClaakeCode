@@ -134,10 +134,16 @@ impl Graph {
             }
         }
         for (name, guard) in &self.guards {
-            if let Guard::Command { timeout_secs, .. } = guard {
-                if !(1..=900).contains(timeout_secs) {
+            match guard {
+                Guard::Command { timeout_secs, .. } if !(1..=900).contains(timeout_secs) => {
                     bail!("guard `{name}`: timeoutSecs must be in 1..=900");
                 }
+                Guard::GitCommit { paths }
+                    if paths.iter().any(|p| Path::new(p).is_absolute() || Path::new(p).components().any(|c| matches!(c, std::path::Component::ParentDir))) =>
+                {
+                    bail!("guard `{name}`: paths must be relative and without `..`");
+                }
+                _ => {}
             }
         }
         let mut seen = HashSet::new();
@@ -262,6 +268,126 @@ where
             }
         }
     }
+}
+
+const MAX_JUDGE_FILE_BYTES: u64 = 1024 * 1024;
+const MAX_REASON_CHARS: usize = 2_000;
+
+fn fail(reason: impl Into<String>) -> GuardVerdict {
+    GuardVerdict::Fail(vec![reason.into()])
+}
+
+fn tail_chars(text: &str, max: usize) -> String {
+    let count = text.chars().count();
+    text.chars().skip(count.saturating_sub(max)).collect()
+}
+
+pub fn head_commit(workspace_root: &Path) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(workspace_root)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (output.status.success() && !sha.is_empty()).then_some(sha)
+}
+
+/// Run `program args` in the workspace: null stdin, merged output, killed on timeout.
+async fn run_bounded(
+    mut command: tokio::process::Command,
+    workspace_root: &Path,
+    timeout_secs: u64,
+) -> std::result::Result<(bool, String), String> {
+    use std::process::Stdio;
+    command
+        .current_dir(workspace_root)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let child = command.spawn().map_err(|error| format!("spawn failed: {error}"))?;
+    let output = tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), child.wait_with_output())
+        .await
+        .map_err(|_| format!("command timed out after {timeout_secs}s"))?
+        .map_err(|error| format!("wait failed: {error}"))?;
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok((output.status.success(), text))
+}
+
+/// Judge one guard against the disk. Never trusts the model.
+pub async fn judge(guard: &Guard, workspace_root: &Path, start_commit: Option<&str>) -> GuardVerdict {
+    use crate::workspace::resolve_workspace_path;
+    let canonical_root = workspace_root.canonicalize().unwrap_or_else(|_| workspace_root.to_path_buf());
+    let workspace_root = canonical_root.as_path();
+    match guard {
+        Guard::FileExists { path } => match resolve_workspace_path(workspace_root, path) {
+            Ok(file) if file.is_file() => GuardVerdict::Pass,
+            _ => fail(format!("missing file {path}")),
+        },
+        Guard::FileContains { path, text } => {
+            let Ok(file) = resolve_workspace_path(workspace_root, path) else {
+                return fail(format!("missing file {path}"));
+            };
+            let Ok(handle) = std::fs::File::open(&file) else {
+                return fail(format!("missing file {path}"));
+            };
+            let mut bytes = Vec::new();
+            if std::io::Read::read_to_end(&mut std::io::Read::take(handle, MAX_JUDGE_FILE_BYTES), &mut bytes).is_err() {
+                return fail(format!("cannot read {path}"));
+            }
+            if String::from_utf8_lossy(&bytes).contains(text.as_str()) {
+                GuardVerdict::Pass
+            } else {
+                fail(format!("{path} does not contain the expected text"))
+            }
+        }
+        Guard::GitCommit { paths } => {
+            let Some(start) = start_commit else {
+                return fail("workspace has no git commit to compare with");
+            };
+            let mut command = tokio::process::Command::new("git");
+            command.args(["log", "--format=%H", &format!("{start}..HEAD"), "--"]).args(paths);
+            match run_bounded(command, workspace_root, 30).await {
+                Ok((true, out)) if !out.trim().is_empty() => GuardVerdict::Pass,
+                Ok((true, _)) => fail("no new commit touching the expected paths"),
+                Ok((false, out)) => fail(tail_chars(out.trim(), MAX_REASON_CHARS)),
+                Err(reason) => fail(reason),
+            }
+        }
+        Guard::Command { run, timeout_secs } => {
+            #[cfg(windows)]
+            {
+                let _ = (run, timeout_secs);
+                fail("command guards are not supported on Windows yet")
+            }
+            #[cfg(not(windows))]
+            {
+                let mut command = tokio::process::Command::new("/bin/bash");
+                // A2a: wrap with crate::sandbox::wrap
+                command.arg("-lc").arg(run);
+                match run_bounded(command, workspace_root, *timeout_secs).await {
+                    Ok((true, _)) => GuardVerdict::Pass,
+                    Ok((false, out)) => fail(tail_chars(out.trim(), MAX_REASON_CHARS)),
+                    Err(reason) => fail(reason),
+                }
+            }
+        }
+    }
+}
+
+/// `advance_with` + real `judge`. Does not save.
+pub async fn advance(run: &mut Run, workspace_root: &Path) -> Verdict {
+    let start = run.start_commit.clone();
+    advance_with(run, |guard| {
+        let guard = guard.clone();
+        let start = start.clone();
+        async move { judge(&guard, workspace_root, start.as_deref()).await }
+    })
+    .await
 }
 
 /// Instruction files of the current step (relative to `graph_dir`, kept inside it), then the human note.
@@ -397,5 +523,114 @@ mod tests {
             "guards":{"g":{"type":"file_contains","path":"a","text":"b"}}}"#;
         assert!(Graph::parse(final_contains.as_bytes()).is_err());
         assert!(Graph::parse(THREE.as_bytes()).is_ok());
+    }
+
+    fn git_repo() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("claakecode-guards-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sh = |args: &[&str]| {
+            let ok = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+                .args(args)
+                .current_dir(&dir)
+                .output()
+                .unwrap()
+                .status
+                .success();
+            assert!(ok, "git {args:?}");
+        };
+        sh(&["init", "-q"]);
+        std::fs::write(dir.join("init.txt"), "x").unwrap();
+        sh(&["add", "."]);
+        sh(&["commit", "-q", "-m", "init"]);
+        dir
+    }
+
+    fn is_pass(v: &GuardVerdict) -> bool {
+        matches!(v, GuardVerdict::Pass)
+    }
+
+    #[tokio::test]
+    async fn file_exists_guard() {
+        let dir = git_repo();
+        let g = Guard::FileExists { path: "a.txt".into() };
+        assert!(!is_pass(&judge(&g, &dir, None).await));
+        std::fs::write(dir.join("a.txt"), "hi").unwrap();
+        assert!(is_pass(&judge(&g, &dir, None).await));
+        let escape = Guard::FileExists { path: "../x".into() };
+        assert!(!is_pass(&judge(&escape, &dir, None).await));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn file_contains_guard() {
+        let dir = git_repo();
+        let g = Guard::FileContains { path: "a.txt".into(), text: "needle".into() };
+        std::fs::write(dir.join("a.txt"), "hay").unwrap();
+        assert!(!is_pass(&judge(&g, &dir, None).await));
+        std::fs::write(dir.join("a.txt"), "hay needle hay").unwrap();
+        assert!(is_pass(&judge(&g, &dir, None).await));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn git_commit_guard() {
+        let dir = git_repo();
+        let start = head_commit(&dir).unwrap();
+        let g = Guard::GitCommit { paths: vec!["b.txt".into()] };
+        assert!(!is_pass(&judge(&g, &dir, None).await));
+        assert!(!is_pass(&judge(&g, &dir, Some(&start)).await));
+        std::fs::write(dir.join("b.txt"), "b").unwrap();
+        for args in [vec!["add", "."], vec!["commit", "-q", "-m", "b"]] {
+            let ok = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+                .args(&args)
+                .current_dir(&dir)
+                .output()
+                .unwrap()
+                .status
+                .success();
+            assert!(ok);
+        }
+        assert!(is_pass(&judge(&g, &dir, Some(&start)).await));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn command_guard() {
+        let dir = git_repo();
+        let g = Guard::Command { run: "test -f ok.txt || { echo nope; exit 1; }".into(), timeout_secs: 10 };
+        match judge(&g, &dir, None).await {
+            GuardVerdict::Fail(reasons) => assert!(reasons[0].contains("nope")),
+            GuardVerdict::Pass => panic!("should be red"),
+        }
+        std::fs::write(dir.join("ok.txt"), "").unwrap();
+        assert!(is_pass(&judge(&g, &dir, None).await));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn command_guard_times_out() {
+        let dir = git_repo();
+        let g = Guard::Command { run: "sleep 5".into(), timeout_secs: 1 };
+        match judge(&g, &dir, None).await {
+            GuardVerdict::Fail(reasons) => assert_eq!(reasons[0], "command timed out after 1s"),
+            GuardVerdict::Pass => panic!("should time out"),
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn validate_rejects_git_commit_bad_paths() {
+        for bad in ["/etc/passwd", "../x", "a/../../x"] {
+            let json = format!(
+                r#"{{"start":"1","steps":{{"1":{{"guard":"g"}}}},"guards":{{"g":{{"type":"git_commit","paths":["{bad}"]}}}}}}"#
+            );
+            assert!(Graph::parse(json.as_bytes()).is_err(), "{bad}");
+        }
+        let ok = r#"{"start":"1","steps":{"1":{"guard":"g"}},"guards":{"g":{"type":"git_commit","paths":["src/a.rs"]}}}"#;
+        assert!(Graph::parse(ok.as_bytes()).is_ok());
     }
 }

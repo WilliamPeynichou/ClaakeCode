@@ -35,6 +35,7 @@ import {
   RlmEmptyState,
   autoComputePrompt,
   LEARN_PROMPT,
+  RlmLearnActions,
   autoComputeTranscript,
   surfaceOf,
   type ChatSurface,
@@ -1993,18 +1994,13 @@ export function Workspace({
       </div>
     ) : surface === "rlm" && activeSurface === "rlm" ? (
       <div className="chat-head__actions">
-        <button
-          type="button"
-          className="chat-head__action"
-          onClick={() =>
+        <RlmLearnActions
+          conversationId={activeConv.id}
+          disabled={activeConv.history.length === 0 || streamingConversationIds.has(activeConv.id)}
+          onLearn={() =>
             void sendMessage(LEARN_PROMPT, [], activeConv.model, thinkingFromRef(activeConv.model), "act")
           }
-          disabled={activeConv.history.length === 0 || streamingConversationIds.has(activeConv.id)}
-          title="Demande à l'agent de consolider ce qu'il a appris de ce chat dans sa mémoire (visible dans Settings > Python persistant)"
-        >
-          <Icon icon="solar:book-bookmark-linear" width={13} height={13} />
-          <span>Apprendre de ce chat</span>
-        </button>
+        />
       </div>
     ) : null;
 
