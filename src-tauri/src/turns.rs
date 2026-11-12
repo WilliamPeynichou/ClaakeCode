@@ -811,11 +811,19 @@ pub(super) async fn answer_question(
         .get(&input.conversation_id)
         .cloned();
 
-    Ok(sender
+    let answered = sender
         .map(|sender| {
-            sender.answer_question(&input.tool_call_id, input.answers, input.stop_questions)
+            sender.answer_question(&input.tool_call_id, input.answers.clone(), input.stop_questions)
         })
-        .unwrap_or(false))
+        .unwrap_or(false);
+    // Swarm teammates outlive the turn: their approvals wait on the team's cancel group.
+    Ok(answered
+        || state.team_runtime.read().await.answer_question(
+            &input.conversation_id,
+            &input.tool_call_id,
+            input.answers,
+            input.stop_questions,
+        ))
 }
 
 #[tauri::command]
@@ -832,9 +840,15 @@ pub(super) async fn reject_question(
         .get(&input.conversation_id)
         .cloned();
 
-    Ok(sender
+    let rejected = sender
         .map(|sender| sender.reject_question(&input.tool_call_id))
-        .unwrap_or(false))
+        .unwrap_or(false);
+    Ok(rejected
+        || state
+            .team_runtime
+            .read()
+            .await
+            .reject_question(&input.conversation_id, &input.tool_call_id))
 }
 
 #[tauri::command]

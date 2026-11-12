@@ -1,5 +1,20 @@
 use super::*;
 
+#[tokio::test]
+async fn team_runtime_answers_an_approval_waiting_on_a_team_cancel() {
+    let cancel = TurnCancel::empty();
+    let mut runtime = TeamRuntime::default();
+    runtime.scopes.entry("conv".into()).or_default().team_cancels.entry("team".into()).or_default().push(cancel.clone());
+
+    let receiver = cancel.register_question("approval:t1").unwrap();
+    assert!(!runtime.answer_question("other", "approval:t1", vec![vec!["once".into()]], false));
+    assert!(runtime.answer_question("conv", "approval:t1", vec![vec!["once".into()]], false));
+    assert!(receiver.await.is_ok());
+
+    let _pending = cancel.register_question("approval:t2").unwrap();
+    assert!(runtime.reject_question("conv", "approval:t2"));
+}
+
 #[test]
 fn optional_object_tools_accept_empty_string_input() {
     let status: TeamNameInput = serde_json::from_value(normalize_optional_object_input(json!("")))

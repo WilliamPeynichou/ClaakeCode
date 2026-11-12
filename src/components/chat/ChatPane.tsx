@@ -3379,6 +3379,36 @@ export function ChatPane({
               )}
             </>
           )}
+          {/* Approbations demandées par un sous-agent ou un coéquipier : visibles sans ouvrir sa vue. */}
+          {[...subAgentViews.values()]
+            .filter((record) => record.id !== activeSubAgentId)
+            .flatMap((record) =>
+              record.view.blocks.flatMap((block) =>
+                block.kind === "tool" && block.approvalPending && block.status === "running"
+                  ? [{ record, block }]
+                  : [],
+              ),
+            )
+            .map(({ record, block }) => (
+              <div key={block.id} className="tool-card__pre" style={{ margin: 0 }}>
+                {record.name} demande à exécuter {block.name}
+                {block.summary ? ` : ${block.summary}` : ""}{" "}
+                {([
+                  ["once", "Autoriser"],
+                  ["turn", "Autoriser pour ce tour"],
+                  ["reject", "Refuser"],
+                ] as const).map(([decision, label]) => (
+                  <button
+                    key={decision}
+                    type="button"
+                    className="tool-card__stop-team"
+                    onClick={() => void handleToolApproval(block.id, decision)}
+                  >
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
           {displayView.lastError && (
             <div
               className="tool-card__pre"
