@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex as StdMutex},
 };
 
@@ -28,6 +28,7 @@ pub struct TurnCancel {
 struct TurnCancelState {
     senders: Vec<mpsc::UnboundedSender<EngineCommand>>,
     questions: HashMap<String, oneshot::Sender<QuestionReply>>,
+    approved_tools: HashSet<String>,
     cancelled: bool,
 }
 
@@ -45,6 +46,20 @@ impl TurnCancel {
     /// Vrai une fois l'annulation demandée. Lu entre deux continuations d'un swarm.
     pub fn is_cancelled(&self) -> bool {
         self.state.lock().map(|state| state.cancelled).unwrap_or(false)
+    }
+
+    /// Outil approuvé « pour ce tour » : partagé avec les sous-agents du tour.
+    pub fn approve_tool(&self, name: &str) {
+        if let Ok(mut state) = self.state.lock() {
+            state.approved_tools.insert(name.to_string());
+        }
+    }
+
+    pub fn is_tool_approved(&self, name: &str) -> bool {
+        self.state
+            .lock()
+            .map(|state| state.approved_tools.contains(name))
+            .unwrap_or(false)
     }
 
     pub fn register(&self, sender: mpsc::UnboundedSender<EngineCommand>) {

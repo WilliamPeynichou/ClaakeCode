@@ -76,6 +76,7 @@ export type ChatBlock =
       hidden?: boolean;
       answered?: boolean;
       answer?: string;
+      approvalPending?: boolean;
       fileChanges?: FileChange[];
       liveFileChange?: FileChange;
       images?: ToolResultImage[];
@@ -1339,6 +1340,14 @@ export function applyEvent(
       });
       return withStreamPhase(state, "tooling", { blocks: next });
     }
+    case "approval_requested": {
+      const next = state.blocks.map((block) =>
+        block.kind === "tool" && block.id === event.id
+          ? { ...block, approvalPending: true }
+          : block,
+      );
+      return withStreamPhase(state, "tooling", { blocks: next });
+    }
     case "tool_finished": {
       const finishedBlock = state.blocks.find(
         (block): block is Extract<ChatBlock, { kind: "tool" }> =>
@@ -1513,6 +1522,7 @@ export function applyEvent(
           return {
             ...block,
             hidden: false,
+            approvalPending: undefined,
             status: event.is_error
               ? ("error" as const)
               : bashStillRunning

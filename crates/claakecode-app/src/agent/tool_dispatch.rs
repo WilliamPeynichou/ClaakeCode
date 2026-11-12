@@ -10,7 +10,12 @@ use crate::{
     WebSearchTool, WriteFileTool,
 };
 
-use super::{cancel::TurnCancel, context::AgentMode, events::AgentEvent};
+use super::{
+    approval::request_approval,
+    cancel::TurnCancel,
+    context::AgentMode,
+    events::{AgentEvent, AgentEventScope},
+};
 
 pub(super) fn should_wait_for_cooperative_cancel(
     name: &str,
@@ -49,6 +54,7 @@ pub(super) async fn run_tool(
     todo_list: &mut TodoListState,
     mode: AgentMode,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    event_scope: Option<&AgentEventScope>,
     cancel: &TurnCancel,
     tool_call_id: &str,
     name: &str,
@@ -66,6 +72,20 @@ pub(super) async fn run_tool(
             format!("{canonical_name} is disabled in Settings"),
             Vec::new(),
         );
+    }
+    if mode != AgentMode::Ask && tool_settings.requires_approval(canonical_name) {
+        let detail = super::tool_summary::pretty_json(&input)
+            .chars()
+            .take(2_000)
+            .collect();
+        if !request_approval(cancel, event_tx, event_scope, tool_call_id, canonical_name, detail)
+            .await
+        {
+            return ToolRunResult::err(
+                format!("{canonical_name} was not approved by the user"),
+                Vec::new(),
+            );
+        }
     }
     if canonical_name == tool_names::BASH {
         bash.run(input).await

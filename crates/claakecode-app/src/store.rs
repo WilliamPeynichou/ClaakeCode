@@ -279,6 +279,8 @@ pub struct ToolConfig {
     pub description_override: bool,
     #[serde(default, skip_serializing)]
     pub default_description: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub require_approval: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -377,6 +379,7 @@ pub struct ToolConfigView {
     pub description: String,
     pub default_description: String,
     pub enabled: bool,
+    pub require_approval: bool,
 }
 
 impl ToolSettings {
@@ -471,6 +474,15 @@ impl ToolSettings {
             .unwrap_or_else(|| default_tool_enabled(tool_names::canonical_tool_name(name)))
     }
 
+    pub fn requires_approval(&self, name: &str) -> bool {
+        let name = tool_names::canonical_tool_name(name);
+        self.tools
+            .iter()
+            .find(|tool| tool.name == name)
+            .map(|tool| tool.require_approval)
+            .unwrap_or(false)
+    }
+
     pub fn openai_image_api_key(&self) -> Option<String> {
         let key = self.openai_image_api_key.trim();
         if key.is_empty() {
@@ -543,6 +555,7 @@ pub fn tool_settings_view(settings: &ToolSettings, catalog: &[ToolDescriptor]) -
                     enabled: setting
                         .map(|tool| tool.enabled)
                         .unwrap_or_else(|| default_tool_enabled(&descriptor.name)),
+                    require_approval: setting.map(|tool| tool.require_approval).unwrap_or(false),
                 })
             })
             .collect(),
@@ -2175,6 +2188,9 @@ impl AppStore {
         ensure_conversations_mode_model_settings_column(&conn)?;
         ensure_conversations_title_initialized_column(&conn)?;
         ensure_app_settings_table(&conn)?;
+        if version == 0 {
+            seed_default_tool_approvals(&conn)?;
+        }
         ensure_turn_checkpoints_table(&conn)?;
         if version < 8 {
             conn.execute("delete from turn_checkpoints", [])
@@ -2313,6 +2329,33 @@ fn ensure_app_settings_table(conn: &Connection) -> Result<()> {
         "#,
     )
     .context("unable to create app settings table")?;
+    Ok(())
+}
+
+// Installation neuve seulement : les utilisateurs existants gardent leur comportement.
+fn seed_default_tool_approvals(conn: &Connection) -> Result<()> {
+    let conversations: i64 = conn
+        .query_row("select count(*) from conversations", [], |row| row.get(0))
+        .context("unable to count conversations")?;
+    let existing: i64 = conn
+        .query_row(
+            "select count(*) from app_settings where key = ?1",
+            params![TOOL_SETTINGS_KEY],
+            |row| row.get(0),
+        )
+        .context("unable to read tool settings key")?;
+    if conversations > 0 || existing > 0 {
+        return Ok(());
+    }
+    conn.execute(
+        "insert into app_settings (key, value_json, updated_at_ms) values (?1, ?2, ?3)",
+        params![
+            TOOL_SETTINGS_KEY,
+            r#"{"tools":[{"name":"bash","requireApproval":true},{"name":"python","requireApproval":true}]}"#,
+            now_ms()
+        ],
+    )
+    .context("unable to seed default tool approvals")?;
     Ok(())
 }
 
@@ -2783,6 +2826,16 @@ mod tests {
     }
 
     #[test]
+    fn requires_approval_defaults_to_false_without_field() {
+        let settings: ToolSettings =
+            serde_json::from_str(r#"{"tools":[{"name":"bash"},{"name":"python","requireApproval":true}]}"#)
+                .unwrap();
+        assert!(!settings.requires_approval("bash"));
+        assert!(settings.requires_approval("python"));
+        assert!(!settings.requires_approval("read"));
+    }
+
+    #[test]
     fn tool_settings_ignore_legacy_saved_descriptions_without_user_override() {
         let settings = ToolSettings {
             tools: vec![ToolConfig {
@@ -2791,6 +2844,7 @@ mod tests {
                 enabled: true,
                 description_override: false,
                 default_description: String::new(),
+                require_approval: false,
             }],
             ..ToolSettings::default()
         }
@@ -2812,6 +2866,7 @@ mod tests {
                     enabled: true,
                     description_override: false,
                     default_description: "read default".to_string(),
+                    require_approval: false,
                 },
                 ToolConfig {
                     name: "edit_file".to_string(),
@@ -2819,6 +2874,7 @@ mod tests {
                     enabled: true,
                     description_override: false,
                     default_description: "edit default".to_string(),
+                    require_approval: false,
                 },
             ],
             ..ToolSettings::default()
@@ -2843,6 +2899,7 @@ mod tests {
                 enabled: true,
                 description_override: true,
                 default_description: String::new(),
+                require_approval: false,
             }],
             ..ToolSettings::default()
         }

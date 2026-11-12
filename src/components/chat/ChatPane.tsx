@@ -2184,6 +2184,22 @@ export function ChatPane({
     view.status,
   ]);
 
+  const handleToolApproval = useCallback(
+    async (toolId: string, decision: "once" | "turn" | "reject") => {
+      const key = `approval:${toolId}`;
+      try {
+        if (decision === "reject") {
+          await api.rejectQuestion(workspacePath, conversationId, key);
+        } else {
+          await api.answerQuestion(workspacePath, conversationId, key, [[decision]]);
+        }
+      } catch (err) {
+        setView((prev) => ({ ...prev, lastError: String(err) }));
+      }
+    },
+    [conversationId, workspacePath],
+  );
+
   const handleQuestionAnswer = useCallback(
     async (
       toolCallId: string,
@@ -3334,6 +3350,7 @@ export function ChatPane({
                   }
                   onOpenFile={onOpenFile}
                   onAnswerQuestion={viewingSubAgent ? () => {} : handleQuestionAnswer}
+                  onToolApproval={handleToolApproval}
                   answerQuestionDisabled={viewingSubAgent}
                   allowStopQuestions={!viewingSubAgent && effectiveMode === "plan"}
                   onPlanKeepUpdating={viewingSubAgent ? () => {} : handlePlanKeepUpdating}
@@ -5963,6 +5980,7 @@ function ChatBlocks({
   rewriteHistoryIndex,
   onOpenFile,
   onAnswerQuestion,
+  onToolApproval,
   answerQuestionDisabled,
   allowStopQuestions,
   onPlanKeepUpdating,
@@ -5989,6 +6007,10 @@ function ChatBlocks({
     toolCallId: string,
     answers: QuestionAnswer[],
     options?: { stopQuestions?: boolean },
+  ) => void | Promise<void>;
+  onToolApproval: (
+    toolId: string,
+    decision: "once" | "turn" | "reject",
   ) => void | Promise<void>;
   answerQuestionDisabled: boolean;
   allowStopQuestions: boolean;
@@ -6036,6 +6058,7 @@ function ChatBlocks({
             rewindDisabled={rewindDisabled}
             rewriteHistoryIndex={rewriteHistoryIndex}
             onOpenFile={onOpenFile}
+            onToolApproval={onToolApproval}
             onPlanKeepUpdating={onPlanKeepUpdating}
             onPlanImplement={onPlanImplement}
             onPlanImplementWithSwarm={onPlanImplementWithSwarm}
@@ -6063,6 +6086,7 @@ function BlockView({
   rewindDisabled,
   rewriteHistoryIndex,
   onOpenFile,
+  onToolApproval,
   onPlanKeepUpdating,
   onPlanImplement,
   onPlanImplementWithSwarm,
@@ -6083,6 +6107,10 @@ function BlockView({
   rewindDisabled: boolean;
   rewriteHistoryIndex: number | null;
   onOpenFile: (path: string) => void;
+  onToolApproval: (
+    toolId: string,
+    decision: "once" | "turn" | "reject",
+  ) => void | Promise<void>;
   onPlanKeepUpdating: (plan: PlanArtifact) => void;
   onPlanImplement: (plan: PlanArtifact) => void;
   onPlanImplementWithSwarm: (plan: PlanArtifact) => void;
@@ -6291,6 +6319,8 @@ function BlockView({
             liveFileChange={block.liveFileChange}
             images={block.images}
             meta={block.meta}
+            approvalPending={block.approvalPending}
+            onApproval={(decision) => onToolApproval(block.id, decision)}
             onOpenFile={onOpenFile}
             onStopTeam={
               isToolName(block.name, "team_run") ? onStopAgentSwarm : undefined

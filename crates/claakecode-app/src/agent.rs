@@ -1,3 +1,4 @@
+mod approval;
 mod assistant_message;
 mod cancel;
 mod clean_context;

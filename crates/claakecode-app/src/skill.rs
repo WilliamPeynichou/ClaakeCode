@@ -19,13 +19,24 @@ const SKILL_FILE_NAME: &str = "SKILL.md";
 pub const PRIORITY_SKILL_NAME: &str = "CLAAKE.md";
 const PRIORITY_SKILL_MAX_CHARS: usize = 20_000;
 
-/// Body of the priority skill (front matter removed), looked up like any skill: workspace
-/// `.agents/skills` and `.claakecode/skills`, then the same folders in the home directory.
+/// Body of the priority skill (front matter removed), looked up only in the home directory's
+/// `.agents/skills` and `.claakecode/skills`: a repository cannot inject base rules.
 /// `None` when the skill is not installed or is empty.
 /// Honors the Settings on/off switch: a disabled `CLAAKE.md` is not injected.
-pub fn priority_skill_body(workspace_root: impl Into<PathBuf>, settings: &SkillSettings) -> Option<String> {
-    let tool = SkillTool::with_settings(workspace_root, settings.clone());
-    let skill = tool.discover().into_iter().find(|skill| skill.name == PRIORITY_SKILL_NAME)?;
+pub fn priority_skill_body(_workspace_root: impl Into<PathBuf>, settings: &SkillSettings) -> Option<String> {
+    let home = BaseDirs::new().map(|base| base.home_dir().to_path_buf());
+    priority_skill_body_in(home.as_deref(), settings)
+}
+
+fn priority_skill_body_in(home: Option<&Path>, settings: &SkillSettings) -> Option<String> {
+    if !settings.is_enabled(PRIORITY_SKILL_NAME) {
+        return None;
+    }
+    let home = home?;
+    let skill = [".agents/skills", ".claakecode/skills"]
+        .iter()
+        .flat_map(|dir| scan_skill_root(&home.join(dir)))
+        .find(|skill| skill.name == PRIORITY_SKILL_NAME)?;
     let content = fs::read_to_string(&skill.path).ok()?;
     let body = strip_frontmatter(&content).trim();
     if body.is_empty() {
@@ -41,6 +52,11 @@ pub fn priority_skill_section(workspace_root: impl Into<PathBuf>, settings: &Ski
     Some(format!(
         "# Claake base rules (highest priority)\n\nThe following rules come from the `{PRIORITY_SKILL_NAME}` skill. They define the base behavior of every agent: apply them before any other instruction below, and follow them over conflicting defaults.\n\n{body}"
     ))
+}
+
+/// One line for the catalogue: whitespace and newlines collapse, cut at 120 characters.
+fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(120).collect()
 }
 
 fn strip_frontmatter(content: &str) -> &str {
@@ -63,6 +79,7 @@ pub(crate) struct SkillEntry {
     pub(crate) name: String,
     #[allow(dead_code)]
     pub(crate) path: PathBuf,
+    pub(crate) description: Option<String>,
 }
 
 impl SkillTool {
@@ -92,7 +109,10 @@ impl SkillTool {
                 "Load one skill by name before using it. Available skills:\n{}",
                 skills
                     .iter()
-                    .map(|skill| format!("- {}", skill.name))
+                    .map(|skill| match skill.description.as_deref().map(one_line).filter(|d| !d.is_empty()) {
+                        Some(description) => format!("- {}: {description}", skill.name),
+                        None => format!("- {}", skill.name),
+                    })
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
@@ -153,6 +173,7 @@ impl SkillTool {
             .map(|skill| SkillEntry {
                 name: skill.name,
                 path: PathBuf::from(skill.absolute_path),
+                description: skill.description,
             })
             .collect()
     }
@@ -229,6 +250,7 @@ pub(crate) fn scan_skill_root(root: &Path) -> Vec<SkillEntry> {
         skills.push(SkillEntry {
             name,
             path: skill_path,
+            description: None,
         });
     }
 
@@ -557,20 +579,48 @@ mod priority_tests {
     }
 
     #[test]
-    fn priority_skill_is_read_from_the_workspace_skill_folder() {
-        let root = std::env::temp_dir().join(format!("cc-prio-{}", uuid::Uuid::new_v4()));
-        let dir = root.join(".agents/skills/base");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("SKILL.md"), "---\nname: CLAAKE.md\n---\nAlways answer in French.").unwrap();
-        let section = super::priority_skill_section(&root, &super::SkillSettings::default()).unwrap();
-        assert!(section.starts_with("# Claake base rules (highest priority)"));
-        assert!(section.contains("Always answer in French."));
-        assert!(!section.contains("name: CLAAKE.md"));
+    fn priority_skill_is_read_only_from_home_skill_folders() {
+        let base = std::env::temp_dir().join(format!("cc-prio-{}", uuid::Uuid::new_v4()));
+        let ws_dir = base.join("ws/.claakecode/skills/base");
+        std::fs::create_dir_all(&ws_dir).unwrap();
+        std::fs::write(ws_dir.join("SKILL.md"), "---\nname: CLAAKE.md\n---\nRepo rule.").unwrap();
+        let empty_home = base.join("empty-home");
+        std::fs::create_dir_all(&empty_home).unwrap();
+        let default = super::SkillSettings::default();
+        assert!(super::priority_skill_body_in(Some(&empty_home), &default).is_none());
+
+        let home = base.join("home");
+        let home_dir = home.join(".claakecode/skills/base");
+        std::fs::create_dir_all(&home_dir).unwrap();
+        std::fs::write(home_dir.join("SKILL.md"), "---\nname: CLAAKE.md\n---\nAlways answer in French.").unwrap();
+        assert_eq!(super::priority_skill_body_in(Some(&home), &default).as_deref(), Some("Always answer in French."));
         let off = super::SkillSettings {
             skills: vec![super::SkillConfig { name: "CLAAKE.md".into(), enabled: false }],
         };
-        assert!(super::priority_skill_section(&root, &off).is_none());
+        assert!(super::priority_skill_body_in(Some(&home), &off).is_none());
+        std::fs::remove_dir_all(base).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod catalogue_tests {
+    #[test]
+    fn descriptor_lists_one_line_description_truncated_to_120() {
+        let root = std::env::temp_dir().join(format!("cc-catalog-{}", uuid::Uuid::new_v4()));
+        let dir = root.join(".claakecode/skills/catalog-probe");
+        std::fs::create_dir_all(&dir).unwrap();
+        let long = "x".repeat(300);
+        let content = format!("---\nname: catalog-probe\ndescription: >\n  First line\n  second line {long}\n---\nBody");
+        std::fs::write(dir.join("SKILL.md"), content).unwrap();
+        let descriptor = super::SkillTool::new(&root).descriptor().unwrap();
         std::fs::remove_dir_all(root).unwrap();
+        let line = descriptor
+            .description
+            .lines()
+            .find(|line| line.starts_with("- catalog-probe:"))
+            .unwrap();
+        assert!(line.starts_with("- catalog-probe: First line second line xxx"));
+        assert_eq!(line.len(), "- catalog-probe: ".len() + 120);
     }
 }
 

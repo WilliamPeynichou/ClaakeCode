@@ -682,6 +682,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         &mut todo_list,
                         mode,
                         &event_tx,
+                        event_scope.as_ref(),
                         &cancel,
                         id,
                         name,
@@ -728,6 +729,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             &mut todo_list,
                             mode,
                             &event_tx,
+                            event_scope.as_ref(),
                             &cancel,
                             id,
                             name,
@@ -963,7 +965,10 @@ fn should_run_eager_write_file(
     mode: AgentMode,
     tool_settings: &crate::ToolSettings,
 ) -> bool {
-    name == "write_file" && mode != AgentMode::Plan && tool_settings.is_enabled(name)
+    name == "write_file"
+        && mode != AgentMode::Plan
+        && tool_settings.is_enabled(name)
+        && !tool_settings.requires_approval(name)
 }
 
 fn abort_eager_tool_results(handles: &mut BTreeMap<String, JoinHandle<ToolRunResult>>) {

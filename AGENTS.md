@@ -95,6 +95,7 @@ Code map:
 │   │       ├── agent.rs
 │   │       ├── agent
 │   │       │   ├── assistant_message.rs
+│   │       │   ├── approval.rs — approbation par outil : request_approval bloque via le canal des questions (id « approval:<tool_call_id> »), réponses once/turn/rejet
 │   │       │   ├── cancel.rs
 │   │       │   ├── clean_context.rs
 │   │       │   ├── compaction.rs

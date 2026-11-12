@@ -4008,6 +4008,22 @@ function ToolSettingsItem({
           </button>
         </div>
       </div>
+      <div className="settings-pane__tool-config-head">
+        <span className="settings-pane__tool-config-label">
+          Demander avant d'exécuter
+        </span>
+        <button
+          type="button"
+          className="settings-pane__switch"
+          role="switch"
+          aria-checked={tool.requireApproval === true}
+          aria-label={`Demander avant d'exécuter ${tool.name}`}
+          data-on={tool.requireApproval ? "true" : "false"}
+          onClick={() => onUpdate({ requireApproval: !tool.requireApproval })}
+        >
+          <span className="settings-pane__switch-thumb" />
+        </button>
+      </div>
       <textarea
         className="settings-pane__tool-config-desc"
         aria-label={`${tool.name} description`}
@@ -6084,6 +6100,7 @@ function normalizeToolSettings(settings: ToolSettings): ToolSettings {
           description: tool.description ?? defaultDescription,
           defaultDescription,
           enabled: tool.enabled !== false,
+          requireApproval: tool.requireApproval === true,
         },
       ];
     }),
