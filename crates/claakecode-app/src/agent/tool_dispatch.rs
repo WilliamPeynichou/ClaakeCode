@@ -160,6 +160,38 @@ pub(super) async fn run_tool(
     }
 }
 
+/// Lecture seule, sans état partagé : peut tourner en même temps que ses voisines.
+pub(super) fn is_parallel_safe(name: &str) -> bool {
+    matches!(
+        tool_names::canonical_tool_name(name),
+        tool_names::READ
+            | tool_names::GLOB
+            | tool_names::GREP
+            | tool_names::WEB_FETCH
+            | tool_names::WEB_SEARCH
+    )
+}
+
+/// Même dispatch que `run_tool` pour les outils de `is_parallel_safe`, sans porte (déjà passées au calcul du lot).
+pub(super) async fn run_parallel_safe_tool(
+    glob: &GlobTool,
+    grep: &GrepTool,
+    read: &ReadTool,
+    web_search: &WebSearchTool,
+    web_fetch: &WebFetchTool,
+    name: &str,
+    input: Value,
+) -> ToolRunResult {
+    match tool_names::canonical_tool_name(name) {
+        tool_names::GLOB => glob.run(input).await,
+        tool_names::GREP => grep.run(input).await,
+        tool_names::READ => read.run(input).await,
+        tool_names::WEB_SEARCH => web_search.run(input).await,
+        tool_names::WEB_FETCH => web_fetch.run(input).await,
+        _ => ToolRunResult::err(format!("unknown tool: {name}"), Vec::new()),
+    }
+}
+
 fn ask_mode_tool_allowed(name: &str) -> bool {
     matches!(
         name,
@@ -175,8 +207,18 @@ fn ask_mode_tool_allowed(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::ask_mode_tool_allowed;
+    use super::{ask_mode_tool_allowed, is_parallel_safe};
     use crate::tool_names;
+
+    #[test]
+    fn is_parallel_safe_only_for_read_only_tools() {
+        for name in ["read", "glob", "grep", "web_fetch", "web_search"] {
+            assert!(is_parallel_safe(name), "{name} should be parallel safe");
+        }
+        for name in ["bash", "edit_file", "write_file", "mgrep"] {
+            assert!(!is_parallel_safe(name), "{name} should not be parallel safe");
+        }
+    }
 
     #[test]
     fn ask_mode_allows_only_read_and_research_tools() {

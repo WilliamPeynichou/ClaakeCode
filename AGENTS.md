@@ -112,7 +112,7 @@ Code map:
 │   │       ├── compact.rs
 │   │       ├── database.rs
 │   │       ├── database_tool.rs
-│   │       ├── edit.rs
+│   │       ├── edit.rs — edit_file tout ou rien (restauration si une écriture échoue)
 │   │       ├── glob.rs
 │   │       ├── grep.rs
 │   │       ├── image.rs
@@ -125,6 +125,7 @@ Code map:
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
+│   │       ├── run_engine.rs — lot C1 : graphe d'étapes (Graph/Step/Guard/Run), validation, advance_with, step_instruction, system_block, run_path ; tests
 │   │       ├── skill.rs — outil skill + priority_skill_section : le skill « CLAAKE.md » est injecté en tête du prompt de tout agent
 │   │       ├── model_turns.rs — mesures locales sans contenu, collecte run_turn (classique/sous-agents) et RLM, agrégats médians, effacement et tarifs manuels ; migration store v12
 │   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10) ; model_stats(since_ms, harness) pour le benchmark ; table model_turns v12

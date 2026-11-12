@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     time::Duration,
 };
 
@@ -30,7 +30,9 @@ use super::{
         successful_read_fingerprints,
     },
     mode::{run_update_goal, system_prompt_for_turn, update_goal_descriptor},
-    tool_dispatch::{run_tool, should_wait_for_cooperative_cancel},
+    tool_dispatch::{
+        is_parallel_safe, run_parallel_safe_tool, run_tool, should_wait_for_cooperative_cancel,
+    },
     tool_preflight::{preflight_error_result, ToolPreflightRegistry},
     tool_summary::{display_mcp_server_name, pretty_json, should_stream_tool_args, summarize_tool},
 };
@@ -636,7 +638,55 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         loops += 1;
 
         let mut tool_results = Vec::new();
-        for part in &assistant.parts {
+        let batch_end = parallel_batches(&assistant.parts, &tool_settings);
+        let mut prefetched = HashMap::<String, ToolRunResult>::new();
+        for (part_index, part) in assistant.parts.iter().enumerate() {
+            if cancelled {
+                break;
+            }
+            if let Some(&end) = batch_end.get(&part_index) {
+                // Lancé ici et pas avant : une lecture après un edit_file doit voir le fichier modifié.
+                let calls: Vec<(&String, &String, &Value)> = assistant.parts[part_index..end]
+                    .iter()
+                    .filter_map(|part| match part {
+                        Part::ToolCall {
+                            id, name, input, ..
+                        } => Some((id, name, input)),
+                        _ => None,
+                    })
+                    .collect();
+                let batch = futures_util::future::join_all(calls.iter().map(
+                    |(_, name, input)| {
+                        run_parallel_safe_tool(
+                            &glob,
+                            &grep,
+                            &read,
+                            &web_search,
+                            &web_fetch,
+                            name,
+                            (*input).clone(),
+                        )
+                    },
+                ));
+                tokio::pin!(batch);
+                let outcome = tokio::select! {
+                    biased;
+                    command = cmd_rx.recv() => Err(command),
+                    results = &mut batch => Ok(results),
+                };
+                let results = match outcome {
+                    Ok(results) => results,
+                    Err(Some(EngineCommand::Cancel)) => {
+                        cancelled = true;
+                        abort_eager_tool_results(&mut eager_tool_results);
+                        break;
+                    }
+                    Err(None) => batch.await,
+                };
+                for ((id, _, _), result) in calls.iter().zip(results) {
+                    prefetched.insert((*id).clone(), result);
+                }
+            }
             if let Part::ToolCall {
                 id, name, input, ..
             } = part
@@ -654,6 +704,8 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             ToolRunResult::err(format!("write_file task failed: {err}"), Vec::new())
                         }
                     }
+                } else if let Some(result) = prefetched.remove(id) {
+                    result
                 } else if should_wait_for_cooperative_cancel(
                     name,
                     subagents.as_ref(),
@@ -960,6 +1012,38 @@ pub(super) fn retain_cancelled_visible_parts(message: &mut ChatMessage) {
     });
 }
 
+/// Indice du premier appel d'un lot -> indice exclusif de fin. Un lot = au moins 2 appels
+/// consécutifs, parallélisables, activés, sans approbation.
+fn parallel_batches(parts: &[Part], settings: &crate::ToolSettings) -> HashMap<usize, usize> {
+    let mut batches = HashMap::new();
+    let mut run: Option<(usize, usize, usize)> = None; // (début, fin exclue, nombre d'appels)
+    let mut close = |run: &mut Option<(usize, usize, usize)>| {
+        if let Some((start, end, count)) = run.take() {
+            if count >= 2 {
+                batches.insert(start, end);
+            }
+        }
+    };
+    for (index, part) in parts.iter().enumerate() {
+        let Part::ToolCall { name, .. } = part else {
+            continue; // texte et réflexion entre deux appels n'exécutent rien
+        };
+        let batchable = is_parallel_safe(name)
+            && settings.is_enabled(name)
+            && !settings.requires_approval(name)
+            && preflight_error_result(part).is_none();
+        if batchable {
+            let entry = run.get_or_insert((index, index, 0));
+            entry.1 = index + 1;
+            entry.2 += 1;
+        } else {
+            close(&mut run);
+        }
+    }
+    close(&mut run);
+    batches
+}
+
 fn should_run_eager_write_file(
     name: &str,
     mode: AgentMode,
@@ -1074,4 +1158,39 @@ fn assistant_has_question_tool(message: &ChatMessage) -> bool {
             Part::ToolCall { name, .. } if tool_names::is_tool_name(name, tool_names::QUESTION)
         )
     })
+}
+
+#[cfg(test)]
+mod parallel_tests {
+    use super::*;
+
+    fn call(name: &str) -> Part {
+        Part::ToolCall {
+            id: format!("id-{name}"),
+            name: name.to_string(),
+            input: json!({}),
+            meta: None,
+        }
+    }
+
+    #[test]
+    fn parallel_batches_groups_consecutive_reads() {
+        let parts = [call("read"), call("read"), call("edit_file"), call("read"), call("grep")];
+        let batches = parallel_batches(&parts, &crate::ToolSettings::default());
+        assert_eq!(batches, HashMap::from([(0, 2), (3, 5)]));
+    }
+
+    #[test]
+    fn parallel_batches_ignores_lone_reads() {
+        let parts = [call("read"), call("edit_file"), call("read")];
+        assert!(parallel_batches(&parts, &crate::ToolSettings::default()).is_empty());
+    }
+
+    #[test]
+    fn parallel_batches_excludes_tools_requiring_approval() {
+        let settings: crate::ToolSettings =
+            serde_json::from_str(r#"{"tools":[{"name":"grep","requireApproval":true}]}"#).unwrap();
+        let parts = [call("read"), call("grep"), call("read"), call("glob")];
+        assert_eq!(parallel_batches(&parts, &settings), HashMap::from([(2, 4)]));
+    }
 }

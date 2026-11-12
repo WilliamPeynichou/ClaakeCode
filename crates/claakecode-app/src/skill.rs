@@ -17,7 +17,7 @@ const SKILL_FILE_NAME: &str = "SKILL.md";
 
 /// Skill every agent must follow first: it defines Claake Code's base rules.
 pub const PRIORITY_SKILL_NAME: &str = "CLAAKE.md";
-const PRIORITY_SKILL_MAX_CHARS: usize = 20_000;
+const PRIORITY_SKILL_MAX_CHARS: usize = 8_000;
 
 /// Body of the priority skill (front matter removed), looked up only in the home directory's
 /// `.agents/skills` and `.claakecode/skills`: a repository cannot inject base rules.
@@ -42,7 +42,12 @@ fn priority_skill_body_in(home: Option<&Path>, settings: &SkillSettings) -> Opti
     if body.is_empty() {
         return None;
     }
-    Some(body.chars().take(PRIORITY_SKILL_MAX_CHARS).collect())
+    if body.chars().count() <= PRIORITY_SKILL_MAX_CHARS {
+        return Some(body.to_string());
+    }
+    tracing::warn!("CLAAKE.md truncated at {PRIORITY_SKILL_MAX_CHARS} characters");
+    let head: String = body.chars().take(PRIORITY_SKILL_MAX_CHARS).collect();
+    Some(format!("{head}\n\n[CLAAKE.md truncated at {PRIORITY_SKILL_MAX_CHARS} characters]"))
 }
 
 /// The section injected at the top of every agent's system prompt (main agent, sub-agents,
@@ -599,6 +604,21 @@ mod priority_tests {
         };
         assert!(super::priority_skill_body_in(Some(&home), &off).is_none());
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn priority_skill_truncates_long_body_with_marker() {
+        let home = std::env::temp_dir().join(format!("cc-prio-long-{}", uuid::Uuid::new_v4()));
+        let dir = home.join(".claakecode/skills/base");
+        std::fs::create_dir_all(&dir).unwrap();
+        let default = super::SkillSettings::default();
+        let write = |body: &str| std::fs::write(dir.join("SKILL.md"), format!("---\nname: CLAAKE.md\n---\n{body}")).unwrap();
+        write(&"a".repeat(9_000));
+        let long = super::priority_skill_body_in(Some(&home), &default).unwrap();
+        assert_eq!(long, format!("{}\n\n[CLAAKE.md truncated at 8000 characters]", "a".repeat(8_000)));
+        write(&"b".repeat(100));
+        assert_eq!(super::priority_skill_body_in(Some(&home), &default).unwrap(), "b".repeat(100));
+        std::fs::remove_dir_all(home).unwrap();
     }
 }
 

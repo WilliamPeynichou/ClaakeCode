@@ -21,6 +21,7 @@ pub mod prime_memory;
 pub mod python;
 pub mod question;
 pub mod read;
+pub mod run_engine;
 mod ripgrep;
 pub mod skill;
 pub mod bundled_skills;
