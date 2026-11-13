@@ -174,6 +174,7 @@ pub fn run() {
         .try_init();
 
     let store = AppStore::open_default().expect("unable to open app store");
+    claakecode_app::sandbox::set_enabled(store.sandbox_enabled());
     claakecode_app::model_catalog::load_cached(&store);
     let openrouter_models = store.load_openrouter_models().unwrap_or_default();
     let mistral_models = store.load_mistral_models().unwrap_or_default();
@@ -488,6 +489,8 @@ pub fn run() {
             rlm::list_rlm_memories,
             rlm::get_claaky_enabled,
             rlm::set_claaky_enabled,
+            rlm::get_sandbox_enabled,
+            rlm::set_sandbox_enabled,
             rlm::get_learning_enabled,
             rlm::set_learning_enabled,
             rlm::get_conversation_learning,

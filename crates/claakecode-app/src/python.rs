@@ -76,8 +76,9 @@ impl PythonTool {
             .map(Duration::from_secs)
             .unwrap_or(DEFAULT_TIMEOUT)
             .min(MAX_TIMEOUT);
-        let mut command = Command::new(executable);
-        command.arg("-").current_dir(cwd).kill_on_drop(true);
+        let (program, args) = crate::sandbox::wrap(&self.workspace_root, executable, &["-".into()]);
+        let mut command = Command::new(program);
+        command.args(args).current_dir(cwd).kill_on_drop(true);
         command.stdin(std::process::Stdio::piped());
         command.stdout(std::process::Stdio::piped());
         command.stderr(std::process::Stdio::piped());

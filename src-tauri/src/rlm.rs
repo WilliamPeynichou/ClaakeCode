@@ -62,6 +62,19 @@ pub(super) fn set_claaky_enabled(state: State<'_, DesktopState>, enabled: bool) 
 }
 
 #[tauri::command]
+pub(super) fn get_sandbox_enabled(state: State<'_, DesktopState>) -> bool {
+    state.store.sandbox_enabled()
+}
+
+/// Applies to the next shell command; running sessions keep the mode they started with.
+#[tauri::command]
+pub(super) fn set_sandbox_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
+    state.store.set_sandbox_enabled(enabled).map_err(error_to_string)?;
+    claakecode_app::sandbox::set_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
 pub(super) fn get_learning_enabled(state: State<'_, DesktopState>) -> bool {
     state.store.learning_enabled()
 }

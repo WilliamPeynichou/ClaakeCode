@@ -3652,6 +3652,39 @@ const SWARM_TOOL_NAMES = new Set([
   "task_list",
 ]);
 
+/** Lot A2a: write sandbox of the bash/python tools (macOS). Saved on click. */
+function SandboxToggle() {
+  const [enabled, setEnabled] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void api.getSandboxEnabled().then(setEnabled).catch((err) => setError(String(err)));
+  }, []);
+  const toggle = async (next: boolean) => {
+    setEnabled(next);
+    try {
+      await api.setSandboxEnabled(next);
+      setError(null);
+    } catch (err) {
+      setEnabled(!next);
+      setError(String(err));
+    }
+  };
+  return (
+    <section className="settings-pane__tool-group">
+      <label>
+        <input type="checkbox" checked={enabled} onChange={(e) => void toggle(e.target.checked)} />{" "}
+        Isoler bash et python (macOS)
+      </label>
+      <p className="settings-pane__subtitle">
+        Les commandes ne peuvent écrire que dans le projet, les dossiers temporaires et les caches
+        (~/.cargo, ~/.npm, ~/.cache, ~/Library/Caches). La lecture et le réseau ne sont pas limités.
+        Appliqué à la prochaine commande.
+      </p>
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function ToolsSection({
   settings,
   loading,
@@ -3744,6 +3777,7 @@ function ToolsSection({
 
       <div className="settings-pane__body settings-pane__body--tools">
         <div className="settings-pane__tool-settings-list">
+          <SandboxToggle />
           <section className="settings-pane__tool-group">
             <div className="settings-pane__tool-group-head">
               <h2>Plan mode prompt</h2>

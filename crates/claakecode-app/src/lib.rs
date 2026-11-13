@@ -22,6 +22,7 @@ pub mod python;
 pub mod question;
 pub mod read;
 pub mod run_engine;
+pub mod sandbox;
 mod ripgrep;
 pub mod skill;
 pub mod bundled_skills;

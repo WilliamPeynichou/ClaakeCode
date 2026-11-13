@@ -366,9 +366,10 @@ pub async fn judge(guard: &Guard, workspace_root: &Path, start_commit: Option<&s
             }
             #[cfg(not(windows))]
             {
-                let mut command = tokio::process::Command::new("/bin/bash");
-                // A2a: wrap with crate::sandbox::wrap
-                command.arg("-lc").arg(run);
+                let (program, args) =
+                    crate::sandbox::wrap(workspace_root, "/bin/bash", &["-lc".into(), run.clone()]);
+                let mut command = tokio::process::Command::new(program);
+                command.args(args);
                 match run_bounded(command, workspace_root, *timeout_secs).await {
                     Ok((true, _)) => GuardVerdict::Pass,
                     Ok((false, out)) => fail(tail_chars(out.trim(), MAX_REASON_CHARS)),

@@ -1858,6 +1858,15 @@ impl AppStore {
         Ok(())
     }
 
+    /// Write sandbox of the shell tools (A2a): on by default.
+    pub fn sandbox_enabled(&self) -> bool {
+        self.load_json_setting::<bool>("sandbox_enabled").ok().flatten().unwrap_or(true)
+    }
+
+    pub fn set_sandbox_enabled(&self, enabled: bool) -> Result<()> {
+        self.save_json_setting("sandbox_enabled", &enabled)
+    }
+
     /// Learning and recall switch (D1): global flag, on by default.
     pub fn learning_enabled(&self) -> bool {
         self.load_json_setting::<bool>("learning_enabled").ok().flatten().unwrap_or(true)
