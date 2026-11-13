@@ -22,6 +22,13 @@ separate memory store. Only report an entry as saved after a successful native p
 operation. Learning here means persisted harness entries, not fine-tuning model weights.
 "#;
 
+const MEMORY_DISABLED_TURN_NOTE: &str = "[Claake: memory is disabled for this conversation. Do not read, write or refine persistent harness memory, and say so if asked about your memory policy.]";
+
+/// Per-turn text sent to Prime: prefixed by the memory-off note when learning is disabled.
+fn turn_prompt(text: &str, learning: bool) -> String {
+    if learning { text.to_string() } else { format!("{MEMORY_DISABLED_TURN_NOTE}\n\n{text}") }
+}
+
 /// Claake base rules (the CLAAKE.md skill) first, then the memory policy.
 fn rlm_append_prompt(
     workspace_root: &std::path::Path,
@@ -415,7 +422,10 @@ pub(super) async fn send_rlm_message(
         conversation_id.clone(), measured_model.provider, measured_model.name, "rlm", false, None,
     );
     let mut reply = String::new();
-    let result = prime::run_prompt(&socket, &session_id, &text, Duration::from_secs(30 * 60), |event| {
+    // D1: Prime may reopen an existing session without the new system prompt, so the switch
+    // also travels with every turn. The readable copy above keeps the user's text unchanged.
+    let prompt = turn_prompt(&text, state.store.learning_enabled_for(&conversation_id));
+    let result = prime::run_prompt(&socket, &session_id, &prompt, Duration::from_secs(30 * 60), |event| {
         match &event {
             AgentEvent::TextChunk { delta } if !delta.is_empty() => measurement.first_token(),
             AgentEvent::ToolStarted { .. } => measurement.record.tool_calls += 1,
@@ -617,5 +627,13 @@ mod learning_tests {
         assert!(!off.contains("continual-harness policy"));
         assert!(off.contains("Memory is disabled"));
         assert!(rlm_append_prompt(root, &skills, false, true).contains("continual-harness policy"));
+    }
+
+    #[test]
+    fn rlm_turn_prompt_carries_learning_switch() {
+        assert_eq!(turn_prompt("salut", true), "salut");
+        let off = turn_prompt("salut", false);
+        assert!(off.starts_with("[Claake: memory is disabled"));
+        assert!(off.ends_with("\n\nsalut"));
     }
 }
