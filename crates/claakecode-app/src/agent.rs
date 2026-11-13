@@ -8,6 +8,8 @@ mod events;
 mod history;
 mod mode;
 #[cfg(test)]
+pub(crate) mod test_support;
+#[cfg(test)]
 mod tests;
 mod tool_dispatch;
 mod tool_preflight;

@@ -90,14 +90,23 @@ pub enum GuardVerdict {
     Fail(Vec<String>),
 }
 
+/// A guard that just passed after having refused at least once (lot D3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Recovered {
+    pub guard: String,
+    /// Reasons of the last refusal.
+    pub reasons: Vec<String>,
+    pub refusals: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     /// Guard green: next step to play.
-    Next { step: String },
+    Next { step: String, recovered: Option<Recovered> },
     Refused { guard: String, reasons: Vec<String>, count: u32 },
     /// `count >= MAX_REFUSALS`.
     Escalate { guard: String, reasons: Vec<String> },
-    Done,
+    Done { recovered: Option<Recovered> },
 }
 
 impl Graph {
@@ -224,6 +233,7 @@ where
     Fut: Future<Output = GuardVerdict>,
 {
     let mut first = true;
+    let mut recovered = None;
     loop {
         let Some(step) = run.graph.steps.get(&run.step).cloned() else {
             return Verdict::Escalate { guard: String::new(), reasons: vec![format!("unknown step `{}`", run.step)] };
@@ -237,13 +247,21 @@ where
         run.updated_at_ms = now_ms();
         match judge(&guard).await {
             GuardVerdict::Pass => {
+                let refusals = run.refusals.get(&step.guard).copied().unwrap_or(0);
+                if first && refusals > 0 {
+                    recovered = Some(Recovered {
+                        guard: step.guard.clone(),
+                        reasons: run.last_reasons.clone(),
+                        refusals,
+                    });
+                }
                 run.refusals.insert(step.guard.clone(), 0);
                 run.last_reasons.clear();
                 run.human_note = None;
                 match step.next {
                     None => {
                         run.status = RunStatus::Done;
-                        return Verdict::Done;
+                        return Verdict::Done { recovered };
                     }
                     Some(next) => {
                         run.step = next;
@@ -254,7 +272,7 @@ where
             GuardVerdict::Fail(reasons) => {
                 // A step just reached is work to do, not a failure.
                 if !first {
-                    return Verdict::Next { step: run.step.clone() };
+                    return Verdict::Next { step: run.step.clone(), recovered };
                 }
                 let count = run.refusals.entry(step.guard.clone()).or_insert(0);
                 *count += 1;
@@ -472,7 +490,7 @@ mod tests {
     async fn skips_green_steps() {
         let mut run = run_of(THREE);
         let verdict = advance_with(&mut run, table(&[("a", true), ("b", false)])).await;
-        assert_eq!(verdict, Verdict::Next { step: "2".into() });
+        assert_eq!(verdict, Verdict::Next { step: "2".into(), recovered: None });
         assert_eq!(run.step, "2");
         assert!(run.refusals.get("g2").copied().unwrap_or(0) == 0);
     }
@@ -489,11 +507,25 @@ mod tests {
         assert_eq!(run.refusals["g1"], MAX_REFUSALS);
     }
 
+    /// Lot D3: the verdict carries the refusal that was just fixed.
+    #[tokio::test]
+    async fn recovered_reports_refusals_before_reset() {
+        let mut run = run_of(THREE);
+        advance_with(&mut run, table(&[("a", false)])).await;
+        advance_with(&mut run, table(&[("a", false)])).await;
+        let verdict = advance_with(&mut run, table(&[("a", true), ("b", false)])).await;
+        let Verdict::Next { step, recovered: Some(recovered) } = verdict else { panic!("{verdict:?}") };
+        assert_eq!(step, "2");
+        assert_eq!((recovered.guard.as_str(), recovered.refusals), ("g1", 2));
+        assert_eq!(recovered.reasons, vec!["a red".to_string()]);
+        assert_eq!(run.refusals["g1"], 0);
+    }
+
     #[tokio::test]
     async fn done_on_final_green() {
         let mut run = run_of(THREE);
         let verdict = advance_with(&mut run, table(&[("a", true), ("b", true), ("true", true)])).await;
-        assert_eq!(verdict, Verdict::Done);
+        assert_eq!(verdict, Verdict::Done { recovered: None });
         assert_eq!(run.status, RunStatus::Done);
     }
 

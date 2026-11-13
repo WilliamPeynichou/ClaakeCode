@@ -157,7 +157,14 @@ pub(super) async fn send_message(
     conversation.plan_workflow = next_plan_workflow.clone();
     conversation.goal_workflow = if policy.mode == AgentMode::Goal {
         match message_visibility {
-            MessageVisibilityInput::Normal => start_goal_workflow(text),
+            MessageVisibilityInput::Normal => {
+                // Lot C5: the command is typed by the user, so no approval is asked. A resumed
+                // goal (SystemReminder) keeps its run.
+                if let Some(command) = input.verify_command.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                    start_goal_run(&workspace_root, &conversation.id, command).map_err(error_to_string)?;
+                }
+                start_goal_workflow(text)
+            }
             MessageVisibilityInput::SystemReminder => {
                 resume_goal_workflow(std::mem::take(&mut conversation.goal_workflow))
             }
@@ -1864,4 +1871,32 @@ pub(super) fn restore_workspace_for_rewrite(
         emit_workspace_file_change(app, workspace_root, &relative_path);
     }
     Ok(())
+}
+
+/// Lot C5: a verified Goal is a one-step run whose guard is the user's command.
+fn start_goal_run(workspace_root: &std::path::Path, conversation_id: &str, command: &str) -> anyhow::Result<()> {
+    use claakecode_app::run_engine::{head_commit, run_path, Graph, Run};
+    let graph = serde_json::json!({
+        "start": "goal",
+        "steps": { "goal": { "guard": "verify" } },
+        "guards": { "verify": { "type": "command", "run": command, "timeoutSecs": 600 } }
+    });
+    let (graph, sha) = Graph::parse(&serde_json::to_vec(&graph)?)?;
+    Run::new(graph, sha, workspace_root.display().to_string(), head_commit(workspace_root))
+        .save(&run_path(workspace_root, conversation_id))
+}
+
+#[cfg(test)]
+mod goal_run_tests {
+    #[test]
+    fn goal_run_is_written_with_the_user_command() {
+        use claakecode_app::run_engine::{run_path, Guard, Run, RunStatus};
+        let root = std::env::temp_dir().join(format!("claakecode-goal-run-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        super::start_goal_run(&root, "c1", "cargo test").unwrap();
+        let run = Run::load(&run_path(&root, "c1")).unwrap().unwrap();
+        assert_eq!(run.status, RunStatus::Active);
+        assert!(matches!(&run.graph.guards["verify"], Guard::Command { run, timeout_secs: 600 } if run == "cargo test"));
+        std::fs::remove_dir_all(root).ok();
+    }
 }

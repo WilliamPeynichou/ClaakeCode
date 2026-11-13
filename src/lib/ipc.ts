@@ -876,6 +876,11 @@ export const api = {
         planControl,
         messageVisibility,
         revertWorkspaceChanges,
+        // Lot C5: only a new Goal carries its verification command.
+        verifyCommand:
+          mode === "goal" && messageVisibility !== "systemReminder"
+            ? goalVerifyCommands.get(conversationId)?.trim() || undefined
+            : undefined,
       },
     });
   },
@@ -1080,3 +1085,12 @@ export const api = {
     });
   },
 };
+
+/** Lot C5: verification command typed in the composer for a Goal, per conversation. */
+const goalVerifyCommands = new Map<string, string>();
+export function setGoalVerifyCommand(conversationId: string, command: string) {
+  goalVerifyCommands.set(conversationId, command);
+}
+export function getGoalVerifyCommand(conversationId: string) {
+  return goalVerifyCommands.get(conversationId) ?? "";
+}

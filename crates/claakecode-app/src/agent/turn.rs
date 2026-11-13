@@ -39,7 +39,10 @@ use super::{
 };
 
 use crate::{
-    run_engine::{advance, head_commit, run_path, step_instruction, Graph, Guard, Run, RunStatus, Verdict},
+    run_engine::{
+        advance, head_commit, run_path, step_instruction, system_block, Graph, Guard, Recovered, Run,
+        RunStatus, Verdict,
+    },
     system_prompt_with_todo, tool_names, AppStore, ReadFingerprint, TodoListState, ToolRunResult,
 };
 
@@ -109,6 +112,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             .flatten()
             .filter(|run| run.status == RunStatus::Active)
     });
+    let mut step_changed_paths = BTreeSet::<String>::new();
     let mut todo_final_answer_guard_attempted = false;
     todo_list.normalize();
 
@@ -187,6 +191,10 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 current_system_prompt.push_str("\n\n");
                 current_system_prompt.push_str(&team_reminder);
             }
+        }
+        if let Some(active) = &active_run {
+            current_system_prompt.push_str("\n\n");
+            current_system_prompt.push_str(&system_block(active));
         }
         let current_system_prompt = system_prompt_for_turn(
             &current_system_prompt,
@@ -608,8 +616,97 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         if let Some(usage) = response_usage {
             attach_token_usage(&mut assistant, provider.name(), &model.name, usage);
         }
+        // Lot C4: the model wants to end its turn, the guard of the active run decides.
+        let mut pending_run_message = None;
+        if let (Some(handle), Some(active)) = (&run, active_run.as_mut()) {
+            if !cancelled
+                && !matches!(stop_reason, StopReason::ToolUse)
+                && eager_tool_results.is_empty()
+                && matches!(mode, AgentMode::Act | AgentMode::Goal)
+                && loops < max_tool_rounds
+            {
+                let path = run_path(&handle.workspace_root, &handle.conversation_id);
+                let verdict = {
+                    let judged = advance(active, &handle.workspace_root);
+                    tokio::pin!(judged);
+                    let outcome = tokio::select! {
+                        biased;
+                        command = cmd_rx.recv() => Err(command),
+                        verdict = &mut judged => Ok(verdict),
+                    };
+                    match outcome {
+                        Ok(verdict) => Some(verdict),
+                        Err(Some(EngineCommand::Cancel)) => None,
+                        Err(None) => Some(judged.await),
+                    }
+                };
+                match verdict {
+                    None => cancelled = true,
+                    Some(verdict) => {
+                        if let Err(error) = active.save(&path) {
+                            tracing::warn!("unable to save run: {error}");
+                        }
+                        if let Verdict::Next { recovered: Some(recovered), .. }
+                        | Verdict::Done { recovered: Some(recovered) } = &verdict
+                        {
+                            capture_guard_lesson(&database.store(), handle, active, recovered, &step_changed_paths);
+                        }
+                        pending_run_message = run_guard_message(&verdict, active);
+                        match verdict {
+                            Verdict::Next { .. } => step_changed_paths.clear(),
+                            Verdict::Refused { .. } | Verdict::Done { .. } => {}
+                            Verdict::Escalate { guard, reasons } => {
+                                if question_enabled {
+                                    append_question_call(
+                                        &mut assistant,
+                                        &event_tx,
+                                        event_scope.as_ref(),
+                                        format!("{RUN_ARBITRAGE_PREFIX}{}", Uuid::new_v4()),
+                                        run_arbitrage_question(&guard, &reasons),
+                                    );
+                                    stop_reason = StopReason::ToolUse;
+                                } else {
+                                    active.status = RunStatus::Stopped;
+                                    let _ = active.save(&path);
+                                    send_event(
+                                        &event_tx,
+                                        event_scope.as_ref(),
+                                        AgentEvent::Error {
+                                            message: format!(
+                                                "run stopped: guard refused {} times",
+                                                crate::run_engine::MAX_REFUSALS
+                                            ),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if active_run.as_ref().is_some_and(|active| active.status != RunStatus::Active) {
+            active_run = None;
+        }
+        if cancelled && eager_tool_results.is_empty() {
+            if !assistant.parts.is_empty() {
+                history.push(assistant);
+            }
+            break 'conversation;
+        }
         if !assistant.parts.is_empty() {
             history.push(assistant.clone());
+        }
+        if let Some(text) = pending_run_message {
+            history.push(ChatMessage {
+                role: Role::User,
+                parts: vec![Part::Text {
+                    text,
+                    meta: Some(json!({ "system_reminder": true, "run_guard": true })),
+                }],
+            });
+            loops += 1;
+            continue 'conversation;
         }
 
         if !matches!(stop_reason, StopReason::ToolUse) && !eager_tool_results.is_empty() {
@@ -707,7 +804,11 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 } else if name == "clean_context" {
                     run_clean_context(&mut history, input.clone(), &current_turn_tool_result_ids)
                 } else if name == "update_goal" {
-                    run_update_goal(&mut goal_workflow, input.clone())
+                    // Lot C5: a goal with an active run is complete only when its guard is green.
+                    match goal_guard_refusal(run.as_ref(), &mut active_run).await {
+                        Some(refusal) => refusal,
+                        None => run_update_goal(&mut goal_workflow, input.clone()),
+                    }
                 } else if let Some(handle) = eager_tool_results.remove(id) {
                     match handle.await {
                         Ok(result) => result,
@@ -807,6 +908,18 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     && !result.is_error
                 {
                     update_read_fingerprint_cache(&mut read_fingerprints, result.meta.as_ref());
+                }
+                for change in &result.file_changes {
+                    step_changed_paths.insert(change.relative_path.clone());
+                }
+                if id.starts_with(RUN_ARBITRAGE_PREFIX) {
+                    if let (Some(handle), Some(active)) = (&run, active_run.as_mut()) {
+                        apply_run_arbitrage(active, result.is_error, result.meta.as_ref());
+                        let _ = active.save(&run_path(&handle.workspace_root, &handle.conversation_id));
+                    }
+                    if active_run.as_ref().is_some_and(|active| active.status != RunStatus::Active) {
+                        active_run = None;
+                    }
                 }
                 let result_images = result.images.clone();
                 let mut result_content = result.content.clone();
@@ -1198,13 +1311,126 @@ async fn start_run_from_graph(
     }
 }
 
+const RUN_ARBITRAGE_PREFIX: &str = "run-arbitrage-";
+
+/// Text sent back to the model after a guard verdict; `None` when the turn may end.
+/// The full step instruction is repeated on the first refusal only.
+pub(super) fn run_guard_message(verdict: &Verdict, run: &Run) -> Option<String> {
+    let instruction = || step_instruction(run).unwrap_or_default();
+    match verdict {
+        Verdict::Next { step, .. } => Some(format!(
+            "The previous step passed its guard. Next step of the run:\n\n<run_step name=\"{step}\">\n{}\n</run_step>",
+            instruction()
+        )),
+        Verdict::Refused { guard, reasons, count } => {
+            let mut text = format!(
+                "You cannot end this turn yet: guard `{guard}` of run step `{}` refused ({count}/{}):\n- {}",
+                run.step,
+                crate::run_engine::MAX_REFUSALS,
+                reasons.join("\n- ")
+            );
+            if *count == 1 {
+                let instruction = instruction();
+                if !instruction.is_empty() {
+                    text.push_str(&format!("\n\n<run_step name=\"{}\">\n{instruction}\n</run_step>", run.step));
+                }
+            }
+            text.push_str("\n\nFix this, then end your turn again: the guard is checked on disk, not on your word.");
+            Some(text)
+        }
+        Verdict::Escalate { .. } | Verdict::Done { .. } => None,
+    }
+}
+
+fn run_arbitrage_question(guard: &str, reasons: &[String]) -> Value {
+    let reason: String = reasons.first().map(String::as_str).unwrap_or("").chars().take(300).collect();
+    json!({
+        "question": format!(
+            "La garde {guard} a refusé {} fois : {reason}. Que faire ?",
+            crate::run_engine::MAX_REFUSALS
+        ),
+        "type": "single_choice",
+        "options": [{ "label": "Arrêter" }, { "label": "Reprendre" }]
+    })
+}
+
+/// Answer to the arbitrage question: stop the run, retry, or retry with the user's note.
+/// A dismissed question stops the run.
+pub(super) fn apply_run_arbitrage(run: &mut Run, is_error: bool, meta: Option<&Value>) {
+    let answer = meta
+        .and_then(|meta| meta.get("question_answers"))
+        .and_then(|answers| answers.get(0))
+        .and_then(|first| first.get(0))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|answer| !answer.is_empty());
+    let guard = run.graph.steps.get(&run.step).map(|step| step.guard.clone()).unwrap_or_default();
+    match answer {
+        Some(answer) if !is_error && answer != "Arrêter" => {
+            run.refusals.insert(guard, 0);
+            if answer != "Reprendre" {
+                run.human_note = Some(answer.to_string());
+            }
+        }
+        _ => run.status = RunStatus::Stopped,
+    }
+}
+
+/// Lot C5: `Some(error result)` while the active run is not done.
+async fn goal_guard_refusal(handle: Option<&RunHandle>, active_run: &mut Option<Run>) -> Option<ToolRunResult> {
+    let (handle, active) = (handle?, active_run.as_mut()?);
+    let verdict = advance(active, &handle.workspace_root).await;
+    let _ = active.save(&run_path(&handle.workspace_root, &handle.conversation_id));
+    let refusal = match verdict {
+        Verdict::Done { .. } => None,
+        Verdict::Next { step, .. } => Some(format!("goal is not complete: the run is now at step `{step}`")),
+        Verdict::Refused { guard, reasons, .. } | Verdict::Escalate { guard, reasons } => Some(format!(
+            "goal is not complete: guard `{guard}` refused: {}",
+            reasons.join("; ")
+        )),
+    };
+    if refusal.is_none() {
+        *active_run = None;
+    }
+    refusal.map(|message| ToolRunResult::err(message, Vec::new()))
+}
+
+/// Lot D3: an error fixed in front of a guard leaves a sourced candidate lesson, without any
+/// model call. A refused insertion (duplicate, learning off) never fails the turn.
+fn capture_guard_lesson(
+    store: &AppStore,
+    handle: &RunHandle,
+    run: &Run,
+    recovered: &Recovered,
+    changed_paths: &BTreeSet<String>,
+) {
+    if !store.learning_enabled_for(&handle.conversation_id) {
+        return;
+    }
+    let reasons = recovered.reasons.join("; ");
+    let first_line: String = reasons.lines().next().unwrap_or("").chars().take(120).collect();
+    let paths = changed_paths.iter().take(10).cloned().collect::<Vec<_>>().join(", ");
+    let paths = if paths.is_empty() { "(no tracked file change)".to_string() } else { paths };
+    let lesson = crate::lessons::NewLesson {
+        title: format!("Garde {} : {first_line}", recovered.guard),
+        content: format!("Refus : {reasons}. Corrigé en modifiant : {paths}."),
+        source_kind: "guard_refusal".into(),
+        evidence: format!("{reasons}\n--- passed after {} refusal(s); files: {paths}", recovered.refusals),
+        tags: run.graph.tags.clone(),
+        run_id: Some(run.id.clone()),
+        conversation_id: Some(handle.conversation_id.clone()),
+    };
+    if let Err(error) = store.insert_lesson(lesson) {
+        tracing::warn!("guard lesson not saved: {error}");
+    }
+}
+
 fn append_plan_fallback_question(
     message: &mut ChatMessage,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
     event_scope: Option<&AgentEventScope>,
 ) {
     let id = format!("plan-question-{}", Uuid::new_v4());
-    let name = tool_names::QUESTION.to_string();
     let input = json!({
         "question": "Je peux continuer a preparer le plan. Tu veux ajouter une contrainte avant que je le cree ?",
         "type": "single_choice",
@@ -1220,6 +1446,18 @@ fn append_plan_fallback_question(
         ]
     });
 
+    append_question_call(message, event_tx, event_scope, id, input);
+}
+
+/// Adds a synthetic `question` tool call to the assistant message, announced like a real one.
+fn append_question_call(
+    message: &mut ChatMessage,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    event_scope: Option<&AgentEventScope>,
+    id: String,
+    input: Value,
+) {
+    let name = tool_names::QUESTION.to_string();
     send_event(
         event_tx,
         event_scope,

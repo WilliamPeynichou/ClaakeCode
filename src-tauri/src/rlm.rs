@@ -18,8 +18,10 @@ Prime's native global_=True scope, with project-qualified context where needed. 
 credentials, tokens, secrets, raw private transcripts or speculative claims. Correct or remove
 stale entries, and validate a learned tactic on the next applicable action. Native automatic
 refinement review is evidence-gated; do not force a refinement on every message or invent a
-separate memory store. Only report an entry as saved after a successful native persistence
-operation. Learning here means persisted harness entries, not fine-tuning model weights.
+separate memory store. Every memory entry must state the original error (or the user's correction)
+and the evidence that the fix worked: the command, test or observation that passed. Do not save
+an entry without that evidence, and never use the global scope for a lesson you have not verified.
+Only report an entry as saved after a successful native persistence operation. Learning here means persisted harness entries, not fine-tuning model weights.
 "#;
 
 const MEMORY_DISABLED_TURN_NOTE: &str = "[Claake: memory is disabled for this conversation. Do not read, write or refine persistent harness memory, and say so if asked about your memory policy.]";

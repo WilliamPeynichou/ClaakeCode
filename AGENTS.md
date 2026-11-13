@@ -126,7 +126,7 @@ Code map:
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
-│   │       ├── run_engine.rs — lots C1-C2 : graphe d'étapes (Graph/Step/Guard/Run), validation, advance_with, step_instruction, system_block, run_path ; gardes jugées sur disque (judge/advance/head_commit) ; tests
+│   │       ├── run_engine.rs — lots C1-C2 : graphe d'étapes (Graph/Step/Guard/Run), validation, advance_with, step_instruction, system_block, run_path ; gardes jugées sur disque (judge/advance/head_commit) ; Verdict.recovered (D3) ; branché dans agent/turn.rs en fin de tour (C4), sur update_goal (C5) ; agent/test_support.rs = ScriptedProvider pour tester la boucle sans modèle ; tests
 │   │       ├── sandbox.rs — lot A2a : bac à sable d'écriture macOS (sandbox-exec) pour bash, python et les gardes Command ; interrupteur global set_enabled, réglage sandbox_enabled ; tests
 │   │       ├── skill.rs — outil skill + priority_skill_section : le skill « CLAAKE.md » est injecté en tête du prompt de tout agent
 │   │       ├── model_turns.rs — mesures locales sans contenu, collecte run_turn (classique/sous-agents) et RLM, agrégats médians, effacement et tarifs manuels ; migration store v12

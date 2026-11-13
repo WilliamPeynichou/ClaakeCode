@@ -30,7 +30,7 @@ import {
 } from "./ToolCard";
 import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
-import { api, type MeasuredModelStats } from "../../lib/ipc";
+import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -3622,6 +3622,19 @@ export function ChatPane({
             onMouseDown={handleComposerResizeMouseDown}
             onDoubleClick={handleComposerResizeDoubleClick}
           />
+          {effectiveMode === "goal" && (
+            <input
+              key={conversationId}
+              type="text"
+              className="composer__input"
+              style={{ minHeight: 0, height: 28, fontSize: 12 }}
+              placeholder="Commande de vérification (optionnel), ex. : npm test"
+              aria-label="Commande de vérification du Goal"
+              title="Le Goal ne peut être déclaré terminé que si cette commande réussit. Prise en compte au lancement d'un nouveau Goal."
+              defaultValue={getGoalVerifyCommand(conversationId)}
+              onChange={(e) => setGoalVerifyCommand(conversationId, e.target.value)}
+            />
+          )}
           <div className="composer__input-wrap">
             <div
               className="composer__overlay"
