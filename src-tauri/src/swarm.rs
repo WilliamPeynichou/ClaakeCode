@@ -337,6 +337,7 @@ pub(super) async fn wake_main_agent_for_swarm_notice(
         provider,
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
+        run: None,
         cache_stable_message_count: turn_user_history_index,
         service_tier: None,
         auto_compact: true,

@@ -270,6 +270,7 @@ impl SubAgentTool {
             provider,
             model: agent.model.clone(),
             cache_key: Some(format!("subagent:{}:{}", agent.id, tool_call_id)),
+            run: None,
             cache_stable_message_count: 0,
             service_tier: self.service_tier,
             auto_compact: true,

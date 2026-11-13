@@ -21,6 +21,7 @@
 /src-tauri/binaries/rg-*
 /src-tauri/binaries/prime-agent-*
 /src-tauri/binaries/uv-*
+/src-tauri/prime/
 /.e2e/
 /target
 .vercel

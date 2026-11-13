@@ -35,6 +35,7 @@ fn rlm_append_prompt(
     skills: &claakecode_app::skill::SkillSettings,
     claaky: bool,
     learning: bool,
+    lessons: Option<&str>,
 ) -> String {
     let mut parts = Vec::new();
     if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skills) {
@@ -42,6 +43,9 @@ fn rlm_append_prompt(
     }
     if claaky {
         parts.push(claakecode_app::skill::CLAAKY_PERSONA.to_string());
+    }
+    if learning {
+        parts.extend(lessons.map(str::to_string));
     }
     parts.push(if learning {
         RLM_MEMORY_POLICY.to_string()
@@ -392,7 +396,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id)),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), state.store.lessons_prompt_for(&input.conversation_id).as_deref()),
                 )
                 .await
                 .map_err(error_to_string)?;
@@ -636,10 +640,11 @@ mod learning_tests {
     fn rlm_append_prompt_respects_learning_switch() {
         let root = std::path::Path::new("/nonexistent");
         let skills = claakecode_app::skill::SkillSettings::default();
-        let off = rlm_append_prompt(root, &skills, false, false);
+        let off = rlm_append_prompt(root, &skills, false, false, Some("<validated_lessons>\n- x: y\n</validated_lessons>"));
         assert!(!off.contains("continual-harness policy"));
-        assert!(off.contains("Memory is disabled"));
-        assert!(rlm_append_prompt(root, &skills, false, true).contains("continual-harness policy"));
+        assert!(off.contains("Memory is disabled") && !off.contains("validated_lessons"));
+        let on = rlm_append_prompt(root, &skills, false, true, Some("<validated_lessons>\n- x: y\n</validated_lessons>"));
+        assert!(on.contains("continual-harness policy") && on.contains("validated_lessons"));
     }
 
     #[test]

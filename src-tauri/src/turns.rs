@@ -126,7 +126,12 @@ pub(super) async fn send_message(
         &input.attachments,
         plan_control,
     )?;
-    let turn_system_prompt = with_turn_plan_reminder(&effective_system_prompt, turn_plan_reminder);
+    let mut turn_system_prompt = with_turn_plan_reminder(&effective_system_prompt, turn_plan_reminder);
+    if state.store.learning_enabled_for(&input.conversation_id) {
+        if let Some(block) = state.store.lessons_prompt_for(&input.conversation_id) {
+            turn_system_prompt = format!("{turn_system_prompt}\n\n{block}");
+        }
+    }
     let mut mode_model_settings = conversation.mode_model_settings.clone();
     let selected_model = model_with_optional_selection(
         mode_model_settings.get(policy.mode),
@@ -208,6 +213,7 @@ pub(super) async fn send_message(
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
         cache_stable_message_count: turn_user_history_index,
+        run: Some(claakecode_app::RunHandle { workspace_root: workspace_root.clone(), conversation_id: conversation.id.clone() }),
         service_tier,
         auto_compact: true,
         mode: policy.mode,

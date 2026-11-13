@@ -137,12 +137,17 @@ impl SkillTool {
 
     pub async fn run(&self, input: Value) -> ToolRunResult {
         match self.load(input) {
-            Ok(output) => ToolRunResult::ok(output, Vec::new()),
+            Ok((output, Some(graph))) => ToolRunResult::ok_with_meta(
+                output,
+                Vec::new(),
+                json!({"run_graph": graph.display().to_string()}),
+            ),
+            Ok((output, None)) => ToolRunResult::ok(output, Vec::new()),
             Err(err) => ToolRunResult::err(err.to_string(), Vec::new()),
         }
     }
 
-    fn load(&self, input: Value) -> Result<String> {
+    fn load(&self, input: Value) -> Result<(String, Option<PathBuf>)> {
         let parsed: SkillInput = serde_json::from_value(input)
             .map_err(|err| anyhow::anyhow!("invalid skill input: {err}"))?;
         let name = parsed.name.trim();
@@ -162,12 +167,14 @@ impl SkillTool {
 
         let content = fs::read_to_string(&skill.path)
             .with_context(|| format!("unable to read skill `{name}`"))?;
-        Ok(format!(
+        let graph = skill.path.parent().map(|dir| dir.join("graph.json")).filter(|path| path.is_file());
+        let output = format!(
             "Loaded skill `{name}`:\nSkill instructions: {}\nSkill directory: {}\nUse these absolute paths to read associated references, scripts and resources on demand. Relative resource paths resolve from the skill directory; shared resources may be in parent directories. Loading a skill does not authorize executing scripts or installing dependencies; normal tool permissions still apply.\n\n<skill name=\"{name}\">\n{}\n</skill>",
             skill.path.display(),
             skill.path.parent().unwrap_or(&skill.path).display(),
             content.trim()
-        ))
+        );
+        Ok((output, graph))
     }
 
     fn discover(&self) -> Vec<SkillEntry> {
@@ -573,6 +580,24 @@ fn default_enabled() -> bool {
 #[derive(Debug, Deserialize)]
 struct SkillInput {
     name: String,
+}
+
+#[cfg(test)]
+mod graph_meta_tests {
+    #[tokio::test]
+    async fn graph_json_adds_run_graph_meta() {
+        let base = std::env::temp_dir().join(format!("claakecode-skill-graph-{}", uuid::Uuid::new_v4()));
+        let dir = base.join(".claakecode/skills/gs");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("SKILL.md"), "---\nname: gs\ndescription: x\n---\nBody").unwrap();
+        let tool = super::SkillTool::new(base.clone());
+        let input = serde_json::json!({"name": "gs"});
+        assert!(tool.run(input.clone()).await.meta.is_none());
+        std::fs::write(dir.join("graph.json"), "{}").unwrap();
+        let meta = tool.run(input).await.meta.unwrap();
+        assert_eq!(meta["run_graph"], dir.join("graph.json").display().to_string());
+        std::fs::remove_dir_all(&base).ok();
+    }
 }
 
 #[cfg(test)]

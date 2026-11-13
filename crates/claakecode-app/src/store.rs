@@ -2179,7 +2179,7 @@ impl AppStore {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap_or(0);
 
-        if version >= 12 {
+        if version >= 13 {
             return Ok(());
         }
 
@@ -2237,6 +2237,7 @@ impl AppStore {
         }
         ensure_conversations_harness_column(&conn)?;
         ensure_rlm_bindings_table(&conn)?;
+        ensure_lessons_table(&conn)?;
         conn.execute_batch("create table if not exists model_turns (
             id integer primary key autoincrement,
             conversation_id text not null,
@@ -2245,7 +2246,7 @@ impl AppStore {
             rewritten integer not null default 0,
             record_json text not null
         ); create index if not exists idx_model_turns_time on model_turns(started_at_ms);")?;
-        conn.pragma_update(None, "user_version", 12)
+        conn.pragma_update(None, "user_version", 13)
             .context("unable to set sqlite schema version")?;
         Ok(())
     }
@@ -2354,6 +2355,30 @@ fn ensure_rlm_bindings_table(conn: &Connection) -> Result<()> {
         );",
     )
     .context("unable to create rlm bindings table")?;
+    Ok(())
+}
+
+fn ensure_lessons_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "create table if not exists lessons (
+            id text primary key,
+            title text not null,
+            content text not null,
+            status text not null default 'candidate',
+            source_kind text not null,
+            evidence text not null,
+            tags_json text not null default '[]',
+            run_id text,
+            conversation_id text,
+            score_without real,
+            score_with real,
+            bench_runs integer not null default 0,
+            created_at_ms integer not null,
+            updated_at_ms integer not null
+        );
+        create index if not exists idx_lessons_status on lessons(status);",
+    )
+    .context("unable to create lessons table")?;
     Ok(())
 }
 

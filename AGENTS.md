@@ -117,11 +117,12 @@ Code map:
 │   │       ├── grep.rs
 │   │       ├── image.rs
 │   │       ├── lib.rs
+│   │       ├── lessons.rs — lot D2 : table lessons (migration v13), CRUD, statuts candidate/validated/rejected, lessons_prompt_block injecté dans les deux harness ; tests
 │   │       ├── mcp.rs
 │   │       ├── model_stats.rs — benchmark B1 : agrégation des `token_usage` de l'historique par harness/provider/modèle (réponses, tokens, cache via prompt_tokens normalisé, outils en erreur), export CSV, tests
 │   │       ├── powershell.rs
 │   │       ├── prime_memory.rs — lecture/édition/suppression atomiques du harness Prime (global + session-artifacts), tests ; commandes list/edit/delete_rlm_memory
-│   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
+│   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, PI_PACKAGE_DIR vers Resources/prime quand prime-agent-runtime (sources Python du noyau, copiées par scripts/prepare-prime-sidecar.mjs) n'est pas à côté du binaire, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs

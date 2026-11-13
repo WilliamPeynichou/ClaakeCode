@@ -120,6 +120,7 @@ impl TeamTool {
         let child_context = TurnContext {
             provider,
             model: agent.model.clone(),
+            run: None,
             cache_key: Some(format!(
                 "team:{}:{}:{}",
                 self.scope_id,

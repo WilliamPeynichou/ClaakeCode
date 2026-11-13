@@ -8,6 +8,7 @@ use rand::Rng;
 use serde_json::{json, Map, Value};
 use tokio::{sync::mpsc, task::JoinHandle};
 use uuid::Uuid;
+use std::path::Path;
 
 use claakecode_core::{
     AppError, ChatMessage, Part, PartKind, ProviderRequest, Role, StopReason, StreamEvent,
@@ -22,7 +23,7 @@ use super::{
         can_auto_compact_history, is_context_length_error, maybe_auto_compact_history,
         run_auto_compaction,
     },
-    context::{AgentMode, TurnContext, TurnOutput},
+    context::{AgentMode, RunHandle, TurnContext, TurnOutput},
     events::{attach_token_usage, send_event, send_token_usage_event, AgentEvent, AgentEventScope},
     history::{
         append_interrupted_tool_results, history_with_current_tool_result_ids,
@@ -37,7 +38,10 @@ use super::{
     tool_summary::{display_mcp_server_name, pretty_json, should_stream_tool_args, summarize_tool},
 };
 
-use crate::{system_prompt_with_todo, tool_names, ReadFingerprint, TodoListState, ToolRunResult};
+use crate::{
+    run_engine::{advance, head_commit, run_path, step_instruction, Graph, Guard, Run, RunStatus, Verdict},
+    system_prompt_with_todo, tool_names, AppStore, ReadFingerprint, TodoListState, ToolRunResult,
+};
 
 const SAFE_STREAM_MAX_RETRIES: usize = 5;
 
@@ -78,6 +82,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         event_tx,
         cancel,
         mut cmd_rx,
+        run,
     } = ctx;
 
     let mut measurement = crate::model_turns::TurnMeasurement::new(
@@ -98,6 +103,12 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
     let mut current_turn_tool_result_ids = BTreeSet::new();
     let mut eager_tool_results = BTreeMap::<String, JoinHandle<ToolRunResult>>::new();
     let mut read_fingerprints = successful_read_fingerprints(&history, &read);
+    let mut active_run = run.as_ref().and_then(|handle| {
+        Run::load(&run_path(&handle.workspace_root, &handle.conversation_id))
+            .ok()
+            .flatten()
+            .filter(|run| run.status == RunStatus::Active)
+    });
     let mut todo_final_answer_guard_attempted = false;
     todo_list.normalize();
 
@@ -798,7 +809,21 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     update_read_fingerprint_cache(&mut read_fingerprints, result.meta.as_ref());
                 }
                 let result_images = result.images.clone();
-                let result_content = result.content.clone();
+                let mut result_content = result.content.clone();
+                if canonical_name == tool_names::SKILL
+                    && !result.is_error
+                    && matches!(mode, AgentMode::Act | AgentMode::Goal)
+                {
+                    let graph = result.meta.as_ref().and_then(|m| m.get("run_graph")).and_then(Value::as_str);
+                    if let (Some(handle), Some(graph)) = (&run, graph) {
+                        let store = database.store();
+                        start_run_from_graph(
+                            handle, &store, &cancel, &event_tx, event_scope.as_ref(), id,
+                            Path::new(graph), &mut active_run, &mut result_content,
+                        )
+                        .await;
+                    }
+                }
                 if let Some(teams) = &teams {
                     teams
                         .record_current_agent_file_changes(name, &result.file_changes)
@@ -1103,6 +1128,76 @@ fn stream_retry_delay(attempt: usize) -> Duration {
     Duration::from_millis((base_ms as f64 * jitter) as u64)
 }
 
+const ACCEPTED_RUN_GRAPHS: &str = "accepted_run_graphs";
+
+/// Starts a run for a skill's graph.json after user approval; appends the outcome to the tool result.
+#[allow(clippy::too_many_arguments)]
+async fn start_run_from_graph(
+    handle: &RunHandle,
+    store: &AppStore,
+    cancel: &super::cancel::TurnCancel,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    scope: Option<&AgentEventScope>,
+    tool_call_id: &str,
+    graph_path: &Path,
+    active_run: &mut Option<Run>,
+    content: &mut String,
+) {
+    let (graph, sha) = match std::fs::read(graph_path)
+        .map_err(anyhow::Error::from)
+        .and_then(|bytes| Graph::parse(&bytes))
+    {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            content.push_str(&format!("\n\n[graph.json ignored: {error}]"));
+            return;
+        }
+    };
+    if let Some(run) = active_run.as_ref().filter(|run| run.status == RunStatus::Active) {
+        content.push_str(&format!("\n\n[a run is already active: {}]", run.id));
+        return;
+    }
+    let mut accepted: Vec<String> = store.load_json_setting(ACCEPTED_RUN_GRAPHS).ok().flatten().unwrap_or_default();
+    if !accepted.contains(&sha) {
+        let mut detail = String::new();
+        for (name, step) in &graph.steps {
+            detail.push_str(&format!("step {name} (guard {})\n", step.guard));
+        }
+        for (name, guard) in &graph.guards {
+            if let Guard::Command { run, .. } = guard {
+                detail.push_str(&format!("guard {name} runs: {run}\n"));
+            }
+        }
+        if !super::approval::request_approval(cancel, event_tx, scope, tool_call_id, "run_graph", detail).await {
+            content.push_str("\n\n[run not started: graph not approved]");
+            return;
+        }
+        accepted.push(sha.clone());
+        let _ = store.save_json_setting(ACCEPTED_RUN_GRAPHS, &accepted);
+    }
+    let graph_dir = graph_path.parent().unwrap_or(graph_path).display().to_string();
+    let mut run = Run::new(graph, sha, graph_dir, head_commit(&handle.workspace_root));
+    let verdict = advance(&mut run, &handle.workspace_root).await;
+    // A fresh step failing its guard is work to do, not a refusal.
+    if matches!(verdict, Verdict::Refused { .. }) {
+        run.refusals.clear();
+        run.last_reasons.clear();
+    }
+    if let Err(error) = run.save(&run_path(&handle.workspace_root, &handle.conversation_id)) {
+        content.push_str(&format!("\n\n[run not started: {error}]"));
+        return;
+    }
+    if run.status == RunStatus::Done {
+        content.push_str("\n\n[run already complete]");
+    } else {
+        match step_instruction(&run) {
+            Ok(text) => content.push_str(&format!("\n\n<run_step name=\"{}\">\n{text}\n</run_step>", run.step)),
+            Err(error) => content.push_str(&format!("\n\n[run step unreadable: {error}]")),
+        }
+        *active_run = Some(run);
+    }
+}
+
 fn append_plan_fallback_question(
     message: &mut ChatMessage,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
@@ -1158,6 +1253,36 @@ fn assistant_has_question_tool(message: &ChatMessage) -> bool {
             Part::ToolCall { name, .. } if tool_names::is_tool_name(name, tool_names::QUESTION)
         )
     })
+}
+
+#[cfg(test)]
+mod run_start_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn accepted_graph_starts_run() {
+        let base = std::env::temp_dir().join(format!("claakecode-c3-{}", Uuid::new_v4()));
+        let skill = base.join("skill");
+        std::fs::create_dir_all(skill.join("steps")).unwrap();
+        std::fs::write(skill.join("steps/a.md"), "Do A").unwrap();
+        let graph = br#"{"start":"a","steps":{"a":{"instructions":["steps/a.md"],"guard":"g","next":null}},"guards":{"g":{"type":"command","run":"false","timeoutSecs":5}}}"#;
+        std::fs::write(skill.join("graph.json"), graph).unwrap();
+        let (_, sha) = Graph::parse(graph).unwrap();
+        let store = AppStore::in_memory().unwrap();
+        store.save_json_setting(ACCEPTED_RUN_GRAPHS, &vec![sha]).unwrap();
+        let handle = RunHandle { workspace_root: base.clone(), conversation_id: "c1".into() };
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let (mut active, mut content) = (None, String::from("Loaded"));
+        start_run_from_graph(
+            &handle, &store, &super::super::cancel::TurnCancel::empty(), &tx, None, "t1",
+            &skill.join("graph.json"), &mut active, &mut content,
+        )
+        .await;
+        assert!(content.contains("<run_step"), "{content}");
+        assert!(run_path(&base, "c1").is_file());
+        assert!(active.is_some());
+        std::fs::remove_dir_all(&base).ok();
+    }
 }
 
 #[cfg(test)]
