@@ -1,0 +1,13 @@
+{
+  "id": "fix-broken-test",
+  "prompt": "The test in test_calc.py fails although calc.py is correct. Fix the test, not calc.py.",
+  "tags": [
+    "tests"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q && grep -q 'return a + b' calc.py && grep -q 'add(2, 3)' test_calc.py",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

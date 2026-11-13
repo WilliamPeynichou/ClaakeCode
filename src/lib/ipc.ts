@@ -194,6 +194,31 @@ export const api = {
   setConversationLearning(conversationId: string, enabled: boolean) {
     return invoke<void>("set_conversation_learning", { conversationId, enabled });
   },
+  listLessons(status?: string) {
+    return invoke<Lesson[]>("list_lessons", { status });
+  },
+  updateLesson(id: string, title: string, content: string) {
+    return invoke<void>("update_lesson", { id, title, content });
+  },
+  deleteLesson(id: string) {
+    return invoke<void>("delete_lesson", { id });
+  },
+  clearLessons() {
+    return invoke<void>("clear_lessons");
+  },
+  addLesson(title: string, content: string, evidence: string) {
+    return invoke<Lesson>("add_lesson", { title, content, evidence });
+  },
+  importPrimeMemory(title: string, content: string) {
+    return invoke<Lesson>("import_prime_memory", { title, content });
+  },
+  /** Runs the agent bench without then with the lesson (spends model quota). */
+  validateLesson(lessonId: string, providerId: string, modelId: string) {
+    return invoke<Lesson>("validate_lesson", { lessonId, providerId, modelId });
+  },
+  stopBenchRun() {
+    return invoke<void>("stop_bench_run");
+  },
   listRlmMemories() {
     return invoke<RlmMemoryEntry[]>("list_rlm_memories");
   },
@@ -1093,4 +1118,21 @@ export function setGoalVerifyCommand(conversationId: string, command: string) {
 }
 export function getGoalVerifyCommand(conversationId: string) {
   return goalVerifyCommands.get(conversationId) ?? "";
+}
+
+export interface Lesson {
+  id: string;
+  title: string;
+  content: string;
+  status: "candidate" | "validated" | "rejected";
+  sourceKind: string;
+  evidence: string;
+  tags: string[];
+  runId: string | null;
+  conversationId: string | null;
+  scoreWithout: number | null;
+  scoreWith: number | null;
+  benchRuns: number;
+  createdAtMs: number;
+  updatedAtMs: number;
 }

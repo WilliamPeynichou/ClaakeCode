@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { api, type PythonRuntimeStatus, type RlmMemoryEntry } from "../lib/ipc";
+import { LessonsSection } from "./LessonsSection";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
@@ -153,9 +154,24 @@ function RlmMemoryList() {
                         </button>
                       </>
                     ) : (
+                      <>
+                      <button
+                        type="button"
+                        className="settings-pane__btn"
+                        title="Copie cette entrée dans les leçons Claake, à vérifier"
+                        onClick={() =>
+                          void api.importPrimeMemory(e.title, e.content).then(
+                            () => setError(null),
+                            (err) => setError(String(err)),
+                          )
+                        }
+                      >
+                        Proposer comme leçon
+                      </button>
                       <button type="button" className="settings-pane__btn" onClick={() => setConfirming(key)}>
                         Supprimer
                       </button>
+                      </>
                     )}
                   </div>
                 </>
@@ -279,6 +295,7 @@ export function PythonRuntimeSection() {
       <div className="settings-pane__body python-runtime">
         {error && <p className="python-runtime__error" role="alert">{error}</p>}
         <LearningToggle />
+        <LessonsSection />
         {!status ? (
           <p className="python-runtime__muted">Chargement…</p>
         ) : (

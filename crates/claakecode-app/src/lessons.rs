@@ -8,7 +8,8 @@ const STATUSES: [&str; 3] = ["candidate", "validated", "rejected"];
 const PROMPT_MAX_CHARS: usize = 4_000;
 const PROMPT_MAX_LESSONS: usize = 20;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Lesson {
     pub id: String,
     pub title: String,
@@ -156,7 +157,7 @@ impl AppStore {
 
     pub fn update_lesson_text(&self, id: &str, title: &str, content: &str) -> Result<()> {
         self.connection()?.execute(
-            "update lessons set title = ?2, content = ?3, updated_at_ms = ?4 where id = ?1",
+            "update lessons set title = ?2, content = ?3, updated_at_ms = ?4, status = 'candidate', score_without = null, score_with = null, bench_runs = 0 where id = ?1",
             params![id, truncate(title.trim(), 200), truncate(content.trim(), 2_000), now_ms()],
         )?;
         Ok(())
@@ -219,6 +220,20 @@ pub fn lessons_prompt_block(validated: &[Lesson], local_candidates: &[Lesson]) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Lot E1: an edited lesson must be validated again.
+    #[test]
+    fn lessons_edit_resets_validation() {
+        let store = AppStore::in_memory().unwrap();
+        let lesson = store
+            .insert_lesson(NewLesson { title: "t".into(), content: "c".into(), evidence: "e".into(), source_kind: "user".into(), ..Default::default() })
+            .unwrap();
+        store.set_lesson_status(&lesson.id, "validated", Some(0.5), Some(1.0), 3).unwrap();
+        store.update_lesson_text(&lesson.id, "t2", "c2").unwrap();
+        let edited = &store.list_lessons(None).unwrap()[0];
+        assert_eq!((edited.status.as_str(), edited.score_with, edited.bench_runs), ("candidate", None, 0));
+        assert_eq!(edited.title, "t2");
+    }
 
     fn new(title: &str, evidence: &str) -> NewLesson {
         NewLesson {

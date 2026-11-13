@@ -109,6 +109,7 @@ Code map:
 │   │       │   ├── tool_summary.rs
 │   │       │   └── turn.rs
 │   │       ├── bash.rs
+│   │       ├── bench.rs — lots D4/D5 : tâches de banc (bench/tasks/<id>/task.json + repo/), run_task avec le vrai harness, promotion_verdict ; tests
 │   │       ├── compact.rs
 │   │       ├── database.rs
 │   │       ├── database_tool.rs

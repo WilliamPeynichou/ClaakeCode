@@ -127,6 +127,7 @@ use tokio::{
     sync::{mpsc, Mutex, Notify, RwLock},
 };
 
+mod bench_runs;
 mod benchmark;
 mod companion_chat;
 mod companion_entry;
@@ -517,6 +518,16 @@ pub fn run() {
             rlm::delete_rlm_memory,
             stats::get_model_stats,
             stats::get_model_usage_series,
+            bench_runs::start_bench_run,
+            bench_runs::stop_bench_run,
+            bench_runs::get_bench_runs,
+            bench_runs::validate_lesson,
+            bench_runs::list_lessons,
+            bench_runs::update_lesson,
+            bench_runs::delete_lesson,
+            bench_runs::clear_lessons,
+            bench_runs::add_lesson,
+            bench_runs::import_prime_memory,
             benchmark::start_active_benchmark,
             benchmark::stop_active_benchmark,
             benchmark::get_active_benchmark_runs,
