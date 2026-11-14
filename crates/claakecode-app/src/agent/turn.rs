@@ -626,7 +626,13 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 && loops < max_tool_rounds
             {
                 let path = run_path(&handle.workspace_root, &handle.conversation_id);
-                let verdict = {
+                // Lot E2: a delegated step is played by its sub-agent before the guard is judged.
+                let delegate = subagents.as_deref().filter(|_| delegated_profile(active).is_some());
+                let mut delegated_notes = Vec::<String>::new();
+                let mut judging_cancelled = false;
+                let mut verdict = if delegate.is_some() {
+                    None
+                } else {
                     let judged = advance(active, &handle.workspace_root);
                     tokio::pin!(judged);
                     let outcome = tokio::select! {
@@ -636,11 +642,37 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     };
                     match outcome {
                         Ok(verdict) => Some(verdict),
-                        Err(Some(EngineCommand::Cancel)) => None,
+                        Err(Some(EngineCommand::Cancel)) => {
+                            judging_cancelled = true;
+                            None
+                        }
                         Err(None) => Some(judged.await),
                     }
                 };
-                match verdict {
+                if let Some(subagents) = subagents.as_deref() {
+                    while !judging_cancelled && active.status == RunStatus::Active {
+                        let Some(profile) = delegated_profile(active) else { break };
+                        if matches!(verdict, Some(Verdict::Escalate { .. })) {
+                            break;
+                        }
+                        let result = run_delegated_step(
+                            subagents, active, &profile, mode, &event_tx, event_scope.as_ref(),
+                        )
+                        .await;
+                        delegated_notes.push(format!(
+                            "Step {} was delegated to {profile}. Result: {}",
+                            active.step,
+                            result.content.chars().take(2_000).collect::<String>()
+                        ));
+                        if cancel.is_cancelled() {
+                            judging_cancelled = true;
+                            break;
+                        }
+                        verdict = Some(advance(active, &handle.workspace_root).await);
+                        let _ = active.save(&path);
+                    }
+                }
+                match verdict.filter(|_| !judging_cancelled) {
                     None => cancelled = true,
                     Some(verdict) => {
                         if let Err(error) = active.save(&path) {
@@ -652,6 +684,13 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             capture_guard_lesson(&database.store(), handle, active, recovered, &step_changed_paths);
                         }
                         pending_run_message = run_guard_message(&verdict, active);
+                        if !delegated_notes.is_empty() && !matches!(verdict, Verdict::Escalate { .. }) {
+                            let notes = delegated_notes.join("\n\n");
+                            pending_run_message = Some(match pending_run_message.take() {
+                                Some(message) => format!("{notes}\n\n{message}"),
+                                None => notes,
+                            });
+                        }
                         match verdict {
                             Verdict::Next { .. } => step_changed_paths.clear(),
                             Verdict::Refused { .. } | Verdict::Done { .. } => {}
@@ -934,9 +973,14 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     let graph = result.meta.as_ref().and_then(|m| m.get("run_graph")).and_then(Value::as_str);
                     if let (Some(handle), Some(graph)) = (&run, graph) {
                         let store = database.store();
+                        let profile_exists = |profile: &str| {
+                            subagents.as_deref().is_some_and(|subagents| {
+                                subagents.summary_for_tool_name(&format!("subagent_{profile}")).is_some()
+                            })
+                        };
                         start_run_from_graph(
                             handle, &store, &cancel, &event_tx, event_scope.as_ref(), id,
-                            Path::new(graph), &mut active_run, &mut result_content,
+                            Path::new(graph), &profile_exists, &mut active_run, &mut result_content,
                         )
                         .await;
                     }
@@ -1273,6 +1317,7 @@ async fn start_run_from_graph(
     scope: Option<&AgentEventScope>,
     tool_call_id: &str,
     graph_path: &Path,
+    profile_exists: &(dyn Fn(&str) -> bool + Send + Sync),
     active_run: &mut Option<Run>,
     content: &mut String,
 ) {
@@ -1288,6 +1333,10 @@ async fn start_run_from_graph(
     };
     if let Some(run) = active_run.as_ref().filter(|run| run.status == RunStatus::Active) {
         content.push_str(&format!("\n\n[a run is already active: {}]", run.id));
+        return;
+    }
+    if let Err(error) = crate::run_engine::validate_profiles(&graph, profile_exists) {
+        content.push_str(&format!("\n\n[run not started: {error}]"));
         return;
     }
     let mut accepted: Vec<String> = store.load_json_setting(ACCEPTED_RUN_GRAPHS).ok().flatten().unwrap_or_default();
@@ -1323,15 +1372,76 @@ async fn start_run_from_graph(
     if run.status == RunStatus::Done {
         content.push_str("\n\n[run already complete]");
     } else {
-        match step_instruction(&run) {
-            Ok(text) => content.push_str(&format!("\n\n<run_step name=\"{}\">\n{text}\n</run_step>", run.step)),
-            Err(error) => content.push_str(&format!("\n\n[run step unreadable: {error}]")),
+        match (delegated_profile(&run), step_instruction(&run)) {
+            (Some(profile), _) => content.push_str(&format!(
+                "\n\n[run started: step `{}` is delegated to sub-agent profile `{profile}`; end your turn to let it run]",
+                run.step
+            )),
+            (None, Ok(text)) => content.push_str(&format!("\n\n<run_step name=\"{}\">\n{text}\n</run_step>", run.step)),
+            (None, Err(error)) => content.push_str(&format!("\n\n[run step unreadable: {error}]")),
         }
         *active_run = Some(run);
     }
 }
 
 const RUN_ARBITRAGE_PREFIX: &str = "run-arbitrage-";
+
+/// Lot E2: sub-agent profile of the current step, if it is delegated.
+fn delegated_profile(run: &Run) -> Option<String> {
+    run.graph.steps.get(&run.step).and_then(|step| step.profile.clone())
+}
+
+/// Lot E2: plays the current step in a sub-agent (fresh context, model of the profile),
+/// announced to the interface like a real tool call.
+async fn run_delegated_step(
+    subagents: &crate::SubAgentTool,
+    run: &Run,
+    profile: &str,
+    mode: AgentMode,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    scope: Option<&AgentEventScope>,
+) -> ToolRunResult {
+    let mut prompt = step_instruction(run).unwrap_or_default();
+    if prompt.trim().is_empty() {
+        prompt = format!("Complete step `{}` of the current run.", run.step);
+    }
+    if !run.last_reasons.is_empty() {
+        prompt.push_str(&format!(
+            "\n\nThe guard refused the previous attempt:\n- {}",
+            run.last_reasons.join("\n- ")
+        ));
+    }
+    let id = format!("run-step-{}", Uuid::new_v4());
+    let name = format!("subagent_{profile}");
+    let input = json!({ "prompt": prompt });
+    send_event(event_tx, scope, AgentEvent::ToolStarted { id: id.clone(), name: name.clone() });
+    send_event(
+        event_tx,
+        scope,
+        AgentEvent::ToolReady {
+            id: id.clone(),
+            summary: summarize_tool(&name, &input),
+            args_pretty: pretty_json(&input),
+        },
+    );
+    let result = subagents
+        .run(&id, &name, input, mode, event_tx.clone())
+        .await
+        .unwrap_or_else(|| ToolRunResult::err(format!("unknown profile {profile}"), Vec::new()));
+    send_event(
+        event_tx,
+        scope,
+        AgentEvent::ToolFinished {
+            id,
+            output: result.content.clone(),
+            is_error: result.is_error,
+            file_changes: result.file_changes.clone(),
+            images: result.images.clone(),
+            meta: result.meta.clone(),
+        },
+    );
+    result
+}
 
 /// Lot E3: nothing when the check passes, a tagged block with the reasons when it fails.
 pub(super) fn post_edit_check_message(verdict: &crate::run_engine::GuardVerdict, command: &str) -> Option<String> {
@@ -1544,7 +1654,7 @@ mod run_start_tests {
         let (mut active, mut content) = (None, String::from("Loaded"));
         start_run_from_graph(
             &handle, &store, &super::super::cancel::TurnCancel::empty(), &tx, None, "t1",
-            &skill.join("graph.json"), &mut active, &mut content,
+            &skill.join("graph.json"), &|_| false, &mut active, &mut content,
         )
         .await;
         assert!(content.contains("<run_step"), "{content}");

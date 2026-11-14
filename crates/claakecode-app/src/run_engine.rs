@@ -170,6 +170,18 @@ impl Graph {
     }
 }
 
+/// Lot E2: every `profile` named by a step must be an existing sub-agent profile.
+pub fn validate_profiles(graph: &Graph, exists: impl Fn(&str) -> bool) -> Result<()> {
+    for step in graph.steps.values() {
+        if let Some(profile) = step.profile.as_deref() {
+            if !exists(profile) {
+                bail!("unknown profile {profile}");
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `<ws>/.claakecode/runs/<conversation_id>.json`. shortcut: an id with characters outside
 /// `[A-Za-z0-9_-]` is rewritten to `_` instead of refused (signature returns a plain path), so it can never leave the runs folder.
 pub fn run_path(workspace_root: &Path, conversation_id: &str) -> PathBuf {
@@ -505,6 +517,19 @@ mod tests {
         let verdict = advance_with(&mut run, table(&[("a", false)])).await;
         assert!(matches!(verdict, Verdict::Escalate { .. }));
         assert_eq!(run.refusals["g1"], MAX_REFUSALS);
+    }
+
+    #[test]
+    fn validate_profiles_refuses_unknown_profile() {
+        let plain = graph(THREE);
+        assert!(validate_profiles(&plain, |_| false).is_ok());
+        let delegated = graph(
+            r#"{"start":"1","steps":{"1":{"guard":"g","profile":"reviewer"}},
+               "guards":{"g":{"type":"command","run":"true"}}}"#,
+        );
+        assert!(validate_profiles(&delegated, |name| name == "reviewer").is_ok());
+        let error = validate_profiles(&delegated, |_| false).unwrap_err().to_string();
+        assert_eq!(error, "unknown profile reviewer");
     }
 
     /// Lot D3: the verdict carries the refusal that was just fixed.

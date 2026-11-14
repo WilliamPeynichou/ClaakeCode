@@ -500,6 +500,60 @@ mod run_loop {
         std::fs::remove_dir_all(dir).ok();
     }
 
+    /// Lot E2: a delegated step goes to its sub-agent, not to the main model. Here the
+    /// sub-agent cannot run (scripted model has no capabilities), so the guard stays red and the
+    /// loop must end after the usual 5 refusals instead of spinning.
+    #[tokio::test]
+    async fn delegated_step_is_bounded_when_the_sub_agent_fails() {
+        use crate::agent::AgentEvent;
+        use crate::subagent::{SubAgentConfig, SubAgentSettings};
+        let root = std::env::temp_dir().join(format!("claakecode-run-loop-e2-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let root = std::fs::canonicalize(root).unwrap();
+        let graph = r#"{"start":"only","steps":{"only":{"guard":"g","profile":"reviewer"}},
+            "guards":{"g":{"type":"command","run":"test -f done.txt"}}}"#;
+        let (graph, sha) = Graph::parse(graph.as_bytes()).unwrap();
+        Run::new(graph, sha, root.display().to_string(), None).save(&run_path(&root, "c1")).unwrap();
+
+        let provider = ScriptedProvider::new(vec![text_response("All done.")]);
+        let (mut context, mut events, store) = test_turn_context(provider.clone(), &root);
+        let reviewer: SubAgentConfig = serde_json::from_value(json!({
+            "id": "reviewer", "name": "Reviewer", "description": "d", "prompt": "p",
+            "model": { "provider": "scripted", "name": "scripted" }
+        }))
+        .unwrap();
+        let mut providers = std::collections::HashMap::new();
+        providers.insert("scripted".to_string(), provider.clone() as std::sync::Arc<dyn claakecode_core::Provider>);
+        context.subagents = Some(std::sync::Arc::new(crate::SubAgentTool::new(
+            root.clone(),
+            String::new(),
+            providers,
+            claakecode_core::ModelRef::new("other", "other"),
+            SubAgentSettings { agents: vec![reviewer], ..Default::default() },
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            crate::DatabaseTool::new(store),
+            5,
+            None,
+            context.cancel.clone(),
+        )));
+        context.run = Some(RunHandle { workspace_root: root.clone(), conversation_id: "c1".into(), verify_command: None });
+
+        run_turn(context).await;
+
+        assert_eq!(provider.call_count(), 1, "the main model must not be asked to do the delegated step");
+        let mut delegated = 0;
+        while let Ok(event) = events.try_recv() {
+            if matches!(&event, AgentEvent::ToolFinished { id, .. } if id.starts_with("run-step-")) {
+                delegated += 1;
+            }
+        }
+        assert_eq!(delegated, crate::run_engine::MAX_REFUSALS as usize);
+        assert_eq!(Run::load(&run_path(&root, "c1")).unwrap().unwrap().status, RunStatus::Stopped);
+        std::fs::remove_dir_all(root).ok();
+    }
+
     #[test]
     fn post_edit_check_message_only_on_failure() {
         use crate::agent::turn::post_edit_check_message;

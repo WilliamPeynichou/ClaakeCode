@@ -3720,7 +3720,7 @@ function SandboxToggle() {
     <section className="settings-pane__tool-group">
       <label>
         <input type="checkbox" checked={enabled} onChange={(e) => void toggle(e.target.checked)} />{" "}
-        Isoler bash et python (macOS)
+        Isoler bash et python (macOS ; Linux si bwrap est installé)
       </label>
       <p className="settings-pane__subtitle">
         Les commandes ne peuvent écrire que dans le projet, les dossiers temporaires et les caches
