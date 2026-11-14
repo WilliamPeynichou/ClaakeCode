@@ -530,6 +530,7 @@ pub fn run() {
             bench_runs::clear_lessons,
             bench_runs::add_lesson,
             bench_runs::import_prime_memory,
+            bench_runs::import_seed_lessons,
             benchmark::start_active_benchmark,
             benchmark::stop_active_benchmark,
             benchmark::get_active_benchmark_runs,

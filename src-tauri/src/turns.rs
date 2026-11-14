@@ -128,7 +128,7 @@ pub(super) async fn send_message(
     )?;
     let mut turn_system_prompt = with_turn_plan_reminder(&effective_system_prompt, turn_plan_reminder);
     if state.store.learning_enabled_for(&input.conversation_id) {
-        if let Some(block) = state.store.lessons_prompt_for(&input.conversation_id) {
+        if let Some(block) = state.store.lessons_prompt_for(&input.conversation_id, text) {
             turn_system_prompt = format!("{turn_system_prompt}\n\n{block}");
         }
     }

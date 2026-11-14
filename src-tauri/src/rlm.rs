@@ -411,7 +411,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), state.store.lessons_prompt_for(&input.conversation_id).as_deref()),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), state.store.lessons_prompt_for(&input.conversation_id, &text).as_deref()),
                 )
                 .await
                 .map_err(error_to_string)?;

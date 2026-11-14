@@ -215,6 +215,9 @@ export const api = {
   addLesson(title: string, content: string, evidence: string) {
     return invoke<Lesson>("add_lesson", { title, content, evidence });
   },
+  importSeedLessons() {
+    return invoke<number>("import_seed_lessons");
+  },
   importPrimeMemory(title: string, content: string) {
     return invoke<Lesson>("import_prime_memory", { title, content });
   },

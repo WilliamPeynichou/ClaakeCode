@@ -78,6 +78,14 @@ export function LessonsSection() {
           >
             Ajouter
           </button>
+          <button
+            type="button"
+            className="settings-pane__btn"
+            title="Ajoute les leçons de base (tirées des skills ponytail et caveman, et des erreurs rencontrées sur ce projet). Elles arrivent « à vérifier »."
+            onClick={() => void act(() => api.importSeedLessons())}
+          >
+            Leçons de base
+          </button>
           {confirmClear ? (
             <button
               type="button"

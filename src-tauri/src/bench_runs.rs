@@ -237,6 +237,12 @@ pub(super) fn add_lesson(state: State<'_, DesktopState>, title: String, content:
         .map_err(error_to_string)
 }
 
+/// Base lessons shipped with the app, added as candidates. Returns how many were new.
+#[tauri::command]
+pub(super) fn import_seed_lessons(state: State<'_, DesktopState>) -> Result<usize, String> {
+    state.store.import_seed_lessons().map_err(error_to_string)
+}
+
 #[tauri::command]
 pub(super) fn import_prime_memory(state: State<'_, DesktopState>, title: String, content: String) -> Result<Lesson, String> {
     state

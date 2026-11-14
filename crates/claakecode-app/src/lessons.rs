@@ -174,8 +174,9 @@ impl AppStore {
     }
 
     /// Prompt block for a conversation: all validated lessons plus its own candidates.
-    pub fn lessons_prompt_for(&self, conversation_id: &str) -> Option<String> {
-        let validated = self.list_lessons(Some("validated")).ok()?;
+    /// `query` (the user's message) only matters above 20 validated lessons: see `rank_lessons`.
+    pub fn lessons_prompt_for(&self, conversation_id: &str, query: &str) -> Option<String> {
+        let validated = rank_lessons(self.list_lessons(Some("validated")).ok()?, query);
         let candidates: Vec<Lesson> = self
             .list_lessons(Some("candidate"))
             .ok()?
@@ -184,6 +185,63 @@ impl AppStore {
             .collect();
         lessons_prompt_block(&validated, &candidates)
     }
+}
+
+#[derive(serde::Deserialize)]
+struct SeedLesson {
+    title: String,
+    content: String,
+    evidence: String,
+    tags: Vec<String>,
+}
+
+impl AppStore {
+    /// Base lessons shipped with the app, inserted as candidates (`source_kind = "seed"`):
+    /// like any lesson they are recalled everywhere only once validated. Returns how many were
+    /// added; the ones already present are skipped.
+    pub fn import_seed_lessons(&self) -> Result<usize> {
+        let seeds: Vec<SeedLesson> = serde_json::from_str(include_str!("seed_lessons.json"))?;
+        let mut added = 0;
+        for seed in seeds {
+            let new = NewLesson {
+                title: seed.title,
+                content: seed.content,
+                evidence: seed.evidence,
+                tags: seed.tags,
+                source_kind: "seed".into(),
+                ..Default::default()
+            };
+            if self.insert_lesson(new).is_ok() {
+                added += 1;
+            }
+        }
+        Ok(added)
+    }
+}
+
+fn words(text: &str) -> std::collections::BTreeSet<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| word.chars().count() >= 4)
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Lot E7, step 1 (reference ranking, no learned model): when more lessons are validated than
+/// the prompt can hold, the ones sharing the most words with the request come first. Ties and
+/// small sets keep the newest-first order, so the prompt stays stable (and cacheable) until then.
+pub fn rank_lessons(mut lessons: Vec<Lesson>, query: &str) -> Vec<Lesson> {
+    if lessons.len() <= PROMPT_MAX_LESSONS {
+        return lessons;
+    }
+    let wanted = words(query);
+    let score = |lesson: &Lesson| {
+        let mut own = words(&lesson.title);
+        own.extend(words(&lesson.content));
+        own.extend(lesson.tags.iter().map(|tag| tag.to_lowercase()));
+        own.intersection(&wanted).count()
+    };
+    lessons.sort_by_cached_key(|lesson| std::cmp::Reverse(score(lesson)));
+    lessons
 }
 
 /// Validated lessons (20 newest, 4000 chars max), then this conversation's unverified candidates.
@@ -220,6 +278,37 @@ pub fn lessons_prompt_block(validated: &[Lesson], local_candidates: &[Lesson]) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lessons_seed_import_is_sourced_and_idempotent() {
+        let store = AppStore::in_memory().unwrap();
+        let added = store.import_seed_lessons().unwrap();
+        assert!(added >= 10, "{added}");
+        assert_eq!(store.import_seed_lessons().unwrap(), 0);
+        let lessons = store.list_lessons(None).unwrap();
+        assert!(lessons.iter().all(|l| l.status == "candidate" && l.source_kind == "seed"));
+        assert!(lessons.iter().all(|l| !l.evidence.trim().is_empty() && !l.tags.is_empty()));
+        // Candidates without a conversation are never recalled before validation.
+        assert!(store.lessons_prompt_for("c1", "fix a bug").is_none());
+    }
+
+    #[test]
+    fn lessons_rank_by_overlap_only_above_the_prompt_limit() {
+        let lesson = |title: &str, content: &str| Lesson {
+            id: title.into(), title: title.into(), content: content.into(), status: "validated".into(),
+            source_kind: "user".into(), evidence: "e".into(), tags: vec![], run_id: None, conversation_id: None,
+            score_without: None, score_with: None, bench_runs: 0, created_at_ms: 0, updated_at_ms: 0,
+        };
+        let few = vec![lesson("a", "nothing"), lesson("b", "database migration")];
+        assert_eq!(rank_lessons(few.clone(), "database migration")[0].id, "a");
+        let mut many: Vec<Lesson> = (0..25).map(|i| lesson(&format!("n{i}"), "unrelated text")).collect();
+        many.push(lesson("target", "always backup before a database migration"));
+        let ranked = rank_lessons(many, "write the database migration");
+        assert_eq!(ranked[0].id, "target");
+        assert_eq!(ranked[1].id, "n0");
+        let block = lessons_prompt_block(&ranked, &[]).unwrap();
+        assert!(block.contains("- target:") && !block.contains("- n24:"));
+    }
 
     /// Lot E1: an edited lesson must be validated again.
     #[test]
@@ -269,9 +358,9 @@ mod tests {
         assert!(lessons_prompt_block(&[], &[]).is_none());
 
         let local = store.insert_lesson(new("local", "proof"))?;
-        let with_local = store.lessons_prompt_for("c1").unwrap();
+        let with_local = store.lessons_prompt_for("c1", "").unwrap();
         assert!(with_local.contains("<candidate_lessons") && with_local.contains("- local:"));
-        assert!(!store.lessons_prompt_for("c2").unwrap().contains("- local:"));
+        assert!(!store.lessons_prompt_for("c2", "").unwrap().contains("- local:"));
         store.delete_lesson(&local.id)?;
         store.clear_lessons()?;
         assert!(store.list_lessons(None)?.is_empty());
