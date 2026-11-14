@@ -320,20 +320,58 @@ export function UpdaterLockScreen({ info, autoInstall = false }: Props) {
   );
 }
 
-/// Plain-text release notes block. We don't trust the manifest enough to dump
-/// HTML/MD into the DOM (same policy as <UpdateBadge />'s popover), so we
-/// split on newlines and render each line as its own paragraph.
+type NoteBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "item"; text: string }
+  | { kind: "text"; text: string };
+
+/// Minimal Markdown subset for release notes: `#`/`##`/`###` headings, `-`/`*` bullets,
+/// `**bold**` and `` `code` ``. We don't trust the manifest enough to inject HTML into the DOM
+/// (same policy as <UpdateBadge />'s popover): everything below becomes React text nodes.
+export function parseReleaseNotes(notes: string): NoteBlock[] {
+  const blocks: NoteBlock[] = [];
+  for (const raw of notes.trim().split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const heading = /^#{1,3}\s+(.*)$/.exec(line);
+    const item = /^[-*]\s+(.*)$/.exec(line);
+    if (heading) blocks.push({ kind: "heading", text: heading[1] });
+    else if (item) blocks.push({ kind: "item", text: item[1] });
+    else blocks.push({ kind: "text", text: line });
+  }
+  return blocks;
+}
+
+export function inline(text: string): (string | JSX.Element)[] {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
 function ReleaseNotes({ notes }: { notes: string }) {
-  const lines = useMemo(() => notes.trim().split(/\r?\n/), [notes]);
+  const blocks = useMemo(() => parseReleaseNotes(notes), [notes]);
   return (
     <div
       className="updater-lock__notes"
       role="region"
       aria-label="Release notes"
     >
-      {lines.map((line, i) => (
-        <p key={i}>{line || "\u00A0"}</p>
-      ))}
+      {blocks.map((block, i) =>
+        block.kind === "heading" ? (
+          <h2 key={i}>{inline(block.text)}</h2>
+        ) : block.kind === "item" ? (
+          <p key={i} className="updater-lock__note-item">
+            <span aria-hidden="true">•</span>
+            <span>{inline(block.text)}</span>
+          </p>
+        ) : (
+          <p key={i}>{inline(block.text)}</p>
+        ),
+      )}
     </div>
   );
 }
