@@ -74,7 +74,7 @@ The harness (prompt, tools, loop) is the part you control.
 ## ✨ What's new in 0.2.8
 
 > [!NOTE]
-> These changes live on the `amelioration/fin` branch. They are **not released and not merged**, and the app version is not bumped: read this as the upcoming version. Each item lists what was and was not verified.
+> These changes ship in version 0.2.8. Each item lists what was and was not verified.
 
 | Area | Change | Status |
 |---|---|---|
