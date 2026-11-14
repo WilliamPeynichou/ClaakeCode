@@ -31,6 +31,7 @@ import {
 import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
 import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
+import { takeComposerText } from "./ChatSurface";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -468,6 +469,16 @@ export function ChatPane({
   const activeSubAgentIdRef = useRef<string | null>(null);
   const [autoCloseSubAgentId, setAutoCloseSubAgentId] = useState<string | null>(null);
   const [text, setText] = useState("");
+  // Lot E4: text handed back by an Auto Compute chat lands in this composer, never sent by itself.
+  useEffect(() => {
+    const take = () => {
+      const pending = takeComposerText(conversationId);
+      if (pending) setText((current) => (current.trim() ? `${current}\n\n${pending}` : pending));
+    };
+    take();
+    window.addEventListener("claakecode:composer-insert", take);
+    return () => window.removeEventListener("claakecode:composer-insert", take);
+  }, [conversationId]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dropActive, setDropActive] = useState(false);
   const [optimisticModeSelectionsByConversation, setOptimisticModeSelectionsByConversation] =
