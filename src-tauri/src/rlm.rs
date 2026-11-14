@@ -18,15 +18,26 @@ Prime's native global_=True scope, with project-qualified context where needed. 
 credentials, tokens, secrets, raw private transcripts or speculative claims. Correct or remove
 stale entries, and validate a learned tactic on the next applicable action. Native automatic
 refinement review is evidence-gated; do not force a refinement on every message or invent a
-separate memory store. Only report an entry as saved after a successful native persistence
-operation. Learning here means persisted harness entries, not fine-tuning model weights.
+separate memory store. Every memory entry must state the original error (or the user's correction)
+and the evidence that the fix worked: the command, test or observation that passed. Do not save
+an entry without that evidence, and never use the global scope for a lesson you have not verified.
+Only report an entry as saved after a successful native persistence operation. Learning here means persisted harness entries, not fine-tuning model weights.
 "#;
+
+const MEMORY_DISABLED_TURN_NOTE: &str = "[Claake: memory is disabled for this conversation. Do not read, write or refine persistent harness memory, and say so if asked about your memory policy.]";
+
+/// Per-turn text sent to Prime: prefixed by the memory-off note when learning is disabled.
+fn turn_prompt(text: &str, learning: bool) -> String {
+    if learning { text.to_string() } else { format!("{MEMORY_DISABLED_TURN_NOTE}\n\n{text}") }
+}
 
 /// Claake base rules (the CLAAKE.md skill) first, then the memory policy.
 fn rlm_append_prompt(
     workspace_root: &std::path::Path,
     skills: &claakecode_app::skill::SkillSettings,
     claaky: bool,
+    learning: bool,
+    lessons: Option<&str>,
 ) -> String {
     let mut parts = Vec::new();
     if let Some(rules) = claakecode_app::skill::priority_skill_section(workspace_root, skills) {
@@ -35,7 +46,14 @@ fn rlm_append_prompt(
     if claaky {
         parts.push(claakecode_app::skill::CLAAKY_PERSONA.to_string());
     }
-    parts.push(RLM_MEMORY_POLICY.to_string());
+    if learning {
+        parts.extend(lessons.map(str::to_string));
+    }
+    parts.push(if learning {
+        RLM_MEMORY_POLICY.to_string()
+    } else {
+        "Memory is disabled for this conversation: do not read, write or refine persistent harness memory.".to_string()
+    });
     parts.join("\n\n")
 }
 
@@ -47,6 +65,60 @@ pub(super) fn get_claaky_enabled(state: State<'_, DesktopState>) -> bool {
 #[tauri::command]
 pub(super) fn set_claaky_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
     state.store.set_claaky_enabled(enabled).map_err(error_to_string)
+}
+
+/// Lot E3: command run after file edits in this workspace ("" when unset).
+#[tauri::command]
+pub(super) fn get_verify_command(state: State<'_, DesktopState>, workspace_path: String) -> std::result::Result<String, String> {
+    let root = normalize_workspace_root(&workspace_path).map_err(error_to_string)?;
+    Ok(state.store.verify_command_for(&root.display().to_string()).unwrap_or_default())
+}
+
+#[tauri::command]
+pub(super) fn set_verify_command(state: State<'_, DesktopState>, workspace_path: String, command: String) -> std::result::Result<(), String> {
+    let root = normalize_workspace_root(&workspace_path).map_err(error_to_string)?;
+    state.store.set_verify_command(&root.display().to_string(), &command).map_err(error_to_string)
+}
+
+#[tauri::command]
+pub(super) fn get_sandbox_enabled(state: State<'_, DesktopState>) -> bool {
+    state.store.sandbox_enabled()
+}
+
+/// Applies to the next shell command; running sessions keep the mode they started with.
+#[tauri::command]
+pub(super) fn set_sandbox_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
+    state.store.set_sandbox_enabled(enabled).map_err(error_to_string)?;
+    claakecode_app::sandbox::set_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+pub(super) fn get_learning_enabled(state: State<'_, DesktopState>) -> bool {
+    state.store.learning_enabled()
+}
+
+#[tauri::command]
+pub(super) async fn set_learning_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
+    state.store.set_learning_enabled(enabled).map_err(error_to_string)?;
+    state.rlm.lock().await.sessions.clear();
+    Ok(())
+}
+
+#[tauri::command]
+pub(super) fn get_conversation_learning(state: State<'_, DesktopState>, conversation_id: String) -> bool {
+    state.store.learning_enabled_for(&conversation_id)
+}
+
+#[tauri::command]
+pub(super) async fn set_conversation_learning(
+    state: State<'_, DesktopState>,
+    conversation_id: String,
+    enabled: bool,
+) -> std::result::Result<(), String> {
+    state.store.set_conversation_learning(&conversation_id, enabled).map_err(error_to_string)?;
+    state.rlm.lock().await.sessions.remove(&conversation_id);
+    Ok(())
 }
 
 #[derive(Default)]
@@ -339,7 +411,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled()),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), state.store.lessons_prompt_for(&input.conversation_id, &text).as_deref()),
                 )
                 .await
                 .map_err(error_to_string)?;
@@ -382,7 +454,10 @@ pub(super) async fn send_rlm_message(
         conversation_id.clone(), measured_model.provider, measured_model.name, "rlm", false, None,
     );
     let mut reply = String::new();
-    let result = prime::run_prompt(&socket, &session_id, &text, Duration::from_secs(30 * 60), |event| {
+    // D1: Prime may reopen an existing session without the new system prompt, so the switch
+    // also travels with every turn. The readable copy above keeps the user's text unchanged.
+    let prompt = turn_prompt(&text, state.store.learning_enabled_for(&conversation_id));
+    let result = prime::run_prompt(&socket, &session_id, &prompt, Duration::from_secs(30 * 60), |event| {
         match &event {
             AgentEvent::TextChunk { delta } if !delta.is_empty() => measurement.first_token(),
             AgentEvent::ToolStarted { .. } => measurement.record.tool_calls += 1,
@@ -569,5 +644,29 @@ pub(super) async fn shutdown_rlm(rlm: &SharedRlm) {
     runtime.providers.clear();
     if let Some(sidecar) = runtime.sidecar.take() {
         let _ = sidecar.stop().await;
+    }
+}
+
+#[cfg(test)]
+mod learning_tests {
+    use super::*;
+
+    #[test]
+    fn rlm_append_prompt_respects_learning_switch() {
+        let root = std::path::Path::new("/nonexistent");
+        let skills = claakecode_app::skill::SkillSettings::default();
+        let off = rlm_append_prompt(root, &skills, false, false, Some("<validated_lessons>\n- x: y\n</validated_lessons>"));
+        assert!(!off.contains("continual-harness policy"));
+        assert!(off.contains("Memory is disabled") && !off.contains("validated_lessons"));
+        let on = rlm_append_prompt(root, &skills, false, true, Some("<validated_lessons>\n- x: y\n</validated_lessons>"));
+        assert!(on.contains("continual-harness policy") && on.contains("validated_lessons"));
+    }
+
+    #[test]
+    fn rlm_turn_prompt_carries_learning_switch() {
+        assert_eq!(turn_prompt("salut", true), "salut");
+        let off = turn_prompt("salut", false);
+        assert!(off.starts_with("[Claake: memory is disabled"));
+        assert!(off.ends_with("\n\nsalut"));
     }
 }

@@ -15,6 +15,11 @@ pub enum AgentEvent {
         observation: claakecode_core::ProviderQuotaObservation,
     },
     TurnStarted,
+    ApprovalRequested {
+        id: String,
+        name: String,
+        detail: String,
+    },
     TextStarted,
     TextChunk {
         delta: String,

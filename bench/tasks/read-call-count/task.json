@@ -1,0 +1,13 @@
+{
+  "id": "read-call-count",
+  "prompt": "Read walk.py without running it and write in answer.txt how many times `visit` is called by `walk(TREE)` (the number only).",
+  "tags": [
+    "reading"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

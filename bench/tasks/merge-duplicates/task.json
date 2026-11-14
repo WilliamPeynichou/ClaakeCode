@@ -1,0 +1,13 @@
+{
+  "id": "merge-duplicates",
+  "prompt": "pricing.py has two duplicated functions, `price_with_tax_a` and `price_with_tax_b`. Replace them by a single `price_with_tax(amount, rate)` with the same behaviour, and update `invoice_total` to use it. Do not change the tests.",
+  "tags": [
+    "refactor"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

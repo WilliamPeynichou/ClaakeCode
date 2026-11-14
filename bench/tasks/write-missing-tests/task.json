@@ -1,0 +1,13 @@
+{
+  "id": "write-missing-tests",
+  "prompt": "clamp.py has no tests. Write test_clamp.py with unittest: at least 3 test methods covering a value below the range, inside it and above it. Do not change clamp.py.",
+  "tags": [
+    "tests"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "test -f test_clamp.py && python3 check.py",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

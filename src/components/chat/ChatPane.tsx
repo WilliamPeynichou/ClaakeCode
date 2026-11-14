@@ -30,7 +30,8 @@ import {
 } from "./ToolCard";
 import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
-import { api, type MeasuredModelStats } from "../../lib/ipc";
+import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
+import { takeComposerText } from "./ChatSurface";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -468,6 +469,16 @@ export function ChatPane({
   const activeSubAgentIdRef = useRef<string | null>(null);
   const [autoCloseSubAgentId, setAutoCloseSubAgentId] = useState<string | null>(null);
   const [text, setText] = useState("");
+  // Lot E4: text handed back by an Auto Compute chat lands in this composer, never sent by itself.
+  useEffect(() => {
+    const take = () => {
+      const pending = takeComposerText(conversationId);
+      if (pending) setText((current) => (current.trim() ? `${current}\n\n${pending}` : pending));
+    };
+    take();
+    window.addEventListener("claakecode:composer-insert", take);
+    return () => window.removeEventListener("claakecode:composer-insert", take);
+  }, [conversationId]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dropActive, setDropActive] = useState(false);
   const [optimisticModeSelectionsByConversation, setOptimisticModeSelectionsByConversation] =
@@ -2184,6 +2195,22 @@ export function ChatPane({
     view.status,
   ]);
 
+  const handleToolApproval = useCallback(
+    async (toolId: string, decision: "once" | "turn" | "reject") => {
+      const key = `approval:${toolId}`;
+      try {
+        if (decision === "reject") {
+          await api.rejectQuestion(workspacePath, conversationId, key);
+        } else {
+          await api.answerQuestion(workspacePath, conversationId, key, [[decision]]);
+        }
+      } catch (err) {
+        setView((prev) => ({ ...prev, lastError: String(err) }));
+      }
+    },
+    [conversationId, workspacePath],
+  );
+
   const handleQuestionAnswer = useCallback(
     async (
       toolCallId: string,
@@ -3334,6 +3361,7 @@ export function ChatPane({
                   }
                   onOpenFile={onOpenFile}
                   onAnswerQuestion={viewingSubAgent ? () => {} : handleQuestionAnswer}
+                  onToolApproval={handleToolApproval}
                   answerQuestionDisabled={viewingSubAgent}
                   allowStopQuestions={!viewingSubAgent && effectiveMode === "plan"}
                   onPlanKeepUpdating={viewingSubAgent ? () => {} : handlePlanKeepUpdating}
@@ -3362,6 +3390,36 @@ export function ChatPane({
               )}
             </>
           )}
+          {/* Approbations demandées par un sous-agent ou un coéquipier : visibles sans ouvrir sa vue. */}
+          {[...subAgentViews.values()]
+            .filter((record) => record.id !== activeSubAgentId)
+            .flatMap((record) =>
+              record.view.blocks.flatMap((block) =>
+                block.kind === "tool" && block.approvalPending && block.status === "running"
+                  ? [{ record, block }]
+                  : [],
+              ),
+            )
+            .map(({ record, block }) => (
+              <div key={block.id} className="tool-card__pre" style={{ margin: 0 }}>
+                {record.name} demande à exécuter {block.name}
+                {block.summary ? ` : ${block.summary}` : ""}{" "}
+                {([
+                  ["once", "Autoriser"],
+                  ["turn", "Autoriser pour ce tour"],
+                  ["reject", "Refuser"],
+                ] as const).map(([decision, label]) => (
+                  <button
+                    key={decision}
+                    type="button"
+                    className="tool-card__stop-team"
+                    onClick={() => void handleToolApproval(block.id, decision)}
+                  >
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
           {displayView.lastError && (
             <div
               className="tool-card__pre"
@@ -3575,6 +3633,19 @@ export function ChatPane({
             onMouseDown={handleComposerResizeMouseDown}
             onDoubleClick={handleComposerResizeDoubleClick}
           />
+          {effectiveMode === "goal" && (
+            <input
+              key={conversationId}
+              type="text"
+              className="composer__input"
+              style={{ minHeight: 0, height: 28, fontSize: 12 }}
+              placeholder="Commande de vérification (optionnel), ex. : npm test"
+              aria-label="Commande de vérification du Goal"
+              title="Le Goal ne peut être déclaré terminé que si cette commande réussit. Prise en compte au lancement d'un nouveau Goal."
+              defaultValue={getGoalVerifyCommand(conversationId)}
+              onChange={(e) => setGoalVerifyCommand(conversationId, e.target.value)}
+            />
+          )}
           <div className="composer__input-wrap">
             <div
               className="composer__overlay"
@@ -5963,6 +6034,7 @@ function ChatBlocks({
   rewriteHistoryIndex,
   onOpenFile,
   onAnswerQuestion,
+  onToolApproval,
   answerQuestionDisabled,
   allowStopQuestions,
   onPlanKeepUpdating,
@@ -5989,6 +6061,10 @@ function ChatBlocks({
     toolCallId: string,
     answers: QuestionAnswer[],
     options?: { stopQuestions?: boolean },
+  ) => void | Promise<void>;
+  onToolApproval: (
+    toolId: string,
+    decision: "once" | "turn" | "reject",
   ) => void | Promise<void>;
   answerQuestionDisabled: boolean;
   allowStopQuestions: boolean;
@@ -6036,6 +6112,7 @@ function ChatBlocks({
             rewindDisabled={rewindDisabled}
             rewriteHistoryIndex={rewriteHistoryIndex}
             onOpenFile={onOpenFile}
+            onToolApproval={onToolApproval}
             onPlanKeepUpdating={onPlanKeepUpdating}
             onPlanImplement={onPlanImplement}
             onPlanImplementWithSwarm={onPlanImplementWithSwarm}
@@ -6063,6 +6140,7 @@ function BlockView({
   rewindDisabled,
   rewriteHistoryIndex,
   onOpenFile,
+  onToolApproval,
   onPlanKeepUpdating,
   onPlanImplement,
   onPlanImplementWithSwarm,
@@ -6083,6 +6161,10 @@ function BlockView({
   rewindDisabled: boolean;
   rewriteHistoryIndex: number | null;
   onOpenFile: (path: string) => void;
+  onToolApproval: (
+    toolId: string,
+    decision: "once" | "turn" | "reject",
+  ) => void | Promise<void>;
   onPlanKeepUpdating: (plan: PlanArtifact) => void;
   onPlanImplement: (plan: PlanArtifact) => void;
   onPlanImplementWithSwarm: (plan: PlanArtifact) => void;
@@ -6291,6 +6373,8 @@ function BlockView({
             liveFileChange={block.liveFileChange}
             images={block.images}
             meta={block.meta}
+            approvalPending={block.approvalPending}
+            onApproval={(decision) => onToolApproval(block.id, decision)}
             onOpenFile={onOpenFile}
             onStopTeam={
               isToolName(block.name, "team_run") ? onStopAgentSwarm : undefined

@@ -24,6 +24,15 @@ pub enum AgentMode {
     Goal,
 }
 
+/// Where the active run of a conversation lives (main chat only).
+#[derive(Debug, Clone)]
+pub struct RunHandle {
+    pub workspace_root: std::path::PathBuf,
+    pub conversation_id: String,
+    /// Lot E3: command judged after a round that edited files (per-workspace setting).
+    pub verify_command: Option<String>,
+}
+
 pub struct TurnContext {
     pub provider: Arc<dyn Provider>,
     pub model: claakecode_core::ModelRef,
@@ -60,6 +69,7 @@ pub struct TurnContext {
     pub event_tx: mpsc::UnboundedSender<AgentEvent>,
     pub cancel: TurnCancel,
     pub cmd_rx: mpsc::UnboundedReceiver<EngineCommand>,
+    pub run: Option<RunHandle>,
 }
 
 pub struct TurnOutput {

@@ -185,7 +185,9 @@ fn automatic_update_applies_only_to_opted_in_repositories() {
     let outcome = update_all_in(&root, true, true).unwrap();
     assert!(outcome.errors.is_empty());
     assert_eq!(outcome.reports.len(), 1);
-    assert_eq!(outcome.reports[0].new_revision, new_head);
+    // Automatic: waits as pending, installed revision unchanged.
+    assert!(!outcome.reports[0].updated);
+    assert_eq!(outcome.reports[0].repository.pending.as_ref().unwrap().revision, new_head);
     assert!(outcome.reports[0].repository.auto_update);
     assert!(outcome.reports[0].repository.enabled);
 }
@@ -240,6 +242,66 @@ fn concurrent_updates_do_not_corrupt_and_clean_the_old_generation() {
     assert_eq!(entries_of(&root, &added.id).len(), 1, "previous and partial generations removed");
 }
 
+#[test]
+fn automatic_update_waits_for_accept_or_discard() {
+    let tmp = Dir::new();
+    let repo = source_repo(&tmp.0, "pend");
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    set_auto_update_in(&root, &added.id, true).unwrap();
+    let skill = repo.join("skills/pend").join(SKILL_FILE);
+    fs::write(&skill, "---\nname: pend\ndescription: changed\n---\nNew body\n").unwrap();
+    git(&repo, &["commit", "-qam", "edit"]);
+    let new_head = head(&repo);
+
+    let outcome = update_all_in(&root, true, true).unwrap();
+    assert_eq!(outcome.reports.len(), 1);
+    assert!(!outcome.reports[0].updated);
+    let served = catalog_in(&root).unwrap().remove(0);
+    assert_eq!(served.revision, added.revision);
+    assert!(fs::read_to_string(&served.skills[0].absolute_path).unwrap().contains("Body\n"));
+    let pending = served.pending.expect("pending recorded");
+    assert_eq!(pending.revision, new_head);
+    assert_eq!(pending.changed_files, vec!["skills/pend/SKILL.md".to_string()]);
+    assert_eq!(entries_of(&root, &added.id).len(), 2);
+    // Same upstream again: nothing new to report.
+    assert!(update_all_in(&root, true, true).unwrap().reports.is_empty());
+
+    let accepted = accept_in(&root, &added.id).unwrap();
+    assert_eq!(accepted.revision, new_head);
+    assert!(accepted.pending.is_none());
+    assert!(fs::read_to_string(&accepted.skills[0].absolute_path).unwrap().contains("New body"));
+    assert_eq!(entries_of(&root, &added.id).len(), 1);
+
+    // Second change, then discard: served content and revision stay, pending folder is gone.
+    fs::write(&skill, "---\nname: pend\ndescription: again\n---\nThird\n").unwrap();
+    git(&repo, &["commit", "-qam", "edit2"]);
+    update_all_in(&root, true, true).unwrap();
+    assert_eq!(entries_of(&root, &added.id).len(), 2);
+    let discarded = discard_in(&root, &added.id).unwrap();
+    assert!(discarded.pending.is_none());
+    assert_eq!(discarded.revision, new_head);
+    assert_eq!(entries_of(&root, &added.id).len(), 1);
+    assert!(accept_in(&root, &added.id).is_err());
+}
+
+#[test]
+fn newer_upstream_replaces_pending_generation_and_remove_deletes_it() {
+    let tmp = Dir::new();
+    let repo = source_repo(&tmp.0, "one");
+    let root = tmp.0.join("store");
+    let added = add_in(&root, &local_url(&repo), true).unwrap();
+    set_auto_update_in(&root, &added.id, true).unwrap();
+    commit_new_skill(&repo, "two");
+    update_all_in(&root, true, true).unwrap();
+    let second = commit_new_skill(&repo, "three");
+    update_all_in(&root, true, true).unwrap();
+    assert_eq!(entries_of(&root, &added.id).len(), 2, "old pending generation removed");
+    assert_eq!(catalog_in(&root).unwrap()[0].pending.as_ref().unwrap().revision, second);
+    remove_in(&root, &added.id).unwrap();
+    assert!(!root.join(&added.id).exists());
+}
+
 /// Recipe on a local copy of the real ponytail fixture: automatic update after a new commit that
 /// adds one skill and removes another (both copies), with the report, skills and conflicts checked.
 #[test]
@@ -275,14 +337,15 @@ fn ponytail_auto_update_reports_added_and_removed_skills_without_conflict() {
     assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
     assert_eq!(outcome.reports.len(), 1);
     let report = &outcome.reports[0];
-    assert!(report.updated);
-    assert_eq!(report.previous_revision, added.revision);
-    assert_eq!(report.new_revision, new_head);
-    assert_eq!(report.added_skills, vec!["ponytail-new".to_string()]);
-    assert_eq!(report.removed_skills, vec!["ponytail-gain".to_string()]);
+    assert!(!report.updated);
+    assert_eq!(report.repository.pending.as_ref().unwrap().revision, new_head);
+    let report = SkillRepositoryUpdateReport { repository: accept_in(&root, &added.id).unwrap(), ..report.clone() };
+    assert_eq!(report.repository.revision, new_head);
     assert!(report.repository.enabled && report.repository.auto_update);
     assert_eq!(report.repository.skills.len(), 6);
     assert!(report.repository.skills.iter().all(|s| !s.conflict));
+    let names: Vec<&str> = report.repository.skills.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"ponytail-new") && !names.contains(&"ponytail-gain"));
     let ponytail = report.repository.skills.iter().find(|s| s.name == "ponytail").unwrap();
     assert!(ponytail.description.as_deref().unwrap_or_default().ends_with("Levels: lite, full (default), ultra."));
     assert_eq!(catalog_in(&root).unwrap()[0].revision, new_head);

@@ -1,0 +1,13 @@
+{
+  "id": "add-slugify",
+  "prompt": "Add a function `slugify(text)` to textutil.py: lowercase, words joined by single hyphens, every character that is not a letter or a digit is a separator, no leading or trailing hyphen. Do not change the tests.",
+  "tags": [
+    "feature"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

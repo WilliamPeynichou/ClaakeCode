@@ -1,5 +1,7 @@
-// Bundles the RLM chat engine: `prime-agent` (built from a pinned commit) and `uv` (pinned
-// release, SHA-256 verified). Prime finds `uv` on PATH; the app puts the sidecar directory first.
+// Bundles the RLM chat engine: `prime-agent` (built from a pinned commit), its Python kernel
+// sources `prime-agent-runtime` (same commit, shipped as a resource) and `uv` (pinned release,
+// SHA-256 verified). Prime finds `uv` on PATH; the app puts the sidecar directory first.
+// Without `prime-agent-runtime` the kernel cannot be installed: it is not on any package registry.
 //
 // Opt-in because compiling Prime takes minutes: runs only when CLAAKECODE_BUNDLE_PRIME=1
 // (release CI) or when invoked directly with --force. Windows is skipped: the daemon transport
@@ -27,6 +29,7 @@ const UV_SHA256 = {
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, "..");
 const binariesDir = path.join(projectRoot, "src-tauri", "binaries");
+const runtimeDir = path.join(projectRoot, "src-tauri", "prime", "prime-agent-runtime");
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
@@ -48,6 +51,7 @@ export async function preparePrime() {
     await ensureUv(triple);
     await ensurePrime(triple);
   }
+  await ensureRuntime();
   if (process.platform === "darwin") {
     for (const name of ["uv", "prime-agent"]) {
       await lipo(name, triples);
@@ -92,6 +96,19 @@ async function ensureUv(triple) {
 async function ensurePrime(triple) {
   const out = outputPath("prime-agent", triple);
   if (await isFile(out)) return console.log(`prime-agent already present: ${triple}`);
+  const src = await primeSource();
+  // Prime's release profile keeps debuginfo (~2x size); strip it for the bundle only.
+  await run("cargo", ["build", "--release", "--locked", "-p", "pa-cli", "--bin", "prime-agent", "--target", triple], src, {
+    CARGO_PROFILE_RELEASE_DEBUG: "0",
+    CARGO_PROFILE_RELEASE_STRIP: "symbols",
+  });
+  await fs.copyFile(path.join(src, "target", triple, "release", "prime-agent"), out);
+  await fs.chmod(out, 0o755);
+  console.log(`prepared ${path.relative(projectRoot, out)}`);
+}
+
+/** Pinned Prime checkout: CLAAKECODE_PRIME_SRC, or a shallow clone in the temp dir. */
+async function primeSource() {
   const src = process.env.CLAAKECODE_PRIME_SRC ?? path.join(os.tmpdir(), `claakecode-prime-${PRIME_SHA.slice(0, 12)}`);
   if (!(await isFile(path.join(src, "Cargo.toml")))) {
     await run("git", ["init", "-q", src]);
@@ -102,14 +119,27 @@ async function ensurePrime(triple) {
   if (stdout.trim() !== PRIME_SHA) {
     throw new Error(`prime sources at ${src} are ${stdout.trim()}, expected pinned ${PRIME_SHA}`);
   }
-  // Prime's release profile keeps debuginfo (~2x size); strip it for the bundle only.
-  await run("cargo", ["build", "--release", "--locked", "-p", "pa-cli", "--bin", "prime-agent", "--target", triple], src, {
-    CARGO_PROFILE_RELEASE_DEBUG: "0",
-    CARGO_PROFILE_RELEASE_STRIP: "symbols",
-  });
-  await fs.copyFile(path.join(src, "target", triple, "release", "prime-agent"), out);
-  await fs.chmod(out, 0o755);
-  console.log(`prepared ${path.relative(projectRoot, out)}`);
+  return src;
+}
+
+/** Python sources of the kernel, copied from the same pinned commit as the binary. */
+async function ensureRuntime() {
+  const stamp = path.join(runtimeDir, ".prime-sha");
+  const current = await fs.readFile(stamp, "utf8").catch(() => "");
+  if (current.trim() === PRIME_SHA && (await isFile(path.join(runtimeDir, "pyproject.toml")))) {
+    return console.log("prime-agent-runtime already present");
+  }
+  const from = path.join(await primeSource(), "prime-agent-runtime");
+  await fs.rm(runtimeDir, { recursive: true, force: true });
+  await fs.mkdir(runtimeDir, { recursive: true });
+  for (const entry of ["pyproject.toml", "uv.lock", "src"]) {
+    await fs.cp(path.join(from, entry), path.join(runtimeDir, entry), {
+      recursive: true,
+      filter: (file) => !file.includes("__pycache__"),
+    });
+  }
+  await fs.writeFile(stamp, `${PRIME_SHA}\n`);
+  console.log(`prepared ${path.relative(projectRoot, runtimeDir)}`);
 }
 
 async function lipo(name, triples) {

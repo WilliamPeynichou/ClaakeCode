@@ -1,0 +1,13 @@
+{
+  "id": "extract-constant",
+  "prompt": "geometry.py repeats the literal 3.14159 in several functions. Introduce a module constant named PI and use it everywhere; the literal must appear exactly once in the file. Behaviour must not change. Do not change the tests.",
+  "tags": [
+    "refactor"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

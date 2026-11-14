@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     time::Duration,
 };
 
@@ -8,6 +8,7 @@ use rand::Rng;
 use serde_json::{json, Map, Value};
 use tokio::{sync::mpsc, task::JoinHandle};
 use uuid::Uuid;
+use std::path::Path;
 
 use claakecode_core::{
     AppError, ChatMessage, Part, PartKind, ProviderRequest, Role, StopReason, StreamEvent,
@@ -22,7 +23,7 @@ use super::{
         can_auto_compact_history, is_context_length_error, maybe_auto_compact_history,
         run_auto_compaction,
     },
-    context::{AgentMode, TurnContext, TurnOutput},
+    context::{AgentMode, RunHandle, TurnContext, TurnOutput},
     events::{attach_token_usage, send_event, send_token_usage_event, AgentEvent, AgentEventScope},
     history::{
         append_interrupted_tool_results, history_with_current_tool_result_ids,
@@ -30,12 +31,20 @@ use super::{
         successful_read_fingerprints,
     },
     mode::{run_update_goal, system_prompt_for_turn, update_goal_descriptor},
-    tool_dispatch::{run_tool, should_wait_for_cooperative_cancel},
+    tool_dispatch::{
+        is_parallel_safe, run_parallel_safe_tool, run_tool, should_wait_for_cooperative_cancel,
+    },
     tool_preflight::{preflight_error_result, ToolPreflightRegistry},
     tool_summary::{display_mcp_server_name, pretty_json, should_stream_tool_args, summarize_tool},
 };
 
-use crate::{system_prompt_with_todo, tool_names, ReadFingerprint, TodoListState, ToolRunResult};
+use crate::{
+    run_engine::{
+        advance, head_commit, run_path, step_instruction, system_block, Graph, Guard, Recovered, Run,
+        RunStatus, Verdict,
+    },
+    system_prompt_with_todo, tool_names, AppStore, ReadFingerprint, TodoListState, ToolRunResult,
+};
 
 const SAFE_STREAM_MAX_RETRIES: usize = 5;
 
@@ -76,6 +85,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         event_tx,
         cancel,
         mut cmd_rx,
+        run,
     } = ctx;
 
     let mut measurement = crate::model_turns::TurnMeasurement::new(
@@ -96,6 +106,13 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
     let mut current_turn_tool_result_ids = BTreeSet::new();
     let mut eager_tool_results = BTreeMap::<String, JoinHandle<ToolRunResult>>::new();
     let mut read_fingerprints = successful_read_fingerprints(&history, &read);
+    let mut active_run = run.as_ref().and_then(|handle| {
+        Run::load(&run_path(&handle.workspace_root, &handle.conversation_id))
+            .ok()
+            .flatten()
+            .filter(|run| run.status == RunStatus::Active)
+    });
+    let mut step_changed_paths = BTreeSet::<String>::new();
     let mut todo_final_answer_guard_attempted = false;
     todo_list.normalize();
 
@@ -174,6 +191,10 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 current_system_prompt.push_str("\n\n");
                 current_system_prompt.push_str(&team_reminder);
             }
+        }
+        if let Some(active) = &active_run {
+            current_system_prompt.push_str("\n\n");
+            current_system_prompt.push_str(&system_block(active));
         }
         let current_system_prompt = system_prompt_for_turn(
             &current_system_prompt,
@@ -595,8 +616,136 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         if let Some(usage) = response_usage {
             attach_token_usage(&mut assistant, provider.name(), &model.name, usage);
         }
+        // Lot C4: the model wants to end its turn, the guard of the active run decides.
+        let mut pending_run_message = None;
+        if let (Some(handle), Some(active)) = (&run, active_run.as_mut()) {
+            if !cancelled
+                && !matches!(stop_reason, StopReason::ToolUse)
+                && eager_tool_results.is_empty()
+                && matches!(mode, AgentMode::Act | AgentMode::Goal)
+                && loops < max_tool_rounds
+            {
+                let path = run_path(&handle.workspace_root, &handle.conversation_id);
+                // Lot E2: a delegated step is played by its sub-agent before the guard is judged.
+                let delegate = subagents.as_deref().filter(|_| delegated_profile(active).is_some());
+                let mut delegated_notes = Vec::<String>::new();
+                let mut judging_cancelled = false;
+                let mut verdict = if delegate.is_some() {
+                    None
+                } else {
+                    let judged = advance(active, &handle.workspace_root);
+                    tokio::pin!(judged);
+                    let outcome = tokio::select! {
+                        biased;
+                        command = cmd_rx.recv() => Err(command),
+                        verdict = &mut judged => Ok(verdict),
+                    };
+                    match outcome {
+                        Ok(verdict) => Some(verdict),
+                        Err(Some(EngineCommand::Cancel)) => {
+                            judging_cancelled = true;
+                            None
+                        }
+                        Err(None) => Some(judged.await),
+                    }
+                };
+                if let Some(subagents) = subagents.as_deref() {
+                    while !judging_cancelled && active.status == RunStatus::Active {
+                        let Some(profile) = delegated_profile(active) else { break };
+                        if matches!(verdict, Some(Verdict::Escalate { .. })) {
+                            break;
+                        }
+                        let result = run_delegated_step(
+                            subagents, active, &profile, mode, &event_tx, event_scope.as_ref(),
+                        )
+                        .await;
+                        delegated_notes.push(format!(
+                            "Step {} was delegated to {profile}. Result: {}",
+                            active.step,
+                            result.content.chars().take(2_000).collect::<String>()
+                        ));
+                        if cancel.is_cancelled() {
+                            judging_cancelled = true;
+                            break;
+                        }
+                        verdict = Some(advance(active, &handle.workspace_root).await);
+                        let _ = active.save(&path);
+                    }
+                }
+                match verdict.filter(|_| !judging_cancelled) {
+                    None => cancelled = true,
+                    Some(verdict) => {
+                        if let Err(error) = active.save(&path) {
+                            tracing::warn!("unable to save run: {error}");
+                        }
+                        if let Verdict::Next { recovered: Some(recovered), .. }
+                        | Verdict::Done { recovered: Some(recovered) } = &verdict
+                        {
+                            capture_guard_lesson(&database.store(), handle, active, recovered, &step_changed_paths);
+                        }
+                        pending_run_message = run_guard_message(&verdict, active);
+                        if !delegated_notes.is_empty() && !matches!(verdict, Verdict::Escalate { .. }) {
+                            let notes = delegated_notes.join("\n\n");
+                            pending_run_message = Some(match pending_run_message.take() {
+                                Some(message) => format!("{notes}\n\n{message}"),
+                                None => notes,
+                            });
+                        }
+                        match verdict {
+                            Verdict::Next { .. } => step_changed_paths.clear(),
+                            Verdict::Refused { .. } | Verdict::Done { .. } => {}
+                            Verdict::Escalate { guard, reasons } => {
+                                if question_enabled {
+                                    append_question_call(
+                                        &mut assistant,
+                                        &event_tx,
+                                        event_scope.as_ref(),
+                                        format!("{RUN_ARBITRAGE_PREFIX}{}", Uuid::new_v4()),
+                                        run_arbitrage_question(&guard, &reasons),
+                                    );
+                                    stop_reason = StopReason::ToolUse;
+                                } else {
+                                    active.status = RunStatus::Stopped;
+                                    let _ = active.save(&path);
+                                    send_event(
+                                        &event_tx,
+                                        event_scope.as_ref(),
+                                        AgentEvent::Error {
+                                            message: format!(
+                                                "run stopped: guard refused {} times",
+                                                crate::run_engine::MAX_REFUSALS
+                                            ),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if active_run.as_ref().is_some_and(|active| active.status != RunStatus::Active) {
+            active_run = None;
+        }
+        if cancelled && eager_tool_results.is_empty() {
+            if !assistant.parts.is_empty() {
+                history.push(assistant);
+            }
+            break 'conversation;
+        }
         if !assistant.parts.is_empty() {
             history.push(assistant.clone());
+        }
+        if let Some(text) = pending_run_message {
+            history.push(ChatMessage {
+                role: Role::User,
+                parts: vec![Part::Text {
+                    text,
+                    meta: Some(json!({ "system_reminder": true, "run_guard": true })),
+                }],
+            });
+            loops += 1;
+            continue 'conversation;
         }
 
         if !matches!(stop_reason, StopReason::ToolUse) && !eager_tool_results.is_empty() {
@@ -636,7 +785,56 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         loops += 1;
 
         let mut tool_results = Vec::new();
-        for part in &assistant.parts {
+        let mut round_edited = false;
+        let batch_end = parallel_batches(&assistant.parts, &tool_settings);
+        let mut prefetched = HashMap::<String, ToolRunResult>::new();
+        for (part_index, part) in assistant.parts.iter().enumerate() {
+            if cancelled {
+                break;
+            }
+            if let Some(&end) = batch_end.get(&part_index) {
+                // Lancé ici et pas avant : une lecture après un edit_file doit voir le fichier modifié.
+                let calls: Vec<(&String, &String, &Value)> = assistant.parts[part_index..end]
+                    .iter()
+                    .filter_map(|part| match part {
+                        Part::ToolCall {
+                            id, name, input, ..
+                        } => Some((id, name, input)),
+                        _ => None,
+                    })
+                    .collect();
+                let batch = futures_util::future::join_all(calls.iter().map(
+                    |(_, name, input)| {
+                        run_parallel_safe_tool(
+                            &glob,
+                            &grep,
+                            &read,
+                            &web_search,
+                            &web_fetch,
+                            name,
+                            (*input).clone(),
+                        )
+                    },
+                ));
+                tokio::pin!(batch);
+                let outcome = tokio::select! {
+                    biased;
+                    command = cmd_rx.recv() => Err(command),
+                    results = &mut batch => Ok(results),
+                };
+                let results = match outcome {
+                    Ok(results) => results,
+                    Err(Some(EngineCommand::Cancel)) => {
+                        cancelled = true;
+                        abort_eager_tool_results(&mut eager_tool_results);
+                        break;
+                    }
+                    Err(None) => batch.await,
+                };
+                for ((id, _, _), result) in calls.iter().zip(results) {
+                    prefetched.insert((*id).clone(), result);
+                }
+            }
             if let Part::ToolCall {
                 id, name, input, ..
             } = part
@@ -646,7 +844,11 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 } else if name == "clean_context" {
                     run_clean_context(&mut history, input.clone(), &current_turn_tool_result_ids)
                 } else if name == "update_goal" {
-                    run_update_goal(&mut goal_workflow, input.clone())
+                    // Lot C5: a goal with an active run is complete only when its guard is green.
+                    match goal_guard_refusal(run.as_ref(), &mut active_run).await {
+                        Some(refusal) => refusal,
+                        None => run_update_goal(&mut goal_workflow, input.clone()),
+                    }
                 } else if let Some(handle) = eager_tool_results.remove(id) {
                     match handle.await {
                         Ok(result) => result,
@@ -654,6 +856,8 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             ToolRunResult::err(format!("write_file task failed: {err}"), Vec::new())
                         }
                     }
+                } else if let Some(result) = prefetched.remove(id) {
+                    result
                 } else if should_wait_for_cooperative_cancel(
                     name,
                     subagents.as_ref(),
@@ -682,6 +886,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                         &mut todo_list,
                         mode,
                         &event_tx,
+                        event_scope.as_ref(),
                         &cancel,
                         id,
                         name,
@@ -728,6 +933,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                             &mut todo_list,
                             mode,
                             &event_tx,
+                            event_scope.as_ref(),
                             &cancel,
                             id,
                             name,
@@ -743,8 +949,42 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 {
                     update_read_fingerprint_cache(&mut read_fingerprints, result.meta.as_ref());
                 }
+                if !result.is_error && matches!(canonical_name, tool_names::EDIT_FILE | tool_names::WRITE_FILE) {
+                    round_edited = true;
+                }
+                for change in &result.file_changes {
+                    step_changed_paths.insert(change.relative_path.clone());
+                }
+                if id.starts_with(RUN_ARBITRAGE_PREFIX) {
+                    if let (Some(handle), Some(active)) = (&run, active_run.as_mut()) {
+                        apply_run_arbitrage(active, result.is_error, result.meta.as_ref());
+                        let _ = active.save(&run_path(&handle.workspace_root, &handle.conversation_id));
+                    }
+                    if active_run.as_ref().is_some_and(|active| active.status != RunStatus::Active) {
+                        active_run = None;
+                    }
+                }
                 let result_images = result.images.clone();
-                let result_content = result.content.clone();
+                let mut result_content = result.content.clone();
+                if canonical_name == tool_names::SKILL
+                    && !result.is_error
+                    && matches!(mode, AgentMode::Act | AgentMode::Goal)
+                {
+                    let graph = result.meta.as_ref().and_then(|m| m.get("run_graph")).and_then(Value::as_str);
+                    if let (Some(handle), Some(graph)) = (&run, graph) {
+                        let store = database.store();
+                        let profile_exists = |profile: &str| {
+                            subagents.as_deref().is_some_and(|subagents| {
+                                subagents.summary_for_tool_name(&format!("subagent_{profile}")).is_some()
+                            })
+                        };
+                        start_run_from_graph(
+                            handle, &store, &cancel, &event_tx, event_scope.as_ref(), id,
+                            Path::new(graph), &profile_exists, &mut active_run, &mut result_content,
+                        )
+                        .await;
+                    }
+                }
                 if let Some(teams) = &teams {
                     teams
                         .record_current_agent_file_changes(name, &result.file_changes)
@@ -818,6 +1058,22 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
 
         if tool_results.is_empty() {
             break;
+        }
+
+        // Lot E3: show compile errors right after an edit. One bounded check, never retried.
+        if round_edited && !cancelled && active_run.is_none() {
+            if let Some((handle, command)) =
+                run.as_ref().and_then(|handle| Some((handle, handle.verify_command.clone()?)))
+            {
+                let guard = Guard::Command { run: command.clone(), timeout_secs: 120 };
+                let verdict = crate::run_engine::judge(&guard, &handle.workspace_root, None).await;
+                if let Some(text) = post_edit_check_message(&verdict, &command) {
+                    tool_results.push(Part::Text {
+                        text,
+                        meta: Some(json!({ "system_reminder": true, "post_edit_check": true })),
+                    });
+                }
+            }
         }
 
         let stop_after_question_result = tool_results.iter().any(|part| {
@@ -958,12 +1214,47 @@ pub(super) fn retain_cancelled_visible_parts(message: &mut ChatMessage) {
     });
 }
 
+/// Indice du premier appel d'un lot -> indice exclusif de fin. Un lot = au moins 2 appels
+/// consécutifs, parallélisables, activés, sans approbation.
+fn parallel_batches(parts: &[Part], settings: &crate::ToolSettings) -> HashMap<usize, usize> {
+    let mut batches = HashMap::new();
+    let mut run: Option<(usize, usize, usize)> = None; // (début, fin exclue, nombre d'appels)
+    let mut close = |run: &mut Option<(usize, usize, usize)>| {
+        if let Some((start, end, count)) = run.take() {
+            if count >= 2 {
+                batches.insert(start, end);
+            }
+        }
+    };
+    for (index, part) in parts.iter().enumerate() {
+        let Part::ToolCall { name, .. } = part else {
+            continue; // texte et réflexion entre deux appels n'exécutent rien
+        };
+        let batchable = is_parallel_safe(name)
+            && settings.is_enabled(name)
+            && !settings.requires_approval(name)
+            && preflight_error_result(part).is_none();
+        if batchable {
+            let entry = run.get_or_insert((index, index, 0));
+            entry.1 = index + 1;
+            entry.2 += 1;
+        } else {
+            close(&mut run);
+        }
+    }
+    close(&mut run);
+    batches
+}
+
 fn should_run_eager_write_file(
     name: &str,
     mode: AgentMode,
     tool_settings: &crate::ToolSettings,
 ) -> bool {
-    name == "write_file" && mode != AgentMode::Plan && tool_settings.is_enabled(name)
+    name == "write_file"
+        && mode != AgentMode::Plan
+        && tool_settings.is_enabled(name)
+        && !tool_settings.requires_approval(name)
 }
 
 fn abort_eager_tool_results(handles: &mut BTreeMap<String, JoinHandle<ToolRunResult>>) {
@@ -1014,13 +1305,273 @@ fn stream_retry_delay(attempt: usize) -> Duration {
     Duration::from_millis((base_ms as f64 * jitter) as u64)
 }
 
+const ACCEPTED_RUN_GRAPHS: &str = "accepted_run_graphs";
+
+/// Starts a run for a skill's graph.json after user approval; appends the outcome to the tool result.
+#[allow(clippy::too_many_arguments)]
+async fn start_run_from_graph(
+    handle: &RunHandle,
+    store: &AppStore,
+    cancel: &super::cancel::TurnCancel,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    scope: Option<&AgentEventScope>,
+    tool_call_id: &str,
+    graph_path: &Path,
+    profile_exists: &(dyn Fn(&str) -> bool + Send + Sync),
+    active_run: &mut Option<Run>,
+    content: &mut String,
+) {
+    let (graph, sha) = match std::fs::read(graph_path)
+        .map_err(anyhow::Error::from)
+        .and_then(|bytes| Graph::parse(&bytes))
+    {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            content.push_str(&format!("\n\n[graph.json ignored: {error}]"));
+            return;
+        }
+    };
+    if let Some(run) = active_run.as_ref().filter(|run| run.status == RunStatus::Active) {
+        content.push_str(&format!("\n\n[a run is already active: {}]", run.id));
+        return;
+    }
+    if let Err(error) = crate::run_engine::validate_profiles(&graph, profile_exists) {
+        content.push_str(&format!("\n\n[run not started: {error}]"));
+        return;
+    }
+    let mut accepted: Vec<String> = store.load_json_setting(ACCEPTED_RUN_GRAPHS).ok().flatten().unwrap_or_default();
+    if !accepted.contains(&sha) {
+        let mut detail = String::new();
+        for (name, step) in &graph.steps {
+            detail.push_str(&format!("step {name} (guard {})\n", step.guard));
+        }
+        for (name, guard) in &graph.guards {
+            if let Guard::Command { run, .. } = guard {
+                detail.push_str(&format!("guard {name} runs: {run}\n"));
+            }
+        }
+        if !super::approval::request_approval(cancel, event_tx, scope, tool_call_id, "run_graph", detail).await {
+            content.push_str("\n\n[run not started: graph not approved]");
+            return;
+        }
+        accepted.push(sha.clone());
+        let _ = store.save_json_setting(ACCEPTED_RUN_GRAPHS, &accepted);
+    }
+    let graph_dir = graph_path.parent().unwrap_or(graph_path).display().to_string();
+    let mut run = Run::new(graph, sha, graph_dir, head_commit(&handle.workspace_root));
+    let verdict = advance(&mut run, &handle.workspace_root).await;
+    // A fresh step failing its guard is work to do, not a refusal.
+    if matches!(verdict, Verdict::Refused { .. }) {
+        run.refusals.clear();
+        run.last_reasons.clear();
+    }
+    if let Err(error) = run.save(&run_path(&handle.workspace_root, &handle.conversation_id)) {
+        content.push_str(&format!("\n\n[run not started: {error}]"));
+        return;
+    }
+    if run.status == RunStatus::Done {
+        content.push_str("\n\n[run already complete]");
+    } else {
+        match (delegated_profile(&run), step_instruction(&run)) {
+            (Some(profile), _) => content.push_str(&format!(
+                "\n\n[run started: step `{}` is delegated to sub-agent profile `{profile}`; end your turn to let it run]",
+                run.step
+            )),
+            (None, Ok(text)) => content.push_str(&format!("\n\n<run_step name=\"{}\">\n{text}\n</run_step>", run.step)),
+            (None, Err(error)) => content.push_str(&format!("\n\n[run step unreadable: {error}]")),
+        }
+        *active_run = Some(run);
+    }
+}
+
+const RUN_ARBITRAGE_PREFIX: &str = "run-arbitrage-";
+
+/// Lot E2: sub-agent profile of the current step, if it is delegated.
+fn delegated_profile(run: &Run) -> Option<String> {
+    run.graph.steps.get(&run.step).and_then(|step| step.profile.clone())
+}
+
+/// Lot E2: plays the current step in a sub-agent (fresh context, model of the profile),
+/// announced to the interface like a real tool call.
+async fn run_delegated_step(
+    subagents: &crate::SubAgentTool,
+    run: &Run,
+    profile: &str,
+    mode: AgentMode,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    scope: Option<&AgentEventScope>,
+) -> ToolRunResult {
+    let mut prompt = step_instruction(run).unwrap_or_default();
+    if prompt.trim().is_empty() {
+        prompt = format!("Complete step `{}` of the current run.", run.step);
+    }
+    if !run.last_reasons.is_empty() {
+        prompt.push_str(&format!(
+            "\n\nThe guard refused the previous attempt:\n- {}",
+            run.last_reasons.join("\n- ")
+        ));
+    }
+    let id = format!("run-step-{}", Uuid::new_v4());
+    let name = format!("subagent_{profile}");
+    let input = json!({ "prompt": prompt });
+    send_event(event_tx, scope, AgentEvent::ToolStarted { id: id.clone(), name: name.clone() });
+    send_event(
+        event_tx,
+        scope,
+        AgentEvent::ToolReady {
+            id: id.clone(),
+            summary: summarize_tool(&name, &input),
+            args_pretty: pretty_json(&input),
+        },
+    );
+    let result = subagents
+        .run(&id, &name, input, mode, event_tx.clone())
+        .await
+        .unwrap_or_else(|| ToolRunResult::err(format!("unknown profile {profile}"), Vec::new()));
+    send_event(
+        event_tx,
+        scope,
+        AgentEvent::ToolFinished {
+            id,
+            output: result.content.clone(),
+            is_error: result.is_error,
+            file_changes: result.file_changes.clone(),
+            images: result.images.clone(),
+            meta: result.meta.clone(),
+        },
+    );
+    result
+}
+
+/// Lot E3: nothing when the check passes, a tagged block with the reasons when it fails.
+pub(super) fn post_edit_check_message(verdict: &crate::run_engine::GuardVerdict, command: &str) -> Option<String> {
+    match verdict {
+        crate::run_engine::GuardVerdict::Pass => None,
+        crate::run_engine::GuardVerdict::Fail(reasons) => Some(format!(
+            "<post_edit_check command=\"{command}\">\n{}\n</post_edit_check>",
+            reasons.join("\n")
+        )),
+    }
+}
+
+/// Text sent back to the model after a guard verdict; `None` when the turn may end.
+/// The full step instruction is repeated on the first refusal only.
+pub(super) fn run_guard_message(verdict: &Verdict, run: &Run) -> Option<String> {
+    let instruction = || step_instruction(run).unwrap_or_default();
+    match verdict {
+        Verdict::Next { step, .. } => Some(format!(
+            "The previous step passed its guard. Next step of the run:\n\n<run_step name=\"{step}\">\n{}\n</run_step>",
+            instruction()
+        )),
+        Verdict::Refused { guard, reasons, count } => {
+            let mut text = format!(
+                "You cannot end this turn yet: guard `{guard}` of run step `{}` refused ({count}/{}):\n- {}",
+                run.step,
+                crate::run_engine::MAX_REFUSALS,
+                reasons.join("\n- ")
+            );
+            if *count == 1 {
+                let instruction = instruction();
+                if !instruction.is_empty() {
+                    text.push_str(&format!("\n\n<run_step name=\"{}\">\n{instruction}\n</run_step>", run.step));
+                }
+            }
+            text.push_str("\n\nFix this, then end your turn again: the guard is checked on disk, not on your word.");
+            Some(text)
+        }
+        Verdict::Escalate { .. } | Verdict::Done { .. } => None,
+    }
+}
+
+fn run_arbitrage_question(guard: &str, reasons: &[String]) -> Value {
+    let reason: String = reasons.first().map(String::as_str).unwrap_or("").chars().take(300).collect();
+    json!({
+        "question": format!(
+            "La garde {guard} a refusé {} fois : {reason}. Que faire ?",
+            crate::run_engine::MAX_REFUSALS
+        ),
+        "type": "single_choice",
+        "options": [{ "label": "Arrêter" }, { "label": "Reprendre" }]
+    })
+}
+
+/// Answer to the arbitrage question: stop the run, retry, or retry with the user's note.
+/// A dismissed question stops the run.
+pub(super) fn apply_run_arbitrage(run: &mut Run, is_error: bool, meta: Option<&Value>) {
+    let answer = meta
+        .and_then(|meta| meta.get("question_answers"))
+        .and_then(|answers| answers.get(0))
+        .and_then(|first| first.get(0))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|answer| !answer.is_empty());
+    let guard = run.graph.steps.get(&run.step).map(|step| step.guard.clone()).unwrap_or_default();
+    match answer {
+        Some(answer) if !is_error && answer != "Arrêter" => {
+            run.refusals.insert(guard, 0);
+            if answer != "Reprendre" {
+                run.human_note = Some(answer.to_string());
+            }
+        }
+        _ => run.status = RunStatus::Stopped,
+    }
+}
+
+/// Lot C5: `Some(error result)` while the active run is not done.
+async fn goal_guard_refusal(handle: Option<&RunHandle>, active_run: &mut Option<Run>) -> Option<ToolRunResult> {
+    let (handle, active) = (handle?, active_run.as_mut()?);
+    let verdict = advance(active, &handle.workspace_root).await;
+    let _ = active.save(&run_path(&handle.workspace_root, &handle.conversation_id));
+    let refusal = match verdict {
+        Verdict::Done { .. } => None,
+        Verdict::Next { step, .. } => Some(format!("goal is not complete: the run is now at step `{step}`")),
+        Verdict::Refused { guard, reasons, .. } | Verdict::Escalate { guard, reasons } => Some(format!(
+            "goal is not complete: guard `{guard}` refused: {}",
+            reasons.join("; ")
+        )),
+    };
+    if refusal.is_none() {
+        *active_run = None;
+    }
+    refusal.map(|message| ToolRunResult::err(message, Vec::new()))
+}
+
+/// Lot D3: an error fixed in front of a guard leaves a sourced candidate lesson, without any
+/// model call. A refused insertion (duplicate, learning off) never fails the turn.
+fn capture_guard_lesson(
+    store: &AppStore,
+    handle: &RunHandle,
+    run: &Run,
+    recovered: &Recovered,
+    changed_paths: &BTreeSet<String>,
+) {
+    if !store.learning_enabled_for(&handle.conversation_id) {
+        return;
+    }
+    let reasons = recovered.reasons.join("; ");
+    let first_line: String = reasons.lines().next().unwrap_or("").chars().take(120).collect();
+    let paths = changed_paths.iter().take(10).cloned().collect::<Vec<_>>().join(", ");
+    let paths = if paths.is_empty() { "(no tracked file change)".to_string() } else { paths };
+    let lesson = crate::lessons::NewLesson {
+        title: format!("Garde {} : {first_line}", recovered.guard),
+        content: format!("Refus : {reasons}. Corrigé en modifiant : {paths}."),
+        source_kind: "guard_refusal".into(),
+        evidence: format!("{reasons}\n--- passed after {} refusal(s); files: {paths}", recovered.refusals),
+        tags: run.graph.tags.clone(),
+        run_id: Some(run.id.clone()),
+        conversation_id: Some(handle.conversation_id.clone()),
+    };
+    if let Err(error) = store.insert_lesson(lesson) {
+        tracing::warn!("guard lesson not saved: {error}");
+    }
+}
+
 fn append_plan_fallback_question(
     message: &mut ChatMessage,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
     event_scope: Option<&AgentEventScope>,
 ) {
     let id = format!("plan-question-{}", Uuid::new_v4());
-    let name = tool_names::QUESTION.to_string();
     let input = json!({
         "question": "Je peux continuer a preparer le plan. Tu veux ajouter une contrainte avant que je le cree ?",
         "type": "single_choice",
@@ -1036,6 +1587,18 @@ fn append_plan_fallback_question(
         ]
     });
 
+    append_question_call(message, event_tx, event_scope, id, input);
+}
+
+/// Adds a synthetic `question` tool call to the assistant message, announced like a real one.
+fn append_question_call(
+    message: &mut ChatMessage,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    event_scope: Option<&AgentEventScope>,
+    id: String,
+    input: Value,
+) {
+    let name = tool_names::QUESTION.to_string();
     send_event(
         event_tx,
         event_scope,
@@ -1069,4 +1632,69 @@ fn assistant_has_question_tool(message: &ChatMessage) -> bool {
             Part::ToolCall { name, .. } if tool_names::is_tool_name(name, tool_names::QUESTION)
         )
     })
+}
+
+#[cfg(test)]
+mod run_start_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn accepted_graph_starts_run() {
+        let base = std::env::temp_dir().join(format!("claakecode-c3-{}", Uuid::new_v4()));
+        let skill = base.join("skill");
+        std::fs::create_dir_all(skill.join("steps")).unwrap();
+        std::fs::write(skill.join("steps/a.md"), "Do A").unwrap();
+        let graph = br#"{"start":"a","steps":{"a":{"instructions":["steps/a.md"],"guard":"g","next":null}},"guards":{"g":{"type":"command","run":"false","timeoutSecs":5}}}"#;
+        std::fs::write(skill.join("graph.json"), graph).unwrap();
+        let (_, sha) = Graph::parse(graph).unwrap();
+        let store = AppStore::in_memory().unwrap();
+        store.save_json_setting(ACCEPTED_RUN_GRAPHS, &vec![sha]).unwrap();
+        let handle = RunHandle { workspace_root: base.clone(), conversation_id: "c1".into(), verify_command: None };
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let (mut active, mut content) = (None, String::from("Loaded"));
+        start_run_from_graph(
+            &handle, &store, &super::super::cancel::TurnCancel::empty(), &tx, None, "t1",
+            &skill.join("graph.json"), &|_| false, &mut active, &mut content,
+        )
+        .await;
+        assert!(content.contains("<run_step"), "{content}");
+        assert!(run_path(&base, "c1").is_file());
+        assert!(active.is_some());
+        std::fs::remove_dir_all(&base).ok();
+    }
+}
+
+#[cfg(test)]
+mod parallel_tests {
+    use super::*;
+
+    fn call(name: &str) -> Part {
+        Part::ToolCall {
+            id: format!("id-{name}"),
+            name: name.to_string(),
+            input: json!({}),
+            meta: None,
+        }
+    }
+
+    #[test]
+    fn parallel_batches_groups_consecutive_reads() {
+        let parts = [call("read"), call("read"), call("edit_file"), call("read"), call("grep")];
+        let batches = parallel_batches(&parts, &crate::ToolSettings::default());
+        assert_eq!(batches, HashMap::from([(0, 2), (3, 5)]));
+    }
+
+    #[test]
+    fn parallel_batches_ignores_lone_reads() {
+        let parts = [call("read"), call("edit_file"), call("read")];
+        assert!(parallel_batches(&parts, &crate::ToolSettings::default()).is_empty());
+    }
+
+    #[test]
+    fn parallel_batches_excludes_tools_requiring_approval() {
+        let settings: crate::ToolSettings =
+            serde_json::from_str(r#"{"tools":[{"name":"grep","requireApproval":true}]}"#).unwrap();
+        let parts = [call("read"), call("grep"), call("read"), call("glob")];
+        assert_eq!(parallel_batches(&parts, &settings), HashMap::from([(2, 4)]));
+    }
 }

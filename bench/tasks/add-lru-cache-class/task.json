@@ -1,0 +1,13 @@
+{
+  "id": "add-lru-cache-class",
+  "prompt": "Add a class `LRUCache(capacity)` to cache.py with `get(key)` (None when absent) and `put(key, value)`. When full, `put` evicts the least recently used key; `get` counts as a use. Do not change the tests.",
+  "tags": [
+    "feature"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

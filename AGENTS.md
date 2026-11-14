@@ -2,7 +2,7 @@ Code map:
 - `.github/workflows/release.yml` : build macOS universel sur `macos-15-intel` explicite pour contourner la saturation du parc ARM64 ; cibles Intel et Apple Silicon conservées.
 - Correctif Mistral streaming : `crates/claakecode-mistral/src/wire.rs` accepte texte ou fragments structurés ; `stream.rs` sépare thinking/texte et teste les formats, outils et usages.
 - Settings Skills : `src/components/SettingsPane.tsx` garde la bibliothèque et l’éditeur prioritaires, avec gestion Git repliable en pied de page ; `src/styles.css` borne son défilement indépendamment.
-- Dépôts de skills Git : `crates/claakecode-app/src/skill.rs` lit l’en-tête des SKILL.md avec `serde_yaml` (`>`/`|`, repli tolérant si YAML invalide) ; `skill_repository.rs` ignore les dossiers cachés (sauf dépôt qui n’a que ça), dédoublonne les copies internes (« doublon ignoré »), et met à jour par clone neuf validé (`auto_update` par dépôt, `update_all_in`) ; tests dans `skill_repository_{tests,security_tests,update_tests}.rs` (+ recette réseau ponytail `--ignored`) et fixtures `crates/claakecode-app/tests/fixtures/ponytail/` ; tâche de fond démarrage + 6 h et commandes dans `src-tauri/src/conversations.rs` / `lib.rs` (événement `skill-repositories-updated`) ; UI (interrupteur mise à jour auto, badge, « Tout mettre à jour », notification) dans `SettingsPane.tsx`.
+- Dépôts de skills Git : `crates/claakecode-app/src/skill.rs` lit l’en-tête des SKILL.md avec `serde_yaml` (`>`/`|`, repli tolérant si YAML invalide) ; `skill_repository.rs` ignore les dossiers cachés (sauf dépôt qui n’a que ça), dédoublonne les copies internes (« doublon ignoré »), et met à jour par clone neuf validé (`auto_update` par dépôt, `update_all_in`) ; tests dans `skill_repository_{tests,security_tests,update_tests}.rs` (+ recette réseau ponytail `--ignored`) et fixtures `crates/claakecode-app/tests/fixtures/ponytail/` ; tâche de fond démarrage + 6 h et commandes dans `src-tauri/src/conversations.rs` / `lib.rs` (événement `skill-repositories-updated`) ; UI (interrupteur mise à jour auto, badge, « Tout mettre à jour », notification) dans `SettingsPane.tsx`. Mise à jour auto = génération en attente (`Record.pending`, fichiers changés), appliquée seulement via accept/discard (A4).
 - Catalogue de modèles distant : `models.json` (racine, aussi embarqué dans le binaire) ; `crates/claakecode-core/src/catalog.rs` valide (niveaux de thinking limités à ceux transmis fidèlement par chaque adaptateur), fusionne (distant gagne, `hidden` masque, ordre du fichier) et sert les limites aux crates providers (secours prudent par provider) ; `crates/claakecode-app/src/model_catalog.rs` télécharge une fois par lancement (3 s, tâche de fond dans `src-tauri/src/lib.rs`) puis émet `model-catalog-updated` ; cache SQLite `model_catalog` ; UI : `src/lib/models.ts` (`applyModelCatalog`, `startModelCatalogSync`, `useModelCatalogVersion`, `fallbackModelEntry` ; thinking piloté par le catalogue) vérifié par `scripts/check-models.mjs`, bulle compagnon qui garde mode/modèle choisis, `remote/public/app.js` ; CI `.github/workflows/models-catalog.yml`.
 - Popup « nouveaux modèles » : `src/lib/modelAnnouncements.ts` (état localStorage `claakecode:model-announcements:v1` : ids déjà vus + en attente, base silencieuse au 1er lancement) alimenté par `applyModelCatalog` dans `src/lib/models.ts` ; `src/components/NewModelsPopup.tsx/.css` (dialog natif, monté dans `src/App.tsx`) ; tests dans `scripts/check-models.mjs`. Le skill `add-models` est privé (`~/.claakecode/skills/add-models`), jamais dans `src-tauri/bundled-skills` (test `shipped_bundle_is_valid…`).
 - L'agent doit garder à jour cette carte simple des fichiers à chaque création, suppression, renommage, déplacement ou modification.
@@ -95,6 +95,7 @@ Code map:
 │   │       ├── agent.rs
 │   │       ├── agent
 │   │       │   ├── assistant_message.rs
+│   │       │   ├── approval.rs — approbation par outil : request_approval bloque via le canal des questions (id « approval:<tool_call_id> »), réponses once/turn/rejet
 │   │       │   ├── cancel.rs
 │   │       │   ├── clean_context.rs
 │   │       │   ├── compaction.rs
@@ -108,25 +109,29 @@ Code map:
 │   │       │   ├── tool_summary.rs
 │   │       │   └── turn.rs
 │   │       ├── bash.rs
+│   │       ├── bench.rs — lots D4/D5 : tâches de banc (bench/tasks/<id>/task.json + repo/), run_task avec le vrai harness, promotion_verdict ; tests
 │   │       ├── compact.rs
 │   │       ├── database.rs
 │   │       ├── database_tool.rs
-│   │       ├── edit.rs
+│   │       ├── edit.rs — edit_file tout ou rien (restauration si une écriture échoue)
 │   │       ├── glob.rs
 │   │       ├── grep.rs
 │   │       ├── image.rs
 │   │       ├── lib.rs
+│   │       ├── lessons.rs — lot D2 : table lessons (migration v13), CRUD, statuts candidate/validated/rejected, lessons_prompt_block injecté dans les deux harness ; tests
 │   │       ├── mcp.rs
 │   │       ├── model_stats.rs — benchmark B1 : agrégation des `token_usage` de l'historique par harness/provider/modèle (réponses, tokens, cache via prompt_tokens normalisé, outils en erreur), export CSV, tests
 │   │       ├── powershell.rs
 │   │       ├── prime_memory.rs — lecture/édition/suppression atomiques du harness Prime (global + session-artifacts), tests ; commandes list/edit/delete_rlm_memory
-│   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
+│   │       ├── prime.rs — boundary daemon Prime v7 : lifecycle Sidecar (start/stop, env minimal), mapping session_event → PrimeEvent → AgentEvent (RlmStream), create_session(_with sessionPath pour rouvrir)/set_model/run_prompt/abort_session, write_auth_file (auth.json 0600, access token seul), connexion persistante send/receive, PI_PACKAGE_DIR vers Resources/prime quand prime-agent-runtime (sources Python du noyau, copiées par scripts/prepare-prime-sidecar.mjs) n'est pas à côté du binaire, commandes JSONL bornées, timeout, correlation, erreurs expurgées et tests (attach/événements/refus/EOF/limites)
 │   │       ├── python.rs
 │   │       ├── question.rs
 │   │       ├── read.rs
+│   │       ├── run_engine.rs — lots C1-C2 : graphe d'étapes (Graph/Step/Guard/Run), validation, advance_with, step_instruction, system_block, run_path ; gardes jugées sur disque (judge/advance/head_commit) ; Verdict.recovered (D3) ; branché dans agent/turn.rs en fin de tour (C4), sur update_goal (C5) ; agent/test_support.rs = ScriptedProvider pour tester la boucle sans modèle ; tests
+│   │       ├── sandbox.rs — lot A2a : bac à sable d'écriture macOS (sandbox-exec) et Linux (bwrap, lot A2b : jamais compilé ni testé) pour bash, python et les gardes Command ; interrupteur global set_enabled, réglage sandbox_enabled ; tests
 │   │       ├── skill.rs — outil skill + priority_skill_section : le skill « CLAAKE.md » est injecté en tête du prompt de tout agent
 │   │       ├── model_turns.rs — mesures locales sans contenu, collecte run_turn (classique/sous-agents) et RLM, agrégats médians, effacement et tarifs manuels ; migration store v12
-│   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10) ; model_stats(since_ms, harness) pour le benchmark ; table model_turns v12
+│   │       ├── store.rs — SQLite ; colonne harness classic/rlm (migration v10) ; model_stats(since_ms, harness) pour le benchmark ; table model_turns v12 ; réglages learning_enabled + learning_disabled_conversations (D1)
 │   │       ├── subagent.rs
 │   │       ├── team.rs
 │   │       ├── team

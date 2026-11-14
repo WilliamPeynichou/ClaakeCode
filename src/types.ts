@@ -191,6 +191,7 @@ export type ToolConfig = {
   description: string;
   defaultDescription: string;
   enabled: boolean;
+  requireApproval?: boolean;
 };
 
 export type ImageProvider = "gptImage2" | "nanoBanana2";
@@ -694,6 +695,7 @@ export type SkillRepository = {
   absolutePath: string;
   skills: RepositorySkill[];
   warnings: string[];
+  pending?: { checkout: string; revision: string; changedFiles: string[] } | null;
 };
 
 export type SkillRepositoryUpdateReport = {
@@ -974,6 +976,7 @@ export type AgentEvent =
   | { type: "tool_args_delta"; id: string; delta: string }
   | { type: "tool_output_delta"; id: string; delta: string }
   | { type: "tool_ready"; id: string; summary: string; args_pretty: string }
+  | { type: "approval_requested"; id: string; name: string; detail: string }
   | {
       type: "tool_finished";
       id: string;

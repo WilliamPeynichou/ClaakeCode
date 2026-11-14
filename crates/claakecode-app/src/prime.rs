@@ -678,8 +678,24 @@ pub fn sidecar_env(config: &SidecarConfig, root: &std::path::Path) -> Vec<(Strin
         ("DO_NOT_TRACK".into(), "1".into()),
         ("PI_OFFLINE".into(), "1".into()),
     ];
+    if let Some(dir) = package_dir(&config.binary) {
+        env.push(("PI_PACKAGE_DIR".into(), dir.display().to_string()));
+    }
     env.extend(config.credentials.iter().cloned());
     env
+}
+
+/// Where Prime finds `prime-agent-runtime` (the Python sources of its kernel) when it is not
+/// next to the binary: the bundle ships it as a resource. `None` keeps Prime's own lookup
+/// (next to its executable). macOS bundle layout only for now.
+fn package_dir(binary: &std::path::Path) -> Option<std::path::PathBuf> {
+    let has_runtime = |dir: &std::path::Path| dir.join("prime-agent-runtime").join("pyproject.toml").is_file();
+    let exe_dir = binary.parent()?;
+    if has_runtime(exe_dir) {
+        return None;
+    }
+    let resources = exe_dir.parent()?.join("Resources").join("prime");
+    has_runtime(&resources).then_some(resources)
 }
 
 #[cfg(unix)]
@@ -776,6 +792,23 @@ pub use unsupported::*;
 mod tests {
     use super::*;
     #[test]
+    fn package_dir_points_to_bundled_runtime() {
+        let app = std::env::temp_dir().join(format!("cc-prime-pkg-{}", uuid::Uuid::new_v4()));
+        let binary = app.join("MacOS").join("prime-agent");
+        std::fs::create_dir_all(app.join("MacOS")).unwrap();
+        assert_eq!(package_dir(&binary), None);
+        let resources = app.join("Resources").join("prime");
+        std::fs::create_dir_all(resources.join("prime-agent-runtime")).unwrap();
+        std::fs::write(resources.join("prime-agent-runtime").join("pyproject.toml"), "").unwrap();
+        assert_eq!(package_dir(&binary), Some(resources));
+        // Next to the binary (dev build): Prime finds it alone.
+        std::fs::create_dir_all(app.join("MacOS").join("prime-agent-runtime")).unwrap();
+        std::fs::write(app.join("MacOS").join("prime-agent-runtime").join("pyproject.toml"), "").unwrap();
+        assert_eq!(package_dir(&binary), None);
+        let _ = std::fs::remove_dir_all(app);
+    }
+
+    #[test]
     fn sidecar_env_is_minimal_and_private() {
         let config = SidecarConfig {
             binary: "prime-agent".into(), data_dir: "/data".into(),
@@ -790,6 +823,7 @@ mod tests {
         assert!(get("PATH").unwrap().starts_with("/opt/uv:"));
         assert_eq!(get("ANTHROPIC_API_KEY"), Some("k"));
         assert!(get("SSH_AUTH_SOCK").is_none());
+        assert!(get("PI_PACKAGE_DIR").is_none());
     }
     fn session_event(event: Value) -> Value {
         json!({"type":"session_event","activeSessionId":"s1","meta":{"sequence":7,"replayed":true},"event":event})

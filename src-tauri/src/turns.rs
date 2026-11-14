@@ -126,7 +126,12 @@ pub(super) async fn send_message(
         &input.attachments,
         plan_control,
     )?;
-    let turn_system_prompt = with_turn_plan_reminder(&effective_system_prompt, turn_plan_reminder);
+    let mut turn_system_prompt = with_turn_plan_reminder(&effective_system_prompt, turn_plan_reminder);
+    if state.store.learning_enabled_for(&input.conversation_id) {
+        if let Some(block) = state.store.lessons_prompt_for(&input.conversation_id, text) {
+            turn_system_prompt = format!("{turn_system_prompt}\n\n{block}");
+        }
+    }
     let mut mode_model_settings = conversation.mode_model_settings.clone();
     let selected_model = model_with_optional_selection(
         mode_model_settings.get(policy.mode),
@@ -152,7 +157,14 @@ pub(super) async fn send_message(
     conversation.plan_workflow = next_plan_workflow.clone();
     conversation.goal_workflow = if policy.mode == AgentMode::Goal {
         match message_visibility {
-            MessageVisibilityInput::Normal => start_goal_workflow(text),
+            MessageVisibilityInput::Normal => {
+                // Lot C5: the command is typed by the user, so no approval is asked. A resumed
+                // goal (SystemReminder) keeps its run.
+                if let Some(command) = input.verify_command.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                    start_goal_run(&workspace_root, &conversation.id, command).map_err(error_to_string)?;
+                }
+                start_goal_workflow(text)
+            }
             MessageVisibilityInput::SystemReminder => {
                 resume_goal_workflow(std::mem::take(&mut conversation.goal_workflow))
             }
@@ -208,6 +220,7 @@ pub(super) async fn send_message(
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
         cache_stable_message_count: turn_user_history_index,
+        run: Some(claakecode_app::RunHandle { workspace_root: workspace_root.clone(), conversation_id: conversation.id.clone(), verify_command: state.store.verify_command_for(&workspace_id) }),
         service_tier,
         auto_compact: true,
         mode: policy.mode,
@@ -811,11 +824,19 @@ pub(super) async fn answer_question(
         .get(&input.conversation_id)
         .cloned();
 
-    Ok(sender
+    let answered = sender
         .map(|sender| {
-            sender.answer_question(&input.tool_call_id, input.answers, input.stop_questions)
+            sender.answer_question(&input.tool_call_id, input.answers.clone(), input.stop_questions)
         })
-        .unwrap_or(false))
+        .unwrap_or(false);
+    // Swarm teammates outlive the turn: their approvals wait on the team's cancel group.
+    Ok(answered
+        || state.team_runtime.read().await.answer_question(
+            &input.conversation_id,
+            &input.tool_call_id,
+            input.answers,
+            input.stop_questions,
+        ))
 }
 
 #[tauri::command]
@@ -832,9 +853,15 @@ pub(super) async fn reject_question(
         .get(&input.conversation_id)
         .cloned();
 
-    Ok(sender
+    let rejected = sender
         .map(|sender| sender.reject_question(&input.tool_call_id))
-        .unwrap_or(false))
+        .unwrap_or(false);
+    Ok(rejected
+        || state
+            .team_runtime
+            .read()
+            .await
+            .reject_question(&input.conversation_id, &input.tool_call_id))
 }
 
 #[tauri::command]
@@ -1844,4 +1871,32 @@ pub(super) fn restore_workspace_for_rewrite(
         emit_workspace_file_change(app, workspace_root, &relative_path);
     }
     Ok(())
+}
+
+/// Lot C5: a verified Goal is a one-step run whose guard is the user's command.
+fn start_goal_run(workspace_root: &std::path::Path, conversation_id: &str, command: &str) -> anyhow::Result<()> {
+    use claakecode_app::run_engine::{head_commit, run_path, Graph, Run};
+    let graph = serde_json::json!({
+        "start": "goal",
+        "steps": { "goal": { "guard": "verify" } },
+        "guards": { "verify": { "type": "command", "run": command, "timeoutSecs": 600 } }
+    });
+    let (graph, sha) = Graph::parse(&serde_json::to_vec(&graph)?)?;
+    Run::new(graph, sha, workspace_root.display().to_string(), head_commit(workspace_root))
+        .save(&run_path(workspace_root, conversation_id))
+}
+
+#[cfg(test)]
+mod goal_run_tests {
+    #[test]
+    fn goal_run_is_written_with_the_user_command() {
+        use claakecode_app::run_engine::{run_path, Guard, Run, RunStatus};
+        let root = std::env::temp_dir().join(format!("claakecode-goal-run-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        super::start_goal_run(&root, "c1", "cargo test").unwrap();
+        let run = Run::load(&run_path(&root, "c1")).unwrap().unwrap();
+        assert_eq!(run.status, RunStatus::Active);
+        assert!(matches!(&run.graph.guards["verify"], Guard::Command { run, timeout_secs: 600 } if run == "cargo test"));
+        std::fs::remove_dir_all(root).ok();
+    }
 }

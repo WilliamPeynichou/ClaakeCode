@@ -176,6 +176,58 @@ export const api = {
   exportModelStatsCsv(filter: ModelStatsFilter, path: string) {
     return invoke<void>("export_model_stats_csv", { input: { ...filter, path } });
   },
+  getVerifyCommand(workspacePath: string) {
+    return invoke<string>("get_verify_command", { workspacePath });
+  },
+  setVerifyCommand(workspacePath: string, command: string) {
+    return invoke<void>("set_verify_command", { workspacePath, command });
+  },
+  getSandboxEnabled() {
+    return invoke<boolean>("get_sandbox_enabled");
+  },
+  setSandboxEnabled(enabled: boolean) {
+    return invoke<void>("set_sandbox_enabled", { enabled });
+  },
+  getLearningEnabled() {
+    return invoke<boolean>("get_learning_enabled");
+  },
+  setLearningEnabled(enabled: boolean) {
+    return invoke<void>("set_learning_enabled", { enabled });
+  },
+  getConversationLearning(conversationId: string) {
+    return invoke<boolean>("get_conversation_learning", { conversationId });
+  },
+  setConversationLearning(conversationId: string, enabled: boolean) {
+    return invoke<void>("set_conversation_learning", { conversationId, enabled });
+  },
+  listLessons(status?: string) {
+    return invoke<Lesson[]>("list_lessons", { status });
+  },
+  updateLesson(id: string, title: string, content: string) {
+    return invoke<void>("update_lesson", { id, title, content });
+  },
+  deleteLesson(id: string) {
+    return invoke<void>("delete_lesson", { id });
+  },
+  clearLessons() {
+    return invoke<void>("clear_lessons");
+  },
+  addLesson(title: string, content: string, evidence: string) {
+    return invoke<Lesson>("add_lesson", { title, content, evidence });
+  },
+  importSeedLessons() {
+    return invoke<number>("import_seed_lessons");
+  },
+  importPrimeMemory(title: string, content: string) {
+    return invoke<Lesson>("import_prime_memory", { title, content });
+  },
+  /** Runs the agent bench without then with the lesson (spends model quota). */
+  validateLesson(lessonId: string, providerId: string, modelId: string) {
+    return invoke<Lesson>("validate_lesson", { lessonId, providerId, modelId });
+  },
+  stopBenchRun() {
+    return invoke<void>("stop_bench_run");
+  },
   listRlmMemories() {
     return invoke<RlmMemoryEntry[]>("list_rlm_memories");
   },
@@ -393,6 +445,12 @@ export const api = {
   },
   setSkillRepositoryEnabled(id: string, enabled: boolean) {
     return invoke<void>("set_skill_repository_enabled_command", { input: { id, enabled } });
+  },
+  acceptSkillRepositoryUpdate(id: string) {
+    return invoke<SkillRepository>("accept_skill_repository_update_command", { input: { id } });
+  },
+  discardSkillRepositoryUpdate(id: string) {
+    return invoke<SkillRepository>("discard_skill_repository_update_command", { input: { id } });
   },
   removeSkillRepository(id: string) {
     return invoke<void>("remove_skill_repository_command", { input: { id } });
@@ -852,6 +910,11 @@ export const api = {
         planControl,
         messageVisibility,
         revertWorkspaceChanges,
+        // Lot C5: only a new Goal carries its verification command.
+        verifyCommand:
+          mode === "goal" && messageVisibility !== "systemReminder"
+            ? goalVerifyCommands.get(conversationId)?.trim() || undefined
+            : undefined,
       },
     });
   },
@@ -1056,3 +1119,29 @@ export const api = {
     });
   },
 };
+
+/** Lot C5: verification command typed in the composer for a Goal, per conversation. */
+const goalVerifyCommands = new Map<string, string>();
+export function setGoalVerifyCommand(conversationId: string, command: string) {
+  goalVerifyCommands.set(conversationId, command);
+}
+export function getGoalVerifyCommand(conversationId: string) {
+  return goalVerifyCommands.get(conversationId) ?? "";
+}
+
+export interface Lesson {
+  id: string;
+  title: string;
+  content: string;
+  status: "candidate" | "validated" | "rejected";
+  sourceKind: string;
+  evidence: string;
+  tags: string[];
+  runId: string | null;
+  conversationId: string | null;
+  scoreWithout: number | null;
+  scoreWith: number | null;
+  benchRuns: number;
+  createdAtMs: number;
+  updatedAtMs: number;
+}

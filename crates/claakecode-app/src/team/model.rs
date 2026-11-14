@@ -7,6 +7,26 @@ pub struct TeamRuntime {
     pub(super) workspace_write_locks: HashMap<String, Arc<Semaphore>>,
 }
 
+impl TeamRuntime {
+    /// Swarm teammates wait on their team's own cancel group, not on the conversation turn:
+    /// approvals they request are answered here.
+    pub fn answer_question(&self, scope_id: &str, tool_call_id: &str, answers: Vec<Vec<String>>, stop: bool) -> bool {
+        self.scope_cancels(scope_id)
+            .any(|cancel| cancel.answer_question(tool_call_id, answers.clone(), stop))
+    }
+
+    pub fn reject_question(&self, scope_id: &str, tool_call_id: &str) -> bool {
+        self.scope_cancels(scope_id).any(|cancel| cancel.reject_question(tool_call_id))
+    }
+
+    fn scope_cancels(&self, scope_id: &str) -> impl Iterator<Item = &TurnCancel> {
+        self.scopes
+            .get(scope_id)
+            .into_iter()
+            .flat_map(|scope| scope.team_cancels.values().flatten())
+    }
+}
+
 #[derive(Debug, Default)]
 pub(super) struct TeamScope {
     pub(super) active_team: Option<String>,

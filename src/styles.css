@@ -700,8 +700,33 @@ textarea {
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-2);
-  max-height: 200px;
+  max-height: 280px;
   overflow-y: auto;
+}
+.updater-lock__notes h2 {
+  margin: 12px 0 6px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text-0);
+}
+.updater-lock__notes h2:first-child {
+  margin-top: 0;
+}
+.updater-lock__notes code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-3, rgba(255, 255, 255, 0.06));
+}
+.updater-lock__note-item {
+  display: flex;
+  gap: 8px;
+}
+.updater-lock__note-item > span:first-child {
+  color: var(--text-3);
 }
 .updater-lock__notes p {
   margin: 0 0 6px;

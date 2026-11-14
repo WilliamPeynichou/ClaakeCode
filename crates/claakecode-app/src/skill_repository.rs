@@ -55,6 +55,18 @@ pub struct SkillRepository {
     pub absolute_path: String,
     pub skills: Vec<RepositorySkill>,
     pub warnings: Vec<String>,
+    /// Automatic update cloned and validated but not yet accepted by the user.
+    #[serde(default)]
+    pub pending: Option<PendingUpdate>,
+}
+
+/// A new generation waiting for the user's accord. `changed_files` is capped at 200 paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingUpdate {
+    pub checkout: String,
+    pub revision: String,
+    pub changed_files: Vec<String>,
 }
 
 /// Outcome of one update: the repository as now installed, plus what changed.
@@ -106,6 +118,8 @@ struct Record {
     auto_update: bool,
     revision: String,
     checkout: String,
+    #[serde(default)]
+    pending: Option<PendingUpdate>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -142,6 +156,9 @@ fn read_manifest(root: &Path) -> Result<Manifest> {
     for record in &manifest.repositories {
         check_id(&record.id)?;
         check_id(&record.checkout)?;
+        if let Some(pending) = &record.pending {
+            check_id(&pending.checkout)?;
+        }
     }
     Ok(manifest)
 }
@@ -491,6 +508,7 @@ fn describe(root: &Path, record: &Record) -> Result<SkillRepository> {
         absolute_path: path.display().to_string(),
         skills,
         warnings,
+        pending: record.pending.clone(),
     })
 }
 
@@ -505,6 +523,7 @@ fn unavailable(root: &Path, record: &Record, error: anyhow::Error) -> SkillRepos
         absolute_path: checkout_path(root, record).display().to_string(),
         skills: Vec::new(),
         warnings: vec![format!("Repository unavailable: {error:#}")],
+        pending: record.pending.clone(),
     }
 }
 
@@ -539,7 +558,13 @@ pub fn list_skill_repositories(
 }
 
 /// Clone into staging, validate, then publish. Any failure leaves the previous state untouched.
-fn install_in(root: &Path, url: &str, existing: Option<&Record>, allow_local: bool) -> Result<SkillRepository> {
+fn install_in(
+    root: &Path,
+    url: &str,
+    existing: Option<&Record>,
+    allow_local: bool,
+    publish: bool,
+) -> Result<SkillRepository> {
     let mut manifest = read_manifest(root)?;
     if existing.is_none() && manifest.repositories.iter().any(|record| same_url(&record.url, url)) {
         bail!("this repository is already installed");
@@ -564,14 +589,26 @@ fn install_in(root: &Path, url: &str, existing: Option<&Record>, allow_local: bo
             bail!(NOT_A_SKILL_REPOSITORY);
         }
         fs::rename(&staging, &target)?;
-        let record = Record {
-            id: id.clone(),
-            name,
-            url: url.to_string(),
-            enabled: existing.map(|record| record.enabled).unwrap_or(true),
-            auto_update: existing.map(|record| record.auto_update).unwrap_or(false),
-            revision,
-            checkout: generation.clone(),
+        let record = match existing {
+            // Not published: the installed generation keeps serving, the new one waits for the user.
+            Some(previous) if !publish => Record {
+                pending: Some(PendingUpdate {
+                    checkout: generation.clone(),
+                    revision,
+                    changed_files: changed_files(&parent.join(&previous.checkout), &target)?,
+                }),
+                ..previous.clone()
+            },
+            _ => Record {
+                id: id.clone(),
+                name,
+                url: url.to_string(),
+                enabled: existing.map(|record| record.enabled).unwrap_or(true),
+                auto_update: existing.map(|record| record.auto_update).unwrap_or(false),
+                revision,
+                checkout: generation.clone(),
+                pending: None,
+            },
         };
         let described = describe(root, &record)?;
         manifest.repositories.retain(|other| other.id != id);
@@ -584,8 +621,14 @@ fn install_in(root: &Path, url: &str, existing: Option<&Record>, allow_local: bo
     match outcome {
         Ok(described) => {
             if let Some(previous) = existing {
-                // The previous generation is no longer referenced by the manifest.
-                let _ = fs::remove_dir_all(parent.join(&previous.checkout));
+                // Generations no longer referenced by the manifest: the replaced pending one, and
+                // the installed one when published.
+                if let Some(pending) = &previous.pending {
+                    let _ = fs::remove_dir_all(parent.join(&pending.checkout));
+                }
+                if publish {
+                    let _ = fs::remove_dir_all(parent.join(&previous.checkout));
+                }
             }
             Ok(described)
         }
@@ -600,10 +643,39 @@ fn install_in(root: &Path, url: &str, existing: Option<&Record>, allow_local: bo
     }
 }
 
+/// SHA-256 of every regular file (`.git` skipped), keyed by relative path.
+fn file_hashes(dir: &Path) -> Result<std::collections::BTreeMap<String, Vec<u8>>> {
+    use sha2::{Digest, Sha256};
+    let mut hashes = std::collections::BTreeMap::new();
+    let walker = walkdir::WalkDir::new(dir)
+        .follow_links(false)
+        .max_depth(MAX_DEPTH)
+        .into_iter()
+        .filter_entry(|entry| entry.depth() == 0 || entry.file_name().to_str() != Some(".git"));
+    for entry in walker.take(MAX_ENTRIES) {
+        let entry = entry?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let mut hasher = Sha256::new();
+        std::io::copy(&mut fs::File::open(entry.path())?, &mut hasher)?;
+        let relative = entry.path().strip_prefix(dir).unwrap_or(entry.path()).display().to_string();
+        hashes.insert(relative, hasher.finalize().to_vec());
+    }
+    Ok(hashes)
+}
+
+/// Relative paths added, removed or modified between two generations (max 200).
+fn changed_files(old: &Path, new: &Path) -> Result<Vec<String>> {
+    let (old, new) = (file_hashes(old)?, file_hashes(new)?);
+    let paths: BTreeSet<&String> = old.keys().chain(new.keys()).collect();
+    Ok(paths.into_iter().filter(|path| old.get(*path) != new.get(*path)).take(200).cloned().collect())
+}
+
 fn add_in(root: &Path, url: &str, allow_local: bool) -> Result<SkillRepository> {
     let url = normalized_url(url, allow_local)?;
     let _guard = lock();
-    install_in(root, &url, None, allow_local)
+    install_in(root, &url, None, allow_local, true)
 }
 
 fn find_record(root: &Path, id: &str) -> Result<Record> {
@@ -632,10 +704,11 @@ fn skill_names(repository: &SkillRepository) -> BTreeSet<String> {
 }
 
 /// Caller holds the lock. Checks upstream read-only first; a fresh clone is made only when it moved.
-fn update_locked(root: &Path, record: &Record, allow_local: bool) -> Result<SkillRepositoryUpdateReport> {
+fn update_locked(root: &Path, record: &Record, allow_local: bool, publish: bool) -> Result<SkillRepositoryUpdateReport> {
     let url = normalized_url(&record.url, allow_local)?;
     let remote = remote_head(&url, allow_local)?;
-    if remote == record.revision {
+    let already_pending = !publish && record.pending.as_ref().is_some_and(|pending| pending.revision == remote);
+    if remote == record.revision || already_pending {
         let repository = describe(root, record)?;
         return Ok(SkillRepositoryUpdateReport {
             previous_revision: record.revision.clone(),
@@ -648,7 +721,7 @@ fn update_locked(root: &Path, record: &Record, allow_local: bool) -> Result<Skil
     }
     let before = describe(root, record).map(|repository| skill_names(&repository)).unwrap_or_default();
     // Staged clone, validated, then published atomically; the previous generation is removed on success.
-    let repository = install_in(root, &url, Some(record), allow_local)?;
+    let repository = install_in(root, &url, Some(record), allow_local, publish)?;
     let after = skill_names(&repository);
     Ok(SkillRepositoryUpdateReport {
         previous_revision: record.revision.clone(),
@@ -664,7 +737,7 @@ fn update_in(root: &Path, id: &str, allow_local: bool) -> Result<SkillRepository
     check_id(id)?;
     let _guard = lock();
     let record = find_record(root, id)?;
-    update_locked(root, &record, allow_local)
+    update_locked(root, &record, allow_local, true)
 }
 
 /// Updates every enabled repository (only those with `auto_update` when `only_auto`).
@@ -676,8 +749,15 @@ fn update_all_in(root: &Path, only_auto: bool, allow_local: bool) -> Result<Skil
         if !record.enabled || (only_auto && !record.auto_update) {
             continue;
         }
-        match update_locked(root, &record, allow_local) {
-            Ok(report) if report.updated => outcome.reports.push(report),
+        match update_locked(root, &record, allow_local, !only_auto) {
+            // Also report a newly pending update; an unchanged pending one stays silent.
+            Ok(report)
+                if report.updated
+                    || report.repository.pending.as_ref().map(|p| &p.revision)
+                        != record.pending.as_ref().map(|p| &p.revision) =>
+            {
+                outcome.reports.push(report)
+            }
             Ok(_) => {}
             Err(error) => outcome.errors.push(SkillRepositoryUpdateError {
                 id: record.id.clone(),
@@ -687,6 +767,41 @@ fn update_all_in(root: &Path, only_auto: bool, allow_local: bool) -> Result<Skil
         }
     }
     Ok(outcome)
+}
+
+fn accept_in(root: &Path, id: &str) -> Result<SkillRepository> {
+    check_id(id)?;
+    let _guard = lock();
+    let mut manifest = read_manifest(root)?;
+    let record = manifest
+        .repositories
+        .iter_mut()
+        .find(|record| record.id == id)
+        .context("unknown skill repository")?;
+    let pending = record.pending.take().context("no pending update")?;
+    let previous = std::mem::replace(&mut record.checkout, pending.checkout);
+    record.revision = pending.revision;
+    let record = record.clone();
+    let described = describe(root, &record)?;
+    save_manifest(root, &manifest)?;
+    let _ = fs::remove_dir_all(root.join(id).join(previous));
+    Ok(described)
+}
+
+fn discard_in(root: &Path, id: &str) -> Result<SkillRepository> {
+    check_id(id)?;
+    let _guard = lock();
+    let mut manifest = read_manifest(root)?;
+    let record = manifest
+        .repositories
+        .iter_mut()
+        .find(|record| record.id == id)
+        .context("unknown skill repository")?;
+    let pending = record.pending.take().context("no pending update")?;
+    let record = record.clone();
+    save_manifest(root, &manifest)?;
+    let _ = fs::remove_dir_all(root.join(id).join(pending.checkout));
+    describe(root, &record)
 }
 
 fn set_enabled_in(root: &Path, id: &str, enabled: bool) -> Result<()> {
@@ -794,6 +909,16 @@ pub fn update_all_skill_repositories() -> Result<SkillRepositoryUpdateAllReport>
 /// Background run: enabled repositories with `auto_update` only. The caller drops the errors.
 pub fn update_automatic_skill_repositories() -> Result<SkillRepositoryUpdateAllReport> {
     update_all_in(&storage_root()?, true, false)
+}
+
+/// The user accepts the pending update: it becomes the served generation.
+pub fn accept_skill_repository_update(id: &str) -> Result<SkillRepository> {
+    accept_in(&storage_root()?, id)
+}
+
+/// The user declines the pending update: its generation is deleted.
+pub fn discard_skill_repository_update(id: &str) -> Result<SkillRepository> {
+    discard_in(&storage_root()?, id)
 }
 
 pub fn set_skill_repository_enabled(id: &str, enabled: bool) -> Result<()> {

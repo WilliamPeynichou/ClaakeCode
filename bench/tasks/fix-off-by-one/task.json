@@ -1,0 +1,13 @@
+{
+  "id": "fix-off-by-one",
+  "prompt": "`paginate` in pager.py returns the wrong items: page 1 must be the first `size` items. Fix the bug without changing the tests.",
+  "tags": [
+    "bug"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

@@ -1,0 +1,14 @@
+{
+  "id": "fix-bug-across-modules",
+  "prompt": "`monthly_report` returns wrong totals: amounts are stored in cents but shown as if they were euros. Find where the conversion is missing and fix it so the report shows euros with 2 decimals. Do not change the tests.",
+  "tags": [
+    "multi-file",
+    "bug"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

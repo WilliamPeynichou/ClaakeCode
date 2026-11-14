@@ -132,7 +132,6 @@ impl EditFileTool {
         let mut summaries = Vec::new();
         let mut no_change_summaries = Vec::new();
         let mut writes = Vec::new();
-        let mut partial_failure = None;
 
         for group in grouped.values_mut() {
             let expected = read_fingerprints.get(&group.relative_path).ok_or_else(|| {
@@ -152,41 +151,17 @@ impl EditFileTool {
             let original = fs::read_to_string(&group.absolute_path)
                 .with_context(|| format!("unable to read file {}", group.relative_path))?;
             let normalized_original = normalize_file_text(&original);
-            let outcome = match plan_file_edits(
+            let plan = plan_file_edits(
                 &group.relative_path,
                 &normalized_original.content,
                 &group.edits,
-            ) {
-                Ok(outcome) => outcome,
-                Err(err) => {
-                    if summaries.is_empty() && no_change_summaries.is_empty() {
-                        return Err(err);
-                    }
-                    partial_failure = Some(PartialEditFailure {
-                        relative_path: group.relative_path.clone(),
-                        failed_edit_index: 0,
-                        total_edit_count: group.edits.len(),
-                        error: err.to_string(),
-                    });
-                    break;
-                }
-            };
-            let plan = match outcome {
-                FileEditPlanOutcome::Complete(plan) => plan,
-                FileEditPlanOutcome::Partial { plan, failure } => {
-                    partial_failure = Some(failure);
-                    plan
-                }
-            };
+            )?;
             if plan.updated_content == normalized_original.content {
                 no_change_summaries.push(NoChangeFileEditSummary {
                     relative_path: group.relative_path.clone(),
                     replacement_count: plan.replacement_count,
                     skipped_noop_indices: plan.skipped_noop_indices.clone(),
                 });
-                if partial_failure.is_some() {
-                    break;
-                }
                 continue;
             }
 
@@ -200,43 +175,36 @@ impl EditFileTool {
                 group.relative_path.clone(),
                 group.absolute_path.clone(),
                 updated_content,
+                original,
             ));
-            if partial_failure.is_some() {
-                break;
-            }
         }
 
         if writes.is_empty() {
-            if let Some(failure) = &partial_failure {
-                let content =
-                    format_partial_edit_failure(failure, &summaries, &no_change_summaries);
-                return Ok(ToolRunResult::err(content, Vec::new()));
-            }
             bail!("{}", format_no_changes_error(&no_change_summaries));
         }
 
         let before = snapshot_workspace_paths(&self.workspace_root, &affected_paths);
-        let mut written_paths = Vec::new();
-        for (relative_path, absolute_path, content) in &writes {
+        let mut written: Vec<(&String, &PathBuf, &String)> = Vec::new();
+        for (relative_path, absolute_path, content, original) in &writes {
             if let Err(err) = fs::write(absolute_path, content) {
-                let after = snapshot_workspace_paths(&self.workspace_root, &affected_paths);
-                let file_changes = diff_snapshots(before, after);
-                let content =
-                    format_partial_write_error(relative_path, &written_paths, writes.len(), err);
-                return Ok(ToolRunResult::err(content, file_changes));
+                let mut message = format!(
+                    "edit_file applied nothing: write failed on {relative_path}. Error: {err}"
+                );
+                for (path, abs, orig) in written.iter().chain(std::iter::once(&(relative_path, absolute_path, original))) {
+                    if let Err(restore_err) = fs::write(abs, orig) {
+                        message.push_str(&format!("\nRestore failed on {path}: {restore_err}"));
+                    }
+                }
+                return Ok(ToolRunResult::err(message, Vec::new()));
             }
-            written_paths.push(relative_path.clone());
+            written.push((relative_path, absolute_path, original));
         }
         let after = snapshot_workspace_paths(&self.workspace_root, &affected_paths);
         let file_changes = diff_snapshots(before, after);
-        if let Some(failure) = &partial_failure {
-            let content = format_partial_edit_failure(failure, &summaries, &no_change_summaries);
-            return Ok(ToolRunResult::err(content, file_changes));
-        }
 
         let updated_fingerprints = writes
             .iter()
-            .map(|(_, absolute_path, _)| fingerprint_path(&self.workspace_root, absolute_path))
+            .map(|(_, absolute_path, _, _)| fingerprint_path(&self.workspace_root, absolute_path))
             .collect::<Result<Vec<_>>>()?;
 
         let content = format_edit_output(&summaries);
@@ -406,23 +374,6 @@ struct PlannedFileEdit {
     skipped_noop_indices: Vec<usize>,
 }
 
-#[derive(Debug)]
-enum FileEditPlanOutcome {
-    Complete(PlannedFileEdit),
-    Partial {
-        plan: PlannedFileEdit,
-        failure: PartialEditFailure,
-    },
-}
-
-#[derive(Debug)]
-struct PartialEditFailure {
-    relative_path: String,
-    failed_edit_index: usize,
-    total_edit_count: usize,
-    error: String,
-}
-
 struct FileEditSummary {
     relative_path: String,
     replacement_count: usize,
@@ -484,7 +435,7 @@ fn plan_file_edits(
     relative_path: &str,
     original: &str,
     edits: &[ReplacementInput],
-) -> Result<FileEditPlanOutcome> {
+) -> Result<PlannedFileEdit> {
     let multiple = edits.len() > 1;
     let mut updated_content = original.to_string();
     let mut replacement_count = 0usize;
@@ -499,33 +450,19 @@ fn plan_file_edits(
                 replacement_count += replacements.len();
                 updated_content = apply_replacements(&updated_content, &replacements);
             }
-            Err(err) => {
-                let plan = PlannedFileEdit {
-                    updated_content,
-                    replacement_count,
-                    skipped_noop_indices,
-                };
-                if plan.replacement_count > 0 || !plan.skipped_noop_indices.is_empty() {
-                    return Ok(FileEditPlanOutcome::Partial {
-                        plan,
-                        failure: PartialEditFailure {
-                            relative_path: relative_path.to_string(),
-                            failed_edit_index: index,
-                            total_edit_count: edits.len(),
-                            error: err.to_string(),
-                        },
-                    });
-                }
-                return Err(err);
-            }
+            Err(err) => bail!(
+                "edit_file applied nothing: {relative_path} edits[{index}] (edit {}/{}) failed. Error: {err}",
+                index + 1,
+                edits.len()
+            ),
         }
     }
 
-    Ok(FileEditPlanOutcome::Complete(PlannedFileEdit {
+    Ok(PlannedFileEdit {
         updated_content,
         replacement_count,
         skipped_noop_indices,
-    }))
+    })
 }
 
 enum SingleEditPlan {
@@ -1250,76 +1187,6 @@ fn apply_replacements(original: &str, replacements: &[PlannedReplacement]) -> St
     updated
 }
 
-fn format_partial_write_error(
-    failed_path: &str,
-    written_paths: &[String],
-    total_writes: usize,
-    err: std::io::Error,
-) -> String {
-    let failed_index = written_paths.len() + 1;
-    let mut output = format!(
-        "edit_file partially applied: wrote {} of {total_writes} files, then failed on {failed_path} (write {failed_index}/{total_writes}). Error: {err}",
-        written_paths.len()
-    );
-    if written_paths.is_empty() {
-        output.push_str("\nNo files were written before the failure.");
-    } else {
-        output.push_str("\nFiles written before failure:");
-        for (index, path) in written_paths.iter().enumerate() {
-            output.push_str(&format!("\n- {}. {path}", index + 1));
-        }
-    }
-    output.push_str(&format!("\nFailed file:\n- {failed_index}. {failed_path}"));
-    output
-}
-
-fn format_partial_edit_failure(
-    failure: &PartialEditFailure,
-    summaries: &[FileEditSummary],
-    no_change_summaries: &[NoChangeFileEditSummary],
-) -> String {
-    let failed_ordinal = failure.failed_edit_index + 1;
-    let mut output = format!(
-        "edit_file partially applied: stopped at {} edits[{}] (edit {failed_ordinal}/{}). Error: {}",
-        failure.relative_path, failure.failed_edit_index, failure.total_edit_count, failure.error
-    );
-    output.push_str("\n");
-    output.push_str(&failed_edit_continuation_text(
-        failure.failed_edit_index,
-        failure.total_edit_count,
-    ));
-
-    if summaries.is_empty() {
-        output.push_str("\nNo file changes were written before the failure.");
-    } else {
-        output.push_str("\nChanges written before failure:");
-        for summary in summaries {
-            output.push_str(&format!("\n- {}", file_edit_summary_text(summary)));
-        }
-    }
-
-    if !no_change_summaries.is_empty() {
-        output.push_str("\nFiles processed before failure with no written changes:");
-        for summary in no_change_summaries {
-            output.push_str(&format!("\n- {}", no_change_file_summary_text(summary)));
-        }
-    }
-
-    output
-}
-
-fn failed_edit_continuation_text(failed_edit_index: usize, total_edit_count: usize) -> String {
-    if failed_edit_index + 1 < total_edit_count {
-        format!(
-            "edits[{failed_edit_index}] failed; edits[{}] through edits[{}] were not attempted.",
-            failed_edit_index + 1,
-            total_edit_count - 1
-        )
-    } else {
-        format!("edits[{failed_edit_index}] failed.")
-    }
-}
-
 fn file_edit_summary_text(summary: &FileEditSummary) -> String {
     format!(
         "{} ({}{})",
@@ -1783,7 +1650,10 @@ mod tests {
             .await
             .expect_err("empty old content should fail");
 
-        assert_eq!(error.to_string(), "oldContent must not be empty in app.rs.");
+        assert_eq!(
+            error.to_string(),
+            "edit_file applied nothing: app.rs edits[0] (edit 1/1) failed. Error: oldContent must not be empty in app.rs."
+        );
         fs::remove_dir_all(root).ok();
     }
 
@@ -1810,14 +1680,10 @@ mod tests {
                 &fingerprints,
             )
             .await
-            .expect("partial edit failure should be reported as a tool result");
+            .expect_err("edit failure should abort the whole call");
 
-        assert!(result.is_error);
-        assert_eq!(
-            result.content,
-            "edit_file partially applied: stopped at app.rs edits[1] (edit 2/3). Error: edits[1].oldContent must not be empty in app.rs.\nedits[1] failed; edits[2] through edits[2] were not attempted.\nChanges written before failure:\n- app.rs (1 replacement)"
-        );
-        assert_eq!(fs::read_to_string(root.join("app.rs")).unwrap(), "A\nb\n");
+        assert!(result.to_string().starts_with("edit_file applied nothing"));
+        assert_eq!(fs::read_to_string(root.join("app.rs")).unwrap(), "a\nb\n");
         fs::remove_dir_all(root).ok();
     }
 
@@ -1844,7 +1710,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "Could not find oldContent in app.rs. No exact, fuzzy, or whitespace-tolerant match was found."
+            "edit_file applied nothing: app.rs edits[0] (edit 1/1) failed. Error: Could not find oldContent in app.rs. No exact, fuzzy, or whitespace-tolerant match was found."
         );
         fs::remove_dir_all(root).ok();
     }
@@ -1872,15 +1738,10 @@ mod tests {
                 &fingerprints,
             )
             .await
-            .expect("partial edit failure should be reported as a tool result");
+            .expect_err("edit failure should abort the whole call");
 
-        assert!(result.is_error);
-        assert_eq!(
-            result.content,
-            "edit_file partially applied: stopped at app.rs edits[1] (edit 2/3). Error: Could not find edits[1] in app.rs after applying previous edits. No exact, fuzzy, or whitespace-tolerant match was found for oldContent.\nedits[1] failed; edits[2] through edits[2] were not attempted.\nChanges written before failure:\n- app.rs (1 replacement)"
-        );
-        assert_eq!(fs::read_to_string(root.join("app.rs")).unwrap(), "A\nb\n");
-        assert_eq!(result.file_changes.len(), 1);
+        assert!(result.to_string().starts_with("edit_file applied nothing"));
+        assert_eq!(fs::read_to_string(root.join("app.rs")).unwrap(), "a\nb\n");
         fs::remove_dir_all(root).ok();
     }
 
@@ -1907,7 +1768,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "Found 2 occurrences of the text in app.rs. The text must be unique. Please provide more context to make it unique."
+            "edit_file applied nothing: app.rs edits[0] (edit 1/1) failed. Error: Found 2 occurrences of the text in app.rs. The text must be unique. Please provide more context to make it unique."
         );
         fs::remove_dir_all(root).ok();
     }
@@ -1935,18 +1796,12 @@ mod tests {
                 &fingerprints,
             )
             .await
-            .expect("partial edit failure should be reported as a tool result");
+            .expect_err("edit failure should abort the whole call");
 
-        assert!(result.is_error);
-        assert!(result.content.contains(
-            "edit_file partially applied: stopped at app.rs edits[1] (edit 2/3). Error: Found 2 occurrences of edits[1] in app.rs. Each oldContent must be unique. Please provide more context to make it unique."
-        ));
-        assert!(result
-            .content
-            .contains("edits[1] failed; edits[2] through edits[2] were not attempted."));
+        assert!(result.to_string().starts_with("edit_file applied nothing"));
         assert_eq!(
             fs::read_to_string(root.join("app.rs")).unwrap(),
-            "changed\nsame\nsame\n"
+            "first\nsame\nsame\n"
         );
         fs::remove_dir_all(root).ok();
     }
@@ -2133,7 +1988,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "Found 2 occurrences of the text in app.rs. The text must be unique. Please provide more context to make it unique."
+            "edit_file applied nothing: app.rs edits[0] (edit 1/1) failed. Error: Found 2 occurrences of the text in app.rs. The text must be unique. Please provide more context to make it unique."
         );
         assert_eq!(
             fs::read_to_string(root.join("app.rs")).unwrap(),
@@ -2429,7 +2284,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "Found 2 occurrences of the text in copy.txt. The text must be unique. Please provide more context to make it unique."
+            "edit_file applied nothing: copy.txt edits[0] (edit 1/1) failed. Error: Found 2 occurrences of the text in copy.txt. The text must be unique. Please provide more context to make it unique."
         );
         fs::remove_dir_all(root).ok();
     }
@@ -2625,9 +2480,43 @@ mod tests {
         fs::remove_dir_all(root).ok();
     }
 
+    #[tokio::test]
+    async fn leaves_all_files_untouched_when_one_edit_fails() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("create temp workspace");
+        fs::write(root.join("a.rs"), "old a\n").expect("write a");
+        fs::write(root.join("b.rs"), "old b\n").expect("write b");
+        let tool = EditFileTool::new(&root);
+        let fingerprints = fingerprints(&root, &["a.rs", "b.rs"]);
+
+        let outcome = tool
+            .edit(
+                json!({
+                    "files": [
+                        {"path": "a.rs", "edits": [{"oldContent": "old a", "newContent": "new a"}]},
+                        {"path": "b.rs", "edits": [{"oldContent": "missing", "newContent": "new b"}]}
+                    ]
+                }),
+                &fingerprints,
+            )
+            .await;
+
+        let message = match outcome {
+            Ok(result) => {
+                assert!(result.file_changes.is_empty());
+                result.content
+            }
+            Err(err) => err.to_string(),
+        };
+        assert!(message.starts_with("edit_file applied nothing"));
+        assert_eq!(fs::read_to_string(root.join("a.rs")).unwrap(), "old a\n");
+        assert_eq!(fs::read_to_string(root.join("b.rs")).unwrap(), "old b\n");
+        fs::remove_dir_all(root).ok();
+    }
+
     #[cfg(unix)]
     #[tokio::test]
-    async fn reports_partial_write_failure_with_file_changes() {
+    async fn restores_written_files_when_a_later_write_fails() {
         use std::os::unix::fs::PermissionsExt;
 
         let root = unique_temp_dir();
@@ -2655,14 +2544,11 @@ mod tests {
         fs::set_permissions(root.join("b.rs"), fs::Permissions::from_mode(0o644))
             .expect("restore b permissions");
         assert!(result.is_error);
-        assert!(result.content.contains("edit_file partially applied"));
-        assert!(result.content.contains("wrote 1 of 2 files"));
-        assert!(result.content.contains("a.rs"));
-        assert!(result.content.contains("Failed file:\n- 2. b.rs"));
-        assert_eq!(fs::read_to_string(root.join("a.rs")).unwrap(), "new a\n");
+        assert!(result.content.starts_with("edit_file applied nothing"));
+        assert!(result.content.contains("b.rs"));
+        assert_eq!(fs::read_to_string(root.join("a.rs")).unwrap(), "old a\n");
         assert_eq!(fs::read_to_string(root.join("b.rs")).unwrap(), "old b\n");
-        assert_eq!(result.file_changes.len(), 1);
-        assert_eq!(result.file_changes[0].relative_path, "a.rs");
+        assert!(result.file_changes.is_empty());
         fs::remove_dir_all(root).ok();
     }
 

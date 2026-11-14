@@ -1,0 +1,13 @@
+{
+  "id": "replace-if-chain",
+  "prompt": "`shipping_cost` in shipping.py is a long if/elif chain. Replace it by a lookup in a module-level dict named RATES (country code -> cost), keeping the default cost of 20 for unknown countries. The function body must not contain `elif`. Do not change the tests.",
+  "tags": [
+    "refactor"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

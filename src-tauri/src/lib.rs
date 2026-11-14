@@ -127,6 +127,7 @@ use tokio::{
     sync::{mpsc, Mutex, Notify, RwLock},
 };
 
+mod bench_runs;
 mod benchmark;
 mod companion_chat;
 mod companion_entry;
@@ -174,6 +175,7 @@ pub fn run() {
         .try_init();
 
     let store = AppStore::open_default().expect("unable to open app store");
+    claakecode_app::sandbox::set_enabled(store.sandbox_enabled());
     claakecode_app::model_catalog::load_cached(&store);
     let openrouter_models = store.load_openrouter_models().unwrap_or_default();
     let mistral_models = store.load_mistral_models().unwrap_or_default();
@@ -474,6 +476,8 @@ pub fn run() {
             conversations::check_skill_repository_upstream_command,
             conversations::set_skill_repository_enabled_command,
             conversations::remove_skill_repository_command,
+            conversations::accept_skill_repository_update_command,
+            conversations::discard_skill_repository_update_command,
             conversations::save_skill_settings,
             turns::check_rewrite_workspace_restore,
             turns::send_message,
@@ -486,6 +490,14 @@ pub fn run() {
             rlm::list_rlm_memories,
             rlm::get_claaky_enabled,
             rlm::set_claaky_enabled,
+            rlm::get_verify_command,
+            rlm::set_verify_command,
+            rlm::get_sandbox_enabled,
+            rlm::set_sandbox_enabled,
+            rlm::get_learning_enabled,
+            rlm::set_learning_enabled,
+            rlm::get_conversation_learning,
+            rlm::set_conversation_learning,
             companion_window::companion_get_position,
             companion_window::companion_set_bubble_open,
             companion_window::companion_toggle_bubble,
@@ -508,6 +520,17 @@ pub fn run() {
             rlm::delete_rlm_memory,
             stats::get_model_stats,
             stats::get_model_usage_series,
+            bench_runs::start_bench_run,
+            bench_runs::stop_bench_run,
+            bench_runs::get_bench_runs,
+            bench_runs::validate_lesson,
+            bench_runs::list_lessons,
+            bench_runs::update_lesson,
+            bench_runs::delete_lesson,
+            bench_runs::clear_lessons,
+            bench_runs::add_lesson,
+            bench_runs::import_prime_memory,
+            bench_runs::import_seed_lessons,
             benchmark::start_active_benchmark,
             benchmark::stop_active_benchmark,
             benchmark::get_active_benchmark_runs,

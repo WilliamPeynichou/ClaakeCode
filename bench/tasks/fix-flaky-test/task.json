@@ -1,0 +1,13 @@
+{
+  "id": "fix-flaky-test",
+  "prompt": "test_ids.py fails some of the time because it depends on random values. Make the test deterministic without changing ids.py and while still checking the length and the alphabet of the id.",
+  "tags": [
+    "tests"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 check.py",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

@@ -1,3 +1,4 @@
+import { inline, parseReleaseNotes } from "./UpdaterLockScreen";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -242,9 +243,9 @@ function UpdatePopover({
   const notes = useMemo(() => {
     const body = info.notes?.trim();
     if (!body) return null;
-    // Plain-text safe rendering — we don't trust the manifest enough to dump
-    // HTML/MD into the DOM. Splitting on newlines keeps formatting readable.
-    return body.split(/\r?\n/);
+    // Safe rendering — we don't trust the manifest enough to dump HTML/MD into the DOM:
+    // a small Markdown subset becomes React text nodes (see parseReleaseNotes).
+    return parseReleaseNotes(body);
   }, [info.notes]);
 
   return (
@@ -259,9 +260,18 @@ function UpdatePopover({
       </div>
       {notes && (
         <div className="titlebar__update-popover-notes">
-          {notes.map((line, i) => (
-            <p key={i}>{line || "\u00A0"}</p>
-          ))}
+          {notes.map((block, i) =>
+            block.kind === "heading" ? (
+              <p key={i}>
+                <strong>{inline(block.text)}</strong>
+              </p>
+            ) : (
+              <p key={i}>
+                {block.kind === "item" ? "• " : ""}
+                {inline(block.text)}
+              </p>
+            ),
+          )}
         </div>
       )}
       <div className="titlebar__update-popover-actions">

@@ -1,0 +1,13 @@
+{
+  "id": "read-and-answer",
+  "prompt": "Read sequence.py without running it and write the value returned by `mystery(10)` in a file named answer.txt (the number only).",
+  "tags": [
+    "reading"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

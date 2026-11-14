@@ -339,7 +339,7 @@ impl BashTool {
                 })
                 .context("unable to open pty")?;
 
-            let mut builder = shell_command_builder(&command);
+            let mut builder = shell_command_builder(&self.workspace_root, command);
             builder.cwd(cwd.as_os_str());
             builder.env("TERM", "dumb");
             builder.env("NO_COLOR", "1");
@@ -487,10 +487,10 @@ impl BashTool {
 }
 
 #[cfg(not(windows))]
-fn shell_command_builder(command: &str) -> CommandBuilder {
-    let mut builder = CommandBuilder::new("/bin/bash");
-    builder.arg("-lc");
-    builder.arg(command);
+fn shell_command_builder(workspace_root: &std::path::Path, command: String) -> CommandBuilder {
+    let (program, args) = crate::sandbox::wrap(workspace_root, "/bin/bash", &["-lc".into(), command]);
+    let mut builder = CommandBuilder::new(program);
+    builder.args(args);
     builder
 }
 
@@ -848,6 +848,75 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    /// Lot A2a: with the sandbox on, a write inside the workspace works and a write in the
+    /// home directory is refused.
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    async fn sandbox_blocks_writes_outside_workspace() {
+        let root = temp_workspace("sandbox_blocks_writes_outside_workspace");
+        let home = PathBuf::from(std::env::var_os("HOME").expect("HOME"));
+        let outside = home.join(format!("claakecode-sandbox-{}", uuid::Uuid::new_v4()));
+        let tool = BashTool::new(&root);
+
+        let _sandbox = crate::sandbox::TEST_LOCK.lock().await;
+        crate::sandbox::set_enabled(true);
+        let result = tool
+            .run(json!({
+                "command": format!("touch ok; touch '{}'; echo done", outside.display()),
+                "yield_time_ms": 5_000
+            }))
+            .await;
+        crate::sandbox::set_enabled(false);
+
+        let leaked = outside.exists();
+        let _ = fs::remove_file(&outside);
+        assert!(result.content.contains("done"), "{}", result.content);
+        assert!(root.join("ok").exists(), "{}", result.content);
+        assert!(!leaked, "sandbox let a write out of the workspace: {}", result.content);
+        assert!(result.content.contains("Operation not permitted"), "{}", result.content);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    /// Lot A2a: a git worktree keeps its real `.git` in the main repository, outside the
+    /// workspace. The main repository lives in the home directory here, where nothing else is writable.
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    async fn sandbox_allows_commit_in_git_worktree() {
+        let home = PathBuf::from(std::env::var_os("HOME").expect("HOME"));
+        let main = home.join(format!("claakecode-sandbox-main-{}", uuid::Uuid::new_v4()));
+        let worktree = temp_workspace("sandbox_allows_commit_in_git_worktree");
+        let _ = fs::remove_dir_all(&worktree);
+        fs::create_dir_all(&main).expect("create main repo");
+        let git = |dir: &PathBuf, args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+                .args(args)
+                .current_dir(dir)
+                .output()
+                .expect("git");
+            assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        };
+        git(&main, &["init", "-q"]);
+        git(&main, &["commit", "-q", "--allow-empty", "-m", "init"]);
+        git(&main, &["worktree", "add", "-q", worktree.to_str().unwrap()]);
+        let tool = BashTool::new(&worktree);
+
+        let _sandbox = crate::sandbox::TEST_LOCK.lock().await;
+        crate::sandbox::set_enabled(true);
+        let result = tool
+            .run(json!({
+                "command": "echo x > f && git add f && git -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q -m w && echo committed",
+                "yield_time_ms": 8_000
+            }))
+            .await;
+        crate::sandbox::set_enabled(false);
+
+        let _ = fs::remove_dir_all(&worktree);
+        let _ = fs::remove_dir_all(&main);
+        assert!(result.content.contains("committed"), "{}", result.content);
     }
 
     fn parse_session_id(content: &str) -> u64 {

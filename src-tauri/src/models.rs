@@ -321,6 +321,9 @@ pub(super) struct SendMessageInput {
     pub(super) service_tier: Option<ServiceTierInput>,
     pub(super) plan_control: Option<PlanControlInput>,
     pub(super) message_visibility: Option<MessageVisibilityInput>,
+    /// Lot C5: shell command that must succeed before a Goal can be marked complete.
+    #[serde(default)]
+    pub(super) verify_command: Option<String>,
     #[serde(default)]
     pub(super) rewrite_from_history_index: Option<usize>,
     #[serde(default)]

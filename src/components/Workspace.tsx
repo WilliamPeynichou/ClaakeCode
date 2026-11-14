@@ -34,7 +34,12 @@ import {
   ChatSurfaceTabs,
   RlmEmptyState,
   autoComputePrompt,
+  autoComputeSourceOf,
+  lastAssistantText,
+  queueComposerText,
+  rememberAutoComputeSource,
   LEARN_PROMPT,
+  RlmLearnActions,
   autoComputeTranscript,
   surfaceOf,
   type ChatSurface,
@@ -1923,7 +1928,12 @@ export function Workspace({
       }
       const conversationId = next.activeConversation.id;
       const title = `Auto Compute · ${source.title || "chat"}`.slice(0, 80);
-      const prompt = autoComputePrompt(source.title, transcript);
+      rememberAutoComputeSource(conversationId, source.id);
+      const uncommitted = await api
+        .gitSnapshot(workspacePath)
+        .then((snapshot) => snapshot.status.map((file) => file.path))
+        .catch(() => []);
+      const prompt = autoComputePrompt(source.title, transcript, uncommitted);
       const model = source.model;
       const thinking = thinkingFromRef(model);
       const [summaries, modeModelSettings] = await Promise.all([
@@ -1993,18 +2003,34 @@ export function Workspace({
       </div>
     ) : surface === "rlm" && activeSurface === "rlm" ? (
       <div className="chat-head__actions">
-        <button
-          type="button"
-          className="chat-head__action"
-          onClick={() =>
+        <RlmLearnActions
+          conversationId={activeConv.id}
+          disabled={activeConv.history.length === 0 || streamingConversationIds.has(activeConv.id)}
+          onLearn={() =>
             void sendMessage(LEARN_PROMPT, [], activeConv.model, thinkingFromRef(activeConv.model), "act")
           }
-          disabled={activeConv.history.length === 0 || streamingConversationIds.has(activeConv.id)}
-          title="Demande à l'agent de consolider ce qu'il a appris de ce chat dans sa mémoire (visible dans Settings > Python persistant)"
-        >
-          <Icon icon="solar:book-bookmark-linear" width={13} height={13} />
-          <span>Apprendre de ce chat</span>
-        </button>
+        />
+        {autoComputeSourceOf(activeConv.id) && (
+          <button
+            type="button"
+            className="chat-head__action"
+            disabled={
+              streamingConversationIds.has(activeConv.id) || !lastAssistantText(activeConv.history)
+            }
+            title="Copie la dernière réponse dans la zone de saisie du chat d'origine, sans l'envoyer"
+            onClick={() => {
+              const sourceId = autoComputeSourceOf(activeConv.id);
+              const text = lastAssistantText(activeConv.history);
+              if (!sourceId || !text) return;
+              queueComposerText(sourceId, `Résultat d'Auto Compute :\n\n${text}`);
+              // The tab follows the conversation that becomes active.
+              void selectConversation(sourceId);
+            }}
+          >
+            <Icon icon="solar:undo-left-linear" width={13} height={13} />
+            <span>Renvoyer au chat d'origine</span>
+          </button>
+        )}
       </div>
     ) : null;
 

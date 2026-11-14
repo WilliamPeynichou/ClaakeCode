@@ -47,6 +47,8 @@ export type ToolCardProps = {
   liveFileChange?: FileChange;
   images?: ToolResultImage[];
   meta?: Record<string, unknown> | null;
+  approvalPending?: boolean;
+  onApproval?: (decision: "once" | "turn" | "reject") => void | Promise<void>;
   onOpenFile: (path: string) => void;
   onOpenSubAgent?: () => void;
   onStopTeam?: (teamName?: string) => void | Promise<void>;
@@ -1051,6 +1053,8 @@ export function ToolCard({
   liveFileChange,
   images,
   meta,
+  approvalPending,
+  onApproval,
   onOpenFile,
   onOpenSubAgent,
   onStopTeam,
@@ -1401,6 +1405,28 @@ export function ToolCard({
               {teamStopState === "stopping" ? "Stopping" : "Stop"}
             </span>
           </button>
+        )}
+        {approvalPending && status === "running" && (
+          <>
+            {([
+              ["once", "Autoriser"],
+              ["turn", "Autoriser pour ce tour"],
+              ["reject", "Refuser"],
+            ] as const).map(([decision, label]) => (
+              <button
+                key={decision}
+                type="button"
+                className="tool-card__stop-team"
+                disabled={!onApproval}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void onApproval?.(decision);
+                }}
+              >
+                <span>{label}</span>
+              </button>
+            ))}
+          </>
         )}
         {canExpand || isSubAgent ? (
           <span

@@ -1,0 +1,13 @@
+{
+  "id": "fix-mutable-default",
+  "prompt": "`add_tag` in tags.py leaks tags between calls. Fix the bug without changing the tests.",
+  "tags": [
+    "bug"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

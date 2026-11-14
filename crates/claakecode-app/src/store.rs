@@ -279,6 +279,8 @@ pub struct ToolConfig {
     pub description_override: bool,
     #[serde(default, skip_serializing)]
     pub default_description: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub require_approval: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -377,6 +379,7 @@ pub struct ToolConfigView {
     pub description: String,
     pub default_description: String,
     pub enabled: bool,
+    pub require_approval: bool,
 }
 
 impl ToolSettings {
@@ -471,6 +474,15 @@ impl ToolSettings {
             .unwrap_or_else(|| default_tool_enabled(tool_names::canonical_tool_name(name)))
     }
 
+    pub fn requires_approval(&self, name: &str) -> bool {
+        let name = tool_names::canonical_tool_name(name);
+        self.tools
+            .iter()
+            .find(|tool| tool.name == name)
+            .map(|tool| tool.require_approval)
+            .unwrap_or(false)
+    }
+
     pub fn openai_image_api_key(&self) -> Option<String> {
         let key = self.openai_image_api_key.trim();
         if key.is_empty() {
@@ -543,6 +555,7 @@ pub fn tool_settings_view(settings: &ToolSettings, catalog: &[ToolDescriptor]) -
                     enabled: setting
                         .map(|tool| tool.enabled)
                         .unwrap_or_else(|| default_tool_enabled(&descriptor.name)),
+                    require_approval: setting.map(|tool| tool.require_approval).unwrap_or(false),
                 })
             })
             .collect(),
@@ -1845,6 +1858,68 @@ impl AppStore {
         Ok(())
     }
 
+    /// Lot E3: command run after file edits, per workspace. Empty clears it.
+    pub fn verify_command_for(&self, workspace_id: &str) -> Option<String> {
+        self.load_json_setting::<HashMap<String, String>>("verify_commands")
+            .ok()
+            .flatten()?
+            .remove(workspace_id)
+            .filter(|command| !command.trim().is_empty())
+    }
+
+    pub fn set_verify_command(&self, workspace_id: &str, command: &str) -> Result<()> {
+        let mut all = self
+            .load_json_setting::<HashMap<String, String>>("verify_commands")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        if command.trim().is_empty() {
+            all.remove(workspace_id);
+        } else {
+            all.insert(workspace_id.to_string(), command.trim().to_string());
+        }
+        self.save_json_setting("verify_commands", &all)
+    }
+
+    /// Write sandbox of the shell tools (A2a): on by default.
+    pub fn sandbox_enabled(&self) -> bool {
+        self.load_json_setting::<bool>("sandbox_enabled").ok().flatten().unwrap_or(true)
+    }
+
+    pub fn set_sandbox_enabled(&self, enabled: bool) -> Result<()> {
+        self.save_json_setting("sandbox_enabled", &enabled)
+    }
+
+    /// Learning and recall switch (D1): global flag, on by default.
+    pub fn learning_enabled(&self) -> bool {
+        self.load_json_setting::<bool>("learning_enabled").ok().flatten().unwrap_or(true)
+    }
+
+    pub fn set_learning_enabled(&self, enabled: bool) -> Result<()> {
+        self.save_json_setting("learning_enabled", &enabled)
+    }
+
+    /// Global switch on AND conversation not listed as disabled.
+    pub fn learning_enabled_for(&self, conversation_id: &str) -> bool {
+        self.learning_enabled() && !self.learning_disabled_conversations().iter().any(|id| id == conversation_id)
+    }
+
+    pub fn learning_disabled_conversations(&self) -> Vec<String> {
+        self.load_json_setting::<Vec<String>>("learning_disabled_conversations")
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+    }
+
+    pub fn set_conversation_learning(&self, conversation_id: &str, enabled: bool) -> Result<()> {
+        let mut ids = self.learning_disabled_conversations();
+        ids.retain(|id| id != conversation_id);
+        if !enabled {
+            ids.push(conversation_id.to_string());
+        }
+        self.save_json_setting("learning_disabled_conversations", &ids)
+    }
+
     /// Model usage stats (benchmark B1). Messages carry no timestamp, so the period keeps
     /// conversations active since `since_ms` (`updated_at_ms`): an approximation, shown as such.
     pub fn model_stats(
@@ -2127,7 +2202,7 @@ impl AppStore {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap_or(0);
 
-        if version >= 12 {
+        if version >= 13 {
             return Ok(());
         }
 
@@ -2175,6 +2250,9 @@ impl AppStore {
         ensure_conversations_mode_model_settings_column(&conn)?;
         ensure_conversations_title_initialized_column(&conn)?;
         ensure_app_settings_table(&conn)?;
+        if version == 0 {
+            seed_default_tool_approvals(&conn)?;
+        }
         ensure_turn_checkpoints_table(&conn)?;
         if version < 8 {
             conn.execute("delete from turn_checkpoints", [])
@@ -2182,6 +2260,7 @@ impl AppStore {
         }
         ensure_conversations_harness_column(&conn)?;
         ensure_rlm_bindings_table(&conn)?;
+        ensure_lessons_table(&conn)?;
         conn.execute_batch("create table if not exists model_turns (
             id integer primary key autoincrement,
             conversation_id text not null,
@@ -2190,7 +2269,7 @@ impl AppStore {
             rewritten integer not null default 0,
             record_json text not null
         ); create index if not exists idx_model_turns_time on model_turns(started_at_ms);")?;
-        conn.pragma_update(None, "user_version", 12)
+        conn.pragma_update(None, "user_version", 13)
             .context("unable to set sqlite schema version")?;
         Ok(())
     }
@@ -2302,6 +2381,30 @@ fn ensure_rlm_bindings_table(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn ensure_lessons_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "create table if not exists lessons (
+            id text primary key,
+            title text not null,
+            content text not null,
+            status text not null default 'candidate',
+            source_kind text not null,
+            evidence text not null,
+            tags_json text not null default '[]',
+            run_id text,
+            conversation_id text,
+            score_without real,
+            score_with real,
+            bench_runs integer not null default 0,
+            created_at_ms integer not null,
+            updated_at_ms integer not null
+        );
+        create index if not exists idx_lessons_status on lessons(status);",
+    )
+    .context("unable to create lessons table")?;
+    Ok(())
+}
+
 fn ensure_app_settings_table(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
@@ -2313,6 +2416,33 @@ fn ensure_app_settings_table(conn: &Connection) -> Result<()> {
         "#,
     )
     .context("unable to create app settings table")?;
+    Ok(())
+}
+
+// Installation neuve seulement : les utilisateurs existants gardent leur comportement.
+fn seed_default_tool_approvals(conn: &Connection) -> Result<()> {
+    let conversations: i64 = conn
+        .query_row("select count(*) from conversations", [], |row| row.get(0))
+        .context("unable to count conversations")?;
+    let existing: i64 = conn
+        .query_row(
+            "select count(*) from app_settings where key = ?1",
+            params![TOOL_SETTINGS_KEY],
+            |row| row.get(0),
+        )
+        .context("unable to read tool settings key")?;
+    if conversations > 0 || existing > 0 {
+        return Ok(());
+    }
+    conn.execute(
+        "insert into app_settings (key, value_json, updated_at_ms) values (?1, ?2, ?3)",
+        params![
+            TOOL_SETTINGS_KEY,
+            r#"{"tools":[{"name":"bash","requireApproval":true},{"name":"python","requireApproval":true}]}"#,
+            now_ms()
+        ],
+    )
+    .context("unable to seed default tool approvals")?;
     Ok(())
 }
 
@@ -2546,6 +2676,26 @@ mod tests {
                 meta,
             }],
         }
+    }
+
+    #[test]
+    fn learning_switch_global_and_per_conversation() -> Result<()> {
+        let path = std::env::temp_dir().join(format!("claakecode-learning-{}.sqlite3", Uuid::new_v4()));
+        let store = AppStore { path: path.clone() };
+        let result = (|| -> Result<()> {
+            store.migrate()?;
+            assert!(store.learning_enabled_for("c1"));
+            store.set_conversation_learning("c1", false)?;
+            assert!(!store.learning_enabled_for("c1"));
+            assert!(store.learning_enabled_for("c2"));
+            store.set_conversation_learning("c1", true)?;
+            assert!(store.learning_enabled_for("c1"));
+            store.set_learning_enabled(false)?;
+            assert!(!store.learning_enabled_for("c2"));
+            Ok(())
+        })();
+        let _ = fs::remove_file(path);
+        result
     }
 
     #[test]
@@ -2783,6 +2933,16 @@ mod tests {
     }
 
     #[test]
+    fn requires_approval_defaults_to_false_without_field() {
+        let settings: ToolSettings =
+            serde_json::from_str(r#"{"tools":[{"name":"bash"},{"name":"python","requireApproval":true}]}"#)
+                .unwrap();
+        assert!(!settings.requires_approval("bash"));
+        assert!(settings.requires_approval("python"));
+        assert!(!settings.requires_approval("read"));
+    }
+
+    #[test]
     fn tool_settings_ignore_legacy_saved_descriptions_without_user_override() {
         let settings = ToolSettings {
             tools: vec![ToolConfig {
@@ -2791,6 +2951,7 @@ mod tests {
                 enabled: true,
                 description_override: false,
                 default_description: String::new(),
+                require_approval: false,
             }],
             ..ToolSettings::default()
         }
@@ -2812,6 +2973,7 @@ mod tests {
                     enabled: true,
                     description_override: false,
                     default_description: "read default".to_string(),
+                    require_approval: false,
                 },
                 ToolConfig {
                     name: "edit_file".to_string(),
@@ -2819,6 +2981,7 @@ mod tests {
                     enabled: true,
                     description_override: false,
                     default_description: "edit default".to_string(),
+                    require_approval: false,
                 },
             ],
             ..ToolSettings::default()
@@ -2843,6 +3006,7 @@ mod tests {
                 enabled: true,
                 description_override: true,
                 default_description: String::new(),
+                require_approval: false,
             }],
             ..ToolSettings::default()
         }

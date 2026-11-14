@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { api, type PythonRuntimeStatus, type RlmMemoryEntry } from "../lib/ipc";
+import { LessonsSection } from "./LessonsSection";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
@@ -153,9 +154,24 @@ function RlmMemoryList() {
                         </button>
                       </>
                     ) : (
+                      <>
+                      <button
+                        type="button"
+                        className="settings-pane__btn"
+                        title="Copie cette entrée dans les leçons Claake, à vérifier"
+                        onClick={() =>
+                          void api.importPrimeMemory(e.title, e.content).then(
+                            () => setError(null),
+                            (err) => setError(String(err)),
+                          )
+                        }
+                      >
+                        Proposer comme leçon
+                      </button>
                       <button type="button" className="settings-pane__btn" onClick={() => setConfirming(key)}>
                         Supprimer
                       </button>
+                      </>
                     )}
                   </div>
                 </>
@@ -172,6 +188,40 @@ function RlmMemoryList() {
  * Settings view of the persistent Python environment. A single engine backs it: Prime's kernel,
  * used by the RLM chat (and later by Auto Compute). Read-only except restart.
  */
+/** Global "Apprentissage et rappel Claake" switch (D1). Always shown, even if the runtime status fails. */
+function LearningToggle() {
+  const [learning, setLearning] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void api.getLearningEnabled().then(setLearning).catch((err) => setError(String(err)));
+  }, []);
+  const toggle = async (enabled: boolean) => {
+    setLearning(enabled);
+    try {
+      await api.setLearningEnabled(enabled);
+      setError(null);
+    } catch (err) {
+      setLearning(!enabled);
+      setError(String(err));
+    }
+  };
+  return (
+    <section className="python-runtime__packages" aria-labelledby="rlm-learning-title">
+      <h2 id="rlm-learning-title">
+        <label>
+          <input type="checkbox" checked={learning} onChange={(e) => void toggle(e.target.checked)} />{" "}
+          Apprentissage et rappel Claake
+        </label>
+      </h2>
+      <p className="python-runtime__muted">
+        Coupé : l'agent RLM ne lit ni n'écrit sa mémoire persistante. Appliqué au prochain message, y compris dans les chats déjà ouverts.
+        Prime peut encore charger sa propre mémoire native.
+      </p>
+      {error && <p className="python-runtime__error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 export function PythonRuntimeSection() {
   const [status, setStatus] = useState<PythonRuntimeStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +294,8 @@ export function PythonRuntimeSection() {
       </header>
       <div className="settings-pane__body python-runtime">
         {error && <p className="python-runtime__error" role="alert">{error}</p>}
+        <LearningToggle />
+        <LessonsSection />
         {!status ? (
           <p className="python-runtime__muted">Chargement…</p>
         ) : (
