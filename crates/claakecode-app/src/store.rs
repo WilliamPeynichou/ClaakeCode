@@ -1858,6 +1858,29 @@ impl AppStore {
         Ok(())
     }
 
+    /// Lot E3: command run after file edits, per workspace. Empty clears it.
+    pub fn verify_command_for(&self, workspace_id: &str) -> Option<String> {
+        self.load_json_setting::<HashMap<String, String>>("verify_commands")
+            .ok()
+            .flatten()?
+            .remove(workspace_id)
+            .filter(|command| !command.trim().is_empty())
+    }
+
+    pub fn set_verify_command(&self, workspace_id: &str, command: &str) -> Result<()> {
+        let mut all = self
+            .load_json_setting::<HashMap<String, String>>("verify_commands")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        if command.trim().is_empty() {
+            all.remove(workspace_id);
+        } else {
+            all.insert(workspace_id.to_string(), command.trim().to_string());
+        }
+        self.save_json_setting("verify_commands", &all)
+    }
+
     /// Write sandbox of the shell tools (A2a): on by default.
     pub fn sandbox_enabled(&self) -> bool {
         self.load_json_setting::<bool>("sandbox_enabled").ok().flatten().unwrap_or(true)

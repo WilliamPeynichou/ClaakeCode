@@ -746,6 +746,7 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
         loops += 1;
 
         let mut tool_results = Vec::new();
+        let mut round_edited = false;
         let batch_end = parallel_batches(&assistant.parts, &tool_settings);
         let mut prefetched = HashMap::<String, ToolRunResult>::new();
         for (part_index, part) in assistant.parts.iter().enumerate() {
@@ -909,6 +910,9 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                 {
                     update_read_fingerprint_cache(&mut read_fingerprints, result.meta.as_ref());
                 }
+                if !result.is_error && matches!(canonical_name, tool_names::EDIT_FILE | tool_names::WRITE_FILE) {
+                    round_edited = true;
+                }
                 for change in &result.file_changes {
                     step_changed_paths.insert(change.relative_path.clone());
                 }
@@ -1010,6 +1014,22 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
 
         if tool_results.is_empty() {
             break;
+        }
+
+        // Lot E3: show compile errors right after an edit. One bounded check, never retried.
+        if round_edited && !cancelled && active_run.is_none() {
+            if let Some((handle, command)) =
+                run.as_ref().and_then(|handle| Some((handle, handle.verify_command.clone()?)))
+            {
+                let guard = Guard::Command { run: command.clone(), timeout_secs: 120 };
+                let verdict = crate::run_engine::judge(&guard, &handle.workspace_root, None).await;
+                if let Some(text) = post_edit_check_message(&verdict, &command) {
+                    tool_results.push(Part::Text {
+                        text,
+                        meta: Some(json!({ "system_reminder": true, "post_edit_check": true })),
+                    });
+                }
+            }
         }
 
         let stop_after_question_result = tool_results.iter().any(|part| {
@@ -1313,6 +1333,17 @@ async fn start_run_from_graph(
 
 const RUN_ARBITRAGE_PREFIX: &str = "run-arbitrage-";
 
+/// Lot E3: nothing when the check passes, a tagged block with the reasons when it fails.
+pub(super) fn post_edit_check_message(verdict: &crate::run_engine::GuardVerdict, command: &str) -> Option<String> {
+    match verdict {
+        crate::run_engine::GuardVerdict::Pass => None,
+        crate::run_engine::GuardVerdict::Fail(reasons) => Some(format!(
+            "<post_edit_check command=\"{command}\">\n{}\n</post_edit_check>",
+            reasons.join("\n")
+        )),
+    }
+}
+
 /// Text sent back to the model after a guard verdict; `None` when the turn may end.
 /// The full step instruction is repeated on the first refusal only.
 pub(super) fn run_guard_message(verdict: &Verdict, run: &Run) -> Option<String> {
@@ -1508,7 +1539,7 @@ mod run_start_tests {
         let (_, sha) = Graph::parse(graph).unwrap();
         let store = AppStore::in_memory().unwrap();
         store.save_json_setting(ACCEPTED_RUN_GRAPHS, &vec![sha]).unwrap();
-        let handle = RunHandle { workspace_root: base.clone(), conversation_id: "c1".into() };
+        let handle = RunHandle { workspace_root: base.clone(), conversation_id: "c1".into(), verify_command: None };
         let (tx, _rx) = mpsc::unbounded_channel();
         let (mut active, mut content) = (None, String::from("Loaded"));
         start_run_from_graph(

@@ -490,6 +490,8 @@ pub fn run() {
             rlm::list_rlm_memories,
             rlm::get_claaky_enabled,
             rlm::set_claaky_enabled,
+            rlm::get_verify_command,
+            rlm::set_verify_command,
             rlm::get_sandbox_enabled,
             rlm::set_sandbox_enabled,
             rlm::get_learning_enabled,

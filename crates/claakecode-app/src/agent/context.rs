@@ -29,6 +29,8 @@ pub enum AgentMode {
 pub struct RunHandle {
     pub workspace_root: std::path::PathBuf,
     pub conversation_id: String,
+    /// Lot E3: command judged after a round that edited files (per-workspace setting).
+    pub verify_command: Option<String>,
 }
 
 pub struct TurnContext {

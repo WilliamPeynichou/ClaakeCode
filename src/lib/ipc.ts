@@ -176,6 +176,12 @@ export const api = {
   exportModelStatsCsv(filter: ModelStatsFilter, path: string) {
     return invoke<void>("export_model_stats_csv", { input: { ...filter, path } });
   },
+  getVerifyCommand(workspacePath: string) {
+    return invoke<string>("get_verify_command", { workspacePath });
+  },
+  setVerifyCommand(workspacePath: string, command: string) {
+    return invoke<void>("set_verify_command", { workspacePath, command });
+  },
   getSandboxEnabled() {
     return invoke<boolean>("get_sandbox_enabled");
   },

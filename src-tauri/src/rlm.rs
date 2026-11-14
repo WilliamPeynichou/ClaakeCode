@@ -67,6 +67,19 @@ pub(super) fn set_claaky_enabled(state: State<'_, DesktopState>, enabled: bool) 
     state.store.set_claaky_enabled(enabled).map_err(error_to_string)
 }
 
+/// Lot E3: command run after file edits in this workspace ("" when unset).
+#[tauri::command]
+pub(super) fn get_verify_command(state: State<'_, DesktopState>, workspace_path: String) -> std::result::Result<String, String> {
+    let root = normalize_workspace_root(&workspace_path).map_err(error_to_string)?;
+    Ok(state.store.verify_command_for(&root.display().to_string()).unwrap_or_default())
+}
+
+#[tauri::command]
+pub(super) fn set_verify_command(state: State<'_, DesktopState>, workspace_path: String, command: String) -> std::result::Result<(), String> {
+    let root = normalize_workspace_root(&workspace_path).map_err(error_to_string)?;
+    state.store.set_verify_command(&root.display().to_string(), &command).map_err(error_to_string)
+}
+
 #[tauri::command]
 pub(super) fn get_sandbox_enabled(state: State<'_, DesktopState>) -> bool {
     state.store.sandbox_enabled()

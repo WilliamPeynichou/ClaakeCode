@@ -376,7 +376,7 @@ mod run_loop {
         let (graph, sha) = Graph::parse(GRAPH.as_bytes()).unwrap();
         let run = Run::new(graph, sha, root.display().to_string(), None);
         run.save(&run_path(&root, "c1")).unwrap();
-        (root.clone(), RunHandle { workspace_root: root, conversation_id: "c1".into() })
+        (root.clone(), RunHandle { workspace_root: root, conversation_id: "c1".into(), verify_command: None })
     }
 
     fn is_run_guard(message: &claakecode_core::ChatMessage) -> bool {
@@ -498,6 +498,38 @@ mod run_loop {
         assert!(second.contains("missing file x") && !second.contains("INSTRUCTION-A"));
         assert!(run_guard_message(&Verdict::Done { recovered: None }, &run).is_none());
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn post_edit_check_message_only_on_failure() {
+        use crate::agent::turn::post_edit_check_message;
+        use crate::run_engine::GuardVerdict;
+        assert!(post_edit_check_message(&GuardVerdict::Pass, "cargo check").is_none());
+        let text = post_edit_check_message(&GuardVerdict::Fail(vec!["error[E0425]".into()]), "cargo check").unwrap();
+        assert!(text.starts_with("<post_edit_check command=\"cargo check\">") && text.contains("error[E0425]"));
+    }
+
+    #[tokio::test]
+    async fn failing_post_edit_check_is_shown_to_the_model() {
+        let root = std::env::temp_dir().join(format!("claakecode-post-edit-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let root = std::fs::canonicalize(root).unwrap();
+        let provider = ScriptedProvider::new(vec![
+            tool_response("w1", "write_file", json!({ "path": "a.txt", "content": "x" })),
+            text_response("Done."),
+        ]);
+        let (mut context, _events, _store) = test_turn_context(provider, &root);
+        context.run = Some(RunHandle {
+            workspace_root: root.clone(),
+            conversation_id: "c1".into(),
+            verify_command: Some("echo BROKEN-BUILD; exit 1".into()),
+        });
+        let output = run_turn(context).await;
+        let shown = output.history.iter().flat_map(|m| m.parts.iter()).any(|part| {
+            matches!(part, Part::Text { text, .. } if text.contains("<post_edit_check") && text.contains("BROKEN-BUILD"))
+        });
+        assert!(shown, "{:?}", output.history);
+        std::fs::remove_dir_all(root).ok();
     }
 
     #[test]

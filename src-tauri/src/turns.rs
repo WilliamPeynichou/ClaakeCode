@@ -220,7 +220,7 @@ pub(super) async fn send_message(
         model: conversation.model.clone(),
         cache_key: Some(conversation.id.clone()),
         cache_stable_message_count: turn_user_history_index,
-        run: Some(claakecode_app::RunHandle { workspace_root: workspace_root.clone(), conversation_id: conversation.id.clone() }),
+        run: Some(claakecode_app::RunHandle { workspace_root: workspace_root.clone(), conversation_id: conversation.id.clone(), verify_command: state.store.verify_command_for(&workspace_id) }),
         service_tier,
         auto_compact: true,
         mode: policy.mode,

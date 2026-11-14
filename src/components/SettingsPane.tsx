@@ -2431,6 +2431,7 @@ export function SettingsPane({ workspacePath }: Props) {
           />
         ) : section === "tools" ? (
           <ToolsSection
+            workspacePath={workspacePath}
             settings={toolSettings}
             loading={toolsLoading}
             saving={toolsSaving}
@@ -3652,6 +3653,52 @@ const SWARM_TOOL_NAMES = new Set([
   "task_list",
 ]);
 
+/** Lot E3: per-project command run after the agent edits files; its errors are shown to the model. */
+function VerifyCommandField({ workspacePath }: { workspacePath: string }) {
+  const [command, setCommand] = useState("");
+  const [saved, setSaved] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void api.getVerifyCommand(workspacePath).then(
+      (value) => {
+        setCommand(value);
+        setSaved(value);
+      },
+      (err) => setError(String(err)),
+    );
+  }, [workspacePath]);
+  const save = async () => {
+    try {
+      await api.setVerifyCommand(workspacePath, command);
+      setSaved(command.trim());
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+  return (
+    <section className="settings-pane__tool-group">
+      <label>
+        Vérification après édition (ce projet){" "}
+        <input
+          type="text"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder="ex. : cargo check, npx tsc --noEmit"
+        />
+      </label>{" "}
+      <button type="button" className="settings-pane__btn" onClick={() => void save()} disabled={command.trim() === saved}>
+        Enregistrer
+      </button>
+      <p className="settings-pane__subtitle">
+        Lancée après chaque série d'outils où l'agent a modifié un fichier (120 s max). Si elle échoue, sa
+        sortie est montrée au modèle. Vide : aucune vérification.
+      </p>
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
+
 /** Lot A2a: write sandbox of the bash/python tools (macOS). Saved on click. */
 function SandboxToggle() {
   const [enabled, setEnabled] = useState(true);
@@ -3686,6 +3733,7 @@ function SandboxToggle() {
 }
 
 function ToolsSection({
+  workspacePath,
   settings,
   loading,
   saving,
@@ -3702,7 +3750,7 @@ function ToolsSection({
   onWebSearchProviderChange,
   onLinkupApiKeyChange,
   openAiStatus,
-}: ToolsSectionProps) {
+}: ToolsSectionProps & { workspacePath: string }) {
   const tools = settings?.tools ?? [];
   const planModePrompt = settings?.planModePrompt ?? "";
   const defaultPlanModePrompt = settings?.defaultPlanModePrompt ?? "";
@@ -3778,6 +3826,7 @@ function ToolsSection({
       <div className="settings-pane__body settings-pane__body--tools">
         <div className="settings-pane__tool-settings-list">
           <SandboxToggle />
+          <VerifyCommandField workspacePath={workspacePath} />
           <section className="settings-pane__tool-group">
             <div className="settings-pane__tool-group-head">
               <h2>Plan mode prompt</h2>

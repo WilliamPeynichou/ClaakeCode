@@ -60,7 +60,7 @@ Claake Code flips that. The harness is the surface area you control.
 - [Tools](#tools) — the agent's toolset
   - [`clean_context`](#clean_context) — the model cleans its own context
   - [`bash` / `bash_input`](#bash--bash_input) — PTY-backed shell sessions
-  - [`python`](#python) — sandboxed Python snippets in the workspace
+  - [`python`](#python) — Python snippets in the workspace (writes confined to the workspace on macOS)
   - [Why dedicated `read`, `glob`, `grep`](#why-dedicated-tools-for-read-glob-and-grep)
   - [`read`](#read) · [`glob`](#glob) · [`grep`](#grep) · [`edit_file`](#edit_file) · [`write_file`](#write_file)
   - [`web_search`](#web_search) · [`web_fetch`](#web_fetch) · [`create_image`](#create_image)
@@ -191,9 +191,15 @@ Each tool can be **individually disabled** in Settings, which lets you go from a
 
 ---
 
+### Tool approval and write sandbox
+
+Each tool has a "Ask before running" switch in Settings → Tools; on a fresh install `bash` and `python` ask first.
+You can approve once or for the rest of the turn; sub-agents and swarm teammates ask through the same prompt.
+On macOS, `bash` and `python` can only write inside the workspace, the temp folders and a few tool caches (switch in Settings → Tools); reads and network are not restricted.
+
 ### `clean_context`
 
-Claake Code is the only coding agent where the model can **clean its own context**. None of the others — Cursor, Claude Code, Codex, Cline — offers this.
+The model has a tool to **clean its own context**: it can remove, by itself, tool results of the current turn that it no longer needs.
 
 The tool takes a list of `tool_call_id`s from the current turn. For each one, the content of the result is replaced in history by an ultra-short placeholder (`[Tool result cleaned by you: irrelevant to future context.]`). The agent does its own mental housekeeping, by itself.
 
@@ -395,7 +401,7 @@ A question tool inside the chat. Classic: the agent can send one or several ques
 
 The agent's todo list. A single tool does everything: add, modify, mark as done, or delete a task.
 
-The difference with Cursor, Claude Code, Codex and the rest: in their tools the todo is just another tool call. When the agent invokes it, the result stays in the conversation and eventually drowns under the tool calls that follow.
+A todo kept as an ordinary tool result stays in the conversation and eventually drowns under the tool calls that follow.
 
 Claake Code **re-injects the full state at every turn into the system reminder**. The model therefore always sees the up-to-date version in front of its eyes, no matter what happened since. That's what changes everything on long tasks — typically in Goal mode, where without it the agent would lose the thread.
 
