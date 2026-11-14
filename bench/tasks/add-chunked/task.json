@@ -1,0 +1,13 @@
+{
+  "id": "add-chunked",
+  "prompt": "Add a function `chunked(items, size)` to listutil.py that returns a list of lists of at most `size` items, in order. Raise ValueError when size is lower than 1. Do not change the tests.",
+  "tags": [
+    "feature"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

@@ -1,0 +1,13 @@
+{
+  "id": "add-roman",
+  "prompt": "Add a function `to_roman(n)` to roman.py for integers from 1 to 3999. Raise ValueError outside that range. Do not change the tests.",
+  "tags": [
+    "feature"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

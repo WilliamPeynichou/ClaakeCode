@@ -1,0 +1,14 @@
+{
+  "id": "read-find-config",
+  "prompt": "The project reads its settings in several files. Find the default port the server listens on when no environment variable is set and write it in answer.txt (the number only).",
+  "tags": [
+    "reading",
+    "multi-file"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

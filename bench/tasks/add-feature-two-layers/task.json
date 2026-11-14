@@ -1,0 +1,14 @@
+{
+  "id": "add-feature-two-layers",
+  "prompt": "Add a `discount` feature: `apply_discount(price, percent)` in pricing/rules.py (percent between 0 and 100, ValueError otherwise, result rounded to 2 decimals), and an optional `discount=0` argument to `checkout` in pricing/checkout.py that applies it to the total. Do not change the tests.",
+  "tags": [
+    "multi-file",
+    "feature"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}

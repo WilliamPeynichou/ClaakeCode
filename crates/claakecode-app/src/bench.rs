@@ -254,7 +254,11 @@ mod tests {
     async fn bench_tasks_load_and_start_red() {
         let dir = default_tasks_dir();
         let tasks = load_tasks(&dir).unwrap();
-        assert!(tasks.len() >= 5, "{}", tasks.len());
+        assert_eq!(tasks.len(), 20);
+        for tag in ["bug", "feature", "refactor", "reading", "tests", "multi-file"] {
+            let count = tasks.iter().filter(|task| task.tags.iter().any(|t| t == tag)).count();
+            assert!(count >= 3, "only {count} task(s) tagged `{tag}`");
+        }
         for task in &tasks {
             let root = prepare_workspace(&dir.join(&task.id)).unwrap();
             let verdict = judge(&task.guard, &root, None).await;

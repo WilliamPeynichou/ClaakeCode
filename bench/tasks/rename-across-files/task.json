@@ -1,0 +1,14 @@
+{
+  "id": "rename-across-files",
+  "prompt": "Rename the function `calc` to `compute_total` everywhere in the project (definition, imports and calls). No reference to the old name may remain. Do not change the tests.",
+  "tags": [
+    "multi-file",
+    "refactor"
+  ],
+  "guard": {
+    "type": "command",
+    "run": "python3 -m unittest -q",
+    "timeoutSecs": 120
+  },
+  "maxToolRounds": 30
+}
