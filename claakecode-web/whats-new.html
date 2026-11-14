@@ -76,6 +76,55 @@
   </div>
 </header>
 <main>
+  <section class="pad-lg" id="unreleased">
+    <div class="wrap">
+      <div class="reveal">
+        <span class="eyebrow">00 · unreleased · next version</span>
+        <h2 class="wn-h2">Fixes and additions <em>on the way</em>.</h2>
+        <p class="wn-p">Not released yet: these changes live on the <code>amelioration/fin</code> branch, which is not merged, and the app version has not changed. Points marked untested or experimental are not verified as working.</p>
+      </div>
+      <div class="grid g3 wn-cards">
+        <article class="glass card reveal"><span class="ix">security</span><h3>Security</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span><b>Per-tool approval.</b> Each tool has an "ask before running" switch (Settings &gt; Tools). On a fresh install bash and python ask first. Approve once or for the rest of the turn; sub-agents and swarm teammates ask through the same prompt. Rust tests pass; the UI was not tried by hand.</span></li>
+            <li><span class="tick">✓</span><span><b>Write sandbox on macOS.</b> bash, python and command guards can only write in the workspace, temp folders and a few caches (<code>~/.cargo</code>, <code>~/.npm</code>, <code>~/.cache</code>, <code>~/Library/Caches</code>). Reads and network are not restricted. Switch in Settings &gt; Tools. Tested on macOS, including a git commit inside a git worktree.</span></li>
+            <li><span class="tick">✓</span><span><b>Linux sandbox through bwrap:</b> experimental, untested. It is written but was never compiled nor run.</span></li>
+            <li><span class="tick">✓</span><span><b>CLAAKE.md base rules</b> are read from the home folder only, no longer from the opened project, and capped at 8,000 characters.</span></li>
+            <li><span class="tick">✓</span><span><b>Skill-repository auto-updates</b> are now held as "pending": you see the changed files and accept or ignore. Manual updates apply directly as before.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">agent loop</span><h3>Agent loop</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span><code>edit_file</code> is all-or-nothing: if one write fails, files already written are restored.</span></li>
+            <li><span class="tick">✓</span><span>Read-only tools (read, glob, grep, web search/fetch) from one model response run in parallel; tools that need approval never do.</span></li>
+            <li><span class="tick">✓</span><span>The skill catalog shows a one-line description per skill.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">run engine</span><h3>Run engine (guards)</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span>A skill can ship a <code>graph.json</code>: ordered steps, each with a guard checked on disk (file exists, file contains, git commit, command). You approve a graph once, by its SHA-256.</span></li>
+            <li><span class="tick">✓</span><span>When the model wants to end its turn, the guard decides; after 5 refusals you are asked to stop or continue.</span></li>
+            <li><span class="tick">✓</span><span>A step can be delegated to a sub-agent profile. Only the failure path is tested.</span></li>
+            <li><span class="tick">✓</span><span>Goal mode: optional verification command; <code>update_goal</code> is refused while it fails.</span></li>
+            <li><span class="tick">✓</span><span>Per-project "check after edit" command: its errors are shown to the model after a round that edited files.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">learning</span><h3>Learning</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span>A "Learning and recall" switch, global and per RLM chat.</span></li>
+            <li><span class="tick">✓</span><span>Every lesson carries its evidence. Statuses: candidate, validated, rejected. Only validated lessons are recalled in every chat (both harnesses); a candidate is recalled only in the conversation where it was born.</span></li>
+            <li><span class="tick">✓</span><span>An error fixed in front of a guard becomes a candidate lesson automatically, with the refusal reasons and changed files as evidence, without any model call.</span></li>
+            <li><span class="tick">✓</span><span>Agent bench: 20 small Python tasks judged by a command. A lesson is validated only if the pass rate with it is not lower than without it (3 runs each). The bench has only been run with a scripted fake model, never with a real model.</span></li>
+            <li><span class="tick">✓</span><span>Lessons screen in Settings &gt; Persistent Python: list, edit (goes back to candidate), delete, validate, import from RLM memory, and 14 base lessons (from the ponytail and caveman skills and from errors met on this project) imported as candidates.</span></li>
+            <li><span class="tick">✓</span><span>Above 20 validated lessons, the ones sharing the most words with the request are recalled first (simple word overlap, no learned model).</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">rlm</span><h3>RLM / Auto Compute</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span><b>Fix:</b> the bundle now ships <code>prime-agent-runtime</code>, without which the persistent Python kernel could not be installed. The fix is written; the kernel start was not observed, and it needs a new release.</span></li>
+            <li><span class="tick">✓</span><span>Auto Compute passes the last 6 tool results and the list of uncommitted files, and a button sends the result back to the source chat's composer without sending it.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">docs and checks</span><h3>Docs and numbers</h3><p>The README no longer claims to be "the only coding agent" for <code>clean_context</code> / <code>todo_list</code>. The app crate has 341 Rust unit tests and the desktop crate 44; the TypeScript check is clean.</p></article>
+      </div>
+    </div>
+  </section>
+
   <section class="pad-lg" id="skills">
     <div class="wrap">
       <div class="split wn-split">

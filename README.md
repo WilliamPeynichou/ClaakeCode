@@ -54,6 +54,7 @@ Claake Code flips that. The harness is the surface area you control.
 
 ## Contents
 
+- [What's new (unreleased)](#whats-new-unreleased) — next version, not yet published
 - [The four modes](#the-four-modes) — Act, Ask, Goal, Plan
 - [`AGENTS.md` & `DESIGN.md`](#agentsmd--designmd) — system prompt injection
 - [Multi-provider, one harness](#multi-provider-one-harness) — Anthropic, OpenAI, Google, Kimi, Mistral, xAI, OpenRouter
@@ -76,6 +77,42 @@ Claake Code flips that. The harness is the surface area you control.
 
 ---
 
+## What's new (unreleased)
+
+Changes on the `amelioration/fin` branch. Not released and not merged; the app version is not bumped.
+
+**Security**
+- Per-tool approval and the macOS write sandbox (see [Tool approval and write sandbox](#tool-approval-and-write-sandbox)). Rust tests pass; the approval UI was not tried by hand. The sandbox was tested on macOS, including a `git commit` inside a git worktree.
+- Linux sandbox through `bwrap`: experimental, untested (written, never compiled nor run).
+- `CLAAKE.md` base rules are read from the home folder only, no longer from the opened project, capped at 8,000 characters.
+- Automatic skill-repository updates are held as "pending": you see the changed files and accept or ignore. Manual updates apply directly as before.
+
+**Agent loop**
+- `edit_file` is all-or-nothing; read-only tools run in parallel; the skill catalog shows a one-line description per skill.
+
+**Run engine (guards)**
+- Skills can ship a `graph.json` with guarded steps (see [`skill`](#skill)); delegating a step to a sub-agent is only tested on the failure path.
+- Goal mode accepts an optional verification command.
+- A per-project "check after edit" command: its errors are shown to the model after a round that edited files.
+
+**Learning**
+- "Learning and recall" switch, global and per RLM chat.
+- Lessons carry their evidence and a status: candidate, validated, rejected. Only validated lessons are recalled in every chat; a candidate is recalled only in the conversation where it was born. Above 20 validated lessons, those sharing the most words with the request come first (simple word overlap, no learned model).
+- An error fixed in front of a guard becomes a candidate lesson automatically, without any model call.
+- Agent bench: 20 small Python tasks judged by a command; a lesson is validated only if the pass rate with it is not lower than without it (3 runs each). The bench has only been run with a scripted fake model, never with a real model.
+- Lessons screen in Settings → Persistent Python: list, edit (goes back to candidate), delete, validate, import from RLM memory, and 14 base lessons imported as candidates.
+
+**RLM / Auto Compute**
+- Fix: the bundle now ships `prime-agent-runtime`, without which the persistent Python kernel could not be installed. The fix is written; the kernel start was not observed; it needs a new release.
+- Auto Compute passes the last 6 tool results and the list of uncommitted files, and a button sends the result back to the source chat's composer without sending it.
+
+**Docs**
+- The README no longer makes an exclusivity claim for `clean_context` / `todo_list`.
+
+**Numbers:** 341 Rust unit tests in the app crate, 44 in the desktop crate, TypeScript check clean.
+
+---
+
 ## The four modes
 
 <p align="center">
@@ -93,6 +130,8 @@ A **read-only** mode for questions about the codebase. The agent can only explor
 ### Goal
 
 The agent runs in a loop until the task is finished. It can keep going for hours, autonomously, without hand-holding.
+
+A Goal can have an optional verification command; `update_goal` is refused while that command fails. *(Unreleased)*
 
 ### Plan
 
@@ -196,6 +235,8 @@ Each tool can be **individually disabled** in Settings, which lets you go from a
 Each tool has a "Ask before running" switch in Settings → Tools; on a fresh install `bash` and `python` ask first.
 You can approve once or for the rest of the turn; sub-agents and swarm teammates ask through the same prompt.
 On macOS, `bash` and `python` can only write inside the workspace, the temp folders and a few tool caches (switch in Settings → Tools); reads and network are not restricted.
+
+Read-only tools (`read`, `glob`, `grep`, web search/fetch) from one model response run in parallel; tools that need approval never do. *(Unreleased)*
 
 ### `clean_context`
 
@@ -357,6 +398,8 @@ Edits existing workspace text files with exact search/replace blocks. The agent 
 
 The tool requires a successful prior `read` and refuses to write if the file changed since that read. Multiple replacements in the same file apply in order, each one seeing the result of the previous; if any fails, nothing is written.
 
+The whole call is all-or-nothing across files too: if one write fails, files already written are restored. *(Unreleased)*
+
 ### `write_file`
 
 Writes a complete text file with `path` and `content`.
@@ -458,6 +501,8 @@ Each skill is a directory containing a `SKILL.md` file.
 The `.agents/skills/` format is deliberately aligned with the **Claude Agent Skills convention**: a skill written for Claude works in Claake Code as-is, and vice-versa. The `.claakecode/skills/` namespace stays available for project-specific skills.
 
 Skills can be individually enabled or disabled in Settings.
+
+*(Unreleased)* The catalog shows a one-line description per skill. A skill can also ship a `graph.json`: ordered steps, each with a guard checked on disk (file exists, file contains, git commit, command). You approve a graph once (by its SHA-256). When the model wants to end its turn, the guard decides; after 5 refusals you are asked to stop or continue. A step can be delegated to a sub-agent profile (only the failure path is tested).
 
 ---
 
