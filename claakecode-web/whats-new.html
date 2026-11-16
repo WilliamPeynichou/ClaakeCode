@@ -50,7 +50,7 @@
       <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
     </picture>
     <strong>claake <em>code</em></strong>
-    <span class="version">v0.2.5</span>
+    <span class="version">v0.2.10</span>
   </a>
   <div class="nav-links" id="navlinks">
     <a href="/whats-new" class="active">What's new</a>
@@ -65,22 +65,50 @@
 </nav>
 <header class="page-hero" id="top">
   <div class="wrap reveal in">
-    <span class="eyebrow">§ what's new · v0.2.5</span>
-    <h1>Share skills from any Git repo. <em>Claake Code keeps them fresh.</em></h1>
-    <p>Version 0.2.5 adds Git skill repositories: paste a repo URL and Claake Code clones it, reads every SKILL.md with a real YAML parser, dedupes mirror copies so a repo never conflicts with itself, and can auto-update by fresh clone. Below: the Claaky desktop companion, the 3D room and Kimi 3.1 Pro from 0.2.x.</p>
+    <span class="eyebrow">§ what's new · v0.2.10</span>
+    <h1>Rate limits that wait. <em>Updates that explain themselves.</em></h1>
+    <p>Version 0.2.10 keeps the provider's retry delay on 429 errors and shows release notes in the update dialog. Earlier: version 0.2.5 added Git skill repositories: paste a repo URL and Claake Code clones it, reads every SKILL.md with a real YAML parser, dedupes mirror copies so a repo never conflicts with itself, and can auto-update by fresh clone. Below: the Claaky desktop companion, the 3D room and Kimi 3.1 Pro from 0.2.x.</p>
     <div class="hero-cta">
-      <a class="btn btn-primary" href="#skills">Git skill repositories</a>
+      <a class="btn btn-primary" href="#latest">Latest changes</a>
+      <a class="btn btn-ghost" href="#skills">Git skill repositories</a>
       <a class="btn btn-ghost" href="#companion">Desktop companion</a>
       <a class="btn btn-ghost" href="#room">3D room</a>
     </div>
   </div>
 </header>
 <main>
+  <section class="pad-lg" id="latest">
+    <div class="wrap">
+      <div class="reveal">
+        <span class="eyebrow">00 · latest · v0.2.9 and v0.2.10</span>
+        <h2 class="wn-h2">Calmer rate limits, <em>clearer updates</em>.</h2>
+        <p class="wn-p">Points marked not verified were covered by unit tests only and have not been checked by hand in the app.</p>
+      </div>
+      <div class="grid g3 wn-cards">
+        <article class="glass card reveal"><span class="ix">rate limits</span><h3>429 errors (0.2.9, 0.2.10)</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span>On a "too many requests" error, the agent waits and retries on its own: up to 8 tries, from 5 s up to 5 min between tries. Stop cancels the wait right away, and the chat shows when the next try happens.</span></li>
+            <li><span class="tick">✓</span><span><b>0.2.10:</b> the provider's <code>Retry-After</code> delay is kept for OpenAI, xAI and Anthropic and is no longer cut to 5 min. If the provider asks for more than 1 hour, the turn stops with the provider's message.</span></li>
+            <li><span class="tick">✓</span><span>Google, OpenRouter, Kimi and Mistral do not pass a delay yet: they keep the 5 s to 5 min wait.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">goal</span><h3>Goal mode (0.2.9)</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span>A goal that answers 3 turns in a row without using any tool is paused instead of looping and burning tokens. Send a message in Goal mode to resume it.</span></li>
+          </ul></article>
+        <article class="glass card reveal"><span class="ix">app</span><h3>Updates and RLM chat (0.2.10)</h3>
+          <ul class="feat-list">
+            <li><span class="tick">✓</span><span>The update dialog now shows the release notes. In 0.2.8 and 0.2.9 they were empty in the update file. <i>Not verified until a real update runs.</i></span></li>
+            <li><span class="tick">✓</span><span>The learning buttons at the top of the RLM chat no longer spill over their neighbours; in a narrow column they show icons only. <i>Not verified by hand.</i></span></li>
+          </ul></article>
+      </div>
+    </div>
+  </section>
+
   <section class="pad-lg" id="unreleased">
     <div class="wrap">
       <div class="reveal">
-        <span class="eyebrow">00 · unreleased · next version</span>
-        <h2 class="wn-h2">Fixes and additions <em>on the way</em>.</h2>
+        <span class="eyebrow">01 · shipped in 0.2.8</span>
+        <h2 class="wn-h2">Fixes and additions <em>from 0.2.8</em>.</h2>
         <p class="wn-p">Shipped in version 0.2.8. Points marked untested or experimental are not verified as working.</p>
       </div>
       <div class="grid g3 wn-cards">
@@ -227,7 +255,7 @@
           <span class="tag-chip">Auto-update by validated fresh clone, never git pull</span>
           <span class="tag-chip">Update-all with per-repo added/removed skill report</span>
         </div>
-        <p>Full changelog and downloads are on the <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/tag/v0.2.5">v0.2.5 release page ↗</a>.</p>
+        <p>Full changelog and downloads are on the <a href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">latest release page ↗</a>.</p>
       </div>
     </div>
   </section>
@@ -243,7 +271,7 @@
             <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="/download/windows">Windows · .exe ↓</a>
             <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="/download/linux">Linux · AppImage ↓</a>
           </div>
-          <p class="meta" style="text-align:center">Latest v0.2.5 · open source · MIT</p>
+          <p class="meta" style="text-align:center">Latest v0.2.10 · open source · MIT</p>
         </div>
       </div>
     </div>
