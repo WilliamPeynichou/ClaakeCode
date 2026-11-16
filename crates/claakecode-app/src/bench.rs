@@ -391,7 +391,7 @@ async fn run_rlm_trial(
             socket,
             session_id,
             &task.prompt,
-            Duration::from_secs(180),
+            Duration::from_secs(1800),
             |event| match event {
                 AgentEvent::ToolStarted { .. } => {
                     tools += 1;
@@ -680,8 +680,12 @@ mod tests {
                 let request: serde_json::Value = serde_json::from_str(&line).unwrap();
                 assert_eq!(request["command"]["type"], "wait_for_headless_completion");
                 assert_eq!(request["command"]["waitForRlmQuiescence"], true);
-                let response = json!({"type":"response","id":request["id"],"success":true,"data":{}});
-                writer.write_all(format!("{response}\n").as_bytes()).await.unwrap();
+                let response =
+                    json!({"type":"response","id":request["id"],"success":true,"data":{}});
+                writer
+                    .write_all(format!("{response}\n").as_bytes())
+                    .await
+                    .unwrap();
             });
             let (tx, mut rx) = mpsc::unbounded_channel();
             let result = run_rlm_trial(
