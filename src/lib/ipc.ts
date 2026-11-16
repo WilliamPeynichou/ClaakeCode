@@ -148,6 +148,8 @@ export type ModelUsageSeriesInput = {
   harness?: "classic" | "rlm" | null;
 };
 
+export type BenchHarness = "classic" | "rlm";
+
 export type StartBenchmarkInput = { providerId: string; modelId: string; budgetUsd: number; maxOutputTokens: number; repetitions: number; confirmed: boolean };
 export type BenchmarkRun = { runId: string; provider: string; model: string; suiteVersion: string; startedAtMs: number; finishedAtMs: number | null; status: string; completedCases: number; totalCases: number; inputTokens: number; outputTokens: number; estimatedCost: number; medianTtftMs: number | null; medianOutputTokensPerSecond: number | null; verifiedChecks: number; error: string | null };
 
@@ -221,9 +223,9 @@ export const api = {
   importPrimeMemory(title: string, content: string) {
     return invoke<Lesson>("import_prime_memory", { title, content });
   },
-  /** Runs the agent bench without then with the lesson (spends model quota). */
-  validateLesson(lessonId: string, providerId: string, modelId: string) {
-    return invoke<Lesson>("validate_lesson", { lessonId, providerId, modelId });
+  /** Tests a SQL lesson with the chosen engine, not the user's native Prime memories. */
+  validateLesson(lessonId: string, providerId: string, modelId: string, harness: BenchHarness) {
+    return invoke<Lesson>("validate_lesson", { lessonId, providerId, modelId, harness });
   },
   stopBenchRun() {
     return invoke<void>("stop_bench_run");
@@ -547,6 +549,7 @@ export const api = {
     text: string,
     model?: { provider: string; name: string },
     thinking?: ThinkingLevel,
+    mode?: AgentMode,
   ) {
     return invoke<void>("send_rlm_message", {
       input: {
@@ -555,6 +558,7 @@ export const api = {
         text,
         model: model ? { provider: model.provider, name: model.name } : null,
         thinking: thinking ?? null,
+        mode: mode ?? null,
       },
     });
   },

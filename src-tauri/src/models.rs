@@ -854,5 +854,7 @@ pub(super) struct RlmMessageInput {
     pub(super) model: Option<ModelInput>,
     /// Thinking level of the picker; `None` keeps Prime's session level.
     #[serde(default)]
-    pub(super) thinking: Option<ThinkingLevelInput>,
+    pub(super) thinking: Option<ThinkingLevelInput>,    /// Goal is a native Prime objective, not the classic engine's continuation loop.
+    #[serde(default)]
+    pub(super) mode: Option<AgentModeInput>,
 }

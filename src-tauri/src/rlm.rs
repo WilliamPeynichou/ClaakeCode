@@ -27,8 +27,18 @@ Only report an entry as saved after a successful native persistence operation. L
 const MEMORY_DISABLED_TURN_NOTE: &str = "[Claake: memory is disabled for this conversation. Do not read, write or refine persistent harness memory, and say so if asked about your memory policy.]";
 
 /// Per-turn text sent to Prime: prefixed by the memory-off note when learning is disabled.
-fn turn_prompt(text: &str, learning: bool) -> String {
-    if learning { text.to_string() } else { format!("{MEMORY_DISABLED_TURN_NOTE}\n\n{text}") }
+fn turn_prompt(text: &str, learning: bool, lessons: Option<&str>) -> String {
+    if !learning { return format!("{MEMORY_DISABLED_TURN_NOTE}\n\n{text}"); }
+    let reminder = lessons.unwrap_or("No Claake lessons apply to this turn.");
+    format!("[Claake: learning is enabled. The following lesson selection replaces earlier Claake lesson blocks for this turn.]\n{reminder}\n\n{text}")
+}
+
+fn mode_prompt(text: &str, mode: Option<AgentModeInput>) -> String {
+    match mode {
+        Some(AgentModeInput::Ask) => format!("[Claake mode: Ask. Read-only investigation; do not change files.]\n\n{text}"),
+        Some(AgentModeInput::Plan) => format!("[Claake mode: Plan. Investigate and propose a plan; do not implement changes before approval.]\n\n{text}"),
+        _ => text.to_string(),
+    }
 }
 
 /// Claake base rules (the CLAAKE.md skill) first, then the memory policy.
@@ -101,7 +111,6 @@ pub(super) fn get_learning_enabled(state: State<'_, DesktopState>) -> bool {
 #[tauri::command]
 pub(super) async fn set_learning_enabled(state: State<'_, DesktopState>, enabled: bool) -> std::result::Result<(), String> {
     state.store.set_learning_enabled(enabled).map_err(error_to_string)?;
-    state.rlm.lock().await.sessions.clear();
     Ok(())
 }
 
@@ -117,7 +126,6 @@ pub(super) async fn set_conversation_learning(
     enabled: bool,
 ) -> std::result::Result<(), String> {
     state.store.set_conversation_learning(&conversation_id, enabled).map_err(error_to_string)?;
-    state.rlm.lock().await.sessions.remove(&conversation_id);
     Ok(())
 }
 
@@ -128,6 +136,7 @@ pub(super) struct RlmRuntime {
     sessions: HashMap<String, String>,
     /// Prime provider ids the running daemon was started with.
     providers: Vec<String>,
+    observers: HashMap<String, tokio::task::JoinHandle<()>>,
 }
 
 pub(super) type SharedRlm = Arc<Mutex<RlmRuntime>>;
@@ -329,6 +338,7 @@ async fn ensure_sidecar(
             let _ = sidecar.stop().await;
         }
         runtime.sessions.clear();
+        for (_, task) in runtime.observers.drain() { task.abort(); }
     }
     let sidecar = Sidecar::start(&SidecarConfig {
         binary: sidecar_binary()?,
@@ -343,6 +353,36 @@ async fn ensure_sidecar(
     runtime.sidecar = Some(sidecar);
     runtime.providers = providers;
     Ok((socket, credentials))
+}
+
+/// A benchmark owns its daemon, auth file and memory roots; no user session is reused.
+pub(super) async fn create_bench_rlm_session(
+    state: &DesktopState, data_root: &std::path::Path, workspace: &std::path::Path,
+    provider_id: &str, model_id: &str, append_system_prompt: &str,
+) -> std::result::Result<(prime::Sidecar, String), String> {
+    let credentials = collect_credentials().await;
+    let provider = prime_provider(provider_id, &credentials)?;
+    let private_root = data_root.join("prime");
+    std::fs::create_dir_all(&private_root).map_err(error_to_string)?;
+    let private_root = std::fs::canonicalize(private_root).map_err(error_to_string)?;
+    let agent_dir = private_root.join("agent");
+    prime::write_auth_file(&agent_dir, &credentials).map_err(error_to_string)?;
+    let model = ModelInput { provider: provider_id.to_string(), name: model_id.to_string(), use_1m_context: None };
+    let declaration = model_declaration(state, &model, provider)?;
+    prime::declare_model(&agent_dir, &declaration).map_err(error_to_string)?;
+    let sidecar = Sidecar::start(&SidecarConfig {
+        binary: sidecar_binary()?, data_dir: private_root, uv_dir: sidecar_dir(), credentials: Vec::new(),
+    }).await.map_err(error_to_string)?;
+    let configured = async {
+        let (session_id, _) = prime::create_rlm_session_with(&sidecar.socket, workspace,
+            "claake-bench", None, append_system_prompt).await.map_err(error_to_string)?;
+        prime::set_model(&sidecar.socket, &session_id, provider, model_id).await.map_err(error_to_string)?;
+        Ok::<_, String>(session_id)
+    }.await;
+    match configured {
+        Ok(session_id) => Ok((sidecar, session_id)),
+        Err(error) => { let _ = sidecar.stop().await; Err(error) }
+    }
 }
 
 #[tauri::command]
@@ -411,7 +451,7 @@ pub(super) async fn send_rlm_message(
                     &worktree,
                     "claakecode-rlm",
                     binding.session_path.as_deref(),
-                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), state.store.lessons_prompt_for(&input.conversation_id, &text).as_deref()),
+                    &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), None),
                 )
                 .await
                 .map_err(error_to_string)?;
@@ -431,77 +471,98 @@ pub(super) async fn send_rlm_message(
             .await
             .map_err(error_to_string)?;
     }
-    // Same single-turn rule as the classic chat: one running turn per conversation, visible
-    // in the active-turns list. Stop goes through Prime's abort, not this cancel handle.
-    {
-        let mut active_turns = state.active_turns.lock().await;
-        if active_turns.contains_key(&input.conversation_id) {
-            return Err("a turn is already running for this conversation".into());
+    ensure_observer(&app, state.inner(), &workspace_id, &input.conversation_id, &socket, &session_id).await?;
+    let lessons = state.store.lessons_prompt_for(&input.conversation_id, &text);
+    let text_for_mode = mode_prompt(&text, input.mode);
+    let prompt = turn_prompt(&text_for_mode, state.store.learning_enabled_for(&input.conversation_id), lessons.as_deref());
+    prime::call(&socket, serde_json::json!({"type":"prompt","activeSessionId":session_id,"message":prompt,"streamingBehavior":"followUp"}),
+        Duration::from_secs(30), |_| {}).await.map_err(error_to_string)?;
+    if input.mode == Some(AgentModeInput::Goal) {
+        // Goal mode: after the user turn, Prime continues natively within this token budget and stops when idle.
+        let objective = text.chars().take(3_900).collect::<String>().replace('\n', " ");
+        prime::call(&socket, serde_json::json!({"type":"prompt","activeSessionId":session_id,
+            "message":format!("/goal --budget 200000 {objective}"),"streamingBehavior":"followUp"}),
+            Duration::from_secs(30), |_| {}).await.map_err(error_to_string)?;
+    }
+    state.store.append_conversation_message(&workspace_id, &input.conversation_id,
+        &claakecode_core::ChatMessage::user_text(text)).map_err(error_to_string)?;
+    Ok(())
+}
+
+async fn ensure_observer(
+    app: &AppHandle, state: &DesktopState, workspace_id: &str, conversation_id: &str,
+    socket: &std::path::Path, session_id: &str,
+) -> std::result::Result<(), String> {
+    let mut runtime = state.rlm.lock().await;
+    if runtime.observers.get(conversation_id).is_some_and(|task| !task.is_finished()) { return Ok(()); }
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let app = app.clone();
+    let state = state.clone();
+    let workspace_id = workspace_id.to_string();
+    let conversation_id = conversation_id.to_string();
+    let observer_key = conversation_id.clone();
+    let socket = socket.to_path_buf();
+    let session_id = session_id.to_string();
+    let task = tokio::spawn(async move {
+        let observer = prime::observe_session(&socket, &session_id, ready_tx, |event| { let _ = tx.send(event); });
+        tokio::pin!(observer);
+        let mut reply = String::new();
+        let mut measurement: Option<claakecode_app::model_turns::TurnMeasurement> = None;
+        loop {
+            let event = tokio::select! {
+                event = rx.recv() => match event { Some(event) => event, None => break },
+                result = &mut observer => {
+                    if let Err(error) = result {
+                        let message = error_to_string(error);
+                        let _ = emit_agent_event(&app, &workspace_id, &conversation_id, &AgentEvent::Error { message });
+                    }
+                    clear_rlm_active(&app, &state, &conversation_id).await;
+                    break;
+                }
+            };
+            match &event {
+                AgentEvent::TurnStarted => {
+                    state.active_turns.lock().await.insert(conversation_id.clone(), TurnCancel::empty());
+                    register_active_turn(&app, &state, &workspace_id, &conversation_id).await;
+                    let model = state.store.load_conversation_model_by_id(&conversation_id).ok().flatten()
+                        .unwrap_or_else(|| ModelRef::new("unknown", "unknown"));
+                    measurement = Some(claakecode_app::model_turns::TurnMeasurement::new(
+                        conversation_id.clone(), model.provider, model.name, "rlm", false, None));
+                    reply.clear();
+                }
+                AgentEvent::TextChunk { delta } => {
+                    reply.push_str(delta);
+                    if let Some(m) = measurement.as_mut() { m.first_token(); }
+                }
+                AgentEvent::ToolStarted { .. } => if let Some(m) = measurement.as_mut() { m.record.tool_calls += 1; },
+                AgentEvent::ToolFinished { is_error: true, .. } => if let Some(m) = measurement.as_mut() { m.record.tool_errors += 1; },
+                AgentEvent::TurnFinished { .. } | AgentEvent::Interrupted | AgentEvent::Error { .. } => {
+                    if !reply.is_empty() {
+                        let _ = state.store.append_conversation_message(&workspace_id, &conversation_id,
+                            &claakecode_core::ChatMessage::assistant_text(std::mem::take(&mut reply)));
+                    }
+                    if let Some(mut m) = measurement.take() {
+                        if matches!(&event, AgentEvent::Interrupted) { m.record.status = "interrupted".into(); }
+                        if matches!(&event, AgentEvent::Error { .. }) { m.record.status = "error".into(); }
+                        let _ = state.store.record_model_turn(&m.finish());
+                    }
+                    clear_rlm_active(&app, &state, &conversation_id).await;
+                }
+                _ => {}
+            }
+            let _ = emit_agent_event(&app, &workspace_id, &conversation_id, &event);
         }
-        active_turns.insert(input.conversation_id.clone(), TurnCancel::empty());
-    }
-    register_active_turn(&app, &state, &workspace_id, &input.conversation_id).await;
-    let conversation_id = input.conversation_id.clone();
-    // Persisted like a classic turn so reopening the conversation shows it. Prime keeps the
-    // authoritative transcript; this is the readable copy shown by the chat.
-    let _ = state.store.append_conversation_message(
-        &workspace_id,
-        &conversation_id,
-        &claakecode_core::ChatMessage::user_text(text.clone()),
-    );
-    let measured_model = input.model.as_ref().map(|m| ModelRef::new(&m.provider, &m.name)).or_else(|| state.store.load_conversation_model_by_id(&conversation_id).ok().flatten()).unwrap_or_else(|| ModelRef::new("unknown", "unknown"));
-    let mut measurement = claakecode_app::model_turns::TurnMeasurement::new(
-        conversation_id.clone(), measured_model.provider, measured_model.name, "rlm", false, None,
-    );
-    let mut reply = String::new();
-    // D1: Prime may reopen an existing session without the new system prompt, so the switch
-    // also travels with every turn. The readable copy above keeps the user's text unchanged.
-    let prompt = turn_prompt(&text, state.store.learning_enabled_for(&conversation_id));
-    let result = prime::run_prompt(&socket, &session_id, &prompt, Duration::from_secs(30 * 60), |event| {
-        match &event {
-            AgentEvent::TextChunk { delta } if !delta.is_empty() => measurement.first_token(),
-            AgentEvent::ToolStarted { .. } => measurement.record.tool_calls += 1,
-            AgentEvent::ToolFinished { is_error: true, .. } => measurement.record.tool_errors += 1,
-            AgentEvent::Interrupted => measurement.record.status = "interrupted".into(),
-            AgentEvent::Error { .. } => measurement.record.status = "error".into(),
-            _ => {},
-        }
-        if let AgentEvent::TextChunk { delta } = &event {
-            reply.push_str(delta);
-        }
-        let _ = emit_agent_event(&app, &workspace_id, &conversation_id, &event);
-    })
-    .await;
-    if result.is_err() && measurement.record.status != "interrupted" { measurement.record.status = "error".into(); }
-    let record = measurement.finish();
-    let measurement_store = state.store.clone();
-    match tokio::task::spawn_blocking(move || measurement_store.record_model_turn(&record)).await {
-        Ok(Ok(())) => {},
-        other => eprintln!("RLM measurement persistence failed: {other:?}"),
-    }
-    if !reply.is_empty() {
-        let _ = state.store.append_conversation_message(
-            &workspace_id,
-            &conversation_id,
-            &claakecode_core::ChatMessage::assistant_text(reply),
-        );
-    }
-    state.active_turns.lock().await.remove(&conversation_id);
-    state
-        .active_turn_details
-        .lock()
-        .map(|mut active| active.remove(&conversation_id))
-        .ok();
-    emit_active_turns_changed(&app, &state.active_turn_details).await;
-    if let Err(err) = &result {
-        let _ = emit_agent_event(
-            &app,
-            &workspace_id,
-            &conversation_id,
-            &AgentEvent::Error { message: error_to_string(anyhow::anyhow!("{err:#}")) },
-        );
-    }
-    result.map_err(error_to_string)
+    });
+    runtime.observers.insert(observer_key, task);
+    drop(runtime);
+    ready_rx.await.map_err(|_| "Prime observer could not attach".to_string())
+}
+
+async fn clear_rlm_active(app: &AppHandle, state: &DesktopState, conversation_id: &str) {
+    state.active_turns.lock().await.remove(conversation_id);
+    if let Ok(mut active) = state.active_turn_details.lock() { active.remove(conversation_id); }
+    emit_active_turns_changed(app, &state.active_turn_details).await;
 }
 
 #[tauri::command]
@@ -515,7 +576,8 @@ pub(super) async fn stop_rlm_turn(
         (socket, runtime.sessions.get(&input.conversation_id).cloned())
     };
     let (Some(socket), Some(session_id)) = (socket, session_id) else { return Ok(()) };
-    prime::abort_session(&socket, &session_id).await.map_err(error_to_string)
+    prime::call(&socket, serde_json::json!({"type":"abort_and_clear_queue","activeSessionId":session_id}),
+        Duration::from_secs(10), |_| {}).await.map(|_| ()).map_err(error_to_string)
 }
 
 /// Exposes the isolation of an RLM conversation so the UI can show where Prime works.
@@ -640,6 +702,7 @@ pub(super) async fn restart_python_runtime(state: State<'_, DesktopState>) -> st
 /// Stops the sidecar; called on app exit so no daemon outlives Claake Code.
 pub(super) async fn shutdown_rlm(rlm: &SharedRlm) {
     let mut runtime = rlm.lock().await;
+    for (_, task) in runtime.observers.drain() { task.abort(); }
     runtime.sessions.clear();
     runtime.providers.clear();
     if let Some(sidecar) = runtime.sidecar.take() {
@@ -664,8 +727,10 @@ mod learning_tests {
 
     #[test]
     fn rlm_turn_prompt_carries_learning_switch() {
-        assert_eq!(turn_prompt("salut", true), "salut");
-        let off = turn_prompt("salut", false);
+        let on = turn_prompt("salut", true, Some("<validated_lessons>new</validated_lessons>"));
+        assert!(on.contains("learning is enabled") && on.contains("new"));
+        let off = turn_prompt("salut", false, Some("must not appear"));
+        assert!(!off.contains("must not appear"));
         assert!(off.starts_with("[Claake: memory is disabled"));
         assert!(off.ends_with("\n\nsalut"));
     }

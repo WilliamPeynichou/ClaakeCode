@@ -488,27 +488,55 @@ fn stop_error(message: &Value) -> Option<String> {
 const MAX_RECONNECTS: u32 = 3;
 
 /// Sends one prompt and streams `AgentEvent`s until the run ends. Replayed (historic) events are dropped.
-/// `max_idle` bounds silence between events, not total runtime. An error here after `prompt` was
-/// sent means the outcome is unknown: do not resend automatically.
+/// Send a prompt and wait for the daemon's settled queue, not an intermediate agent_end.
 #[cfg(unix)]
 pub async fn run_prompt(
     socket: &std::path::Path, session_id: &str, text: &str, max_idle: Duration,
+    on_event: impl FnMut(crate::AgentEvent),
+) -> Result<()> {
+    drive_session(socket, session_id, Some(text), max_idle, None, on_event).await
+}
+
+/// Retain the attach while idle so background completions and continuations stay visible.
+#[cfg(unix)]
+pub async fn observe_session(
+    socket: &std::path::Path, session_id: &str,
+    ready: tokio::sync::oneshot::Sender<()>,
+    on_event: impl FnMut(crate::AgentEvent),
+) -> Result<()> {
+    drive_session(socket, session_id, None, Duration::from_secs(30 * 60), Some(ready), on_event).await
+}
+
+#[cfg(unix)]
+async fn drive_session(
+    socket: &std::path::Path, session_id: &str, text: Option<&str>, max_idle: Duration,
+    mut ready: Option<tokio::sync::oneshot::Sender<()>>,
     mut on_event: impl FnMut(crate::AgentEvent),
 ) -> Result<()> {
+    let retained = text.is_none();
     let mut connection = Connection::connect(socket).await?;
     let attach = connection.send(json!({"type":"attach","activeSessionId":session_id})).await?;
     let initial = parse_attach(&wait_response(&mut connection, &attach).await?);
     let mut generation = initial.generation;
-    let prompt = connection.send(json!({"type":"prompt","activeSessionId":session_id,"message":text})).await?;
-    // Start after the history: anything at or below the attach cursor is not this turn.
+    let mut prompt = if let Some(text) = text {
+        Some(connection.send(json!({"type":"prompt","activeSessionId":session_id,"message":text})).await?)
+    } else { None };
     let mut stream = RlmStream::starting_after(initial.last_sequence);
+    let mut active = initial.streaming;
+    if active { on_event(crate::AgentEvent::TurnStarted); }
+    let mut settlement: Option<String> = if active {
+        Some(connection.send(json!({"type":"wait_for_headless_completion",
+            "activeSessionId":session_id,"waitForRlmQuiescence":true})).await?)
+    } else { None };
+    let mut terminal = None;
     let mut reconnects = 0;
+    if let Some(ready) = ready.take() { let _ = ready.send(()); }
     loop {
-        let frame = match tokio::time::timeout(max_idle, connection.receive()).await {
+        let received = if retained && !active { Ok(connection.receive().await) }
+            else { tokio::time::timeout(max_idle, connection.receive()).await };
+        let frame = match received {
             Err(_) => bail!("Prime run stalled; outcome unknown"),
             Ok(Ok(frame)) => frame,
-            // Broken stream (daemon side closed, socket error): the run may still be going.
-            // Reattach and resync; the prompt is never resent.
             Ok(Err(err)) => {
                 reconnects += 1;
                 if reconnects > MAX_RECONNECTS {
@@ -520,29 +548,70 @@ pub async fn run_prompt(
                     "sequence":stream.last_sequence().unwrap_or(initial.last_sequence)});
                 let Ok(id) = fresh.send(json!({"type":"attach","activeSessionId":session_id,"resumeCursor":cursor})).await else { continue };
                 let snapshot = match wait_response(&mut fresh, &id).await {
-                    Ok(data) => parse_attach(&data),
-                    Err(_) => continue,
+                    Ok(data) => parse_attach(&data), Err(_) => continue,
                 };
                 if snapshot.generation.is_some() && generation.is_some() && snapshot.generation != generation {
                     bail!("Prime daemon restarted during the run; outcome unknown");
                 }
                 generation = snapshot.generation.clone().or(generation);
                 connection = fresh;
+                settlement = None;
                 let (events, ended) = stream.resync(&snapshot);
                 for event in events { on_event(event); }
-                if ended { return Ok(()); }
+                if ended {
+                    active = false;
+                    if !retained { return Ok(()); }
+                } else {
+                    active = true;
+                    settlement = Some(connection.send(json!({"type":"wait_for_headless_completion",
+                        "activeSessionId":session_id,"waitForRlmQuiescence":true})).await?);
+                }
                 continue;
             }
         };
-        if frame["type"] == "response" && frame["id"] == prompt.as_str() {
-            if frame["success"] != true { bail!("{}", rejection("prompt", &frame)); }
-            continue;
+        if frame["type"] == "response" {
+            let id = frame["id"].as_str();
+            if prompt.as_deref() == id && prompt.is_some() {
+                if frame["success"] != true { bail!("{}", rejection("prompt", &frame)); }
+                prompt = None;
+                continue;
+            }
+            if settlement.as_deref() == id && settlement.is_some() {
+                if frame["success"] != true { bail!("{}", rejection("wait_for_headless_completion", &frame)); }
+                settlement = None;
+                if active {
+                    for event in stream.push(PrimeEnvelope { session_id: session_id.to_string(),
+                        sequence: None, replayed: false, event: PrimeEvent::TurnEnded { error: terminal.take() } }) {
+                        on_event(event);
+                    }
+                    active = false;
+                }
+                if !retained { return Ok(()); }
+                continue;
+            }
         }
         let Some(envelope) = map_session_event(&frame) else { continue };
         if envelope.replayed || envelope.session_id != session_id { continue; }
-        let ended = matches!(envelope.event, PrimeEvent::TurnEnded { .. });
+        if envelope.sequence.is_some_and(|seq| stream.last_sequence().is_some_and(|last| seq <= last)) { continue; }
+        match &envelope.event {
+            PrimeEvent::TurnStarted => {
+                terminal = None;
+                if active { continue; }
+                active = true;
+            }
+            PrimeEvent::TurnEnded { error } => {
+                terminal = error.clone();
+                // Consume the boundary sequence without publishing a false terminal to Claake.
+                stream.last_sequence = envelope.sequence.or(stream.last_sequence);
+                if settlement.is_none() {
+                    settlement = Some(connection.send(json!({"type":"wait_for_headless_completion",
+                        "activeSessionId":session_id,"waitForRlmQuiescence":true})).await?);
+                }
+                continue;
+            }
+            _ => {}
+        }
         for event in stream.push(envelope) { on_event(event); }
-        if ended { return Ok(()); }
     }
 }
 
@@ -939,9 +1008,16 @@ mod unsupported {
     pub async fn run_prompt(
         _: &std::path::Path, _: &str, _: &str, _: Duration, _: impl FnMut(crate::AgentEvent),
     ) -> Result<()> { bail!(UNSUPPORTED) }
+    pub async fn observe_session(
+        _: &std::path::Path, _: &str, _: tokio::sync::oneshot::Sender<()>, _: impl FnMut(crate::AgentEvent),
+    ) -> Result<()> { bail!(UNSUPPORTED) }
 }
 #[cfg(not(unix))]
 pub use unsupported::*;
+
+#[cfg(all(test, unix))]
+#[path = "prime_lifecycle_tests.rs"]
+mod lifecycle_tests;
 
 #[cfg(test)]
 mod tests {
