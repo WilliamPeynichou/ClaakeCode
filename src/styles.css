@@ -6252,6 +6252,7 @@ button.settings-pane__about-link:disabled {
 .chat-head {
   flex: 0 0 32px;
   height: 32px;
+  container-type: inline-size;
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -10645,6 +10646,8 @@ button.settings-pane__about-link:disabled {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 .chat-head__actions + .chat-head__dot { margin-left: 0; }
 .chat-head__action {
@@ -10665,6 +10668,11 @@ button.settings-pane__about-link:disabled {
   border-color: var(--accent);
 }
 .chat-head__action:disabled { opacity: 0.45; cursor: default; }
+.chat-head__action { flex: 0 0 auto; white-space: nowrap; }
+/* Narrow column: icons only (each button keeps its title tooltip). */
+@container (max-width: 620px) {
+  .chat-head__action span { display: none; }
+}
 
 .rlm-empty {
   flex: 1 1 auto;
