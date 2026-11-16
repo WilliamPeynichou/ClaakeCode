@@ -18,6 +18,7 @@ fn error_category(raw: &str) -> &'static str {
     else if raw == "Worker authentication failed" { "worker authentication refused" }
     else if raw.starts_with("Invalid create config:") || raw.starts_with("Invalid thinking level") { "invalid session configuration" }
     else if raw.starts_with("continueRecent is not supported:") { "explicit sessionPath required" }
+    else if raw.contains("is already active in") { "session already open in another Prime process (quit Claake Code completely, then reopen it)" }
     else { "unclassified failure (upstream details withheld)" }
 }
 
@@ -914,6 +915,8 @@ mod tests {
             "Prime daemon rejected command `set_model`: model unavailable");
         assert_eq!(error_category("No API key found for SECRET"), "provider authentication unavailable");
         assert_eq!(error_category("Unknown active session: SECRET"), "session unavailable");
+        assert!(error_category("Session file /SECRET.jsonl is already active in abc — open elsewhere").starts_with("session already open"));
+        assert!(!error_category("Session file /SECRET.jsonl is already active in abc").contains("SECRET"));
     }
 
     #[cfg(unix)]

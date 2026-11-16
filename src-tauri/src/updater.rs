@@ -199,9 +199,15 @@ pub async fn updater_download_and_install(
 
 /// Relaunch the application. Called by the frontend once the user accepts the
 /// restart prompt that appears after a successful install.
+///
+/// `AppHandle::restart` on the main thread skips `RunEvent::Exit`, which left the
+/// Prime daemon's workers alive holding RLM session locks. Stop Prime first, then
+/// restart through the exit event.
 #[tauri::command]
-pub fn updater_restart(app: AppHandle) {
-    app.restart();
+pub(crate) async fn updater_restart(app: AppHandle, state: State<'_, crate::DesktopState>) -> Result<(), String> {
+    crate::rlm::shutdown_rlm(&state.rlm).await;
+    app.request_restart();
+    Ok(())
 }
 
 /// Returns the current app version. Used by the frontend to render the badge
