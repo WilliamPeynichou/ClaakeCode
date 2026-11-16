@@ -624,7 +624,6 @@ mod tests {
         let body = build_responses_request(
             &request,
             &request.transcript,
-            false,
             Some(false),
             Some(true),
         )
@@ -634,7 +633,7 @@ mod tests {
         assert!(value.as_object().unwrap().get("type").is_none());
         assert_eq!(value["store"], false);
         assert_eq!(value["stream"], true);
-        assert_eq!(value["prompt_cache_key"], "conversation-1");
+        assert!(value.as_object().unwrap().get("prompt_cache_key").is_none());
         assert_eq!(value["input"].as_array().unwrap().len(), 1);
     }
 
@@ -648,7 +647,6 @@ mod tests {
         let body = build_responses_request(
             &request,
             &request.transcript,
-            false,
             Some(false),
             Some(true),
         )

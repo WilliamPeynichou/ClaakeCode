@@ -22,7 +22,12 @@ impl Drop for Fixture {
     fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
 }
 fn descriptor_has(tool: &SkillTool, name: &str) -> bool {
-    tool.descriptor().is_some_and(|descriptor| descriptor.description.lines().any(|line| line == format!("- {name}")))
+    tool.descriptor().is_some_and(|descriptor| {
+        descriptor.description.lines().any(|line| {
+            let Some(entry) = line.strip_prefix("- ") else { return false; };
+            entry == name || entry.strip_prefix(name).is_some_and(|suffix| suffix.starts_with(": "))
+        })
+    })
 }
 
 #[tokio::test]

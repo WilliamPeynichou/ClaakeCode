@@ -16,6 +16,7 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 
 static DOWNLOAD_LOCK: std::sync::OnceLock<Mutex<()>> = std::sync::OnceLock::new();
 
+#[cfg(test)]
 pub(crate) fn ripgrep_executable() -> PathBuf {
     find_existing_ripgrep().unwrap_or_else(|| PathBuf::from(platform_executable_name()))
 }

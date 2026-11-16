@@ -1196,15 +1196,6 @@ fn file_edit_summary_text(summary: &FileEditSummary) -> String {
     )
 }
 
-fn no_change_file_summary_text(summary: &NoChangeFileEditSummary) -> String {
-    format!(
-        "{} (no written changes; {}{})",
-        summary.relative_path,
-        replacement_count_text(summary.replacement_count),
-        skipped_noop_suffix(&summary.skipped_noop_indices)
-    )
-}
-
 fn format_no_changes_error(summaries: &[NoChangeFileEditSummary]) -> String {
     if summaries.is_empty() {
         return "No changes made.".to_string();
