@@ -16,6 +16,7 @@ Code map:
 ├── Cargo.lock
 ├── Cargo.toml
 ├── docs — notes et plans (déplacés de la racine)
+│   ├── recapitulatif-release-v0.2.12.md — bilan du correctif RLM, de la compaction du chat et de la release, avec limites et vérifications restantes
 │   ├── model-benchmark-plan.md — feuille de route performance modèles P0 filtres/intégrité, P1 métriques/comparabilité/qualité, P2 benchmark actif sécurisé (B5) + confidentialité
 │   ├── plansNouvellesFeatures.md — plan : benchmark de performance des modèles (B1–B4/B6 faits, B5 phase 2 optionnelle) + mascotte Claaky (C1–C5 faits, version 2D)
 │   ├── claaky2d/ — prototype du Claaky 2D : claaky2d.js/.css (dessin + poses), preview.html (planche animée), shoot.mjs (rend claaky2d-preview.png via Playwright)
