@@ -1,4 +1,4 @@
-//! Boundary for Prime Agent daemon v7 (pin 3358e0016bce).
+//! Boundary for Prime Agent daemon v7 (pin f24bcccebcfc).
 //! No Prime crates are linked; wire identifiers deliberately retain upstream names.
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
@@ -29,7 +29,8 @@ fn rejection(kind: &str, frame: &Value) -> String {
     // Command names are caller-controlled too: display only known wire tags.
     let kind = match kind {
         "create" | "attach" | "abort" | "set_model" | "set_thinking_level" | "prompt" |
-        "prompt_and_wait" | "list" | "shutdown" | "get_messages" | "get_available_models" => kind,
+        "prompt_and_wait" | "list" | "shutdown" | "get_messages" | "get_available_models" |
+        "wait_for_headless_completion" | "abort_and_clear_queue" => kind,
         _ => "unknown",
     };
     if frame["errorInfo"]["code"].as_str() == Some("session_already_active") {
@@ -996,6 +997,7 @@ mod unsupported {
         pub async fn stop(self) -> Result<()> { Ok(()) }
     }
     pub async fn daemon_alive(_: &std::path::Path) -> bool { false }
+    pub async fn call(_: &std::path::Path, _: Value, _: Duration, _: impl FnMut(Value)) -> Result<Value> { bail!(UNSUPPORTED) }
     pub async fn create_session_with(
         _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&std::path::Path>, _: Option<&str>,
     ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
