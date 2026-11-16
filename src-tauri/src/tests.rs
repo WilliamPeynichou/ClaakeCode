@@ -135,6 +135,7 @@ fn workflow_active_mode_uses_goal_only_while_goal_is_active() {
         objective: "work".into(),
         started_at_ms: 10,
         updated_at_ms: 15,
+        idle_turns: 0,
     };
     let paused_goal = GoalWorkflowState::Paused {
         objective: "work".into(),

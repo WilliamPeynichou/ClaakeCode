@@ -369,6 +369,30 @@ pub(super) async fn send_message(
                             let mut goal_workflow = output.goal_workflow;
                             if output.interrupted {
                                 goal_workflow = pause_goal_workflow(goal_workflow);
+                            } else if matches!(goal_workflow, GoalWorkflowState::Active { .. }) {
+                                // A goal that keeps answering without acting is paused, not looped.
+                                let used_tools = history
+                                    .get(turn_user_history_index..)
+                                    .unwrap_or(&[])
+                                    .iter()
+                                    .flat_map(|message| message.parts.iter())
+                                    .any(|part| matches!(part, Part::ToolCall { .. }));
+                                let (next, paused) =
+                                    claakecode_app::record_goal_turn(goal_workflow, used_tools);
+                                goal_workflow = next;
+                                if paused {
+                                    let _ = emit_agent_event(
+                                        &app,
+                                        &workspace_id,
+                                        &conversation_id,
+                                        &AgentEvent::Error {
+                                            message: format!(
+                                                "goal paused: {} turns in a row without any tool call",
+                                                claakecode_app::GOAL_MAX_IDLE_TURNS
+                                            ),
+                                        },
+                                    );
+                                }
                             }
                             let question_stop_requested = latest_question_stop_requested(
                                 &history,

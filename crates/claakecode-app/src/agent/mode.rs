@@ -110,6 +110,25 @@ pub(super) fn goal_objective(goal_workflow: &GoalWorkflowState) -> Option<&str> 
     }
 }
 
+/// A goal that ends this many turns in a row without calling a tool is paused.
+pub const GOAL_MAX_IDLE_TURNS: u32 = 3;
+
+/// Counts a finished goal turn. Returns the new state and `true` when the goal was
+/// paused because it stayed idle `GOAL_MAX_IDLE_TURNS` turns in a row.
+pub fn record_goal_turn(workflow: GoalWorkflowState, used_tools: bool) -> (GoalWorkflowState, bool) {
+    match workflow {
+        GoalWorkflowState::Active { objective, started_at_ms, updated_at_ms, idle_turns } => {
+            let idle_turns = if used_tools { 0 } else { idle_turns.saturating_add(1) };
+            if idle_turns >= GOAL_MAX_IDLE_TURNS {
+                (GoalWorkflowState::Paused { objective, started_at_ms, updated_at_ms: now_ms() }, true)
+            } else {
+                (GoalWorkflowState::Active { objective, started_at_ms, updated_at_ms, idle_turns }, false)
+            }
+        }
+        other => (other, false),
+    }
+}
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -161,4 +180,50 @@ pub(super) fn system_prompt_for_turn(
         return prompt;
     };
     format!("{prompt}\n\n<goal_objective>\n{objective}\n</goal_objective>")
+}
+
+#[cfg(test)]
+mod idle_goal_tests {
+    use super::*;
+
+    fn active(idle_turns: u32) -> GoalWorkflowState {
+        GoalWorkflowState::Active { objective: "o".into(), started_at_ms: 1, updated_at_ms: 1, idle_turns }
+    }
+
+    #[test]
+    fn goal_pauses_after_three_idle_turns() {
+        let (state, paused) = record_goal_turn(active(0), false);
+        assert_eq!(state, active(1));
+        assert!(!paused);
+        let (state, paused) = record_goal_turn(state, false);
+        assert_eq!(state, active(2));
+        assert!(!paused);
+        let (state, paused) = record_goal_turn(state, false);
+        assert!(paused);
+        assert!(matches!(state, GoalWorkflowState::Paused { ref objective, .. } if objective == "o"));
+    }
+
+    #[test]
+    fn a_tool_call_resets_the_idle_count() {
+        let (state, paused) = record_goal_turn(active(2), true);
+        assert_eq!(state, active(0));
+        assert!(!paused);
+    }
+
+    #[test]
+    fn non_active_goals_are_left_alone() {
+        let (state, paused) = record_goal_turn(GoalWorkflowState::Idle, false);
+        assert_eq!(state, GoalWorkflowState::Idle);
+        assert!(!paused);
+    }
+
+    #[test]
+    fn old_saved_goals_without_idle_turns_still_load() {
+        let state: GoalWorkflowState = serde_json::from_value(json!({
+            "status": "active", "objective": "o", "started_at_ms": 1, "updated_at_ms": 1
+        }))
+        .unwrap();
+        assert_eq!(state, active(0));
+        assert!(!serde_json::to_string(&state).unwrap().contains("idle_turns"));
+    }
 }

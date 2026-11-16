@@ -142,6 +142,7 @@ pub(super) fn start_goal_workflow(objective: &str) -> GoalWorkflowState {
         objective: objective.trim().to_string(),
         started_at_ms: now,
         updated_at_ms: now,
+        idle_turns: 0,
     }
 }
 
@@ -155,6 +156,7 @@ pub(super) fn resume_goal_workflow(workflow: GoalWorkflowState) -> GoalWorkflowS
             objective,
             started_at_ms,
             updated_at_ms: now_ms(),
+            idle_turns: 0,
         },
         current => current,
     }

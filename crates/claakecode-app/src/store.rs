@@ -196,6 +196,10 @@ pub enum PlanWorkflowState {
     },
 }
 
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "camelCase")]
 #[derive(Default)]
@@ -206,6 +210,9 @@ pub enum GoalWorkflowState {
         objective: String,
         started_at_ms: i64,
         updated_at_ms: i64,
+        /// Consecutive goal turns that ended without any tool call.
+        #[serde(default, skip_serializing_if = "is_zero_u32")]
+        idle_turns: u32,
     },
     Paused {
         objective: String,

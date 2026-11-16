@@ -470,7 +470,7 @@ mod run_loop {
         context.mode = AgentMode::Goal;
         context.max_tool_rounds = 1;
         context.goal_workflow =
-            GoalWorkflowState::Active { objective: "x".into(), started_at_ms: 1, updated_at_ms: 1 };
+            GoalWorkflowState::Active { objective: "x".into(), started_at_ms: 1, updated_at_ms: 1, idle_turns: 0 };
 
         let output = run_turn(context).await;
 
