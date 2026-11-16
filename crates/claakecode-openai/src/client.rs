@@ -610,7 +610,10 @@ async fn read_http_error(response: reqwest::Response) -> AppError {
     if status == reqwest::StatusCode::UNAUTHORIZED {
         AppError::Auth(message)
     } else if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        AppError::RateLimit(message)
+        AppError::RateLimit {
+            message,
+            retry_after_ms: delay_ms,
+        }
     } else if is_transient_http_status(status) {
         AppError::RetryableStream {
             message: format!("HTTP {status}: {message}"),

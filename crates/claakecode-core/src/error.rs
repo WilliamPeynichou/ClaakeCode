@@ -8,8 +8,11 @@ pub enum AppError {
     Auth(String),
     #[error("invalid request: {0}")]
     InvalidRequest(String),
-    #[error("rate limited: {0}")]
-    RateLimit(String),
+    #[error("rate limited: {message}")]
+    RateLimit {
+        message: String,
+        retry_after_ms: Option<u64>,
+    },
     #[error("context window exceeded: {0}")]
     ContextLength(String),
     #[error("network error: {0}")]

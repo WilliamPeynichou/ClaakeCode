@@ -1315,12 +1315,15 @@ fn stream_retry_delay(attempt: usize) -> Duration {
 
 /// A 429 is retried longer than a dropped stream: the quota comes back on its own.
 pub(super) const RATE_LIMIT_MAX_RETRIES: usize = 8;
+/// Cap on the agent's own backoff. A provider hint is never capped by it.
 const RATE_LIMIT_MAX_WAIT: Duration = Duration::from_secs(300);
+/// Past this provider hint (e.g. a quota that resets in hours), waiting in the turn is pointless: give up.
+const RATE_LIMIT_MAX_HINT: Duration = Duration::from_secs(3600);
 const RATE_LIMIT_FIRST_WAIT_SECS: u64 = 5;
 
 pub(super) fn is_rate_limited(err: &AppError) -> bool {
     match err {
-        AppError::RateLimit(_) => true,
+        AppError::RateLimit { .. } => true,
         AppError::RetryableStream { message, .. } => {
             let lower = message.to_ascii_lowercase();
             lower.contains("429")
@@ -1336,15 +1339,16 @@ pub(super) fn is_rate_limited(err: &AppError) -> bool {
 /// The provider's `Retry-After` hint is a floor, never shortened.
 pub(super) fn retry_delay(err: &AppError, attempts: usize) -> Option<Duration> {
     let hinted = match err {
-        AppError::RetryableStream { delay_ms: Some(ms), .. } => Duration::from_millis(*ms),
+        AppError::RateLimit { retry_after_ms: Some(ms), .. }
+        | AppError::RetryableStream { delay_ms: Some(ms), .. } => Duration::from_millis(*ms),
         _ => Duration::ZERO,
     };
     if is_rate_limited(err) {
-        if attempts >= RATE_LIMIT_MAX_RETRIES {
+        if attempts >= RATE_LIMIT_MAX_RETRIES || hinted > RATE_LIMIT_MAX_HINT {
             return None;
         }
         let backoff = Duration::from_secs(RATE_LIMIT_FIRST_WAIT_SECS << attempts.min(6));
-        return Some(hinted.max(backoff).min(RATE_LIMIT_MAX_WAIT));
+        return Some(hinted.max(backoff.min(RATE_LIMIT_MAX_WAIT)));
     }
     if !should_retry_stream(err, attempts) {
         return None;
@@ -1789,7 +1793,7 @@ mod rate_limit_tests {
 
     #[test]
     fn rate_limits_wait_longer_and_grow() {
-        let err = AppError::RateLimit("slow down".into());
+        let err = AppError::RateLimit { message: "slow down".into(), retry_after_ms: None };
         assert_eq!(retry_delay(&err, 0), Some(Duration::from_secs(5)));
         assert_eq!(retry_delay(&err, 1), Some(Duration::from_secs(10)));
         assert_eq!(retry_delay(&err, 7), Some(RATE_LIMIT_MAX_WAIT));
@@ -1801,6 +1805,19 @@ mod rate_limit_tests {
         let err = AppError::RetryableStream { message: "HTTP 429 Too Many Requests".into(), delay_ms: Some(42_000) };
         assert!(is_rate_limited(&err));
         assert_eq!(retry_delay(&err, 0), Some(Duration::from_secs(42)));
+    }
+
+    #[test]
+    fn rate_limit_error_keeps_a_long_retry_after() {
+        let err = AppError::RateLimit { message: "slow down".into(), retry_after_ms: Some(600_000) };
+        assert_eq!(retry_delay(&err, 0), Some(Duration::from_secs(600)));
+        assert_eq!(retry_delay(&err, 7), Some(Duration::from_secs(600)));
+    }
+
+    #[test]
+    fn retry_after_beyond_an_hour_gives_up() {
+        let err = AppError::RateLimit { message: "quota".into(), retry_after_ms: Some(3 * 3_600_000) };
+        assert_eq!(retry_delay(&err, 0), None);
     }
 
     #[test]

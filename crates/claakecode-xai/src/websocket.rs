@@ -456,7 +456,10 @@ fn map_http_status(status: StatusCode, message: String) -> AppError {
     if status == StatusCode::UNAUTHORIZED {
         AppError::Auth(message)
     } else if status == StatusCode::TOO_MANY_REQUESTS {
-        AppError::RateLimit(message)
+        AppError::RateLimit {
+            message,
+            retry_after_ms: None,
+        }
     } else if is_transient_http_status(status) {
         AppError::RetryableStream {
             message: format!("HTTP {status}: {message}"),

@@ -619,7 +619,10 @@ async fn read_http_error(response: reqwest::Response, retry_transient: bool) -> 
             delay_ms,
         }
     } else if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        AppError::RateLimit(message)
+        AppError::RateLimit {
+            message,
+            retry_after_ms: delay_ms,
+        }
     } else if status.is_client_error() {
         if is_context_length_message(&message) {
             AppError::ContextLength(message)
