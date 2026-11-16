@@ -8,6 +8,9 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 pub const PROTOCOL_VERSION: u32 = 7;
 pub const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 
+const SESSION_ALREADY_OPEN: &str =
+    "session already open in another Prime process (quit Claake Code completely, then reopen it)";
+
 /// Only fixed categories cross the boundary; even short upstream strings can contain secrets.
 fn error_category(raw: &str) -> &'static str {
     if raw.starts_with("Model not found:") { "model unavailable" }
@@ -18,7 +21,7 @@ fn error_category(raw: &str) -> &'static str {
     else if raw == "Worker authentication failed" { "worker authentication refused" }
     else if raw.starts_with("Invalid create config:") || raw.starts_with("Invalid thinking level") { "invalid session configuration" }
     else if raw.starts_with("continueRecent is not supported:") { "explicit sessionPath required" }
-    else if raw.contains("is already active in") { "session already open in another Prime process (quit Claake Code completely, then reopen it)" }
+    else if raw.contains("is already active in") || raw.starts_with("This session is currently open in another") { SESSION_ALREADY_OPEN }
     else { "unclassified failure (upstream details withheld)" }
 }
 
@@ -29,6 +32,9 @@ fn rejection(kind: &str, frame: &Value) -> String {
         "prompt_and_wait" | "list" | "shutdown" | "get_messages" | "get_available_models" => kind,
         _ => "unknown",
     };
+    if frame["errorInfo"]["code"].as_str() == Some("session_already_active") {
+        return format!("Prime daemon rejected command `{kind}`: {SESSION_ALREADY_OPEN}");
+    }
     let raw = frame["error"].as_str().or_else(|| frame["error"]["message"].as_str()).unwrap_or("");
     format!("Prime daemon rejected command `{kind}`: {}", error_category(raw))
 }
@@ -653,13 +659,41 @@ pub struct SidecarConfig {
 pub struct Sidecar {
     child: tokio::process::Child,
     pub socket: std::path::PathBuf,
+    /// Process group of the daemon and its session workers (`process_group(0)` at spawn).
+    pgid: Option<u32>,
 }
 
 #[cfg(unix)]
 impl Drop for Sidecar {
     fn drop(&mut self) {
+        // Workers are separate processes: killing the supervisor alone leaves them holding
+        // session leases, and every later `create` is refused. Take the whole group down.
+        if let Some(pgid) = self.pgid { kill_group(pgid, "KILL"); }
         if let Some(dir) = self.socket.parent() { let _ = std::fs::remove_dir_all(dir); }
     }
+}
+
+/// Signals every process of group `pgid` (no libc dependency). Errors (group gone) are ignored.
+#[cfg(unix)]
+fn kill_group(pgid: u32, signal: &str) {
+    if pgid <= 1 { return; }
+    let _ = std::process::Command::new("/bin/kill")
+        .args(["-s", signal, "--", &format!("-{pgid}")])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+}
+
+/// True when group `pgid` still holds a `prime-agent` process (guards against pgid reuse).
+#[cfg(unix)]
+fn group_runs_prime(pgid: u32) -> bool {
+    pgid > 1
+        && std::process::Command::new("/usr/bin/pgrep")
+            .args(["-g", &pgid.to_string(), "-f", "prime-agent"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
 }
 
 /// Minimal environment: telemetry off, private HOME-independent state, no ambient secrets.
@@ -713,6 +747,28 @@ impl Sidecar {
         let socket_dir = std::fs::canonicalize(socket_dir)?;
         let socket = socket_dir.join("d.sock");
         if socket.as_os_str().len() > 100 { bail!("Prime socket path too long"); }
+        // A daemon from a previous app run (crash, update relaunch) keeps its workers and their
+        // session leases: every create would then be refused. Ask it to shut down first.
+        let marker = root.join("daemon.socket");
+        if let Ok(content) = std::fs::read_to_string(&marker) {
+            let mut lines = content.lines();
+            let previous = std::path::PathBuf::from(lines.next().unwrap_or("").trim());
+            let previous_group = lines.next().and_then(|l| l.trim().parse::<u32>().ok());
+            if !previous.as_os_str().is_empty() && daemon_alive(&previous).await {
+                tracing::warn!("stopping a Prime daemon left over from a previous run");
+                let _ = call(&previous, json!({"type":"shutdown"}), Duration::from_secs(5), |_| {}).await;
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                while daemon_alive(&previous).await && tokio::time::Instant::now() < deadline {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+            }
+            // Workers may outlive their supervisor (socket gone, leases still held).
+            if let Some(pgid) = previous_group.filter(|g| group_runs_prime(*g)) {
+                tracing::warn!(pgid, "killing leftover Prime process group");
+                kill_group(pgid, "KILL");
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+        }
         // Supervisor output may echo prompts: keep it private to the data dir (0600 on unix).
         let log = std::fs::OpenOptions::new().create(true).append(true).open(root.join("supervisor.log"))?;
         std::fs::set_permissions(root.join("supervisor.log"), std::fs::Permissions::from_mode(0o600))?;
@@ -730,13 +786,17 @@ impl Sidecar {
         // Own process group so a hard stop can target the whole family.
         command.process_group(0);
         let mut child = command.spawn().context("spawn Prime sidecar")?;
+        let pgid = child.id();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
             if tokio::net::UnixStream::connect(&socket).await.is_ok() {
-                return Ok(Self { child, socket });
+                let group = pgid.map(|g| g.to_string()).unwrap_or_default();
+                let _ = std::fs::write(&marker, format!("{}\n{group}\n", socket.display()));
+                return Ok(Self { child, socket, pgid });
             }
             if child.try_wait()?.is_some() { bail!("Prime sidecar exited during startup"); }
             if tokio::time::Instant::now() > deadline {
+                if let Some(g) = pgid { kill_group(g, "KILL"); }
                 let _ = child.kill().await;
                 bail!("Prime sidecar socket unavailable");
             }
@@ -748,8 +808,9 @@ impl Sidecar {
     pub async fn stop(mut self) -> Result<()> {
         let _ = call(&self.socket, json!({"type":"shutdown"}), Duration::from_secs(5), |_| {}).await;
         if tokio::time::timeout(Duration::from_secs(10), self.child.wait()).await.is_err() {
-            self.child.kill().await?;
+            let _ = self.child.kill().await;
         }
+        // Drop then kills any worker that survived the drain (whole process group).
         Ok(())
     }
 }
@@ -917,6 +978,11 @@ mod tests {
         assert_eq!(error_category("Unknown active session: SECRET"), "session unavailable");
         assert!(error_category("Session file /SECRET.jsonl is already active in abc — open elsewhere").starts_with("session already open"));
         assert!(!error_category("Session file /SECRET.jsonl is already active in abc").contains("SECRET"));
+        let refused = rejection("create", &json!({
+            "error": "This session is currently open in another process (active in x) SECRET",
+            "errorInfo": {"code": "session_already_active", "sessionPath": "/SECRET"}
+        }));
+        assert!(refused.contains("session already open") && !refused.contains("SECRET"));
     }
 
     #[cfg(unix)]
