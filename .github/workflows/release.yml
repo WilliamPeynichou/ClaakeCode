@@ -204,6 +204,18 @@ jobs:
             src-tauri/binaries/uv-*
           key: prime-sidecar-${{ matrix.platform.name }}-${{ hashFiles('scripts/prepare-prime-sidecar.mjs') }}
 
+      # tauri-action copies `releaseBody` into the `notes` field of latest.json, which the in-app update dialog shows.
+      - name: Load release notes
+        shell: bash
+        run: |
+          NOTES_FILE=".github/release-notes/${{ needs.create-release.outputs.tag_name }}.md"
+          {
+            echo "RELEASE_NOTES<<NOTES_EOF"
+            if [ -f "$NOTES_FILE" ]; then cat "$NOTES_FILE"; fi
+            echo
+            echo "NOTES_EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Build & publish via tauri-action
         uses: tauri-apps/tauri-action@v0
         env:
@@ -215,6 +227,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseBody: ${{ env.RELEASE_NOTES }}
           args: ${{ matrix.platform.tauri_args }}
           # tauri-action auto-generates latest.json when:
           #   - `bundle.createUpdaterArtifacts` is true (we set this)
