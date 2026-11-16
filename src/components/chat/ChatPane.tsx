@@ -3385,7 +3385,13 @@ export function ChatPane({
               )}
               {showPlanningNextMove && (
                 <div className="msg" data-role="assistant">
-                  <PlanningNextMoveBlock />
+                  <PlanningNextMoveBlock
+                    label={
+                      displayView.rateLimitedUntilMs
+                        ? `Rate limited, retrying at ${new Date(displayView.rateLimitedUntilMs).toLocaleTimeString()}`
+                        : undefined
+                    }
+                  />
                 </div>
               )}
             </>

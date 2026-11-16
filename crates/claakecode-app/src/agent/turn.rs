@@ -258,16 +258,20 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
             let mut stream = match provider.stream(request.clone()).await {
                 Ok(stream) => stream,
                 Err(err) => {
-                    if should_retry_stream(&err, stream_retry_attempts) {
+                    if let Some(delay) = retry_delay(&err, stream_retry_attempts) {
                         stream_retry_attempts += 1;
                         tracing::warn!(
                             provider = provider.name(),
                             attempt = stream_retry_attempts,
-                            max_attempts = SAFE_STREAM_MAX_RETRIES,
+                            delay_ms = delay.as_millis() as u64,
                             error = %err,
                             "retrying provider stream setup"
                         );
-                        tokio::time::sleep(stream_retry_delay(stream_retry_attempts)).await;
+                        notify_rate_limit(&event_tx, event_scope.as_ref(), &err, delay, stream_retry_attempts);
+                        if wait_or_cancel(delay, &mut cmd_rx).await {
+                            cancelled = true;
+                            break 'conversation;
+                        }
                         continue 'stream_attempt;
                     }
 
@@ -521,16 +525,20 @@ pub async fn run_turn(ctx: TurnContext) -> TurnOutput {
                     break 'stream_attempt (message_builder, stop_reason, response_usage);
                 }
 
-                if should_retry_stream(&err, stream_retry_attempts) {
+                if let Some(delay) = retry_delay(&err, stream_retry_attempts) {
                     stream_retry_attempts += 1;
                     tracing::warn!(
                         provider = provider.name(),
                         attempt = stream_retry_attempts,
-                        max_attempts = SAFE_STREAM_MAX_RETRIES,
+                        delay_ms = delay.as_millis() as u64,
                         error = %err,
                         "retrying provider stream"
                     );
-                    tokio::time::sleep(stream_retry_delay(stream_retry_attempts)).await;
+                    notify_rate_limit(&event_tx, event_scope.as_ref(), &err, delay, stream_retry_attempts);
+                    if wait_or_cancel(delay, &mut cmd_rx).await {
+                        cancelled = true;
+                        break 'conversation;
+                    }
                     continue 'stream_attempt;
                 }
 
@@ -1305,6 +1313,82 @@ fn stream_retry_delay(attempt: usize) -> Duration {
     Duration::from_millis((base_ms as f64 * jitter) as u64)
 }
 
+/// A 429 is retried longer than a dropped stream: the quota comes back on its own.
+pub(super) const RATE_LIMIT_MAX_RETRIES: usize = 8;
+const RATE_LIMIT_MAX_WAIT: Duration = Duration::from_secs(300);
+const RATE_LIMIT_FIRST_WAIT_SECS: u64 = 5;
+
+pub(super) fn is_rate_limited(err: &AppError) -> bool {
+    match err {
+        AppError::RateLimit(_) => true,
+        AppError::RetryableStream { message, .. } => {
+            let lower = message.to_ascii_lowercase();
+            lower.contains("429")
+                || lower.contains("rate limit")
+                || lower.contains("rate_limit")
+                || lower.contains("too many requests")
+        }
+        _ => false,
+    }
+}
+
+/// How long to wait before the next attempt, or `None` to give up.
+/// The provider's `Retry-After` hint is a floor, never shortened.
+pub(super) fn retry_delay(err: &AppError, attempts: usize) -> Option<Duration> {
+    let hinted = match err {
+        AppError::RetryableStream { delay_ms: Some(ms), .. } => Duration::from_millis(*ms),
+        _ => Duration::ZERO,
+    };
+    if is_rate_limited(err) {
+        if attempts >= RATE_LIMIT_MAX_RETRIES {
+            return None;
+        }
+        let backoff = Duration::from_secs(RATE_LIMIT_FIRST_WAIT_SECS << attempts.min(6));
+        return Some(hinted.max(backoff).min(RATE_LIMIT_MAX_WAIT));
+    }
+    if !should_retry_stream(err, attempts) {
+        return None;
+    }
+    Some(hinted.min(Duration::from_secs(60)).max(stream_retry_delay(attempts + 1)))
+}
+
+fn notify_rate_limit(
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    scope: Option<&AgentEventScope>,
+    err: &AppError,
+    delay: Duration,
+    attempt: usize,
+) {
+    if is_rate_limited(err) {
+        send_event(
+            event_tx,
+            scope,
+            AgentEvent::RateLimited {
+                retry_in_ms: delay.as_millis() as u64,
+                attempt,
+                max_attempts: RATE_LIMIT_MAX_RETRIES,
+            },
+        );
+    }
+}
+
+/// Sleeps `delay`; returns `true` if the user cancelled the turn meanwhile.
+async fn wait_or_cancel(delay: Duration, cmd_rx: &mut mpsc::UnboundedReceiver<EngineCommand>) -> bool {
+    let sleep = tokio::time::sleep(delay);
+    tokio::pin!(sleep);
+    tokio::select! {
+        biased;
+        command = cmd_rx.recv() => match command {
+            Some(EngineCommand::Cancel) => true,
+            None => {
+                (&mut sleep).await;
+                false
+            }
+        },
+        _ = &mut sleep => false,
+    }
+}
+
 const ACCEPTED_RUN_GRAPHS: &str = "accepted_run_graphs";
 
 /// Starts a run for a skill's graph.json after user approval; appends the outcome to the tool result.
@@ -1696,5 +1780,44 @@ mod parallel_tests {
             serde_json::from_str(r#"{"tools":[{"name":"grep","requireApproval":true}]}"#).unwrap();
         let parts = [call("read"), call("grep"), call("read"), call("glob")];
         assert_eq!(parallel_batches(&parts, &settings), HashMap::from([(2, 4)]));
+    }
+}
+
+#[cfg(test)]
+mod rate_limit_tests {
+    use super::*;
+
+    #[test]
+    fn rate_limits_wait_longer_and_grow() {
+        let err = AppError::RateLimit("slow down".into());
+        assert_eq!(retry_delay(&err, 0), Some(Duration::from_secs(5)));
+        assert_eq!(retry_delay(&err, 1), Some(Duration::from_secs(10)));
+        assert_eq!(retry_delay(&err, 7), Some(RATE_LIMIT_MAX_WAIT));
+        assert_eq!(retry_delay(&err, RATE_LIMIT_MAX_RETRIES), None);
+    }
+
+    #[test]
+    fn retry_after_hint_is_a_floor() {
+        let err = AppError::RetryableStream { message: "HTTP 429 Too Many Requests".into(), delay_ms: Some(42_000) };
+        assert!(is_rate_limited(&err));
+        assert_eq!(retry_delay(&err, 0), Some(Duration::from_secs(42)));
+    }
+
+    #[test]
+    fn dropped_streams_keep_the_short_retry() {
+        let err = AppError::Stream("connection reset".into());
+        assert!(!is_rate_limited(&err));
+        assert!(retry_delay(&err, 0).unwrap() < Duration::from_secs(1));
+        assert_eq!(retry_delay(&err, SAFE_STREAM_MAX_RETRIES), None);
+        assert_eq!(retry_delay(&AppError::InvalidRequest("bad".into()), 0), None);
+    }
+
+    #[tokio::test]
+    async fn cancel_interrupts_the_wait() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(EngineCommand::Cancel).unwrap();
+        let started = std::time::Instant::now();
+        assert!(wait_or_cancel(Duration::from_secs(60), &mut rx).await);
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 }

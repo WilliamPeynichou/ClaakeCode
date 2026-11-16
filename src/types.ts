@@ -996,6 +996,7 @@ export type AgentEvent =
       usage: StreamTokenUsage;
     }
   | { type: "interrupted" }
+  | { type: "rate_limited"; retry_in_ms: number; attempt: number; max_attempts: number }
   | { type: "error"; message: string }
   | {
       type: "peer_message_received";

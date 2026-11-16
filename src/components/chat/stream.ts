@@ -125,6 +125,8 @@ export type ChatViewState = {
   streamPhase: StreamPhase;
   lastError: string | null;
   turnStartedAtMs: number | null;
+  /** Set while the provider is rate limited: when the next attempt starts. */
+  rateLimitedUntilMs?: number | null;
 };
 
 export function initialStateFromHistory(history: ChatMessage[]): ChatViewState {
@@ -1153,6 +1155,7 @@ function withStreamPhase(
 ): ChatViewState {
   return {
     ...state,
+    rateLimitedUntilMs: null,
     ...patch,
     streamPhase,
   };
@@ -1548,6 +1551,11 @@ export function applyEvent(
     }
     case "token_usage":
       return state;
+
+    case "rate_limited":
+      return withStreamPhase(state, "waiting", {
+        rateLimitedUntilMs: Date.now() + event.retry_in_ms,
+      });
 
     case "interrupted": {
       const blocks = state.blocks.map((block) => {

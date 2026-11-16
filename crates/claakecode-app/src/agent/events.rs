@@ -65,6 +65,12 @@ pub enum AgentEvent {
         usage: Usage,
     },
     Interrupted,
+    /// The provider is rate limited; the turn waits and retries on its own.
+    RateLimited {
+        retry_in_ms: u64,
+        attempt: usize,
+        max_attempts: usize,
+    },
     Error {
         message: String,
     },

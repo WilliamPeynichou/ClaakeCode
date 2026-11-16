@@ -2,7 +2,7 @@ import { DotmSquare5 } from "./DotmSquare5";
 import { Claaky } from "../claaky/Claaky";
 import { useClaakyEnabled } from "../claaky/useClaakyEnabled";
 
-export function PlanningNextMoveBlock() {
+export function PlanningNextMoveBlock({ label = "Planning next moves" }: { label?: string }) {
   const claakyOn = useClaakyEnabled();
   return (
     <div className="thinking-block planning-next-move" role="status">
@@ -21,7 +21,7 @@ export function PlanningNextMoveBlock() {
           />
         )}
         <span className="thinking-block__label" data-streaming="true">
-          Planning next moves
+          {label}
         </span>
       </div>
     </div>
