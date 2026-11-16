@@ -577,7 +577,7 @@ Swarm teammates ask for tool approval through the same prompt ([Security](#secur
 <a id="compaction"></a>
 ## 🗜️ Compaction
 
-- **Automatic**: triggered when the context window fills up. The history is summarised to free room and let the agent keep going.
+- **Automatic**: disabled only in the main classic chat, including context-overflow recovery, to avoid additional compaction requests during rate limits. Sub-agents, teams and benchmarks retain automatic compaction; RLM Prime is unchanged. Use manual compaction in the chat when needed.
 - **Manual**: triggered from a button in the UI. You can attach an **optional directive** to steer compaction towards a topic ("keep mostly what concerns X"); the cleanup is then more aggressive on everything outside it.
 
 For Anthropic, a per-session toggle enables the **1M context (beta)** window on Claude models that support it (e.g. Opus 5.5), without burning the beta header on accounts that don't have access.

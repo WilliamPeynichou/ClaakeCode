@@ -9,7 +9,7 @@ pub const PROTOCOL_VERSION: u32 = 7;
 pub const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 
 const SESSION_ALREADY_OPEN: &str =
-    "session already open in another Prime process (quit Claake Code completely, then reopen it)";
+    "session already open in another Prime process (quit Claake Code completely, including Claaky in the menu bar and the dev version, then reopen it)";
 
 /// Only fixed categories cross the boundary; even short upstream strings can contain secrets.
 fn error_category(raw: &str) -> &'static str {
@@ -659,8 +659,9 @@ pub struct SidecarConfig {
 pub struct Sidecar {
     child: tokio::process::Child,
     pub socket: std::path::PathBuf,
-    /// Process group of the daemon and its session workers (`process_group(0)` at spawn).
+    /// Group created for the supervisor; workers may detach, so snapshot children on stop.
     pgid: Option<u32>,
+    children: Vec<PrimeProcess>,
 }
 
 #[cfg(unix)]
@@ -668,7 +669,13 @@ impl Drop for Sidecar {
     fn drop(&mut self) {
         // Workers are separate processes: killing the supervisor alone leaves them holding
         // session leases, and every later `create` is refused. Take the whole group down.
-        if let Some(pgid) = self.pgid { kill_group(pgid, "KILL"); }
+        if let Some(pgid) = self.pgid {
+            if matches!(self.child.try_wait(), Ok(None)) {
+                self.children.extend(direct_children(pgid));
+            }
+            if group_runs_prime(pgid, "prime-agent") { kill_group(pgid, "KILL"); }
+            kill_recorded_children(&self.children, pgid);
+        }
         if let Some(dir) = self.socket.parent() { let _ = std::fs::remove_dir_all(dir); }
     }
 }
@@ -686,14 +693,118 @@ fn kill_group(pgid: u32, signal: &str) {
 
 /// True when group `pgid` still holds a `prime-agent` process (guards against pgid reuse).
 #[cfg(unix)]
-fn group_runs_prime(pgid: u32) -> bool {
+fn group_runs_prime(pgid: u32, pattern: &str) -> bool {
     pgid > 1
         && std::process::Command::new("/usr/bin/pgrep")
-            .args(["-g", &pgid.to_string(), "-f", "prime-agent"])
+            .args(["-g", &pgid.to_string(), "-f", pattern])
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .is_ok_and(|s| s.success())
+}
+
+#[cfg(unix)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PrimeProcess {
+    pid: u32,
+    ppid: u32,
+    pgid: u32,
+    uid: u32,
+    identity: String,
+    command: String,
+}
+
+#[cfg(unix)]
+fn process_info(pid: u32) -> Option<PrimeProcess> {
+    let output = std::process::Command::new("/bin/ps")
+        .args(["-ww", "-o", "pid=,ppid=,pgid=,uid=,lstart=,command=", "-p", &pid.to_string()])
+        .output().ok()?;
+    if !output.status.success() { return None; }
+    parse_process(&String::from_utf8(output.stdout).ok()?)
+}
+
+#[cfg(unix)]
+fn parse_process(line: &str) -> Option<PrimeProcess> {
+    let mut fields = line.split_whitespace();
+    let pid = fields.next()?.parse().ok()?;
+    let ppid = fields.next()?.parse().ok()?;
+    let pgid = fields.next()?.parse().ok()?;
+    let uid = fields.next()?.parse().ok()?;
+    let mut date = Vec::new();
+    for _ in 0..5 { date.push(fields.next()?); }
+    let command = fields.collect::<Vec<_>>().join(" ");
+    if command.is_empty() { return None; }
+    Some(PrimeProcess { pid, ppid, pgid, uid, identity: date.join(" "), command })
+}
+
+#[cfg(unix)]
+fn matching_pids(args: &[&str]) -> Vec<u32> {
+    let Ok(output) = std::process::Command::new("/usr/bin/pgrep").args(args).output() else { return Vec::new(); };
+    if !output.status.success() { return Vec::new(); }
+    String::from_utf8_lossy(&output.stdout).split_whitespace()
+        .filter_map(|s| s.parse::<u32>().ok()).filter(|p| *p > 1).collect()
+}
+
+#[cfg(unix)]
+fn direct_children(pid: u32) -> Vec<PrimeProcess> {
+    matching_pids(&["-P", &pid.to_string()]).into_iter()
+        .filter_map(process_info).filter(|p| p.ppid == pid).collect()
+}
+
+#[cfg(unix)]
+fn kill_recorded_children(children: &[PrimeProcess], supervisor: u32) {
+    for saved in children {
+        let Some(current) = process_info(saved.pid) else { continue; };
+        // Check start time, owner and command again: never signal a reused PID.
+        if current.identity == saved.identity && current.uid == saved.uid
+            && current.command == saved.command && (current.ppid == supervisor || current.ppid == 1)
+        {
+            let _ = std::process::Command::new("/bin/kill")
+                .args(["-s", "KILL", "--", &current.pid.to_string()]).status();
+        }
+    }
+}
+
+/// Only Claake's supervisor command can authorize orphan cleanup, not a detached worker.
+#[cfg(unix)]
+fn orphan_socket(process: &PrimeProcess, uid: u32) -> Option<std::path::PathBuf> {
+    if process.ppid != 1 || process.pid != process.pgid || process.pgid <= 1 || process.uid != uid {
+        return None;
+    }
+    // The executable path may contain spaces (e.g. Claake Code.app).
+    let (executable, arguments) = process.command.split_once(" --mode ")?;
+    if std::path::Path::new(executable).file_name()? != "prime-agent" { return None; }
+    let args: Vec<_> = arguments.split_whitespace().collect();
+    if args.first().copied() != Some("daemon") { return None; }
+    let index = args.iter().position(|a| *a == "--daemon-socket")?;
+    let socket = std::path::PathBuf::from(*args.get(index + 1)?);
+    let dir = socket.parent()?;
+    let name = dir.file_name()?.to_str()?.strip_prefix("ccp-")?;
+    if socket.file_name()? != "d.sock" || name.len() != 12 || !name.bytes().all(|b| b.is_ascii_hexdigit())
+        || !matches!(dir.parent()?.to_str()?, "/tmp" | "/private/tmp")
+    { return None; }
+    Some(socket)
+}
+
+#[cfg(unix)]
+fn cleanup_orphans(root: &std::path::Path) {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(metadata) = std::fs::metadata(root) else { return; };
+    for pid in matching_pids(&["-P", "1", "-f", "prime-agent"]) {
+        let Some(process) = process_info(pid) else { continue; };
+        let Some(socket) = orphan_socket(&process, metadata.uid()) else { continue; };
+        let Some(dir) = socket.parent() else { continue; };
+        let Ok(dir_metadata) = std::fs::symlink_metadata(dir) else { continue; };
+        if !dir_metadata.is_dir() || dir_metadata.uid() != metadata.uid() || dir_metadata.mode() & 0o077 != 0 { continue; }
+        let children = direct_children(pid);
+        // Recheck immediately before signaling; errors and changed ownership fail closed.
+        if process_info(pid).as_ref() != Some(&process) { continue; }
+        if !group_runs_prime(process.pgid, "prime-agent") { continue; }
+        tracing::warn!(pgid = process.pgid, "killing orphaned Claake Prime group");
+        kill_group(process.pgid, "KILL");
+        kill_recorded_children(&children, pid);
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
 
 /// Minimal environment: telemetry off, private HOME-independent state, no ambient secrets.
@@ -747,28 +858,9 @@ impl Sidecar {
         let socket_dir = std::fs::canonicalize(socket_dir)?;
         let socket = socket_dir.join("d.sock");
         if socket.as_os_str().len() > 100 { bail!("Prime socket path too long"); }
-        // A daemon from a previous app run (crash, update relaunch) keeps its workers and their
-        // session leases: every create would then be refused. Ask it to shut down first.
-        let marker = root.join("daemon.socket");
-        if let Ok(content) = std::fs::read_to_string(&marker) {
-            let mut lines = content.lines();
-            let previous = std::path::PathBuf::from(lines.next().unwrap_or("").trim());
-            let previous_group = lines.next().and_then(|l| l.trim().parse::<u32>().ok());
-            if !previous.as_os_str().is_empty() && daemon_alive(&previous).await {
-                tracing::warn!("stopping a Prime daemon left over from a previous run");
-                let _ = call(&previous, json!({"type":"shutdown"}), Duration::from_secs(5), |_| {}).await;
-                let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-                while daemon_alive(&previous).await && tokio::time::Instant::now() < deadline {
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                }
-            }
-            // Workers may outlive their supervisor (socket gone, leases still held).
-            if let Some(pgid) = previous_group.filter(|g| group_runs_prime(*g)) {
-                tracing::warn!(pgid, "killing leftover Prime process group");
-                kill_group(pgid, "KILL");
-                tokio::time::sleep(Duration::from_millis(300)).await;
-            }
-        }
+        // Never contact the shared legacy marker: it may name another live app's daemon.
+        let _ = std::fs::remove_file(root.join("daemon.socket"));
+        cleanup_orphans(&root);
         // Supervisor output may echo prompts: keep it private to the data dir (0600 on unix).
         let log = std::fs::OpenOptions::new().create(true).append(true).open(root.join("supervisor.log"))?;
         std::fs::set_permissions(root.join("supervisor.log"), std::fs::Permissions::from_mode(0o600))?;
@@ -790,9 +882,7 @@ impl Sidecar {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
             if tokio::net::UnixStream::connect(&socket).await.is_ok() {
-                let group = pgid.map(|g| g.to_string()).unwrap_or_default();
-                let _ = std::fs::write(&marker, format!("{}\n{group}\n", socket.display()));
-                return Ok(Self { child, socket, pgid });
+                return Ok(Self { child, socket, pgid, children: Vec::new() });
             }
             if child.try_wait()?.is_some() { bail!("Prime sidecar exited during startup"); }
             if tokio::time::Instant::now() > deadline {
@@ -804,13 +894,16 @@ impl Sidecar {
         }
     }
 
-    /// Graceful `shutdown` first, then kill; never leaves the daemon running.
+    /// One total grace period for both the shutdown request and supervisor exit.
     pub async fn stop(mut self) -> Result<()> {
-        let _ = call(&self.socket, json!({"type":"shutdown"}), Duration::from_secs(5), |_| {}).await;
-        if tokio::time::timeout(Duration::from_secs(10), self.child.wait()).await.is_err() {
-            let _ = self.child.kill().await;
-        }
-        // Drop then kills any worker that survived the drain (whole process group).
+        if let Some(pid) = self.pgid { self.children = direct_children(pid); }
+        let graceful = async {
+            let _ = call(&self.socket, json!({"type":"shutdown"}), Duration::from_secs(3), |_| {}).await;
+            let _ = self.child.wait().await;
+        };
+        let _ = tokio::time::timeout(Duration::from_secs(3), graceful).await;
+        // Do not await another unbounded drain. Drop guards the group and detached children.
+        let _ = self.child.start_kill();
         Ok(())
     }
 }
@@ -853,6 +946,69 @@ pub use unsupported::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[test]
+    fn orphan_cleanup_rejects_live_apps_workers_and_unrelated_paths() {
+        let original = parse_process("123 1 123 501 Mon Nov 17 12:00:00 2025 /Applications/Claake Code.app/Contents/MacOS/prime-agent --mode daemon --daemon-socket /private/tmp/ccp-abcdef012345/d.sock").unwrap();
+        assert!(orphan_socket(&original, 501).is_some());
+        for (ppid, pgid, uid) in [(42, 123, 501), (1, 99, 501), (1, 1, 501), (1, 123, 502)] {
+            let p = PrimeProcess { ppid, pgid, uid, ..original.clone() };
+            assert!(orphan_socket(&p, 501).is_none());
+        }
+        for path in ["/tmp/other/d.sock", "/tmp/ccp-abcdef012345/../d.sock", "/home/ccp-abcdef012345/d.sock"] {
+            let p = PrimeProcess { command: format!("prime-agent --mode daemon --daemon-socket {path}"), ..original.clone() };
+            assert!(orphan_socket(&p, 501).is_none());
+        }
+        assert!(parse_process("invalid").is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kill_group_stops_supervisor_and_children() {
+        use std::os::unix::process::CommandExt;
+        let mut child = std::process::Command::new("/bin/sh")
+            .args(["-c", "sleep 30 & sleep 30"]).process_group(0).spawn().unwrap();
+        let pgid = child.id();
+        // A guard also cleans up when an assertion fails.
+        struct Guard(u32);
+        impl Drop for Guard { fn drop(&mut self) { kill_group(self.0, "KILL"); } }
+        let _guard = Guard(pgid);
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(group_runs_prime(pgid, "sleep 30"));
+        kill_group(pgid, "KILL");
+        child.wait().unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while group_runs_prime(pgid, ".") && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!group_runs_prime(pgid, "."));
+        assert!(!group_runs_prime(0, "."));
+        assert!(!group_runs_prime(1, "."));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn stop_is_bounded_when_shutdown_does_not_reply() {
+        let dir = std::path::PathBuf::from("/tmp").join(format!("ccp-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
+        std::fs::create_dir(&dir).unwrap();
+        let socket = dir.join("d.sock");
+        let listener = tokio::net::UnixListener::bind(&socket).unwrap();
+        let server = tokio::spawn(async move {
+            let (_stream, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        });
+        let mut command = tokio::process::Command::new("/bin/sleep");
+        command.arg("30").process_group(0).kill_on_drop(true);
+        let child = command.spawn().unwrap();
+        let pgid = child.id();
+        let sidecar = Sidecar { child, socket, pgid, children: Vec::new() };
+        let started = std::time::Instant::now();
+        tokio::time::timeout(Duration::from_secs(5), sidecar.stop()).await.unwrap().unwrap();
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(!dir.exists());
+        server.abort();
+    }
+
     #[test]
     fn package_dir_points_to_bundled_runtime() {
         let app = std::env::temp_dir().join(format!("cc-prime-pkg-{}", uuid::Uuid::new_v4()));

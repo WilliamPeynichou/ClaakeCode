@@ -1,4 +1,7 @@
 Code map:
+- Release `v0.2.12` : notes dans `.github/release-notes/v0.2.12.md` ; versions workspace Rust, npm et Tauri alignées.
+- Arrêt RLM Prime (`crates/claakecode-app/src/prime.rs`) : marqueur partagé `daemon.socket` abandonné ; nettoyage limité aux superviseurs orphelins (PPID 1, même utilisateur, groupe propre, socket privé `ccp-<12 hex>/d.sock`), revalidation avant signal et suppression de leur dossier. Arrêt gracieux borné à 3 s au total, groupe vérifié dans Drop et enfants directs relevés/revalidés pour les workers détachés. Tests Unix : groupe shell, arrêt sans réponse, filtrage des candidats. Vérification réelle des PGID Prime encore requise si `ps` est interdit par le sandbox.
+- Compaction du chat classique principal : automatique désactivée (`auto_compact: false`) uniquement dans `src-tauri/src/turns.rs`, y compris le secours sur dépassement de contexte ; commande manuelle conservée. Sous-agents, équipes, benchmarks et moteur RLM Prime inchangés.
 - `.github/workflows/release.yml` : build macOS universel sur `macos-15-intel` explicite pour contourner la saturation du parc ARM64 ; cibles Intel et Apple Silicon conservées.
 - Correctif Mistral streaming : `crates/claakecode-mistral/src/wire.rs` accepte texte ou fragments structurés ; `stream.rs` sépare thinking/texte et teste les formats, outils et usages.
 - Settings Skills : `src/components/SettingsPane.tsx` garde la bibliothèque et l’éditeur prioritaires, avec gestion Git repliable en pied de page ; `src/styles.css` borne son défilement indépendamment.

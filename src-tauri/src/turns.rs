@@ -222,7 +222,7 @@ pub(super) async fn send_message(
         cache_stable_message_count: turn_user_history_index,
         run: Some(claakecode_app::RunHandle { workspace_root: workspace_root.clone(), conversation_id: conversation.id.clone(), verify_command: state.store.verify_command_for(&workspace_id) }),
         service_tier,
-        auto_compact: true,
+        auto_compact: false,
         mode: policy.mode,
         stop_questions: policy.stop_questions,
         system_prompt: turn_system_prompt.clone(),
