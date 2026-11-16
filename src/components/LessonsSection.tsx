@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type Lesson } from "../lib/ipc";
+import { api, type BenchHarness, type Lesson } from "../lib/ipc";
 
 const STATUS_LABEL: Record<Lesson["status"], string> = {
   candidate: "À vérifier",
@@ -24,6 +24,9 @@ export function LessonsSection() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [provider, setProvider] = useState(() => localStorage.getItem("claake.bench.provider") ?? "anthropic");
   const [model, setModel] = useState(() => localStorage.getItem("claake.bench.model") ?? "");
+  const [harness, setHarness] = useState<BenchHarness>(() =>
+    localStorage.getItem("claake.bench.harness") === "classic" ? "classic" : "rlm",
+  );
 
   const load = useCallback(async () => {
     try {
@@ -48,8 +51,9 @@ export function LessonsSection() {
   const validate = async (lesson: Lesson) => {
     localStorage.setItem("claake.bench.provider", provider);
     localStorage.setItem("claake.bench.model", model);
+    localStorage.setItem("claake.bench.harness", harness);
     setValidating(lesson.id);
-    await act(() => api.validateLesson(lesson.id, provider.trim(), model.trim()));
+    await act(() => api.validateLesson(lesson.id, provider.trim(), model.trim(), harness));
     setValidating(null);
   };
 
@@ -105,12 +109,16 @@ export function LessonsSection() {
         </div>
       </div>
       <p className="python-runtime__muted">
-        Une leçon validée est rappelée dans tous les chats. Une leçon à vérifier n'est rappelée que dans
-        la conversation où elle est née. « Valider » lance le banc de tâches 3 fois sans la leçon puis 3
-        fois avec : cela consomme du quota du modèle choisi et n'est disponible que dans la version de
-        développement.
+        « Valider » teste cette leçon Claake 3 fois sans puis 3 fois avec, sur le moteur choisi.
+        Les tâches sont embarquées dans l'app ; leur vérification nécessite Python 3 et Git.
+        Chaque essai RLM utilise une session et une mémoire jetables isolées. Le banc consomme du
+        quota et ne valide ni ne modifie les souvenirs natifs Prime de vos chats.
       </p>
       <div className="rlm-memory__tools">
+        <select value={harness} disabled={validating !== null} onChange={(e) => setHarness(e.target.value as BenchHarness)} aria-label="Moteur du banc">
+          <option value="rlm">RLM Prime</option>
+          <option value="classic">Classique</option>
+        </select>
         <input value={provider} onChange={(e) => setProvider(e.target.value)} aria-label="Fournisseur du banc" placeholder="fournisseur (ex. anthropic)" />
         <input value={model} onChange={(e) => setModel(e.target.value)} aria-label="Modèle du banc" placeholder="modèle du banc" />
         {validating && (
@@ -190,7 +198,7 @@ export function LessonsSection() {
                     type="button"
                     className="settings-pane__btn"
                     disabled={validating !== null || !model.trim() || !provider.trim()}
-                    title={model.trim() ? "Lance le banc sans puis avec cette leçon" : "Indique d'abord le modèle du banc"}
+                    title={model.trim() ? `Lance le banc ${harness === "rlm" ? "RLM Prime" : "classique"} sans puis avec cette leçon` : "Indique d'abord le modèle du banc"}
                     onClick={() => void validate(lesson)}
                   >
                     {validating === lesson.id ? "Banc en cours…" : "Valider"}
