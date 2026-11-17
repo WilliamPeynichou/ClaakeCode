@@ -323,6 +323,19 @@ jobs:
     needs: [create-release, build-tauri]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Test updater release verification
+        run: node --test scripts/verify-updater-release.test.mjs
+      - name: Verify published updater artifacts and reconcile manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.create-release.outputs.tag_name }}
+        run: |
+          node scripts/verify-updater-release.mjs "$RELEASE_TAG" "$RUNNER_TEMP/latest.json"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/latest.json" --clobber
       - uses: actions/github-script@v8
         with:
           script: |
