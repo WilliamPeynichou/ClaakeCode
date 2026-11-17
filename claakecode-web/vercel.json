@@ -135,36 +135,6 @@
       "source": "/download/linux.html",
       "destination": "/#telecharger",
       "permanent": true
-    },
-    {
-      "source": "/download/macos",
-      "destination": "/#telecharger",
-      "permanent": true
-    },
-    {
-      "source": "/download/macos.html",
-      "destination": "/#telecharger",
-      "permanent": true
-    },
-    {
-      "source": "/download/windows",
-      "destination": "/#telecharger",
-      "permanent": true
-    },
-    {
-      "source": "/download/windows.html",
-      "destination": "/#telecharger",
-      "permanent": true
-    },
-    {
-      "source": "/download/linux",
-      "destination": "/#telecharger",
-      "permanent": true
-    },
-    {
-      "source": "/download/linux.html",
-      "destination": "/#telecharger",
-      "permanent": true
     }
   ],
   "headers": [
