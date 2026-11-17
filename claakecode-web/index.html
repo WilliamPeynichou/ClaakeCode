@@ -1,841 +1,124 @@
 <!doctype html>
-<html lang="en" data-theme="forest">
+<html lang="fr">
 <head>
-<meta charset="utf-8" />
-<title>Claake Code - Open-Source AI Coding IDE You Can Control</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Open-source desktop AI coding IDE: editable tools, MCP servers, any model provider, sub-agents, rollback and no telemetry. Free for macOS, Windows, Linux." />
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-<meta name="keywords" content="Claake Code, open-source AI coding IDE, AI coding agent, desktop AI IDE, MCP coding agent, Claude Code alternative, Cursor alternative open source, editable AI tools, multi-provider AI coding assistant, database-aware coding agent, no telemetry AI IDE" />
-<meta name="author" content="Claake Code" />
-<meta name="theme-color" content="#0c1f17" />
-<link rel="canonical" href="https://claakecode-web.vercel.app/" />
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="Claake Code" />
-<meta property="og:url" content="https://claakecode-web.vercel.app/" />
-<meta property="og:title" content="Claake Code - Open-Source AI Coding IDE You Can Control" />
-<meta property="og:description" content="A forkable desktop AI IDE with a visible agent harness: editable tools, skills, MCP servers, providers, database sources, sub-agents, rollback and no telemetry." />
-<meta property="og:image" content="https://claakecode-web.vercel.app/assets/social-preview.png" />
-<meta property="og:image:alt" content="Claake Code - open-source AI coding IDE with a controllable agent harness" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Claake Code - Open-Source AI Coding IDE You Can Control" />
-<meta name="twitter:description" content="Desktop AI coding IDE for developers who want editable tools, MCP, providers, database safeguards, no telemetry and a forkable agent harness." />
-<meta name="twitter:image" content="https://claakecode-web.vercel.app/assets/social-preview.png" />
-<meta name="twitter:image:alt" content="Claake Code - open-source AI coding IDE" />
-<link rel="icon" type="image/png" href="assets/claakecode-icon.png" />
-<link rel="apple-touch-icon" href="assets/claakecode-icon.png" />
-<link href="/assets/fonts/fonts.css" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://claakecode-web.vercel.app/#organization",
-      "name": "Claake Code",
-      "url": "https://claakecode-web.vercel.app/",
-      "logo": "https://claakecode-web.vercel.app/assets/claakecode-icon.png",
-      "sameAs": ["https://github.com/WilliamPeynichou/ClaakeCode"]
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://claakecode-web.vercel.app/#website",
-      "url": "https://claakecode-web.vercel.app/",
-      "name": "Claake Code",
-      "description": "Open-source desktop AI coding IDE with a developer-controlled agent harness.",
-      "publisher": { "@id": "https://claakecode-web.vercel.app/#organization" },
-      "inLanguage": "en"
-    },
-    {
-      "@type": "SoftwareApplication",
-      "@id": "https://claakecode-web.vercel.app/#software",
-      "name": "Claake Code",
-      "alternateName": "ClaakeCode",
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "macOS, Windows, Linux",
-      "softwareVersion": "0.2.5",
-      "license": "https://opensource.org/license/mit/",
-      "isAccessibleForFree": true,
-      "url": "https://claakecode-web.vercel.app/",
-      "downloadUrl": "https://github.com/WilliamPeynichou/ClaakeCode/releases/latest",
-      "codeRepository": "https://github.com/WilliamPeynichou/ClaakeCode",
-      "image": "https://claakecode-web.vercel.app/assets/social-preview.png",
-      "description": "Claake Code is an open-source desktop AI coding IDE that lets developers control the full agent harness, including tools, skills, MCP servers, model providers, database sources and workspace context.",
-      "featureList": [
-        "Native desktop AI IDE",
-        "AI coding agent with visible tools",
-        "Editable tool descriptions and permissions",
-        "Skills as Markdown playbooks",
-        "MCP server support",
-        "Multi-provider AI models",
-        "Database source inspection with safeguards",
-        "Sub-agents and team workflows",
-        "Claaky desktop companion with Ask and Code modes",
-        "Animated Claaky 3D room showing agent activity",
-        "Kimi 3.1 Pro model support",
-        "Mistral Large 4 model support",
-        "Measured model usage benchmark with optional user-configured cost estimates",
-        "Skill repositories managed from Settings",
-        "Optional cloud-backed mgrep semantic search alongside ripgrep",
-        "Anthropic rate-limit headers observed from official API responses",
-        "Windows skill Reveal opens containing folder in Explorer",
-        "Experimental macOS RLM Auto Compute powered by Prime Agent with persistent Python kernel",
-        "Rollback and context cleaning",
-        "No telemetry"
-      ],
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "author": { "@id": "https://claakecode-web.vercel.app/#organization" }
-    }
-  ]
-}
-</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoObject","name":"Claake Code - open-source AI coding IDE demo","description":"80-second tour of Claake Code: the visible agent, editable tools, providers, MCP and settings.","thumbnailUrl":"https://claakecode-web.vercel.app/assets/claake-code-poster.jpg","contentUrl":"https://claakecode-web.vercel.app/assets/claake-code.mp4","uploadDate":"2026-09-28","duration":"PT1M20S"}</script>
-<script defer src="/_vercel/insights/script.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claake Code — Le code, les modèles et les outils au même endroit</title>
+<meta name="description" content="Claake Code : outil desktop de code IA, chat classique et RLM Prime sur Mac et Linux. Fonctions, limites, changements 0.2.14 et téléchargements.">
+<meta name="theme-color" content="#faf9f5">
+<link rel="canonical" href="https://claakecode-web.vercel.app/">
+<link rel="icon" href="/assets/claakecode-icon.png">
+<link rel="stylesheet" href="/styles.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="Claake Code">
+<meta property="og:url" content="https://claakecode-web.vercel.app/">
+<meta property="og:title" content="Claake Code — Un espace desktop pour coder avec l’IA">
+<meta property="og:description" content="Chat, fichiers, terminal et choix du modèle. Découvrez les fonctions, les limites de RLM Prime et les changements 0.2.14.">
+<meta property="og:image" content="https://claakecode-web.vercel.app/assets/social-preview.png">
+<meta property="og:image:alt" content="Claake Code, outil desktop de code IA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claake Code — Coder avec l’IA sur desktop">
+<meta name="twitter:description" content="Fonctions, limites de RLM Prime et changements 0.2.14.">
+<meta name="twitter:image" content="https://claakecode-web.vercel.app/assets/social-preview.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Claake Code","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Windows, Linux","url":"https://claakecode-web.vercel.app/","downloadUrl":"https://github.com/WilliamPeynichou/ClaakeCode/releases/latest","license":"https://opensource.org/license/mit/","description":"Outil desktop open source de code IA avec chat, éditeur, terminal et outils configurables. RLM Prime expérimental sur macOS et Linux."}</script>
+<script src="/site.js" defer></script>
 </head>
 <body>
-
-<!-- ── Loading screen ──────────────────────────────────────────────── -->
-<div id="loader" role="status" aria-label="Loading Claake Code">
-  <div class="loader-inner">
-    <picture>
-      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
-      <img src="assets/claakecode-icon.png" alt="" class="loader-logo" />
-    </picture>
-    <span class="loader-wordmark">claake <em>code</em></span>
-  </div>
-</div>
-
-<div class="bgfallback"></div>
-<canvas id="bg" aria-hidden="true"></canvas>
-<div class="veil"></div>
-
-<nav class="nav glass" id="nav" aria-label="Primary navigation">
-  <a class="brand" href="/" aria-label="Claake Code home">
-    <picture>
-      <source srcset="assets/claakecode-icon.webp" type="image/webp" />
-      <img src="assets/claakecode-icon.png" alt="Claake Code logo" />
-    </picture>
-    <strong>claake <em>code</em></strong>
-    <span class="version">v0.2.10</span>
-  </a>
-  <div class="nav-links" id="navlinks">
-    <a href="/whats-new">What's new</a>
-    <a href="/features">Features</a>
-    <a href="/settings">Settings</a>
-    <a href="/agent">Agent</a>
-    <a href="/#rlm">RLM</a>
-    <a href="/why">Why</a>
-    <a href="/faq">FAQ</a>
-  </div>
-  <a class="nav-cta" href="/" aria-label="Download Claake Code for macOS, Windows or Linux">Download</a>
-</nav>
-
-<header class="hero" id="top">
-  <div class="wrap reveal in">
-    <span class="eyebrow">Open-source AI coding IDE · desktop app · MIT</span>
-    <h1>The AI coding IDE you fully <em>control</em>.</h1>
-    <p class="lede">Every tool, provider and workspace decision stays visible, editable and yours - no telemetry, no lock-in.</p>
-    <div class="hero-cta" aria-label="Primary downloads">
-      <a class="btn btn-primary" aria-label="Download Claake Code for macOS universal DMG" href="/download/macos">Download for macOS ↓</a>
-      <a class="btn btn-ghost" aria-label="Download Claake Code for Windows x64 setup" href="/download/windows">Windows ↓</a>
-      <a class="btn btn-ghost" aria-label="Download Claake Code for Linux AppImage" href="/download/linux">Linux ↓</a>
-      <a class="btn btn-ghost" aria-label="Open Claake Code source code on GitHub" href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub ↗</a>
-    </div>
-    <p class="meta">Latest <span>v0.2.10</span> · macOS · Windows · Linux · MIT licensed</p>
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label="Claake Code, accueil"><img src="/assets/claakecode-icon.webp" width="36" height="36" alt=""><span>claake <em>code</em></span></a>
+    <nav aria-label="Navigation principale"><a href="#fonctions">Fonctions</a><a href="#rlm">RLM Prime</a><a href="#version">0.2.14</a><a href="#faq">FAQ</a></nav>
+    <a class="button header-download" href="#telecharger">Télécharger <span aria-hidden="true">↓</span></a>
   </div>
 </header>
-
-<main>
-  <section class="pad-sm" id="whats-new">
-    <div class="wrap">
-      <div class="glass release-slim reveal">
-        <div class="release-slim-text">
-          <span class="eyebrow">new in v0.2.5</span>
-          <h3>Share skills from any Git repo. Claake Code clones, dedupes and keeps them updated.</h3>
-        </div>
-        <div class="release-slim-tags">
-          <span class="tag-chip">Git skill repositories</span>
-          <span class="tag-chip">Auto-update · clone-fresh</span>
-          <span class="tag-chip">No self-conflicts</span>
-        </div>
-        <a class="btn btn-primary" href="/whats-new">What's new →</a>
+<main id="contenu">
+  <section class="hero grain" aria-labelledby="hero-title">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Code IA · Application desktop · Open source</p>
+        <h1 id="hero-title">Coder avec l’IA.<br><em>Dans votre projet.</em></h1>
+        <p class="intro">Claake Code réunit un éditeur, un terminal et un chat IA pour travailler sur vos projets. Vous choisissez le modèle et les outils que l’agent peut utiliser.</p>
+        <div class="actions"><a class="button button-solid" href="#telecharger">Choisir un téléchargement <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/WilliamPeynichou/ClaakeCode">Voir le code source ↗</a></div>
+        <p class="small">macOS, Windows et Linux · Licence MIT<br>RLM Prime : macOS et Linux uniquement.</p>
       </div>
-    </div>
-  </section>
-
-  <section class="pad-lg" id="showcase">
-    <div class="wrap">
-      <div class="shead reveal" style="text-align:center; margin:0 auto 44px;">
-        <h2>A real IDE with an <em>agentic core</em>.</h2>
-        <p style="margin-left:auto; margin-right:auto;">Editor, terminal, chat and agent tools - all in one native workspace.</p>
-      </div>
-      <figure class="glass media reveal" aria-label="Claake Code product video showing the desktop AI IDE">
-        <div class="video-frame">
-          <video id="hero-video" loop muted playsinline preload="none" poster="assets/claake-code-poster.jpg" data-src="assets/claake-code.mp4">
-            <!-- src chargée par IntersectionObserver -->
-          </video>
-        </div>
+      <figure class="product-shot reveal">
+        <a href="/assets/claake-code-poster.jpg" aria-label="Agrandir la capture de Claake Code"><img src="/assets/claake-code-poster.jpg" width="1280" height="720" alt="Capture de l’application Claake Code : espace de travail, éditeur et conversation IA" fetchpriority="high"></a>
+        <figcaption><span>01 / L’application</span><span>Capture réelle · agrandir ↗</span></figcaption>
+        <p class="image-note">Aperçu de l’interface. Certains écrans précèdent la version 0.2.14.</p>
       </figure>
     </div>
+    <div class="container"><a class="release-link" href="#version"><span>Version 0.2.14</span><span>Dépendances Rust, CI et mise à jour intégrée</span><span aria-hidden="true">↗</span></a></div>
   </section>
 
-  <!-- ── RLM chat · scroll-driven motion section ────────────────────────────────────
-       Every frame of the stage is a pure function of scroll (rlmRender(p, pre)): no CSS
-       transitions inside the stage, no timers, same inputs = same pixels. Only the mouse
-       tilt on .rlm-tilt is pointer-driven, outside rlmRender.                          -->
-  <section class="rlm" id="rlm" aria-labelledby="rlm-title">
-    <div class="wrap rlm-intro reveal">
-      <span class="eyebrow">Experimental · macOS only</span>
-      <h2 id="rlm-title">A second chat that <em>keeps its state</em>.</h2>
-      <p>The RLM chat runs the open-source Prime Agent engine in its own tab, next to Chat: an agent with a persistent Python kernel, working in its own git worktree. On macOS, one click on <b>Auto Compute</b> hands any agent chat over to it.</p>
-    </div>
-
-    <div class="rlm-track" id="rlm-track">
-      <div class="rlm-stage">
-        <div class="rlm-shade" aria-hidden="true"></div>
-        <canvas class="rlm-field" aria-hidden="true"></canvas>
-        <div class="rlm-glow" aria-hidden="true"></div>
-
-        <!-- Prelude: giant letters that split apart as the window flies in -->
-        <div class="rlm-hero" aria-hidden="true">
-          <div class="rlm-hero-word"><span class="rlm-L">R</span><span class="rlm-L">L</span><span class="rlm-L">M</span></div>
-          <div class="rlm-hero-sub"><span>persistent Python</span><i></i><span>own worktree</span><i></i><span>Auto Compute</span></div>
-          <div class="rlm-hero-hint"><span></span>scroll</div>
-        </div>
-
-        <div class="wrap rlm-grid">
-          <div class="rlm-copy">
-            <ol class="rlm-rail" aria-hidden="true">
-              <li><span>01</span></li><li><span>02</span></li><li><span>03</span></li><li><span>04</span></li><li><span>05</span></li>
-              <i class="rlm-rail-fill"></i>
-            </ol>
-            <div class="rlm-scenes">
-              <div class="rlm-count" aria-hidden="true"><span class="rlm-count-win"><span class="rlm-count-col"><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span></span></span><span class="rlm-count-of">/ 05</span></div>
-              <article class="rlm-scene" data-scene="0">
-                <span class="rlm-k">01 · Chat | RLM</span>
-                <h3><span class="ln"><span>A tab next to <em>Chat</em>,</span></span><span class="ln"><span>its own history.</span></span></h3>
-                <p>Open the <b>RLM</b> tab at the top of the chat panel. It keeps its own list of conversations and uses the same model picker, sign-ins and API keys as the classic chat: Anthropic and OpenAI accounts, OpenRouter and Mistral keys.</p>
-              </article>
-              <article class="rlm-scene" data-scene="1">
-                <span class="rlm-k">02 · Auto Compute</span>
-                <h3><span class="ln"><span>Hand a chat over,</span></span><span class="ln"><span>let it <em>compute</em>.</span></span></h3>
-                <p>Press <b>Auto Compute</b> in an agent chat: a new RLM chat opens on the same model, receives the conversation and starts checking, measuring and re-running what it needs in Python. The original chat stays untouched.</p>
-              </article>
-              <article class="rlm-scene" data-scene="2">
-                <span class="rlm-k">03 · Isolated worktree</span>
-                <h3><span class="ln"><span>Its own branch.</span></span><span class="ln"><span>Your files <em>untouched</em>.</span></span></h3>
-                <p>Each RLM conversation gets a git worktree on a <code>claakecode/rlm-…</code> branch. A banner says it plainly: the agent runs locally with your permissions, there is no sandbox.</p>
-              </article>
-              <article class="rlm-scene" data-scene="3">
-                <span class="rlm-k">04 · Persistent Python</span>
-                <h3><span class="ln"><span>Variables survive</span></span><span class="ln"><span><em>between</em> messages.</span></span></h3>
-                <p>Load data once, reuse it three questions later. The <b>Python persistant</b> page in Settings shows the engine state, Python version, size, location and every installed package, with a restart button.</p>
-              </article>
-              <article class="rlm-scene" data-scene="4">
-                <span class="rlm-k">05 · Resumes after a cut</span>
-                <h3><span class="ln"><span>Connection drops?</span></span><span class="ln"><span>The answer <em>still lands</em>.</span></span></h3>
-                <p>Claake Code reattaches to the running turn, fills the gap from Prime's snapshot without duplicating text, and never sends your prompt twice. Conversations reopen with their history after a restart.</p>
-              </article>
-            </div>
-          </div>
-
-          <div class="rlm-tilt">
-          <figure class="glass rlm-window" aria-label="Illustration of the RLM chat">
-            <div class="rlm-bar">
-              <i></i><i></i><i></i>
-              <div class="rlm-tabs"><span class="rlm-tab" data-tab="chat">Chat</span><span class="rlm-tab" data-tab="rlm">RLM</span><b class="rlm-tab-ind"></b></div>
-              <span class="rlm-ac-btn"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5"/><path d="M6 1v2M10 1v2M6 13v2M10 13v2M1 6h2M1 10h2M13 6h2M13 10h2"/><path class="bolt" d="M8.6 5.4 6.8 8.2h2.4l-1.8 2.6"/></svg>Auto Compute</span>
-              <span class="rlm-illus">Illustration</span>
-            </div>
-            <div class="rlm-view">
-              <!-- Scene 0: tabs with separate histories, shared providers -->
-              <div class="rlm-layer" data-layer="0">
-                <div class="rlm-hist">
-                  <div class="rlm-list" data-list="chat">
-                    <div class="rlm-row"><span class="rlm-dot"></span>Refactor auth middleware</div>
-                    <div class="rlm-row"><span class="rlm-dot"></span>Fix flaky CI job</div>
-                    <div class="rlm-row"><span class="rlm-dot"></span>Latency regression</div>
-                  </div>
-                  <div class="rlm-list" data-list="rlm">
-                    <div class="rlm-row rlm-row--rlm"><span class="rlm-dot"></span>Auto Compute · Latency regression</div>
-                    <div class="rlm-row rlm-row--rlm"><span class="rlm-dot"></span>Explore runs.csv</div>
-                    <div class="rlm-row rlm-row--ghost">+ New RLM chat</div>
-                  </div>
-                </div>
-                <div class="rlm-shared">
-                  <span class="rlm-shared-k">same model picker · same sign-ins &amp; keys</span>
-                  <div class="rlm-providers">
-                    <span class="rlm-chip">Anthropic</span><span class="rlm-chip">OpenAI</span><span class="rlm-chip">OpenRouter</span><span class="rlm-chip">Mistral</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Scene 1: Auto Compute hand-over -->
-              <div class="rlm-layer" data-layer="1">
-                <div class="rlm-src">
-                  <div class="rlm-msg rlm-msg--user">Why did p50 latency jump on Tuesday?</div>
-                  <div class="rlm-msg rlm-msg--agent2">Probably the new retry policy, but I can't confirm it without loading <code>runs.csv</code>.</div>
-                  <div class="rlm-msg rlm-msg--user">Can you check?</div>
-                </div>
-                <div class="rlm-dest">
-                  <div class="rlm-dest-title"><span class="rlm-pulse"></span>Auto Compute · Latency regression</div>
-                  <div class="rlm-handed"><code>&lt;agent_chat&gt;</code> 3 messages handed over <code>&lt;/agent_chat&gt;</code></div>
-                  <div class="rlm-msg rlm-msg--agent"><span class="rlm-stream2" data-text="Loading runs.csv into the kernel… grouping by day and retry policy, then testing the claim."></span></div>
-                </div>
-                <div class="rlm-sparks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-              </div>
-
-              <!-- Scene 2: git worktree branches off -->
-              <div class="rlm-layer" data-layer="2">
-                <div class="rlm-banner"><b>RLM · local trust</b> Isolated worktree. Runs with your permissions (no sandbox).</div>
-                <svg class="rlm-git" viewBox="0 0 400 170" aria-hidden="true">
-                  <path class="rlm-git-main" d="M20 120 H380" />
-                  <path class="rlm-git-branch" d="M140 120 C190 120 190 50 240 50 H380" />
-                  <circle class="rlm-git-n" cx="60" cy="120" r="7" /><circle class="rlm-git-n" cx="140" cy="120" r="7" />
-                  <circle class="rlm-git-n rlm-git-head" cx="300" cy="120" r="7" />
-                  <circle class="rlm-git-n rlm-git-b" cx="270" cy="50" r="7" /><circle class="rlm-git-n rlm-git-b" cx="340" cy="50" r="7" />
-                  <text x="20" y="150">main · your workspace</text>
-                  <text class="rlm-git-label" x="240" y="28">claakecode/rlm-7f3a</text>
-                </svg>
-              </div>
-
-              <!-- Scene 3: persistent kernel -->
-              <div class="rlm-layer" data-layer="3">
-                <div class="rlm-cell" data-cell="0"><span class="rlm-in">msg 1</span><code class="rlm-type" data-text='df = pd.read_csv("runs.csv")'></code></div>
-                <div class="rlm-cell rlm-out" data-cell="1"><span class="rlm-in">out</span><code>12 840 rows × 6 columns</code></div>
-                <div class="rlm-gap" data-cell="2">… two questions later …</div>
-                <div class="rlm-cell" data-cell="3"><span class="rlm-in">msg 4</span><code class="rlm-type" data-text='df.groupby("model").latency.median()'></code></div>
-                <div class="rlm-cell rlm-out" data-cell="4"><span class="rlm-in">out</span><code>no reload · <b>df</b> still in memory</code></div>
-                <div class="rlm-kernel"><span class="rlm-pulse"></span>kernel alive · state kept between messages<span class="rlm-ns">df</span></div>
-              </div>
-
-              <!-- Scene 4: stream cut and resync -->
-              <div class="rlm-layer" data-layer="4">
-                <div class="rlm-msg rlm-msg--user rlm-u4">Summarise the failing tests</div>
-                <div class="rlm-msg rlm-msg--agent"><span class="rlm-stream" data-text="Three tests fail in auth/: the token refresh path expects a refresh token that is no longer sent."></span><span class="rlm-caret"></span></div>
-                <div class="rlm-cut"><span class="rlm-cut-line"></span><span class="rlm-cut-tag">connection lost → reattach</span></div>
-                <div class="rlm-ledger">
-                  <span>prompt sent <b>1×</b></span><span>duplicated text <b>0</b></span><span class="rlm-resync">resynced from snapshot</span>
-                </div>
-              </div>
-
-              <div class="rlm-sweep" aria-hidden="true"></div>
-            </div>
-            <svg class="rlm-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2.5 19 12l-6.6 1.4L9 20z"/></svg>
-            <span class="rlm-ripple" aria-hidden="true"></span>
-          </figure>
-          </div>
-        </div>
+  <section id="fonctions" class="section" aria-labelledby="features-title">
+    <div class="container split-layout">
+      <div class="section-heading reveal"><p class="eyebrow">01 / Dans l’espace de travail</p><h2 id="features-title">Un chat qui peut<br><em>agir sur le projet.</em></h2><p>Ouvrez un dossier, connectez un fournisseur, puis donnez une tâche. Vérifiez les modifications et les résultats avant de les garder.</p>
+      <a class="text-link" href="https://github.com/WilliamPeynichou/ClaakeCode#tools">Documentation des outils ↗</a></div>
+      <div class="feature-list">
+        <article class="feature reveal"><span class="number">01</span><div><h3>Lire, modifier, exécuter</h3><p>Arborescence de fichiers, éditeur et terminal dans la même fenêtre. Le chat classique peut rechercher du texte, modifier des fichiers et lancer des commandes. Les appels d’outils et leurs sorties restent visibles.</p></div></article>
+        <article class="feature reveal"><span class="number">02</span><div><h3>Régler les outils et le contexte</h3><p>Activez ou désactivez les outils, ajustez leurs descriptions et les demandes d’approbation. Ajoutez des instructions Markdown, des dépôts de skills ou des serveurs MCP. Lisez leurs contenus avant de les utiliser.</p></div></article>
+        <article class="feature reveal"><span class="number">03</span><div><h3>Choisir le modèle et la connexion</h3><p>Le chat classique propose Anthropic, OpenAI, Google, Kimi, Mistral, xAI et OpenRouter. Les connexions ne sont pas interchangeables : clés API pour Anthropic, OpenAI, Mistral et OpenRouter ; connexion de compte selon le fournisseur.</p><p class="small">Les accès par abonnement dépendent de votre compte, des quotas et des conditions du fournisseur. Certains flux OAuth sont destinés aux clients officiels. Aucun accès gratuit aux modèles n’est inclus. <a href="https://github.com/WilliamPeynichou/ClaakeCode#providers">Détail des connexions ↗</a></p></div></article>
       </div>
     </div>
+    <div class="container demo reveal"><details><summary>Voir la vidéo de présentation existante <span aria-hidden="true">+</span></summary><video controls playsinline preload="none" poster="/assets/claake-code-poster.jpg" aria-label="Présentation de l’interface Claake Code"><source src="/assets/claake-code.mp4" type="video/mp4"></video><p class="small">Vidéo de l’interface, sans lecture automatique. Certaines vues sont antérieures à 0.2.14.</p></details></div>
+  </section>
 
-    <div class="wrap rlm-foot reveal">
-      <div class="glass rlm-facts">
-        <div><span class="rlm-k">Engine</span><p>Prime Agent 0.9.8, open source, pinned to a reviewed commit and bundled with the app.</p></div>
-        <div><span class="rlm-k">Platforms</span><p>macOS only. Windows and Linux do not currently bundle the Prime Agent sidecar.</p></div>
-        <div><span class="rlm-k">Providers</span><p>Anthropic, OpenAI, OpenRouter, Mistral. Google sign-in is not supported in RLM yet.</p></div>
-        <div><span class="rlm-k">Status</span><p>Experimental. Needs a git repository with at least one commit. Auto Compute hands over the text of the chat, not tool results.</p></div>
+  <section id="rlm" class="section dark-section grain" aria-labelledby="rlm-title">
+    <div class="container split-layout">
+      <div class="section-heading reveal"><p class="eyebrow">02 / RLM Prime · Expérimental</p><h2 id="rlm-title">Un second chat.<br><em>Un Python persistant.</em></h2><p>RLM utilise le moteur Prime Agent dans un onglet distinct du chat classique. Les variables Python restent disponibles entre les exécutions d’une même session.</p><p class="platform-note">macOS et Linux seulement. Pas de RLM sur Windows.</p></div>
+      <div class="rlm-content reveal">
+        <h3>Ce qui change</h3><p>Chaque conversation RLM dispose de son historique et d’un worktree Git. Auto Compute ouvre un chat RLM depuis un chat classique et lui transmet du contexte ; le résultat peut être repris dans le brouillon du chat d’origine.</p>
+        <h3>Ce qu’il faut prévoir</h3><ul class="plain-list"><li>Un dépôt Git avec au moins un commit.</li><li>Une connexion Anthropic, OpenAI, OpenRouter ou Mistral. Google, Kimi et xAI ne sont pas pris en charge dans RLM.</li><li>Des commandes exécutées avec vos permissions. Un worktree sépare les fichiers de travail ; ce n’est pas un bac à sable de sécurité.</li></ul>
+        <p class="limit-note">Les tâches longues et le mode Goal restent à vérifier manuellement avec un vrai modèle. Un agent peut se tromper, s’arrêter ou consommer des tokens sans résoudre la tâche. Gardez les tests et la revue du code.</p>
       </div>
     </div>
   </section>
 
-  <section class="pad" id="download">
-    <div class="wrap">
-      <div class="glass final reveal">
-        <div class="inner">
-          <h2>Install Claake Code.<br>Then make the agent <em>yours</em>.</h2>
-          <p>Connect providers, approve tools, add skills - the AI coding harness works exactly the way you shape it.</p>
-          <div class="hero-cta">
-            <a class="btn btn-primary" aria-label="Download Claake Code macOS universal DMG" href="/download/macos">macOS · .dmg ↓</a>
-            <a class="btn btn-ghost" aria-label="Download Claake Code Windows x64 setup" href="/download/windows">Windows · .exe ↓</a>
-            <a class="btn btn-ghost" aria-label="Download Claake Code Linux AppImage" href="/download/linux">Linux · AppImage ↓</a>
-          </div>
-          <p class="meta" style="text-align:center">Latest v0.2.10 · open source · MIT</p>
-        </div>
+  <section id="apprentissage" class="section cream-section" aria-labelledby="learning-title">
+    <div class="container split-layout">
+      <div class="section-heading reveal"><p class="eyebrow">03 / Leçons et mesures</p><h2 id="learning-title">Garder une leçon.<br><em>Vérifier sa portée.</em></h2></div>
+      <div class="reveal"><h3>Des instructions, pas un modèle réentraîné</h3><p>Les leçons conservent une règle et ses preuves, avec un statut candidat, validé ou rejeté. Elles se consultent, se modifient et se suppriment dans les réglages. Le rappel des leçons peut être désactivé.</p><h3>Deux mesures à ne pas confondre</h3><p>Le suivi des modèles mesure les tours, durées et tokens des sessions. Les coûts dépendent des tarifs saisis : ce sont des estimations, pas une facture ni un classement de qualité.</p><p>Le banc de test compare des exécutions avec et sans leçon sur de petites tâches Python, notamment via le moteur RLM. Le parcours complet avec un vrai modèle reste à vérifier : ces tests ne prouvent pas un gain sur tous vos projets.</p></div>
+    </div>
+  </section>
+
+  <section id="version" class="section" aria-labelledby="version-title">
+    <div class="container split-layout">
+      <div class="section-heading reveal"><p class="eyebrow">04 / Version 0.2.14 en préparation</p><h2 id="version-title">Les dépendances<br><em>et la distribution.</em></h2><p>Cette page décrit les changements prévus pour 0.2.14, en préparation. Les téléchargements pointent vers la dernière version stable publiée sur GitHub, qui peut encore être antérieure.</p></div>
+      <div class="release-details reveal">
+        <article><h3>21 avis Rust corrigés sur 23</h3><p>Mise à jour des dépendances signalées par <code>cargo audit</code> dans le précédent fichier de verrouillage : notamment rustls, QUIC, Tokio, les certificats, plist/quick-xml et zip.</p></article>
+        <article><h3>CI et mise à jour intégrée</h3><p>Actions GitHub sur des runtimes Node 24 ; scripts de build sur Node 22 plutôt que Node 20. Plugin updater Tauri 2.14.1, avec des correctifs d’installation et de vérification des signatures.</p></article>
+        <article class="remaining"><h3>Deux avis restent ouverts</h3><p><code>libsqlite3-sys</code> (RUSTSEC-2026-0459) et <code>rsa</code> via <code>sqlx-mysql</code> (RUSTSEC-2023-0071). Leur correction nécessite une migration coordonnée des dépendances de bases de données. Ces avis ne sont pas masqués.</p></article>
+        <a class="text-link" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">Consulter la version publiée et ses notes ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="telecharger" class="section cream-section" aria-labelledby="download-title">
+    <div class="container download-heading reveal"><div><p class="eyebrow">05 / Installation</p><h2 id="download-title">Choisissez votre système.</h2></div><p>Dernière version stable sur GitHub.<br>Vérifiez le numéro de version avant l’installation.</p></div>
+    <div class="container download-grid">
+      <article class="download-card reveal"><h3>macOS</h3><p>Apple Silicon et Intel<br>Installateur universel · .dmg</p><a class="button" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_universal.dmg">Télécharger pour macOS ↓</a><span class="small">Chat classique + RLM Prime</span></article>
+      <article class="download-card reveal"><h3>Windows</h3><p>64 bits · x64<br>Installateur · .exe</p><a class="button" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_x64-setup.exe">Télécharger pour Windows ↓</a><span class="small">Chat classique · pas de RLM Prime</span></article>
+      <article class="download-card reveal"><h3>Linux</h3><p>64 bits · amd64<br>Application · AppImage</p><a class="button" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest/download/Claake_Code_amd64.AppImage">Télécharger pour Linux ↓</a><span class="small">Chat classique + RLM Prime</span></article>
+    </div>
+    <div class="container download-after"><p class="small">Après l’installation : ouvrez un projet, connectez un fournisseur dans les réglages et choisissez un modèle. Sur macOS, un binaire non signé peut nécessiter clic droit → Ouvrir.</p><a class="text-link" href="https://github.com/WilliamPeynichou/ClaakeCode/releases/latest">Autres formats et notes de version ↗</a></div>
+  </section>
+
+  <section id="faq" class="section" aria-labelledby="faq-title">
+    <div class="container split-layout">
+      <div class="section-heading reveal"><p class="eyebrow">06 / Questions utiles</p><h2 id="faq-title">Avant de<br><em>commencer.</em></h2></div>
+      <div class="faq-list reveal">
+        <details><summary>Est-ce un outil gratuit ?</summary><p>Le code de Claake Code est sous licence MIT. L’utilisation des modèles n’est pas incluse : elle dépend de vos clés API, abonnements, quotas et des conditions de chaque fournisseur.</p></details>
+        <details><summary>Est-ce local, privé ou utilisable hors ligne ?</summary><p>L’interface est une application desktop. Les requêtes et le contexte utile sont envoyés aux fournisseurs et services que vous configurez. L’utilisation de ces modèles nécessite une connexion réseau ; le traitement n’est pas entièrement local. Les outils terminal et les serveurs MCP peuvent aussi accéder au réseau.</p></details>
+        <details><summary>Le chat classique et RLM ont-ils les mêmes accès ?</summary><p>Non. RLM est expérimental, disponible sur macOS et Linux seulement, avec Anthropic, OpenAI, OpenRouter et Mistral. Le chat classique offre davantage de fournisseurs. Les possibilités dépendent aussi du modèle choisi.</p></details>
+        <details><summary>L’agent peut-il travailler sans surveillance ?</summary><p>Il peut enchaîner des outils et des étapes. Cela ne garantit pas une tâche terminée ni un résultat juste. Limitez ses permissions, contrôlez les commandes et les diffs, puis lancez vos tests. RLM n’est pas isolé par un bac à sable.</p></details>
+        <details><summary>Les benchmarks prouvent-ils qu’un modèle est meilleur ?</summary><p>Non. Les mesures de session décrivent votre usage. Le banc des leçons est limité à de petites tâches et n’a pas été validé avec un vrai modèle. Aucun des deux ne constitue un classement général des modèles.</p></details>
+        <details><summary>Où signaler un problème ?</summary><p>Ouvrez une <a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">issue GitHub</a> en indiquant la version, le système et les étapes pour reproduire le problème. N’y joignez pas vos clés ni des données sensibles. Pour un problème de sécurité, consultez la <a href="https://github.com/WilliamPeynichou/ClaakeCode/security/policy">politique de sécurité</a>.</p></details>
       </div>
     </div>
   </section>
 </main>
-
-<footer>
-  <div class="wrap">
-    <div class="glass foot-card">
-      <div class="foot">
-        <div>
-          <a class="brand" href="/" aria-label="Claake Code home"><picture><source srcset="assets/claakecode-icon.webp" type="image/webp" /><img src="assets/claakecode-icon.png" alt="Claake Code logo" /></picture><strong>claake <em>code</em></strong></a>
-          <small>Open-source desktop AI coding IDE with a developer-controlled harness.</small>
-        </div>
-        <div class="foot-cols">
-          <div class="foot-col"><h5>Product</h5><a href="/whats-new">What's new</a><a href="/features">Features</a><a href="/settings">Settings</a><a href="/agent">Agent</a><a href="/why">Why</a><a href="/faq">FAQ</a></div>
-          <div class="foot-col"><h5>Resources</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode">Source</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/blob/main/README.md">README</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/releases">Releases</a><a href="/llms.txt">llms.txt</a></div>
-          <div class="foot-col"><h5>Legal</h5><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><a href="/.well-known/security.txt">Security</a></div>
-          <div class="foot-col"><h5>Community</h5><a href="https://github.com/WilliamPeynichou/ClaakeCode/issues">Issues</a><a href="https://github.com/WilliamPeynichou/ClaakeCode/discussions">Discussions</a><a href="https://github.com/Paseru/sinew">Forked from Sinew</a></div>
-        </div>
-      </div>
-      <div class="foot-line"><span>© 2026 · MIT licensed</span><span>open-source AI coding IDE · no telemetry</span></div>
-    </div>
-  </div>
-</footer>
-
-<div class="switcher glass" role="group" aria-label="Visual palette">
-  <span class="lab">Palette</span>
-  <button class="sw" data-t="forest" aria-pressed="true" title="Forest" aria-label="Use forest palette"></button>
-  <button class="sw" data-t="dusk" aria-pressed="false" title="Dusk" aria-label="Use dusk palette"></button>
-  <button class="sw" data-t="tide" aria-pressed="false" title="Tide" aria-label="Use tide palette"></button>
-</div>
-
-<script defer src="bg-loader.js"></script>
-<script>
-(function(){
-  const THEMES = {
-    forest:{ deep:'#0c1f17', mid:'#1f6b48', light:'#cfe9b0', accent:'#e8c87a' },
-    dusk:  { deep:'#2a1320', mid:'#b5563a', light:'#f0b07a', accent:'#e88a9a' },
-    tide:  { deep:'#07202a', mid:'#16808f', light:'#7fdcc9', accent:'#f0936f' },
-  };
-  const root = document.documentElement;
-  const SAVE = 'claakecode-web-theme';
-  function applyTheme(t){
-    root.setAttribute('data-theme', t);
-    if(window.setLiquidTheme) window.setLiquidTheme(THEMES[t]);
-    document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
-    try { localStorage.setItem(SAVE, t); } catch(e) {}
-  }
-  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.t)));
-  let saved = 'forest';
-  try { saved = localStorage.getItem(SAVE) || 'forest'; } catch(e) {}
-  if(!THEMES[saved]) saved = 'forest';
-  function initTheme(){ if(window.setLiquidTheme) applyTheme(saved); else setTimeout(initTheme, 80); }
-  initTheme();
-
-  const nav = document.getElementById('nav');
-  function navState(){ nav.classList.toggle('shrunk', window.scrollY > 60); }
-  window.addEventListener('scroll', navState, { passive:true }); navState();
-
-  const rev = new IntersectionObserver((entries) => {
-    entries.forEach(en => { if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
-  }, { rootMargin:'0px 0px -10% 0px', threshold:.12 });
-  document.querySelectorAll('.reveal').forEach((el, i) => {
-    el.style.transitionDelay = (Math.min(i % 4, 3) * 70) + 'ms';
-    rev.observe(el);
-  });
-
-  const heroVideo = document.getElementById('hero-video');
-  if (heroVideo) {
-    heroVideo.muted = true;
-    heroVideo.setAttribute('muted', '');
-    const playVideo = () => { heroVideo.play().catch(() => {}); };
-    const loadAndPlay = () => {
-      const src = heroVideo.dataset.src;
-      if (!src || heroVideo.src) return;
-      heroVideo.src = src;
-      heroVideo.addEventListener('canplay', playVideo, { once: true });
-      heroVideo.load();
-    };
-    const videoObserver = new IntersectionObserver((entries) => {
-      entries.forEach(en => { if (en.isIntersecting) { loadAndPlay(); videoObserver.unobserve(en.target); } });
-    }, { rootMargin: '200px', threshold: 0 });
-    videoObserver.observe(heroVideo);
-  }
-})();
-</script>
-
-<script>
-/* RLM section motion. rlmRender(p, pre) is pure: every style derives from its inputs, the
-   measured layout and constants. p = progress through the pinned track (0..1), pre = how far
-   the stage has entered the viewport before pinning (0..1). */
-(function () {
-  const track = document.getElementById('rlm-track');
-  if (!track) return;
-  const $ = (s, r = track) => r.querySelector(s);
-  const $$ = (s, r = track) => Array.from(r.querySelectorAll(s));
-  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
-  const lerp = (a, b, u) => a + (b - a) * u;
-  const smooth = (u) => { u = clamp(u); return u * u * (3 - 2 * u); };
-  const easeOut = (u) => 1 - Math.pow(1 - clamp(u), 4);
-  const easeInOut = (u) => { u = clamp(u); return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
-  const lin = (u) => clamp(u);
-  const prog = (x, start, dur, e = smooth) => e(clamp((x - start) / dur));
-  const bell = (u) => Math.sin(Math.PI * clamp(u));
-  // Closed-form underdamped spring: accelerates, overshoots a little, settles. Seekable.
-  function spring(tau, f = 1.6, z = 0.62) {
-    if (tau <= 0) return 0;
-    const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z);
-    return 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z * w / wd) * Math.sin(wd * tau));
-  }
-  function springTargets(x, base, changes, k, f, z) {
-    let v = base, prev = base;
-    for (const [at, target] of changes) { v += (target - prev) * spring((x - at) * k, f, z); prev = target; }
-    return v;
-  }
-  function mulberry32(seed) {
-    return () => {
-      let x = (seed += 0x6d2b79f5);
-      x = Math.imul(x ^ (x >>> 15), x | 1);
-      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  const P0 = 0.14;               // prelude share of the track
-  const N = 5, SEG = 1 / N;
-  const stage = $('.rlm-stage');
-  const canvas = $('.rlm-field'), ctx = canvas.getContext('2d');
-  const glow = $('.rlm-glow'), shade = $('.rlm-shade');
-  const hero = $('.rlm-hero'), letters = $$('.rlm-L'), heroSub = $('.rlm-hero-sub'), heroHint = $('.rlm-hero-hint');
-  const copy = $('.rlm-copy'), tilt = $('.rlm-tilt'), win = $('.rlm-window');
-  const scenes = $$('.rlm-scene'), layers = $$('.rlm-layer');
-  const rail = $$('.rlm-rail li'), railFill = $('.rlm-rail-fill');
-  const countCol = $('.rlm-count-col'), count = $('.rlm-count');
-  const tabs = $$('.rlm-tab'), tabInd = $('.rlm-tab-ind'), acBtn = $('.rlm-ac-btn');
-  const sweep = $('.rlm-sweep'), cursor = $('.rlm-cursor'), ripple = $('.rlm-ripple');
-  // 0
-  const chatRows = $$('[data-list="chat"] .rlm-row'), rlmRows = $$('[data-list="rlm"] .rlm-row');
-  const chips = $$('.rlm-chip'), sharedK = $('.rlm-shared-k');
-  // 1
-  const src = $('.rlm-src'), srcMsgs = $$('.rlm-src .rlm-msg'), sparks = $$('.rlm-sparks i');
-  const destTitle = $('.rlm-dest-title'), handed = $('.rlm-handed'), destMsg = $('.rlm-dest .rlm-msg'), stream2 = $('.rlm-stream2');
-  // 2
-  const gitBranch = $('.rlm-git-branch'), gitMain = $('.rlm-git-main');
-  const gitNodes = $$('.rlm-git-n'), gitLabel = $('.rlm-git-label'), banner = $('.rlm-banner');
-  // 3
-  const cells = $$('[data-cell]'), typers = $$('.rlm-type'), kernel = $('.rlm-kernel'), ns = $('.rlm-ns');
-  // 4
-  const stream = $('.rlm-stream'), caret = $('.rlm-caret'), cut = $('.rlm-cut'), ledger = $$('.rlm-ledger span');
-  const userMsg4 = $('.rlm-u4');
-
-  [gitBranch, gitMain].forEach((el) => { const L = el.getTotalLength(); el.style.strokeDasharray = L; el.dataset.len = L; });
-  const draw = (el, u) => { el.style.strokeDashoffset = el.dataset.len * (1 - clamp(u)); };
-  const typeText = (el, u) => { const t = el.dataset.text; el.textContent = t.slice(0, Math.round(t.length * clamp(u))); };
-  const show = (el, u, dy = 14) => { el.style.opacity = clamp(u); el.style.transform = `translateY(${lerp(dy, 0, clamp(u))}px)`; };
-
-  // ── Layout (measured, untransformed offsets) ─────────────────────────────────────────
-  const L = {};
-  function offsetIn(el, root) {
-    let x = 0, y = 0, n = el;
-    while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
-    return { x, y };
-  }
-  const rnd = mulberry32(7);
-  let dots = [];
-  function layout() {
-    const W = stage.clientWidth, H = stage.clientHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    L.W = W; L.H = H;
-    const t = offsetIn(tilt, stage);
-    L.cx = t.x + tilt.offsetWidth / 2; L.cy = t.y + tilt.offsetHeight / 2;
-    L.hx = W / 2; L.hy = H / 2;
-    L.maxR = Math.hypot(W, H) * 1.05;
-    const gap = W < 700 ? 30 : 26;
-    const r = mulberry32(11);
-    dots = [];
-    for (let y = gap / 2; y < H; y += gap) for (let x = gap / 2; x < W; x += gap) dots.push([x, y, r()]);
-    // window-relative points for the Auto Compute choreography
-    const btn = offsetIn(acBtn, win), rt = offsetIn(tabs[1], win), s = offsetIn(src, win);
-    L.btnX = btn.x + acBtn.offsetWidth / 2; L.btnY = btn.y + acBtn.offsetHeight / 2;
-    L.tabX = rt.x + tabs[1].offsetWidth / 2; L.tabY = rt.y + tabs[1].offsetHeight / 2;
-    L.srcX = s.x + src.offsetWidth / 2; L.srcY = s.y + src.offsetHeight / 2;
-    L.winW = win.offsetWidth; L.winH = win.offsetHeight;
-    L.tab = tabs.map((t) => ({ x: t.offsetLeft, w: t.offsetWidth }));
-    L.sparkSeed = sparks.map(() => [rnd() - 0.5, rnd() - 0.5]);
-    L.accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e7c878';
-  }
-  function hexRgb(c) {
-    const m = c.replace('#', '');
-    const v = m.length === 3 ? m.split('').map((h) => h + h).join('') : m;
-    const n = parseInt(v, 16);
-    return Number.isNaN(n) ? [231, 200, 120] : [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
-
-  // Scene visibility in q-space: outgoing scene leaves before the next one enters.
-  function sceneAmount(q, i) {
-    const s = i * SEG;
-    const enter = i === 0 ? 1 : prog(q, s - 0.004, 0.05);
-    const leave = i === N - 1 ? 0 : prog(q, s + SEG - 0.05, 0.042);
-    return { enter, leave, vis: enter * (1 - leave) };
-  }
-  const local = (q, i) => clamp((q - i * SEG) / SEG);
-
-  function field(p, q) {
-    const { W, H } = L;
-    ctx.clearRect(0, 0, W, H);
-    const [r, g, b] = hexRgb(L.accent);
-    const pre = p < P0;
-    const ox = pre ? L.hx : L.cx, oy = pre ? L.hy : L.cy;
-    // One ring per scene, launched at the scene start; a bigger one for the prelude.
-    const ringU = pre ? p / P0 : (q % SEG) / SEG;
-    const R = easeOut(ringU) * L.maxR * (pre ? 1 : 0.9);
-    const width = pre ? 110 : 80;
-    const fade = pre ? 1 : 1 - ringU * 0.6;
-    const appear = clamp(p / 0.03 + 0.25);
-    for (const [x, y, s] of dots) {
-      const dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy) || 1;
-      const ring = Math.exp(-Math.pow((d - R) / width, 2)) * fade;
-      const tw = 0.5 + 0.5 * Math.sin(s * 6.283 + p * 60 + d * 0.01);
-      const a = (0.05 + 0.05 * tw + 0.55 * ring) * appear;
-      if (a < 0.02) continue;
-      const push = ring * 6;
-      const size = 1.3 + ring * 1.6;
-      ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
-      ctx.fillRect(x + (dx / d) * push - size / 2, y + (dy / d) * push - size / 2, size, size);
-    }
-  }
-
-  function rlmRender(p, pre = 1) {
-    const q = clamp((p - P0) / (1 - P0));
-    const inPrelude = p < P0;
-
-    // ── Prelude: letters rise in as the stage arrives, then split and blow past the camera.
-    const out = prog(p, 0.035, 0.095, easeInOut);
-    hero.style.visibility = out < 0.999 ? 'visible' : 'hidden';
-    letters.forEach((el, i) => {
-      const inU = clamp(spring((pre - 0.35 - i * 0.07) * 3.2, 1.3, 0.6), 0, 1.15);
-      const ty = lerp(70, 0, inU);
-      const tx = (i - 1) * out * 36;
-      const sc = 1 + out * 1.8;
-      el.style.transform = `translate3d(${tx}vw, ${ty}%, 0) scale(${sc})`;
-      el.style.opacity = clamp(inU) * (1 - out);
-      el.style.filter = `blur(${(out * 16).toFixed(2)}px)`;
-    });
-    hero.style.setProperty('--fill', `${(prog(p, 0, 0.05, lin) * 100).toFixed(1)}%`);
-    const subIn = prog(pre, 0.7, 0.25);
-    heroSub.style.opacity = subIn * (1 - prog(p, 0.015, 0.04));
-    heroSub.style.transform = `translateY(${lerp(16, 0, subIn) - 20 * prog(p, 0.015, 0.04)}px)`;
-    heroHint.style.opacity = prog(pre, 0.85, 0.15) * (1 - prog(p, 0, 0.02));
-
-    // ── Window flies in from a tilted, far position with a spring, then a gentle camera drift.
-    const wT = clamp((p - 0.055) / 0.1);
-    const wIn = clamp(spring(wT * 1.25, 1.05, 0.7), 0, 1.06);
-    const yaw = springTargets(q, -3, [[SEG, 3], [2 * SEG, -2.5], [3 * SEG, 2.5], [4 * SEG, -1.5]], 30, 1.1, 0.65);
-    const pitch = springTargets(q, 2, [[SEG, -1.5], [2 * SEG, 1.5], [3 * SEG, -1], [4 * SEG, 1]], 30, 1.1, 0.65);
-    win.style.transform =
-      `translate3d(0, ${lerp(220, 0, wIn).toFixed(1)}px, ${lerp(-420, 0, wIn).toFixed(1)}px) ` +
-      `rotateX(${lerp(38, pitch, wIn).toFixed(2)}deg) rotateY(${lerp(-34, yaw, wIn).toFixed(2)}deg) rotateZ(${lerp(-6, 0, wIn).toFixed(2)}deg)`;
-    win.style.opacity = prog(p, 0.05, 0.035);
-    const cIn = prog(p, 0.085, 0.06, easeOut);
-    copy.style.opacity = cIn;
-    copy.style.transform = `translateX(${lerp(-40, 0, cIn)}px)`;
-
-    shade.style.opacity = clamp(pre * 1.2 - 0.1);
-    // ── Field + glow follow the window; a ring is launched at every scene start.
-    field(p, q);
-    const pulse = inPrelude ? 0 : Math.exp(-((q % SEG) / SEG) * 7);
-    glow.style.transform = `translate3d(${L.cx}px, ${L.cy}px, 0) translate(-50%, -50%) scale(${(0.6 + 0.4 * wIn + 0.25 * pulse).toFixed(3)})`;
-    glow.style.opacity = (0.25 + 0.35 * wIn + 0.3 * pulse) * clamp(p / 0.06 + 0.3);
-
-    // ── Rail + rolling counter
-    railFill.style.transform = `scaleY(${q})`;
-    rail.forEach((li, i) => li.classList.toggle('on', !inPrelude && q >= i * SEG - 0.004));
-    const idx = springTargets(q, 0, [1, 2, 3, 4].map((i) => [i * SEG - 0.02, i]), 32, 1.3, 0.62);
-    countCol.style.transform = `translateY(${(-idx * 100 / N).toFixed(3)}%)`;
-    count.style.opacity = cIn;
-
-    // ── Copy scenes: masked line reveal, lines leave upward.
-    scenes.forEach((sc, i) => {
-      const a = sceneAmount(q, i);
-      const enter = i === 0 ? cIn : a.enter;
-      const vis = enter * (1 - a.leave);
-      sc.style.visibility = vis > 0.001 ? 'visible' : 'hidden';
-      $$('.ln > span', sc).forEach((line, j) => {
-        const inU = i === 0 ? prog(p, 0.09 + j * 0.012, 0.05, easeOut) : prog(q, i * SEG - 0.004 + j * 0.014, 0.05, easeOut);
-        const y = a.leave > 0 ? lerp(0, -120, a.leave) : lerp(120, 0, inU);
-        line.style.transform = `translateY(${y}%)`;
-      });
-      const k = $('.rlm-k', sc), para = $('p', sc);
-      k.style.opacity = vis; para.style.opacity = vis;
-      para.style.transform = `translateY(${lerp(12, 0, enter) - 12 * a.leave}px)`;
-      para.style.filter = `blur(${((1 - enter) * 6 + a.leave * 6).toFixed(2)}px)`;
-    });
-
-    // ── Window layers: depth crossfade (scale + blur), a light sweep covers each cut.
-    layers.forEach((ly, i) => {
-      const a = sceneAmount(q, i);
-      ly.style.visibility = a.vis > 0.001 ? 'visible' : 'hidden';
-      ly.style.opacity = a.vis;
-      const sc = a.leave > 0 ? lerp(1, 0.94, a.leave) : lerp(1.05, 1, a.enter);
-      ly.style.transform = `translateY(${lerp(14, 0, a.enter) - 10 * a.leave}px) scale(${sc.toFixed(4)})`;
-      ly.style.filter = `blur(${((1 - a.enter) * 8 + a.leave * 8).toFixed(2)}px)`;
-    });
-    let sw = 0;
-    for (let i = 1; i < N; i++) { const u = prog(q, i * SEG - 0.04, 0.08, lin); if (u > 0 && u < 1) sw = u; }
-    sweep.style.opacity = bell(sw);
-    sweep.style.transform = `translateY(${lerp(-30, 130, sw)}%)`;
-
-    // ── Tabs: Chat ↔ RLM indicator, with springy travel.
-    const tabU = springTargets(q, 0, [[0.32 * SEG, 1], [SEG - 0.03, 0], [SEG + 0.56 * SEG, 1]], 42, 1.3, 0.6);
-    const tu = clamp(tabU, -0.08, 1.08);
-    tabInd.style.transform = `translateX(${lerp(L.tab[0].x, L.tab[1].x, tu).toFixed(1)}px)`;
-    tabInd.style.width = `${lerp(L.tab[0].w, L.tab[1].w, clamp(tu)).toFixed(1)}px`;
-    tabs[0].classList.toggle('on', tu < 0.5); tabs[1].classList.toggle('on', tu >= 0.5);
-    // Auto Compute only exists on the Chat tab, like in the app.
-    const l1 = local(q, 1);
-    const press = bell(prog(l1, 0.35, 0.06, lin));
-    acBtn.style.opacity = clamp(1 - tabU * 1.6);
-    acBtn.style.transform = `scale(${(1 - 0.1 * press).toFixed(3)})`;
-    acBtn.classList.toggle('hot', q > SEG && l1 > 0.28 && l1 < 0.5);
-
-    // 0 · histories flip with the tab; providers drop in, shared by both tabs.
-    const l0 = local(q, 0);
-    const fu = clamp(tabU, 0, 1);
-    chatRows.forEach((r, j) => {
-      const u = clamp(fu * 1.6 - j * 0.25);
-      r.style.transform = `rotateX(${(u * 90).toFixed(1)}deg)`; r.style.opacity = 1 - u;
-    });
-    rlmRows.forEach((r, j) => {
-      const u = clamp(fu * 1.6 - j * 0.25 - 0.2);
-      r.style.transform = `rotateX(${((1 - u) * -90).toFixed(1)}deg)`; r.style.opacity = u;
-    });
-    chips.forEach((c, i) => {
-      const s = spring((l0 - 0.55 - i * 0.05) * 6, 1.6, 0.55);
-      c.style.transform = `translateY(${lerp(-24, 0, s).toFixed(1)}px)`; c.style.opacity = clamp(s * 1.4);
-    });
-    sharedK.style.opacity = prog(l0, 0.5, 0.1);
-
-    // 1 · Auto Compute: messages arrive, cursor clicks, the chat packs into the RLM tab.
-    srcMsgs.forEach((m, j) => show(m, prog(l1, 0.02 + j * 0.05, 0.06), 12));
-    const cur = prog(l1, 0.12, 0.22, easeInOut);
-    const cx0 = L.winW * 0.82, cy0 = L.winH * 0.92;
-    const cxp = lerp(cx0, L.btnX, cur) + Math.sin(Math.PI * cur) * -40;
-    const cyp = lerp(cy0, L.btnY, cur);
-    const cVis = prog(l1, 0.1, 0.04) * (1 - prog(l1, 0.5, 0.06)) * sceneAmount(q, 1).vis;
-    cursor.style.opacity = cVis;
-    cursor.style.transform = `translate(${cxp.toFixed(1)}px, ${cyp.toFixed(1)}px) scale(${(1 - 0.18 * press).toFixed(3)})`;
-    const rp = prog(l1, 0.36, 0.12, easeOut);
-    ripple.style.opacity = (rp > 0 && rp < 1 ? 1 - rp : 0) * sceneAmount(q, 1).vis;
-    ripple.style.transform = `translate(${L.btnX}px, ${L.btnY}px) translate(-50%, -50%) scale(${lerp(0.3, 4, rp).toFixed(3)})`;
-    const k = prog(l1, 0.42, 0.17, easeInOut);
-    const dx = (L.tabX - L.srcX) * k, dy = (L.tabY - L.srcY) * k - bell(k) * 50;
-    src.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${lerp(1, 0.06, k).toFixed(4)})`;
-    src.style.opacity = 1 - prog(l1, 0.55, 0.05);
-    src.style.filter = `blur(${(k * 3).toFixed(2)}px)`;
-    sparks.forEach((s, j) => {
-      const u = prog(l1, 0.43 + j * 0.011, 0.17, easeInOut);
-      const [jx, jy] = L.sparkSeed[j];
-      const x = lerp(L.srcX, L.tabX, u) + bell(u) * jx * 140;
-      const y = lerp(L.srcY, L.tabY, u) - bell(u) * (50 + jy * 90);
-      s.style.opacity = bell(u) * sceneAmount(q, 1).vis;
-      s.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${lerp(1.4, 0.4, u).toFixed(3)})`;
-    });
-    show(destTitle, prog(l1, 0.62, 0.06), 10);
-    const hs = clamp(spring((l1 - 0.67) * 7, 1.5, 0.55), 0, 1.1);
-    handed.style.opacity = clamp(hs); handed.style.transform = `scale(${lerp(0.85, 1, hs).toFixed(4)})`;
-    show(destMsg, prog(l1, 0.74, 0.05), 10);
-    typeText(stream2, prog(l1, 0.76, 0.2, lin));
-
-    // 2 · branch draws off main, its commits pop, the trust banner slides down.
-    const l2 = local(q, 2);
-    draw(gitMain, prog(l2, 0, 0.25)); draw(gitBranch, prog(l2, 0.2, 0.35));
-    gitNodes.forEach((n, i) => {
-      const at = n.classList.contains('rlm-git-b') ? 0.45 + (i - 3) * 0.1 : i * 0.08;
-      const s = spring((l2 - at) * 5, 1.6, 0.55);
-      n.style.transform = `scale(${clamp(s, 0, 1.4)})`;
-    });
-    gitLabel.style.opacity = prog(l2, 0.5, 0.15);
-    const b = prog(l2, 0.62, 0.2, easeOut);
-    banner.style.opacity = b; banner.style.transform = `translateY(${lerp(-16, 0, b)}px)`;
-
-    // 3 · code types, output appears, later message reuses df; kernel stays alive.
-    const l3 = local(q, 3);
-    typeText(typers[0], prog(l3, 0.02, 0.22, lin));
-    show(cells[0], prog(l3, 0, 0.06));
-    show(cells[1], prog(l3, 0.26, 0.08));
-    show(cells[2], prog(l3, 0.38, 0.08));
-    show(cells[3], prog(l3, 0.46, 0.06));
-    typeText(typers[1], prog(l3, 0.48, 0.24, lin));
-    show(cells[4], prog(l3, 0.74, 0.08));
-    kernel.style.opacity = prog(l3, 0.05, 0.1);
-    const nsS = clamp(spring((l3 - 0.26) * 6, 1.6, 0.5), 0, 1.25);
-    ns.style.transform = `scale(${nsS.toFixed(3)})`;
-    ns.classList.toggle('hot', l3 > 0.74 && l3 < 0.9);
-
-    // 4 · text streams, the link cuts (stream freezes), reattach, the rest lands once.
-    const l4 = local(q, 4);
-    show(userMsg4, prog(l4, 0, 0.08));
-    const cutAt = 0.38, resumeAt = 0.6;
-    const first = prog(l4, 0.08, cutAt - 0.08, lin) * 0.45;
-    const rest = prog(l4, resumeAt, 0.3, lin) * 0.55;
-    typeText(stream, first + rest);
-    const cutU = prog(l4, cutAt, 0.05) * (1 - prog(l4, resumeAt - 0.02, 0.06));
-    cut.style.opacity = cutU; cut.style.transform = `scaleX(${lerp(0.6, 1, cutU)})`;
-    caret.style.opacity = l4 > 0.08 && l4 < 0.92 ? 1 : 0;
-    caret.classList.toggle('frozen', cutU > 0.5);
-    win.classList.toggle('glitch', l4 > cutAt && l4 < cutAt + 0.04 && q > 4 * SEG);
-    ledger.forEach((s, i) => show(s, prog(l4, 0.72 + i * 0.07, 0.08), 8));
-  }
-  window.rlmRender = rlmRender;
-
-  // ── Drivers ─────────────────────────────────────────────────────────────────────────
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-  function inputs() {
-    const r = track.getBoundingClientRect();
-    const vh = window.innerHeight;
-    const total = r.height - vh;
-    return {
-      p: total > 0 ? clamp(-r.top / total) : 0,
-      pre: clamp(1 - r.top / vh),
-      visible: r.bottom > 0 && r.top < vh,
-    };
-  }
-  let queued = false;
-  function frame() {
-    queued = false;
-    if (reduce.matches) return;
-    const i = inputs();
-    if (i.visible) rlmRender(i.p, i.pre);
-  }
-  function request() { if (!queued) { queued = true; requestAnimationFrame(frame); } }
-  function relayout() { layout(); request(); }
-  window.addEventListener('scroll', request, { passive: true });
-  window.addEventListener('resize', relayout);
-  new MutationObserver(relayout).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  reduce.addEventListener?.('change', () => { document.documentElement.classList.toggle('rlm-static', reduce.matches); relayout(); });
-  document.documentElement.classList.toggle('rlm-static', reduce.matches);
-  window.rlmLayout = layout;
-
-  // Pointer tilt (interactive garnish, outside the pure render): eased toward the pointer.
-  let tx = 0, ty = 0, cx = 0, cy = 0, tiltRaf = 0;
-  function tiltStep() {
-    cx += (tx - cx) * 0.1; cy += (ty - cy) * 0.1;
-    tilt.style.transform = `rotateX(${cy.toFixed(3)}deg) rotateY(${cx.toFixed(3)}deg)`;
-    tiltRaf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.01 ? requestAnimationFrame(tiltStep) : 0;
-  }
-  const finePointer = window.matchMedia('(pointer: fine)');
-  stage.addEventListener('pointermove', (e) => {
-    if (reduce.matches || !finePointer.matches) return;
-    const r = tilt.getBoundingClientRect();
-    tx = clamp((e.clientX - (r.left + r.width / 2)) / r.width, -1, 1) * 6;
-    ty = clamp((e.clientY - (r.top + r.height / 2)) / r.height, -1, 1) * -5;
-    if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep);
-  });
-  stage.addEventListener('pointerleave', () => { tx = 0; ty = 0; if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep); });
-
-  layout(); frame();
-  document.fonts?.ready.then(relayout);
-  window.addEventListener('load', relayout);
-})();
-</script>
-
-<script>
-(function () {
-  const loader = document.getElementById('loader');
-  const t0 = Date.now();
-  const MIN_MS = 650;
-  function dismiss() {
-    const elapsed = Date.now() - t0;
-    const delay = Math.max(0, MIN_MS - elapsed);
-    setTimeout(function () {
-      loader.classList.add('loader--done');
-      loader.addEventListener('transitionend', function () { loader.remove(); }, { once: true });
-    }, delay);
-  }
-  if (document.readyState === 'complete') dismiss();
-  else window.addEventListener('load', dismiss, { once: true });
-})();
-</script>
+<footer class="site-footer"><div class="container footer-inner"><a class="brand" href="/">claake <em>code</em></a><p>Un outil desktop de code IA.<br>Open source · MIT · Dérivé de <a href="https://github.com/Paseru/sinew">Sinew</a>.</p><nav aria-label="Liens de pied de page"><a href="https://github.com/WilliamPeynichou/ClaakeCode">GitHub ↗</a><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><a href="/llms.txt">llms.txt</a></nav><span class="small">© 2026 Claake Code</span></div></footer>
 </body>
 </html>

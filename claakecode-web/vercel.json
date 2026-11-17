@@ -5,6 +5,168 @@
   "buildCommand": "echo 'static site: no build'",
   "outputDirectory": ".",
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/features",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/features.html",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/settings",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/settings.html",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/agent",
+      "destination": "/#rlm",
+      "permanent": true
+    },
+    {
+      "source": "/agent.html",
+      "destination": "/#rlm",
+      "permanent": true
+    },
+    {
+      "source": "/why",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/why.html",
+      "destination": "/#fonctions",
+      "permanent": true
+    },
+    {
+      "source": "/faq",
+      "destination": "/#faq",
+      "permanent": true
+    },
+    {
+      "source": "/faq.html",
+      "destination": "/#faq",
+      "permanent": true
+    },
+    {
+      "source": "/whats-new",
+      "destination": "/#version",
+      "permanent": true
+    },
+    {
+      "source": "/whats-new.html",
+      "destination": "/#version",
+      "permanent": true
+    },
+    {
+      "source": "/download",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/macos",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/macos.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/windows",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/windows.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/linux",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/linux.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/macos",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/macos.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/windows",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/windows.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/linux",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/linux.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/macos",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/macos.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/windows",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/windows.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/linux",
+      "destination": "/#telecharger",
+      "permanent": true
+    },
+    {
+      "source": "/download/linux.html",
+      "destination": "/#telecharger",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
