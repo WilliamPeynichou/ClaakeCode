@@ -3,47 +3,84 @@ const panels = [...document.querySelectorAll('[data-panel]')];
 const links = [...document.querySelectorAll('[data-feature]')];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 let current = 0;
-let cleanup;
+let position = 0;
+let target = 0;
+let frame = null;
+let lastTime = 0;
+let ignoreScrollUntil = 0;
+history.scrollRestoration = 'manual';
+const exhibition = document.querySelector('.exhibition');
+const viewport = document.querySelector('.gallery-viewport');
+const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+const parts = panels.map(panel => ({
+  info: panel.querySelector('.feature-info'),
+  art: panel.querySelector('.feature-art'),
+  word: panel.querySelector('.feature-word'),
+}));
 const aliases = { settings: 'outils', agent: 'rlm', pourquoi: 'fonctions' };
 const byHash = () => data.findIndex(item => item.id === (aliases[location.hash.slice(1)] || location.hash.slice(1)));
-const exhibition = document.querySelector('.exhibition');
-let scrollFrame;
-const scrollRange = () => Math.max(0, exhibition.offsetHeight - document.querySelector('.gallery-viewport').offsetHeight);
-function scrollToFeature(index) {
-  const target = exhibition.offsetTop + scrollRange() * index / (data.length - 1);
-  window.scrollTo({ top: target, behavior: 'instant' });
-}
-function select(index, updateHash = true, fromScroll = false) {
-  const next = (index + data.length) % data.length;
-  clearTimeout(cleanup);
+const scrollRange = () => Math.max(0, exhibition.offsetHeight - viewport.offsetHeight);
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+function renderScene() {
+  const mobile = innerWidth <= 650;
   panels.forEach((panel, i) => {
-    panel.classList.remove('is-entering', 'is-leaving');
-    if (i !== current && i !== next) panel.hidden = true;
+    const delta = i - position;
+    const visible = Math.abs(delta) < 1;
+    panel.hidden = !visible;
+    panel.inert = i !== current;
+    panel.setAttribute('aria-hidden', String(i !== current));
+    if (!visible) return;
+    // Keep the scene readable near each stop; blend only between stops.
+    const amount = clamp((Math.abs(delta) - .12) / .76, 0, 1);
+    const eased = amount * amount * (3 - 2 * amount);
+    const opacity = 1 - eased;
+    const sign = Math.sign(delta);
+    panel.style.zIndex = i === current ? '2' : '1';
+    parts[i].info.style.opacity = opacity;
+    parts[i].info.style.transform = `translate3d(0, ${sign * eased * 38}px, 0)`;
+    parts[i].art.style.opacity = opacity;
+    parts[i].art.style.transform = `translate3d(${sign * eased * (mobile ? 70 : 170)}px, ${eased * 24}px, ${-eased * 150}px)`;
+    parts[i].word.style.opacity = opacity;
+    parts[i].word.style.transform = `translate3d(${sign * eased * -65}px, ${eased * 28}px, 0)`;
   });
-  const previous = current;
-  const direction = next > current ? 1 : -1;
-  document.documentElement.style.setProperty('--direction', direction);
-  if (previous !== next && !reduced.matches) {
-    panels[previous].classList.add('is-leaving');
-    panels[previous].setAttribute('inert', '');
-  } else panels[previous].hidden = true;
-  current = next;
-  panels[next].hidden = false;
-  panels[next].removeAttribute('inert');
-  panels[next].classList.add('is-entering');
+  viewport.style.setProperty('--progress', position / (data.length - 1));
+}
+function tick(time) {
+  const elapsed = lastTime ? Math.min(time - lastTime, 40) : 16;
+  lastTime = time;
+  position += (target - position) * (1 - Math.exp(-elapsed / 105));
+  if (Math.abs(target - position) < .001) position = target;
+  renderScene();
+  if (position !== target) frame = requestAnimationFrame(tick);
+  else { frame = null; lastTime = 0; }
+}
+function animateTo(value) {
+  target = clamp(value, 0, data.length - 1);
+  if (reduced.matches) { position = target; renderScene(); return; }
+  if (!frame) frame = requestAnimationFrame(tick);
+}
+function markCurrent(index, updateHash = true, fromScroll = false) {
+  current = index;
   links.forEach((link, i) => {
-    if (i === next) link.setAttribute('aria-current', 'true');
+    if (i === index) link.setAttribute('aria-current', 'true');
     else link.removeAttribute('aria-current');
   });
-  document.querySelector('.current-count').textContent = `0${next + 1} / 0${data.length}`;
+  panels.forEach((panel, i) => { panel.inert = i !== index; panel.setAttribute('aria-hidden', String(i !== index)); });
+  document.querySelector('.current-count').textContent = `0${index + 1} / 0${data.length}`;
   if (updateHash) {
-    if (fromScroll) history.replaceState(null, '', '#' + data[next].id);
-    else history.pushState(null, '', '#' + data[next].id);
+    if (fromScroll) history.replaceState(null, '', '#' + data[index].id);
+    else history.pushState(null, '', '#' + data[index].id);
   }
-  if (!fromScroll) scrollToFeature(next);
-  cleanup = setTimeout(() => {
-    panels.forEach((panel, i) => { if (i !== current) panel.hidden = true; });
-  }, reduced.matches ? 0 : 420);
+}
+function jumpTo(index) {
+  ignoreScrollUntil = performance.now() + 250;
+  window.scrollTo({ top: exhibition.offsetTop + scrollRange() * index / (data.length - 1), behavior: 'instant' });
+}
+function select(index, updateHash = true) {
+  const next = (index + data.length) % data.length;
+  markCurrent(next, updateHash);
+  animateTo(next);
+  jumpTo(next);
 }
 links.forEach((link, index) => link.addEventListener('click', event => { event.preventDefault(); select(index); }));
 document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click', () => select(current + Number(button.dataset.step))));
@@ -96,19 +133,40 @@ function applyHash() {
 }
 window.addEventListener('hashchange', applyHash);
 window.addEventListener('scroll', () => {
-  if (scrollFrame || document.querySelector('dialog[open]')) return;
-  scrollFrame = requestAnimationFrame(() => {
-    scrollFrame = null;
-    const range = scrollRange();
-    if (!range) return;
-    const progress = Math.max(0, Math.min(1, (window.scrollY - exhibition.offsetTop) / range));
-    const index = Math.round(progress * (data.length - 1));
-    if (index !== current) select(index, true, true);
-  });
+  if (performance.now() < ignoreScrollUntil || document.querySelector('dialog[open]')) return;
+  const range = scrollRange();
+  if (!range) return;
+  const value = clamp((window.scrollY - exhibition.offsetTop) / range, 0, 1) * (data.length - 1);
+  const next = Math.round(value);
+  if (next !== current) markCurrent(next, true, true);
+  animateTo(reduced.matches ? next : value);
 }, { passive: true });
-window.addEventListener('resize', () => scrollToFeature(current));
+window.addEventListener('resize', () => select(current, false));
+reduced.addEventListener('change', () => {
+  if (frame) cancelAnimationFrame(frame);
+  frame = null; lastTime = 0;
+  position = target = current; renderScene();
+});
+// Pointer light is local to the object; it does not move the text or the page.
+document.querySelectorAll('.art-object').forEach(object => {
+  object.addEventListener('pointermove', event => {
+    if (reduced.matches || !finePointer.matches) return;
+    const rect = object.getBoundingClientRect();
+    object.style.setProperty('--light-x', `${clamp((event.clientX - rect.left) / rect.width, 0, 1) * 100}%`);
+    object.style.setProperty('--light-y', `${clamp((event.clientY - rect.top) / rect.height, 0, 1) * 100}%`);
+  });
+});
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); select(0); });
-document.documentElement.classList.add('js-gallery');
-panels.forEach(panel => { panel.hidden = true; });
-select(Math.max(0, byHash()), false);
+document.documentElement.classList.add('js-gallery', 'motion-gallery');
+current = position = target = Math.max(0, byHash());
+markCurrent(current, false);
+renderScene();
+jumpTo(current);
+addEventListener('load', () => { jumpTo(current); renderScene(); }, { once: true });
+if (!reduced.matches) {
+  viewport.classList.add('scene-arrival');
+  viewport.addEventListener('animationend', event => {
+    if (event.animationName === 'arrival-rule') viewport.classList.remove('scene-arrival');
+  });
+}
 applyHash();
