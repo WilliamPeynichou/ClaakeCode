@@ -6,7 +6,14 @@ let current = 0;
 let cleanup;
 const aliases = { settings: 'outils', agent: 'rlm', pourquoi: 'fonctions' };
 const byHash = () => data.findIndex(item => item.id === (aliases[location.hash.slice(1)] || location.hash.slice(1)));
-function select(index, updateHash = true) {
+const exhibition = document.querySelector('.exhibition');
+let scrollFrame;
+const scrollRange = () => Math.max(0, exhibition.offsetHeight - document.querySelector('.gallery-viewport').offsetHeight);
+function scrollToFeature(index) {
+  const target = exhibition.offsetTop + scrollRange() * index / (data.length - 1);
+  window.scrollTo({ top: target, behavior: 'instant' });
+}
+function select(index, updateHash = true, fromScroll = false) {
   const next = (index + data.length) % data.length;
   clearTimeout(cleanup);
   panels.forEach((panel, i) => {
@@ -29,7 +36,11 @@ function select(index, updateHash = true) {
     else link.removeAttribute('aria-current');
   });
   document.querySelector('.current-count').textContent = `0${next + 1} / 0${data.length}`;
-  if (updateHash) history.pushState(null, '', '#' + data[next].id);
+  if (updateHash) {
+    if (fromScroll) history.replaceState(null, '', '#' + data[next].id);
+    else history.pushState(null, '', '#' + data[next].id);
+  }
+  if (!fromScroll) scrollToFeature(next);
   cleanup = setTimeout(() => {
     panels.forEach((panel, i) => { if (i !== current) panel.hidden = true; });
   }, reduced.matches ? 0 : 420);
@@ -51,6 +62,7 @@ let restoreFocus;
 function openDialog(dialog, opener) {
   restoreFocus = opener || document.activeElement;
   dialog.showModal();
+  document.documentElement.classList.add('dialog-open');
 }
 document.querySelectorAll('[data-detail]').forEach(button => button.addEventListener('click', () => {
   const item = data[Number(button.dataset.detail)];
@@ -70,7 +82,10 @@ document.querySelectorAll('dialog').forEach(dialog => {
     const rect = dialog.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
   } });
-  dialog.addEventListener('close', () => restoreFocus?.focus());
+  dialog.addEventListener('close', () => {
+    document.documentElement.classList.remove('dialog-open');
+    restoreFocus?.focus({ preventScroll: true });
+  });
 });
 function applyHash() {
   const hash = location.hash.slice(1);
@@ -80,6 +95,18 @@ function applyHash() {
   } else { const index = byHash(); if (index >= 0) select(index, false); }
 }
 window.addEventListener('hashchange', applyHash);
+window.addEventListener('scroll', () => {
+  if (scrollFrame || document.querySelector('dialog[open]')) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = null;
+    const range = scrollRange();
+    if (!range) return;
+    const progress = Math.max(0, Math.min(1, (window.scrollY - exhibition.offsetTop) / range));
+    const index = Math.round(progress * (data.length - 1));
+    if (index !== current) select(index, true, true);
+  });
+}, { passive: true });
+window.addEventListener('resize', () => scrollToFeature(current));
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); select(0); });
 document.documentElement.classList.add('js-gallery');
 panels.forEach(panel => { panel.hidden = true; });
