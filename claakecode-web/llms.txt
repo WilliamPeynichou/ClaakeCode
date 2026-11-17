@@ -10,7 +10,9 @@
 ## Page unique
 
 - [Accueil](https://claakecode-web.vercel.app/)
-- [Fonctions et réglages](https://claakecode-web.vercel.app/#fonctions)
+- [Espace de travail](https://claakecode-web.vercel.app/#fonctions)
+- [Modèles](https://claakecode-web.vercel.app/#modeles)
+- [Outils, skills et MCP](https://claakecode-web.vercel.app/#outils)
 - [RLM Prime et limites](https://claakecode-web.vercel.app/#rlm)
 - [Leçons et mesures](https://claakecode-web.vercel.app/#apprentissage)
 - [Version 0.2.14 en préparation](https://claakecode-web.vercel.app/#version)
