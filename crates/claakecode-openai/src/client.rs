@@ -353,6 +353,7 @@ fn response_instructions(request: &ProviderRequest, is_oauth: bool) -> Option<&s
 fn effort_to_reasoning(model_id: &str, effort: Option<Effort>) -> Option<wire::ReasoningConfig> {
     Some(wire::ReasoningConfig {
         effort: match effort.unwrap_or(Effort::Medium) {
+            Effort::None if matches!(model_id, "gpt-6.2-astra" | "gpt-6.2-sol") => "low",
             Effort::None => "none",
             Effort::Low => "low",
             Effort::Medium => "medium",
@@ -700,6 +701,16 @@ mod tests {
                 }
             ])
         );
+    }
+
+    #[test]
+    fn gpt_6_2_models_never_send_none_reasoning() {
+        for model in ["gpt-6.2-sol", "gpt-6.2-astra"] {
+            assert_eq!(effort_to_reasoning(model, Some(Effort::None)).unwrap().effort, "low");
+            assert_eq!(effort_to_reasoning(model, None).unwrap().effort, "medium");
+            assert_eq!(effort_to_reasoning(model, Some(Effort::High)).unwrap().effort, "high");
+        }
+        assert_eq!(effort_to_reasoning("gpt-5.5", Some(Effort::None)).unwrap().effort, "none");
     }
 
     #[test]

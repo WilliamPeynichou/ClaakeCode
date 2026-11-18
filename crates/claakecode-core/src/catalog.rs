@@ -16,7 +16,7 @@ pub const CATALOG_PROVIDERS: &[&str] = &["anthropic", "openai", "google", "xai",
 fn thinking_levels(provider: &str, id: &str) -> &'static [&'static str] {
     match provider {
         "anthropic" => &["off", "low", "medium", "high", "xhigh", "max"],
-        "openai" if id == "gpt-5.3-codex-spark" => &["low", "medium", "high", "xhigh", "max"],
+        "openai" if matches!(id, "gpt-5.3-codex-spark" | "gpt-6.2-astra" | "gpt-6.2-sol") => &["low", "medium", "high", "xhigh", "max"],
         "openai" => &["off", "low", "medium", "high", "xhigh", "max"],
         "google" if id.contains("-pro") => &["low", "medium", "high"],
         "google" => &["minimal", "low", "medium", "high"],
@@ -208,6 +208,20 @@ mod tests {
     #[test]
     fn embedded_catalog_is_valid() {
         assert!(!embedded().models.is_empty());
+    }
+
+    #[test]
+    fn gpt_6_2_catalog_requires_reasoning_and_uses_documented_windows() {
+        for id in ["gpt-6.2-sol", "gpt-6.2-astra"] {
+            let model = embedded().models.iter().find(|m| m.provider == "openai" && m.id == id).unwrap();
+            assert_eq!(model.context_window, 1_050_000);
+            assert_eq!(model.preferred_window, 922_000);
+            assert_eq!(model.max_output, 128_000);
+            assert!(model.supports_images);
+            assert!(!model.thinking.iter().any(|level| level == "off"));
+            let invalid = entry("openai", id, "test", false);
+            assert!(parse(&catalog(&[invalid])).is_err());
+        }
     }
 
     #[test]

@@ -175,6 +175,22 @@ export const MODELS: ModelEntry[] = [
     defaultThinking: "medium",
   },
   {
+    value: "openai:gpt-6.2-astra",
+    provider: "openai",
+    label: "GPT-6.2 Astra",
+    thinking: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+    supportsFast: true,
+  },
+  {
+    value: "openai:gpt-6.2-sol",
+    provider: "openai",
+    label: "GPT-6.2 Sol",
+    thinking: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinking: "medium",
+    supportsFast: true,
+  },
+  {
     value: "openai:gpt-6-luna",
     provider: "openai",
     label: "GPT-6 Luna",
