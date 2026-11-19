@@ -20,6 +20,7 @@ fn error_category(raw: &str) -> &'static str {
     else if matches!(raw, "Supervisor is shutting down" | "supervisor is shutting down" | "Session is shutting down") { "daemon shutting down" }
     else if raw == "Worker authentication failed" { "worker authentication refused" }
     else if raw.starts_with("Invalid create config:") || raw.starts_with("Invalid thinking level") { "invalid session configuration" }
+    else if raw.starts_with("Agent name \"") && raw.ends_with("\" is unavailable: an agent of that name already exists at depth 0 under this parent") { "another Prime session already uses this name" }
     else if raw.starts_with("continueRecent is not supported:") { "explicit sessionPath required" }
     else if raw.contains("is already active in") || raw.starts_with("This session is currently open in another") { SESSION_ALREADY_OPEN }
     else { "unclassified failure (upstream details withheld)" }
@@ -1212,6 +1213,9 @@ mod tests {
         assert_eq!(error_category("Unknown active session: SECRET"), "session unavailable");
         assert!(error_category("Session file /SECRET.jsonl is already active in abc — open elsewhere").starts_with("session already open"));
         assert!(!error_category("Session file /SECRET.jsonl is already active in abc").contains("SECRET"));
+        let duplicate = rejection("create", &json!({"error": "Agent name \"SECRET\" is unavailable: an agent of that name already exists at depth 0 under this parent"}));
+        assert_eq!(duplicate, "Prime daemon rejected command `create`: another Prime session already uses this name");
+        assert!(!duplicate.contains("SECRET"));
         let refused = rejection("create", &json!({
             "error": "This session is currently open in another process (active in x) SECRET",
             "errorInfo": {"code": "session_already_active", "sessionPath": "/SECRET"}

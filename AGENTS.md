@@ -1,4 +1,6 @@
 Code map:
+- Release `v0.2.15` : notes dans `.github/release-notes/v0.2.15.md` ; versions Rust, npm et Tauri alignées.
+- Chat RLM (`src-tauri/src/rlm.rs`) : nom Prime stable et distinct par conversation, reprise du transcript via `sessionPath` inchangée ; `prime.rs` masque le nom dans le diagnostic de collision.
 - `scripts/verify-updater-release.mjs` : vérifie les archives et signatures publiées, exige les quatre cibles desktop, réconcilie `latest.json` et épingle les URL au tag avant publication (`release.yml`). Tests : `node --test scripts/verify-updater-release.test.mjs`.
 - Release `v0.2.12` : notes dans `.github/release-notes/v0.2.12.md` ; versions workspace Rust, npm et Tauri alignées.
 - Arrêt RLM Prime (`crates/claakecode-app/src/prime.rs`) : marqueur partagé `daemon.socket` abandonné ; nettoyage limité aux superviseurs orphelins (PPID 1, même utilisateur, groupe propre, socket privé `ccp-<12 hex>/d.sock`), revalidation avant signal et suppression de leur dossier. Arrêt gracieux borné à 3 s au total, groupe vérifié dans Drop et enfants directs relevés/revalidés pour les workers détachés. Tests Unix : groupe shell, arrêt sans réponse, filtrage des candidats. Vérification réelle des PGID Prime encore requise si `ps` est interdit par le sandbox.
