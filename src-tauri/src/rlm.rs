@@ -411,6 +411,11 @@ pub(super) async fn create_rlm_conversation(
         .map_err(error_to_string)
 }
 
+/// Prime enforces unique names among live sessions, including restored ones.
+fn rlm_prime_session_name(conversation_id: &str) -> String {
+    format!("claakecode-rlm-{conversation_id}")
+}
+
 #[tauri::command]
 pub(super) async fn send_rlm_message(
     app: AppHandle,
@@ -449,7 +454,7 @@ pub(super) async fn send_rlm_message(
                 let (id, file) = prime::create_rlm_session_with(
                     &socket,
                     &worktree,
-                    "claakecode-rlm",
+                    &rlm_prime_session_name(&input.conversation_id),
                     binding.session_path.as_deref(),
                     &rlm_append_prompt(&root, &state.store.load_skill_settings().map_err(error_to_string)?, state.store.claaky_enabled(), state.store.learning_enabled_for(&input.conversation_id), None),
                 )
@@ -713,6 +718,12 @@ pub(super) async fn shutdown_rlm(rlm: &SharedRlm) {
 #[cfg(test)]
 mod learning_tests {
     use super::*;
+
+    #[test]
+    fn prime_session_names_distinguish_conversations() {
+        assert_eq!(rlm_prime_session_name("first"), "claakecode-rlm-first");
+        assert_ne!(rlm_prime_session_name("first"), rlm_prime_session_name("second"));
+    }
 
     #[test]
     fn rlm_append_prompt_respects_learning_switch() {
