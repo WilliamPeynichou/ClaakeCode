@@ -134,8 +134,11 @@ mod companion_entry;
 mod companion_window;
 mod context;
 mod conversations;
+mod diagnostics;
 mod event_pump;
 mod git;
+mod ide_hooks;
+mod ide_process;
 mod models;
 mod platform;
 mod prod;
@@ -359,6 +362,8 @@ pub fn run() {
             }
         })
         .manage(state)
+        .manage(diagnostics::DiagnosticsState::default())
+        .manage(ide_hooks::HookRuntime::default())
         .manage(updater::UpdaterState::new())
         .invoke_handler(tauri::generate_handler![
             workspace::open_workspace,
@@ -551,6 +556,13 @@ pub fn run() {
             terminal::write_terminal,
             terminal::resize_terminal,
             terminal::kill_terminal,
+            diagnostics::diagnostics_snapshot,
+            diagnostics::diagnostics_set_enabled,
+            diagnostics::diagnostics_rerun,
+            ide_hooks::ide_hooks_list,
+            ide_hooks::ide_hooks_save,
+            ide_hooks::ide_hooks_runs,
+            ide_hooks::ide_hooks_cancel,
             git::git_repository_snapshot_command,
             git::git_init_command,
             git::git_create_worktree_command,
@@ -559,6 +571,7 @@ pub fn run() {
             git::git_delete_branch_command,
             git::git_rename_branch_command,
             git::git_commit_command,
+            git::git_file_diff_command,
             git::git_push_command,
             git::git_pull_command,
             git::git_create_pull_request_command,

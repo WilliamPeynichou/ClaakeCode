@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Icon } from "@iconify/react";
 import { languageForPath } from "../lib/language";
 import { fileIcon } from "../lib/fileIcon";
+import type { Problem } from "../lib/diagnostics";
 import { attachMonacoTheme, monacoThemeForDocument } from "../lib/monacoThemes";
 import { Markdown } from "./chat/Markdown";
 import type { EditorRevealTarget, EditorTab } from "../types";
@@ -63,6 +64,7 @@ type Props = {
   revealTarget?: EditorRevealTarget | null;
   onSettingsActivate?: () => void;
   onSettingsClose?: () => void;
+  problems?: Problem[];
 };
 
 export function EditorPane({
@@ -84,6 +86,7 @@ export function EditorPane({
   revealTarget,
   onSettingsActivate,
   onSettingsClose,
+  problems,
 }: Props) {
   const claakyOn = useClaakyEnabled();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -274,6 +277,28 @@ export function EditorPane({
     revealTarget?.id,
     showTextEditor,
   ]);
+
+  // Disk-based results only describe the saved file: hide them while the buffer differs.
+  useEffect(() => {
+    const model = editorRef.current?.getModel();
+    if (!model) return;
+    const here = activeTab?.relativePath;
+    const list = here && !activeTab?.dirty ? (problems ?? []).filter((p) => p.path === here) : [];
+    monacoNs.editor.setModelMarkers(
+      model,
+      "claake-diagnostics",
+      list.map((p) => ({
+        severity: p.severity === "error" ? monacoNs.MarkerSeverity.Error : monacoNs.MarkerSeverity.Warning,
+        message: p.message,
+        code: p.code ?? undefined,
+        source: p.source,
+        startLineNumber: p.line,
+        startColumn: p.column,
+        endLineNumber: p.endLine,
+        endColumn: Math.max(p.endColumn, p.column + 1),
+      })),
+    );
+  }, [problems, activeTab?.relativePath, activeTab?.dirty, editorReadySeq]);
 
   const onEditorChange = useCallback(
     (value: string | undefined) => {

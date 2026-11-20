@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { api } from "../lib/ipc";
+import { GitDiffDialog } from "./GitDiffDialog";
 import type {
   GitBranch,
   GitPullRequestOutput,
@@ -103,6 +104,7 @@ export function GitPanel({
   // mirrors how multi-select works in the rest of the sidebar).
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [commitMessage, setCommitMessage] = useState("");
+  const [previewFile, setPreviewFile] = useState<GitStatusFile | null>(null);
 
   // Worktree composer (modal)
   const [createWtOpen, setCreateWtOpen] = useState(false);
@@ -853,6 +855,7 @@ export function GitPanel({
                   file={file}
                   selected={selected.has(file.path)}
                   onToggle={() => toggleFile(file.path)}
+                  onPreview={() => setPreviewFile(file)}
                 />
               ))}
             </div>
@@ -909,6 +912,14 @@ export function GitPanel({
             </button>
           </div>
         </section>
+
+        {previewFile && (
+          <GitDiffDialog
+            workspacePath={workspacePath}
+            file={previewFile}
+            onClose={() => setPreviewFile(null)}
+          />
+        )}
 
         {/* WORKTREES --------------------------------------------------- */}
         <section className="git-panel__section">
@@ -1416,13 +1427,16 @@ function FileRow({
   file,
   selected,
   onToggle,
+  onPreview,
 }: {
   file: GitStatusFile;
   selected: boolean;
   onToggle: () => void;
+  onPreview: () => void;
 }) {
   const letter = statusLetter(file);
   return (
+    <div className="git-panel__file-wrap">
     <button
       type="button"
       className="git-panel__row git-panel__row--file"
@@ -1452,6 +1466,16 @@ function FileRow({
         )}
       </span>
     </button>
+    <button
+      type="button"
+      className="git-panel__head-btn git-panel__file-diff"
+      onClick={onPreview}
+      title="Show changes"
+      aria-label={`Show changes in ${file.path}`}
+    >
+      <Icon icon="solar:eye-linear" width={14} height={14} />
+    </button>
+    </div>
   );
 }
 

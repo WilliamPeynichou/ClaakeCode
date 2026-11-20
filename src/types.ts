@@ -781,6 +781,16 @@ export type GitStatusFile = {
   staged: boolean;
 };
 
+export type GitFileDiff = {
+  path: string;
+  oldPath?: string | null;
+  kind: "text" | "binary" | "tooLarge" | "unsupported";
+  hasHead: boolean;
+  original?: string | null;
+  modified?: string | null;
+  message?: string | null;
+};
+
 export type GitWorktree = {
   name: string;
   path: string;

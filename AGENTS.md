@@ -1,4 +1,5 @@
 Code map:
+- IDE natif sans LLM : revue du diff avant commit (`git.rs` `git_file_diff_command`, `GitDiffDialog.tsx`), diagnostics automatiques `tsc`/`cargo check` après changement de fichier (`diagnostics.rs`, `ProblemsPanel.tsx`, marqueurs Monaco dans `EditorPane.tsx`, activation explicite par workspace) et hooks locaux configurables (`ide_hooks.rs`, `IdeHooksSection.tsx`, réglages dans le dossier de données de l'app, jamais lus depuis le dépôt) ; exécution bornée partagée dans `ide_process.rs`. Plans : `.claakecode/plans/plan-ide-*.md`.
 - Release `v0.2.15` : notes dans `.github/release-notes/v0.2.15.md` ; versions Rust, npm et Tauri alignées.
 - Chat RLM (`src-tauri/src/rlm.rs`) : nom Prime stable et distinct par conversation, reprise du transcript via `sessionPath` inchangée ; `prime.rs` masque le nom dans le diagnostic de collision.
 - `scripts/verify-updater-release.mjs` : vérifie les archives et signatures publiées, exige les quatre cibles desktop, réconcilie `latest.json` et épingle les URL au tag avant publication (`release.yml`). Tests : `node --test scripts/verify-updater-release.test.mjs`.

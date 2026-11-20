@@ -26,6 +26,8 @@ import { GitPanel, GitMark } from "./GitPanel";
 import { EditorPane } from "./EditorPane";
 import { SettingsPane } from "./SettingsPane";
 import { TerminalPanel } from "./TerminalPanel";
+import { ProblemsPanel } from "./ProblemsPanel";
+import { useDiagnostics, type Problem } from "../lib/diagnostics";
 import { RemotePanel } from "./RemotePanel";
 import { SearchPane } from "./SearchPane";
 import { ChatPane, type ExternalDropFeed } from "./chat/ChatPane";
@@ -2082,6 +2084,26 @@ export function Workspace({
   const [topSplit, setTopSplit] = useState(INITIAL_SPLIT_TOP);
   const [terminalAvailable, setTerminalAvailable] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const diagnostics = useDiagnostics(workspacePath);
+  const openProblem = useCallback(
+    (problem: Problem) =>
+      void openFile(
+        {
+          name: basename(problem.path),
+          relativePath: problem.path,
+          absolutePath: `${workspacePath}/${problem.path}`,
+          kind: "file",
+          hasChildren: false,
+        },
+        {
+          lineNumber: problem.line,
+          columnStart: problem.column,
+          columnEnd: Math.max(problem.endColumn, problem.column + 1),
+          query: "",
+        },
+      ),
+    [openFile, workspacePath],
+  );
   const [terminalFullHeight, setTerminalFullHeight] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(INITIAL_TERMINAL_HEIGHT);
   const [pendingTerminalCommand, setPendingTerminalCommand] = useState<{
@@ -2525,8 +2547,16 @@ export function Workspace({
                 setSettingsActive(true);
               }}
               onSettingsClose={closeSettings}
+              problems={diagnostics.snapshot?.enabled ? diagnostics.snapshot.problems : undefined}
             />
           </div>
+          <ProblemsPanel
+            snapshot={diagnostics.snapshot}
+            onEnable={() => void diagnostics.setEnabled(true)}
+            onDisable={() => void diagnostics.setEnabled(false)}
+            onRerun={() => void diagnostics.rerun()}
+            onOpen={openProblem}
+          />
           {terminalVisible && !terminalFullHeight && (
             <Splitter
               orientation="horizontal"

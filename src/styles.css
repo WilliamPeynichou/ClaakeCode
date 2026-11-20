@@ -10965,3 +10965,40 @@ html.companion-window #root {
   background: transparent !important;
   overflow: hidden;
 }
+
+.git-panel__file-wrap { display: flex; align-items: stretch; gap: 2px; }
+.git-panel__file-wrap > .git-panel__row { flex: 1; min-width: 0; }
+.git-panel__file-diff { flex: none; align-self: center; }
+.git-diff__backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgb(0 0 0 / 45%); }
+.git-diff { width: min(1100px, 92vw); height: min(720px, 86vh); display: flex; flex-direction: column; background: var(--bg-elev, var(--bg)); border: 1px solid var(--border, #444); border-radius: 10px; overflow: hidden; }
+.git-diff__head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border, #444); }
+.git-diff__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.git-diff__hint { opacity: 0.6; font-size: 12px; }
+.git-diff__notice { padding: 6px 14px; font-size: 12px; background: rgb(255 180 0 / 14%); }
+.git-diff__body { flex: 1; min-height: 0; }
+.git-diff__message { padding: 24px; opacity: 0.75; white-space: pre-wrap; }
+
+.problems { flex: none; border-top: 1px solid var(--border, #444); font-size: 12px; }
+.problems__bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; }
+.problems__toggle, .problems__link { background: none; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 2px 4px; }
+.problems__link { opacity: 0.75; }
+.problems__counts { margin-left: 10px; opacity: 0.7; }
+.problems__actions { display: flex; gap: 8px; }
+.problems__list { max-height: 220px; overflow: auto; padding: 0 6px 6px; }
+.problems__project { padding: 4px; opacity: 0.8; }
+.problems__project pre { margin: 4px 0 0; white-space: pre-wrap; }
+.problems__project[data-status="failed"], .problems__project[data-status="toolMissing"], .problems__project[data-status="timedOut"] { color: var(--danger, #e5484d); }
+.problems__item { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 3px 4px; cursor: pointer; border-radius: 4px; }
+.problems__item:hover { background: rgb(255 255 255 / 6%); }
+.problems__item[data-severity="error"] .problems__where { color: var(--danger, #e5484d); }
+.problems__item[data-severity="warning"] .problems__where { color: var(--tone-read, #d9a441); }
+.problems__where { flex: none; font-family: ui-monospace, Menlo, monospace; }
+.problems__msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.problems__code { opacity: 0.55; }
+
+.ide-hook { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1px solid var(--border, #444); border-radius: 8px; }
+.ide-hook__row { display: flex; gap: 8px; align-items: center; }
+.ide-hook__row input[type="text"], .ide-hook__row input:not([type]), .ide-hook__row select { flex: 1; min-width: 0; }
+.ide-hook textarea { font-family: ui-monospace, Menlo, monospace; }
+.ide-hook__run pre { max-height: 240px; overflow: auto; white-space: pre-wrap; }
+.ide-hook__run[data-status="failed"] summary, .ide-hook__run[data-status="timedOut"] summary { color: var(--danger, #e5484d); }

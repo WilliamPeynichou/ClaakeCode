@@ -455,6 +455,7 @@ pub(super) async fn git_rename_branch_command(
 
 #[tauri::command]
 pub(super) async fn git_commit_command(
+    app: AppHandle,
     input: GitCommitInput,
 ) -> std::result::Result<GitOperationResult, String> {
     let workspace_root =
@@ -469,19 +470,191 @@ pub(super) async fn git_commit_command(
         return Err("select at least one file to commit".into());
     }
 
-    let mut add_args = vec!["add".to_string(), "--".to_string()];
-    add_args.extend(paths.iter().cloned());
-    git_checked_owned(&repo_root, &add_args).map_err(error_to_string)?;
+    let head = current_head(&repo_root);
+    ide_hooks::before_commit(&app, &workspace_root, &repo_root, paths.clone(), head)
+        .await
+        .map_err(error_to_string)?;
+    let output = commit_git_paths(&repo_root, message, &paths).map_err(error_to_string)?;
+    Ok(operation_result("Commit created.", output))
+}
 
+fn commit_git_paths(repo: &Path, message: &str, paths: &[String]) -> Result<GitCommandOutput> {
+    let mut add_args = vec!["--literal-pathspecs".to_string(), "add".to_string(), "--all".to_string(), "--".to_string()];
+    let stageable: Vec<String> = paths
+        .iter()
+        .filter(|path| {
+            repo.join(path).symlink_metadata().is_ok()
+                || git_output(repo, &["--literal-pathspecs", "ls-files", "--error-unmatch", "--", path])
+                    .is_ok_and(|output| output.success)
+        })
+        .cloned()
+        .collect();
+    if !stageable.is_empty() {
+        add_args.extend(stageable);
+        git_checked_owned(repo, &add_args)?;
+    }
     let mut commit_args = vec![
+        "--literal-pathspecs".to_string(),
         "commit".to_string(),
         "-m".to_string(),
         message.to_string(),
         "--".to_string(),
     ];
     commit_args.extend(paths.iter().cloned());
-    let output = git_checked_owned(&repo_root, &commit_args).map_err(error_to_string)?;
-    Ok(operation_result("Commit created.", output))
+    git_checked_owned(repo, &commit_args)
+}
+
+const PREVIEW_MAX_BYTES: u64 = 1_000_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum GitFileDiffKind {
+    Text,
+    Binary,
+    TooLarge,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct GitFileDiff {
+    pub(super) path: String,
+    pub(super) old_path: Option<String>,
+    pub(super) kind: GitFileDiffKind,
+    pub(super) has_head: bool,
+    pub(super) original: Option<String>,
+    pub(super) modified: Option<String>,
+    pub(super) message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct GitFileDiffInput {
+    pub(super) workspace_path: String,
+    pub(super) path: String,
+    pub(super) old_path: Option<String>,
+}
+
+fn head_content(repo: &Path, path: &str) -> Result<Option<Vec<u8>>> {
+    let object = format!("HEAD:{path}");
+    let exists = git_output(repo, &["cat-file", "-e", &object])?;
+    if !exists.success {
+        return Ok(None);
+    }
+    let size = git_checked(repo, &["cat-file", "-s", &object])?
+        .stdout
+        .trim()
+        .parse::<u64>()
+        .unwrap_or(u64::MAX);
+    if size > PREVIEW_MAX_BYTES {
+        anyhow::bail!("too large");
+    }
+    let output = git_checked(repo, &["cat-file", "blob", &object])?;
+    Ok(Some(output.stdout.into_bytes()))
+}
+
+fn diff_without_content(
+    path: &str,
+    old_path: Option<&str>,
+    has_head: bool,
+    kind: GitFileDiffKind,
+    message: &str,
+) -> GitFileDiff {
+    GitFileDiff {
+        path: path.to_string(),
+        old_path: old_path.map(str::to_string),
+        kind,
+        has_head,
+        original: None,
+        modified: None,
+        message: Some(message.to_string()),
+    }
+}
+
+pub(super) fn current_head(repo: &Path) -> Option<String> {
+    git_output(repo, &["rev-parse", "--verify", "HEAD"])
+        .ok()
+        .filter(|output| output.success)
+        .map(|output| output.stdout.trim().to_string())
+}
+
+/// What a path-limited commit would contain: HEAD on the left, the working-tree
+/// bytes Git would store on the right. The index is neither read nor changed.
+fn git_file_diff(repo: &Path, path: &str, old_path: Option<&str>) -> Result<GitFileDiff> {
+    let has_head = git_output(repo, &["rev-parse", "--verify", "HEAD"])?.success;
+    let original_path = old_path.unwrap_or(path);
+    let original = if has_head {
+        match head_content(repo, original_path) {
+            Ok(content) => content,
+            Err(_) => {
+                return Ok(diff_without_content(path, old_path, has_head, GitFileDiffKind::TooLarge, "File too large to preview."));
+            }
+        }
+    } else {
+        None
+    };
+    let file = repo.join(path);
+    let modified = match fs::metadata(&file) {
+        Ok(meta) if meta.is_file() => {
+            if meta.len() > PREVIEW_MAX_BYTES {
+                return Ok(diff_without_content(path, old_path, has_head, GitFileDiffKind::TooLarge, "File too large to preview."));
+            }
+            Some(fs::read(&file)?)
+        }
+        Ok(_) => {
+            return Ok(diff_without_content(path, old_path, has_head, GitFileDiffKind::Unsupported, "Not a regular file."));
+        }
+        Err(_) => None,
+    };
+    let is_binary = |bytes: &[u8]| bytes.contains(&0);
+    if original.as_deref().is_some_and(is_binary) || modified.as_deref().is_some_and(is_binary) {
+        return Ok(diff_without_content(path, old_path, has_head, GitFileDiffKind::Binary, "Binary file."));
+    }
+    if let Some(bytes) = &modified {
+        let stored = git_checked(repo, &["--literal-pathspecs", "hash-object", &format!("--path={path}"), "--", path])?;
+        let raw = git_checked(repo, &["--literal-pathspecs", "hash-object", "--no-filters", "--", path])?;
+        if stored.stdout.trim() != raw.stdout.trim() {
+            return Ok(diff_without_content(
+                path,
+                old_path,
+                has_head,
+                GitFileDiffKind::Unsupported,
+                "Git converts this file when committing (line endings or filters); the exact result cannot be previewed.",
+            ));
+        }
+        if std::str::from_utf8(bytes).is_err() {
+            return Ok(diff_without_content(path, old_path, has_head, GitFileDiffKind::Unsupported, "File is not UTF-8."));
+        }
+    }
+    let text = |bytes: Option<Vec<u8>>| bytes.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+    Ok(GitFileDiff {
+        path: path.to_string(),
+        old_path: old_path.map(str::to_string),
+        kind: GitFileDiffKind::Text,
+        has_head,
+        original: Some(text(original)),
+        modified: Some(text(modified)),
+        message: None,
+    })
+}
+
+#[tauri::command]
+pub(super) async fn git_file_diff_command(
+    input: GitFileDiffInput,
+) -> std::result::Result<GitFileDiff, String> {
+    let workspace_root =
+        normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
+    let repo_root = require_repo_root(&workspace_root).map_err(error_to_string)?;
+    let paths = validate_git_paths(&[input.path.clone()]).map_err(error_to_string)?;
+    let path = paths.first().ok_or("invalid git path")?.clone();
+    let old_path = match input.old_path.as_deref() {
+        Some(old) => validate_git_paths(&[old.to_string()]).map_err(error_to_string)?.into_iter().next(),
+        None => None,
+    };
+    tauri::async_runtime::spawn_blocking(move || git_file_diff(&repo_root, &path, old_path.as_deref()))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(error_to_string)
 }
 
 #[tauri::command]
@@ -824,7 +997,7 @@ fn executable_works(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn repo_root(path: &Path) -> Result<PathBuf> {
+pub(super) fn repo_root(path: &Path) -> Result<PathBuf> {
     let output = git_checked(path, &["rev-parse", "--show-toplevel"])?;
     let raw = output.stdout.trim();
     if raw.is_empty() {
@@ -1575,6 +1748,87 @@ mod tests {
         git_checked(&repo, &["worktree", "remove", "--force", &worktree.display().to_string()]).ok();
         fs::remove_dir_all(&repo).ok();
         fs::remove_dir_all(&plain).ok();
+    }
+
+    #[test]
+    fn commit_preview_uses_disk_and_leaves_unselected_index_alone() {
+        let repo = init_test_repo("preview-partially-staged");
+        let path = "file [x].txt";
+        fs::write(repo.join(path), "first\nsecond\n").unwrap();
+        run_test_git(&repo, &["--literal-pathspecs", "add", "--", path]);
+        run_test_git(&repo, &["commit", "-m", "add test file"]);
+        fs::write(repo.join(path), "staged\nsecond\n").unwrap();
+        run_test_git(&repo, &["--literal-pathspecs", "add", "--", path]);
+        fs::write(repo.join(path), "staged\nunstaged\n").unwrap();
+        fs::write(repo.join("README.md"), "unselected\n").unwrap();
+        run_test_git(&repo, &["add", "README.md"]);
+        let index = fs::read(repo.join(".git/index")).unwrap();
+
+        let preview = preview(&repo, path, None);
+        assert_eq!(preview.kind, GitFileDiffKind::Text);
+        assert_eq!(preview.original.as_deref(), Some("first\nsecond\n"));
+        assert_eq!(preview.modified.as_deref(), Some("staged\nunstaged\n"));
+        assert_eq!(fs::read(repo.join(".git/index")).unwrap(), index);
+        assert_eq!(fs::read_to_string(repo.join(path)).unwrap(), "staged\nunstaged\n");
+
+        commit_git_paths(&repo, "selected only", &[path.to_owned()]).unwrap();
+        assert_eq!(preview.modified.unwrap(), show(&repo, &format!("HEAD:{path}")));
+        assert_eq!(show(&repo, "HEAD:README.md"), "test\n");
+        assert_eq!(show(&repo, ":README.md"), "unselected\n");
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn commit_preview_first_commit_then_rename_and_delete() {
+        let repo = unique_temp_dir("preview-first");
+        fs::create_dir_all(&repo).unwrap();
+        run_test_git(&repo, &["init", "-b", "test"]);
+        run_test_git(&repo, &["config", "user.email", "test@example.com"]);
+        run_test_git(&repo, &["config", "user.name", "Claake Code Test"]);
+        fs::write(repo.join("old"), "before\n").unwrap();
+        let first = preview(&repo, "old", None);
+        assert!(!first.has_head);
+        assert_eq!(first.original.as_deref(), Some(""));
+        commit_git_paths(&repo, "first", &["old".into()]).unwrap();
+        assert_eq!(first.modified.unwrap(), show(&repo, "HEAD:old"));
+
+        run_test_git(&repo, &["mv", "old", "new"]);
+        fs::write(repo.join("new"), "after\n").unwrap();
+        let rename = preview(&repo, "new", Some("old"));
+        assert_eq!(rename.original.as_deref(), Some("before\n"));
+        assert_eq!(rename.old_path.as_deref(), Some("old"));
+        commit_git_paths(&repo, "rename", &["new".into(), "old".into()]).unwrap();
+        assert_eq!(rename.modified.unwrap(), show(&repo, "HEAD:new"));
+        assert!(!git_output(&repo, &["cat-file", "-e", "HEAD:old"]).unwrap().success);
+
+        run_test_git(&repo, &["rm", "new"]);
+        let deletion = preview(&repo, "new", None);
+        assert_eq!(deletion.original.as_deref(), Some("after\n"));
+        assert_eq!(deletion.modified.as_deref(), Some(""));
+        commit_git_paths(&repo, "delete", &["new".into()]).unwrap();
+        assert!(!git_output(&repo, &["cat-file", "-e", "HEAD:new"]).unwrap().success);
+        fs::remove_dir_all(repo).ok();
+    }
+
+    #[test]
+    fn commit_preview_reports_conversion_instead_of_showing_wrong_bytes() {
+        let repo = init_test_repo("preview-conversion");
+        fs::write(repo.join(".gitattributes"), "*.txt text eol=lf\n").unwrap();
+        fs::write(repo.join("crlf.txt"), b"one\r\ntwo\r\n").unwrap();
+        let diff = preview(&repo, "crlf.txt", None);
+        assert_eq!(diff.kind, GitFileDiffKind::Unsupported);
+        assert!(diff.modified.is_none());
+        commit_git_paths(&repo, "normalized", &["crlf.txt".into()]).unwrap();
+        assert_eq!(show(&repo, "HEAD:crlf.txt"), "one\ntwo\n");
+        fs::remove_dir_all(repo).ok();
+    }
+
+    fn show(repo: &Path, object: &str) -> String {
+        git_checked(repo, &["show", object]).unwrap().stdout
+    }
+
+    fn preview(repo: &Path, path: &str, old_path: Option<&str>) -> GitFileDiff {
+        git_file_diff(repo, path, old_path).unwrap()
     }
 
     fn init_test_repo(name: &str) -> PathBuf {

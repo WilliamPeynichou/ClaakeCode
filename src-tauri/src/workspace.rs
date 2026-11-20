@@ -67,6 +67,7 @@ pub(super) async fn watch_workspace_command(
     }
 
     let watcher_root = workspace_root.clone();
+    let hook_root = git::repo_root(&workspace_root).unwrap_or_else(|_| workspace_root.clone());
     let app_for_watcher = app.clone();
     let workspace_id_for_watcher = workspace_id.clone();
     let mut watcher =
@@ -76,6 +77,8 @@ pub(super) async fn watch_workspace_command(
                     return;
                 }
                 if event.paths.is_empty() {
+                    diagnostics::file_changed(&app_for_watcher, &watcher_root, "");
+                    ide_hooks::files_changed(&app_for_watcher, &watcher_root, &hook_root, vec![String::new()]);
                     let _ = app_for_watcher.emit(
                         FILE_CHANGE_EVENT_NAME,
                         WorkspaceFileChangeEvent {
@@ -85,11 +88,14 @@ pub(super) async fn watch_workspace_command(
                     );
                     return;
                 }
+                let mut hook_paths = Vec::new();
                 for path in event.paths {
                     if should_ignore_workspace_event_path(&watcher_root, &path) {
                         continue;
                     }
                     if let Some(relative_path) = event_relative_path(&watcher_root, &path) {
+                        diagnostics::file_changed(&app_for_watcher, &watcher_root, &relative_path);
+                        hook_paths.push(relative_path.clone());
                         let _ = app_for_watcher.emit(
                             FILE_CHANGE_EVENT_NAME,
                             WorkspaceFileChangeEvent {
@@ -99,6 +105,9 @@ pub(super) async fn watch_workspace_command(
                         );
                     }
                 }
+                if !hook_paths.is_empty() {
+                    ide_hooks::files_changed(&app_for_watcher, &watcher_root, &hook_root, hook_paths);
+                }
             }
             Err(err) => tracing::warn!(%err, "workspace watcher error"),
         })
@@ -106,24 +115,26 @@ pub(super) async fn watch_workspace_command(
     watcher
         .watch(&workspace_root, RecursiveMode::Recursive)
         .map_err(error_to_string)?;
+    diagnostics::open_workspace(&app, &workspace_root);
     watchers.insert(workspace_id, watcher);
     Ok(())
 }
 
 #[tauri::command]
 pub(super) async fn unwatch_workspace_command(
+    app: AppHandle,
     state: State<'_, DesktopState>,
     input: WorkspaceInput,
 ) -> std::result::Result<bool, String> {
     let workspace_root =
         normalize_workspace_root(&input.workspace_path).map_err(error_to_string)?;
     let workspace_id = workspace_root.display().to_string();
-    Ok(state
-        .file_watchers
-        .lock()
-        .await
-        .remove(&workspace_id)
-        .is_some())
+    let mut watchers = state.file_watchers.lock().await;
+    let removed = watchers.remove(&workspace_id).is_some();
+    if removed {
+        diagnostics::close_workspace(&app, &workspace_root);
+    }
+    Ok(removed)
 }
 
 #[tauri::command]

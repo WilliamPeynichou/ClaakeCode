@@ -509,6 +509,18 @@ pub(super) async fn send_message(
                                 &conversation_id,
                                 &turn_finished_event,
                             );
+                            if saved_ok && !output.interrupted {
+                                let turn_id = format!(
+                                    "{conversation_id}:{}",
+                                    std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map(|d| d.as_millis())
+                                        .unwrap_or_default()
+                                );
+                                let worktree = git::repo_root(&workspace_root_for_output)
+                                    .unwrap_or_else(|_| workspace_root_for_output.clone());
+                                ide_hooks::turn_finished(&app, &workspace_root_for_output, &worktree, turn_id);
+                            }
                             active_turns.lock().await.remove(&conversation_id);
                             active_turn_details
                                 .lock()

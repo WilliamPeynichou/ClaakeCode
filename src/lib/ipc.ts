@@ -18,6 +18,7 @@ import type {
   RewriteWorkspaceRestoreCheck,
   FileDocument,
   GitCreateWorktreeOutput,
+  GitFileDiff,
   GitOperationResult,
   GitPullRequestOutput,
   GitRepositorySnapshot,
@@ -307,6 +308,11 @@ export const api = {
   gitCommit(workspacePath: string, message: string, paths: string[]) {
     return invoke<GitOperationResult>("git_commit_command", {
       input: { workspacePath, message, paths },
+    });
+  },
+  gitFileDiff(workspacePath: string, path: string, oldPath: string | null) {
+    return invoke<GitFileDiff>("git_file_diff_command", {
+      input: { workspacePath, path, oldPath },
     });
   },
   gitPush(workspacePath: string) {

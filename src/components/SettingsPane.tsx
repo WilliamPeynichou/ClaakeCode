@@ -26,6 +26,7 @@ import { ProdSection } from "./ProdSettingsSection";
 import { TypeSafeSection } from "./TypeSafeSettingsSection";
 import { ClaakySettingsSection } from "./claaky/ClaakySettingsSection";
 import { PythonRuntimeSection } from "./PythonRuntimeSection";
+import { IdeHooksSection } from "./IdeHooksSection";
 import { ModelStatsSection } from "./ModelStatsSection";
 import { EmbeddingSection } from "./EmbeddingSettingsSection";
 import {
@@ -139,6 +140,7 @@ type Section =
   | "subagents"
   | "embedding"
   | "python"
+  | "hooks"
   | "modelStats"
   | "claaky";
 
@@ -2315,6 +2317,21 @@ export function SettingsPane({ workspacePath }: Props) {
         <button
           type="button"
           className="settings-pane__nav-item"
+          data-active={section === "hooks" ? "true" : "false"}
+          onClick={() => setSection("hooks")}
+        >
+          <Icon
+            icon="solar:bolt-linear"
+            width={15}
+            height={15}
+            className="settings-pane__nav-icon"
+          />
+          <span className="settings-pane__nav-label">IDE hooks</span>
+          <span className="settings-pane__nav-count" />
+        </button>
+        <button
+          type="button"
+          className="settings-pane__nav-item"
           data-active={section === "modelStats" ? "true" : "false"}
           title="Performance des modèles"
           onClick={() => setSection("modelStats")}
@@ -2563,6 +2580,8 @@ export function SettingsPane({ workspacePath }: Props) {
           />
         ) : section === "python" ? (
           <PythonRuntimeSection />
+        ) : section === "hooks" ? (
+          <IdeHooksSection workspacePath={workspacePath} />
         ) : section === "modelStats" ? (
           <ModelStatsSection />
         ) : section === "claaky" ? (
