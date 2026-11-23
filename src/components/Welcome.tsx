@@ -10,6 +10,9 @@ import type {
   RecentWorkspace,
 } from "../types";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
+import { BlobAvatar, shortRelativeTime } from "./BlobAvatar";
+import { Claaky } from "./claaky/Claaky";
+import { useTheme } from "../lib/theme";
 
 type Props = {
   onPick: (path: string) => void;
@@ -31,6 +34,7 @@ function activeWorkspaceSet(turns: ActiveTurnSummary[]): Set<string> {
 export function Welcome({ onPick, error, deriveName }: Props) {
   const [recents, setRecents] = useState<RecentWorkspace[]>([]);
   const [picking, setPicking] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const [activeWorkspaces, setActiveWorkspaces] = useState<Set<string>>(
     () => new Set(),
   );
@@ -105,32 +109,48 @@ export function Welcome({ onPick, error, deriveName }: Props) {
           <WindowControls />
         </div>
       )}
-      <main className="welcome__stage">
-        <header className="welcome__head">
-          <h1 className="welcome__title">
-            Claake Code<span className="welcome__title-dot">.</span>
-          </h1>
-          <p className="welcome__tag">Your personal Agentic IDE</p>
-        </header>
-
+      <div className="welcome__float" data-windows={IS_WINDOWS ? "true" : undefined}>
         <button
-          className="welcome__cta"
+          type="button"
+          className="welcome__float-btn"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label="Toggle theme"
+        >
+          <Icon
+            icon={theme === "dark" ? "solar:sun-2-linear" : "solar:moon-linear"}
+            width={20}
+            height={20}
+          />
+        </button>
+        <button
+          type="button"
+          className="welcome__float-btn"
           onClick={pickFolder}
           disabled={picking}
+          title="Open a folder"
+          aria-label="Open a folder"
         >
-          <span className="welcome__cta-icon">
-            <Icon icon="solar:folder-with-files-bold-duotone" width={22} height={22} />
-          </span>
-          <span className="welcome__cta-body">
-            <span className="welcome__cta-title">Open a folder</span>
-            <span className="welcome__cta-sub">
-              {picking ? "Opening…" : "Choose any directory to start a session"}
-            </span>
-          </span>
-          <span className="welcome__cta-chev">
-            <Icon icon="solar:alt-arrow-right-linear" width={16} height={16} />
-          </span>
+          <Icon icon="solar:add-circle-linear" width={22} height={22} />
         </button>
+      </div>
+
+      <main className="welcome__stage">
+        <header className="welcome__head">
+          <span className="welcome__hero">
+            <Claaky size={104} state="idle" decorative />
+          </span>
+          <h1 className="welcome__title">Claake Code</h1>
+          <p className="welcome__tag">Your personal Agentic IDE</p>
+          <button
+            className="welcome__cta"
+            onClick={pickFolder}
+            disabled={picking}
+          >
+            <Icon icon="solar:folder-open-bold" width={16} height={16} />
+            <span>{picking ? "Opening…" : "Open a folder"}</span>
+          </button>
+        </header>
 
         {error && (
           <div className="welcome__error">{error}</div>
@@ -150,23 +170,23 @@ export function Welcome({ onPick, error, deriveName }: Props) {
                     onClick={() => onPick(recent.path)}
                   >
                     <span className="welcome__recent-icon">
-                      {isActive ? (
+                      <BlobAvatar seed={recent.path} size={46} />
+                      {isActive && (
                         <span
                           className="welcome__recent-spinner"
                           role="status"
                           aria-label="Agent running"
                         />
-                      ) : (
-                        <Icon
-                          icon="solar:folder-bold-duotone"
-                          width={18}
-                          height={18}
-                        />
                       )}
                     </span>
                     <span className="welcome__recent-body">
-                      <span className="welcome__recent-name">
-                        {recent.name || deriveName(recent.path)}
+                      <span className="welcome__recent-line">
+                        <span className="welcome__recent-name">
+                          {recent.name || deriveName(recent.path)}
+                        </span>
+                        <span className="welcome__recent-time">
+                          {isActive ? "agent actif" : shortRelativeTime(recent.lastOpenedMs)}
+                        </span>
                       </span>
                       <span className="welcome__recent-path">{recent.path}</span>
                     </span>

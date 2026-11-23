@@ -4,10 +4,14 @@ export type Theme = "dark" | "light";
 
 const STORAGE_KEY = "claakecode.theme";
 
+/** Design system "Soft": light is the default; an explicit dark choice is kept. */
 function readStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === "light" ? "light" : "dark";
+  if (typeof window === "undefined") return "light";
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 }
 
 function applyTheme(theme: Theme) {

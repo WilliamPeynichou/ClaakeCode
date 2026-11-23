@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { ConversationSummary } from "../types";
+import { BlobAvatar, shortRelativeTime } from "./BlobAvatar";
 
 type Props = {
   conversations: ConversationSummary[];
@@ -12,6 +13,16 @@ type Props = {
   /** Empty-list text (the RLM tab has its own history). */
   emptyLabel?: string;
 };
+
+/// "Auto Compute · J'ai relu…" → { kicker: "Auto Compute", name: "J'ai relu…" }.
+/// Titles without a " · " prefix keep their full text as name.
+function splitTitle(title: string): { kicker: string | null; name: string } {
+  const idx = title.indexOf(" · ");
+  if (idx > 0 && idx < 32) {
+    return { kicker: title.slice(0, idx), name: title.slice(idx + 3) || title };
+  }
+  return { kicker: null, name: title };
+}
 
 // Renders only the body of the conversations list. The parent owns the
 // `sidebar__section` shell and the head (now shared with the Git tab),
@@ -46,6 +57,8 @@ export function ConversationList({
           const isEditing = editingId === conv.id;
           const isActive = activeId === conv.id;
           const isStreaming = streamingIds.has(conv.id);
+          const fullTitle = conv.title || "Untitled";
+          const parts = splitTitle(fullTitle);
           return (
             <div
               key={conv.id}
@@ -54,40 +67,43 @@ export function ConversationList({
               data-streaming={isStreaming ? "true" : "false"}
               onClick={() => !isEditing && onSelect(conv.id)}
             >
-              <span className="conv-row__icon">
-                {isStreaming ? (
+              <span className="conv-row__avatar">
+                <BlobAvatar seed={conv.id} size={34} />
+                {isStreaming && (
                   <span className="conv-row__spinner" aria-label="Streaming" />
-                ) : (
-                  <Icon
-                    icon={
-                      isActive
-                        ? "solar:chat-round-dots-bold"
-                        : "solar:chat-round-dots-linear"
-                    }
-                    width={15}
-                    height={15}
-                  />
                 )}
               </span>
-              <span
-                ref={isEditing ? editRef : undefined}
-                className="conv-row__title"
-                contentEditable={isEditing}
-                suppressContentEditableWarning
-                onKeyDown={(event) => {
-                  if (!isEditing) return;
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    commitRename(conv.id);
-                  } else if (event.key === "Escape") {
-                    setEditingId(null);
-                  }
-                }}
-                onBlur={() => {
-                  if (isEditing) commitRename(conv.id);
-                }}
-              >
-                {conv.title || "Untitled"}
+              <span className="conv-row__text">
+                <span className="conv-row__line">
+                  <span
+                    ref={isEditing ? editRef : undefined}
+                    className="conv-row__title"
+                    contentEditable={isEditing}
+                    suppressContentEditableWarning
+                    onKeyDown={(event) => {
+                      if (!isEditing) return;
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitRename(conv.id);
+                      } else if (event.key === "Escape") {
+                        setEditingId(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (isEditing) commitRename(conv.id);
+                    }}
+                  >
+                    {isEditing ? fullTitle : parts.name}
+                  </span>
+                  <span className="conv-row__time">
+                    {isStreaming ? "en cours" : shortRelativeTime(conv.updatedAtMs)}
+                  </span>
+                </span>
+                {!isEditing && (
+                  <span className="conv-row__sub">
+                    {parts.kicker ?? (conv.harness === "rlm" ? "Chat RLM" : "Conversation")}
+                  </span>
+                )}
               </span>
               <span className="conv-row__actions">
                 <button

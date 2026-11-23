@@ -1,186 +1,200 @@
 /* ------------------------------------------------------------------
-   Claake Code — desktop UI, "Vert Noisette" dark design system.
-   Palette: warm dark base #1a1916, brand vert noisette #6b7c5c,
-   neutres chauds (stone, hazel green). DM Serif Display for editorial
-   titles, DM Sans for body. Sharp corners, hairline borders, no
-   drop-shadows. Editorial discipline meets IDE density.
+   Claake Code — desktop UI, design system "Soft".
+   Refonte 2026 : surfaces blanches et aérées (clair par défaut),
+   typographie système (SF Pro sur macOS, Inter ailleurs), grands
+   rayons, contrôles en pilule, ombres diffuses plutôt que filets,
+   avatars « blob » colorés. Le vert Claaky reste la couleur de marque.
+   Les surcharges de composants vivent dans src/styles/soft-ui.css,
+   chargé après ce fichier.
    ------------------------------------------------------------------ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+/* Dark (":root") — graphite doux, mêmes formes que le clair. */
 :root {
-  /* ---- Surfaces — warm dark noisette scale ---------------------- */
-  --bg-canvas: #1a1916;          /* dark-bg de la DA */
-  --bg-0: #1a1916;               /* body, main content */
-  --bg-1: #1f1d1a;               /* sidebars, titlebar, chat column */
-  --bg-2: #252320;               /* cards, panels, user bubble */
-  --bg-3: #2a2824;               /* hover */
-  --bg-4: #302d28;               /* active / selected */
-  --bg-5: #36332e;               /* pressed */
-  --bg-hi: #252320;              /* subtle highlight == bg-2 */
-  --bg-pure: #0d0c0a;
+  /* ---- Surfaces ------------------------------------------------- */
+  --bg-canvas: #111113;
+  --bg-0: #111113;               /* body, main content */
+  --bg-1: #161618;               /* sidebars, titlebar, chat column */
+  --bg-2: #1e1e21;               /* cards, panels, user bubble */
+  --bg-3: #252528;               /* hover */
+  --bg-4: #2d2d31;               /* active / selected */
+  --bg-5: #36363b;               /* pressed */
+  --bg-hi: #1e1e21;
+  --bg-pure: #000000;
+  --bg-float: #1c1c1f;           /* floating pills, popovers */
 
-  /* Editor surface — slightly deeper than shell */
-  --editor-bg: #151412;
-  --editor-bg-2: #1f1d1a;
-  --editor-bg-3: #252320;
-  --editor-fg: #e8e4d8;
-  --editor-fg-dim: #a09a8a;
+  --editor-bg: #111113;
+  --editor-bg-2: #18181b;
+  --editor-bg-3: #1e1e21;
+  --editor-fg: #ececef;
+  --editor-fg-dim: #9a9aa2;
 
-  /* ---- Lines / borders — warm stone on dark at low alpha -------- */
-  --line-soft:   rgba(232, 228, 216, 0.04);
-  --line:        rgba(232, 228, 216, 0.08);
-  --line-strong: rgba(232, 228, 216, 0.14);
-  --line-bold:   rgba(232, 228, 216, 0.30);
-  --divider:     rgba(232, 228, 216, 0.08);
+  /* ---- Lines ---------------------------------------------------- */
+  --line-soft:   rgba(255, 255, 255, 0.04);
+  --line:        rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-bold:   rgba(255, 255, 255, 0.26);
+  --divider:     rgba(255, 255, 255, 0.06);
 
-  /* ---- Text — warm neutral scale -------------------------------- */
-  --text-0: #e8e4d8;               /* dark-text */
-  --text-1: #c8c3b4;
-  --text-2: #a09a8a;               /* stone-400 */
-  --text-3: #8a8578;               /* dark-muted */
-  --text-muted: #6b6558;           /* stone-600 */
-  --text-faint: #4a463e;
+  /* ---- Text ----------------------------------------------------- */
+  --text-0: #f4f4f6;
+  --text-1: #d4d4d9;
+  --text-2: #a1a1aa;
+  --text-3: #8b8b94;
+  --text-muted: #6b6b74;
+  --text-faint: #46464d;
 
-  /* ---- Accents — Vert Noisette primary -------------------------- */
-  --accent:      #6b7c5c;          /* brand */
-  --accent-hi:   #8a9b78;          /* brand-light */
-  --accent-dim:  #5a6b4d;
-  --accent-deep: #4e5c42;          /* brand-dark */
-  --accent-glow: rgba(107, 124, 92, 0.35);
-  --accent-soft: rgba(107, 124, 92, 0.14);
+  /* ---- Accent — vert Claaky ------------------------------------ */
+  --accent:      #4fb477;
+  --accent-hi:   #6fcf94;
+  --accent-dim:  #3f9662;
+  --accent-deep: #2f7a4d;
+  --accent-glow: rgba(79, 180, 119, 0.35);
+  --accent-soft: rgba(79, 180, 119, 0.16);
+  --accent-ink:  #ffffff;        /* text on accent */
 
-  /* second accent — pale hazel for signals */
-  --accent-2:      #d0dac4;        /* hazel-green-200 */
-  --accent-2-soft: rgba(208, 218, 196, 0.14);
+  --accent-2:      #b9e6c9;
+  --accent-2-soft: rgba(185, 230, 201, 0.12);
 
-  /* hover — brighten text to pure text-0 (no hue shift) */
   --hover-shift: var(--text-0);
 
-  /* semantic */
-  --signal: #d0dac4;               /* hazel pale for dirty marker */
-  --danger: #d76b6b;               /* warm rose on dark */
-  --ok:     #8a9b78;               /* brand-light as confirmation */
+  --signal: #f5b93f;
+  --danger: #ff6b6b;
+  --ok:     #4fb477;
 
-  /* timeline (tool) colors — warm-shifted to match palette */
-  --tone-thinking: #c8a982;        /* warm amber */
-  --tone-grep:     #8a9b78;        /* vert noisette light */
-  --tone-read:     #b0bca0;        /* hazel-green pale */
-  --tone-edit:     #d0dac4;        /* hazel pale */
+  --tone-thinking: #f5b93f;
+  --tone-grep:     #5aa9f0;
+  --tone-read:     #8b8cf6;
+  --tone-edit:     #4fb477;
 
-  /* diff */
-  --diff-add-bg: rgba(138, 155, 120, 0.16);
-  --diff-add-fg: #b0bca0;
-  --diff-rem-bg: rgba(215, 107, 107, 0.16);
-  --diff-rem-fg: #e88a8a;
+  --diff-add-bg: rgba(79, 180, 119, 0.16);
+  --diff-add-fg: #8ee0ae;
+  --diff-rem-bg: rgba(255, 107, 107, 0.16);
+  --diff-rem-fg: #ff9a9a;
 
-  /* ---- Typography — Editorial pairing -------------------------- */
-  --font-ui: "DM Sans", ui-sans-serif, system-ui, -apple-system,
-             BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+  /* Blob avatar palette (shared by light & dark). */
+  --blob-blue:   #5fb0ee;
+  --blob-sun:    #f5b93f;
+  --blob-indigo: #5b6cf0;
+  --blob-rose:   #e8608f;
+  --blob-leaf:   #4fb477;
+  --blob-coral:  #f2875a;
+  --blob-lilac:  #a68bf7;
+  --blob-face:   #24325c;
+
+  /* ---- Typography ---------------------------------------------- */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+             ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
              sans-serif;
-  --font-display: "DM Serif Display", "Cormorant Garamond",
-                  "Playfair Display", Georgia, serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                  "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo,
                Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --fs-base: 13px;
-  --fs-sm: 12px;
-  --fs-xs: 11px;
+  --fs-base: 13.5px;
+  --fs-sm: 13px;
+  --fs-xs: 12px;
   --fs-mono: 12px;
   --fs-mono-sm: 11.5px;
 
-  /* radius — Vert Noisette is sharp: 0 or 2px on buttons, slightly
-     softer for cards to stay readable in dense IDE chrome. */
-  --r-micro: 0px;
-  --r-small: 2px;
-  --r-med: 2px;
-  --r-card: 4px;
-  --r-feature: 6px;
-  --r-large: 8px;
+  /* ---- Radius — soft & round ----------------------------------- */
+  --r-micro: 4px;
+  --r-small: 8px;
+  --r-med: 10px;
+  --r-card: 14px;
+  --r-feature: 18px;
+  --r-large: 24px;
   --r-pill: 9999px;
 
-  /* elevation */
+  /* ---- Elevation — diffuse, never harsh ------------------------ */
   --ring-1: 0 0 0 1px var(--line);
   --ring-2: 0 0 0 1px var(--line-strong);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.30), 0 6px 20px rgba(0, 0, 0, 0.25);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06),
+                  0 2px 6px rgba(0, 0, 0, 0.30),
+                  0 12px 32px rgba(0, 0, 0, 0.35);
   --shadow-ambient: 0 0 16px rgba(0, 0, 0, 0.35), 0 0 8px rgba(0, 0, 0, 0.18);
-  --shadow-elevated: 0 32px 72px rgba(0, 0, 0, 0.60),
-                     0 14px 32px rgba(0, 0, 0, 0.40),
+  --shadow-elevated: 0 32px 72px rgba(0, 0, 0, 0.55),
+                     0 14px 32px rgba(0, 0, 0, 0.35),
                      0 0 0 1px var(--line);
-  --shadow-focus: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-focus: 0 0 0 4px var(--accent-soft);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* ----------------------------------------------------------------
-   Light theme — "Vert Noisette" warm light variant.
+   Light theme — default look of the redesign: white, airy, iOS-like.
    Activated via `<html data-theme="light">`.
    ---------------------------------------------------------------- */
 html[data-theme="light"] {
-  /* Surfaces — warm cream scale */
-  --bg-canvas: #faf9f5;          /* warm-white */
-  --bg-0: #faf9f5;
-  --bg-1: #f3f0e8;               /* cream — sidebars, titlebar */
-  --bg-2: #ede9de;               /* cards, panels */
-  --bg-3: #e8e4d8;               /* stone-100 — hover */
-  --bg-4: #dbd6c6;               /* active / selected */
-  --bg-5: #cfcab8;               /* pressed */
-  --bg-hi: #ede9de;
+  --bg-canvas: #ffffff;
+  --bg-0: #ffffff;
+  --bg-1: #f7f7f8;               /* sidebars — barely tinted */
+  --bg-2: #f1f1f3;               /* cards, user bubble */
+  --bg-3: #ebebee;               /* hover */
+  --bg-4: #e3e3e7;               /* active / selected */
+  --bg-5: #d9d9de;               /* pressed */
+  --bg-hi: #f1f1f3;
   --bg-pure: #ffffff;
+  --bg-float: #ffffff;
 
-  /* Editor surface — almost white */
-  --editor-bg: #fdfcf8;
-  --editor-bg-2: #f7f5ec;
-  --editor-bg-3: #f0ecdf;
-  --editor-fg: #1e1c18;
-  --editor-fg-dim: #6b6558;
+  --editor-bg: #ffffff;
+  --editor-bg-2: #f7f7f8;
+  --editor-bg-3: #f1f1f3;
+  --editor-fg: #111114;
+  --editor-fg-dim: #6e6e76;
 
-  /* Lines / borders — stone-900 on light at low alpha */
-  --line-soft:   rgba(30, 28, 24, 0.05);
-  --line:        rgba(30, 28, 24, 0.10);
-  --line-strong: rgba(30, 28, 24, 0.18);
-  --line-bold:   rgba(30, 28, 24, 0.32);
-  --divider:     rgba(30, 28, 24, 0.10);
+  --line-soft:   rgba(17, 17, 20, 0.04);
+  --line:        rgba(17, 17, 20, 0.07);
+  --line-strong: rgba(17, 17, 20, 0.12);
+  --line-bold:   rgba(17, 17, 20, 0.26);
+  --divider:     rgba(17, 17, 20, 0.06);
 
-  /* Text — warm stone scale (dark on light) */
-  --text-0: #1e1c18;             /* stone-900 — body */
-  --text-1: #3a3730;             /* stone-800 */
-  --text-2: #6b6558;             /* stone-600 */
-  --text-3: #a09a8a;             /* stone-400 */
-  --text-muted: #b3ad9c;
-  --text-faint: #cfcab8;
+  --text-0: #111114;
+  --text-1: #2c2c31;
+  --text-2: #6e6e76;
+  --text-3: #9a9aa2;             /* iOS secondary gray */
+  --text-muted: #b4b4bb;
+  --text-faint: #d4d4da;
 
-  /* Accent — same vert noisette, more saturated on light */
-  --accent:      #6b7c5c;
-  --accent-hi:   #4e5c42;        /* brand-dark for hover on light */
-  --accent-dim:  #8a9b78;
-  --accent-deep: #3d4933;
-  --accent-glow: rgba(107, 124, 92, 0.30);
-  --accent-soft: rgba(107, 124, 92, 0.12);
+  --accent:      #2f9e5e;
+  --accent-hi:   #23844c;
+  --accent-dim:  #57b77f;
+  --accent-deep: #1d6b3e;
+  --accent-glow: rgba(47, 158, 94, 0.28);
+  --accent-soft: rgba(47, 158, 94, 0.10);
+  --accent-ink:  #ffffff;
 
-  --accent-2:      #4e5c42;
-  --accent-2-soft: rgba(78, 92, 66, 0.10);
+  --accent-2:      #23844c;
+  --accent-2-soft: rgba(35, 132, 76, 0.08);
 
   --hover-shift: var(--text-0);
 
-  --signal: #4e5c42;
-  --danger: #b14a4a;
-  --ok:     #4e5c42;
+  --signal: #d9930b;
+  --danger: #e5484d;
+  --ok:     #2f9e5e;
 
-  --tone-thinking: #a07246;
-  --tone-grep:     #4e5c42;
-  --tone-read:     #5a6b4d;
-  --tone-edit:     #6b7c5c;
+  --tone-thinking: #c98a0c;
+  --tone-grep:     #2f86d6;
+  --tone-read:     #5b5ee8;
+  --tone-edit:     #2f9e5e;
 
-  --diff-add-bg: rgba(78, 92, 66, 0.14);
-  --diff-add-fg: #3d4933;
-  --diff-rem-bg: rgba(177, 74, 74, 0.14);
-  --diff-rem-fg: #8c3a3a;
+  --diff-add-bg: rgba(47, 158, 94, 0.10);
+  --diff-add-fg: #1d6b3e;
+  --diff-rem-bg: rgba(229, 72, 77, 0.10);
+  --diff-rem-fg: #b42b30;
 
-  /* Light-mode shadows: very subtle, no harsh blacks */
-  --shadow-ambient: 0 0 14px rgba(30, 28, 24, 0.06),
-                    0 0 6px rgba(30, 28, 24, 0.03);
-  --shadow-elevated: 0 24px 56px rgba(30, 28, 24, 0.10),
-                     0 10px 24px rgba(30, 28, 24, 0.06),
+  --shadow-soft: 0 1px 2px rgba(17, 17, 20, 0.04), 0 6px 18px rgba(17, 17, 20, 0.06);
+  --shadow-float: 0 0 0 1px rgba(17, 17, 20, 0.04),
+                  0 2px 6px rgba(17, 17, 20, 0.04),
+                  0 10px 30px rgba(17, 17, 20, 0.08);
+  --shadow-ambient: 0 0 14px rgba(17, 17, 20, 0.06),
+                    0 0 6px rgba(17, 17, 20, 0.03);
+  --shadow-elevated: 0 24px 56px rgba(17, 17, 20, 0.12),
+                     0 10px 24px rgba(17, 17, 20, 0.06),
                      0 0 0 1px var(--line);
-  --shadow-focus: 0 3px 12px rgba(30, 28, 24, 0.10);
+  --shadow-focus: 0 0 0 4px var(--accent-soft);
 }
 
 * {
@@ -250,13 +264,13 @@ textarea {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(232, 233, 236, 0.08);
+  background: var(--line-strong);
   border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: var(--r-pill);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 233, 236, 0.18);
+  background: var(--line-bold);
   background-clip: padding-box;
   border: 2px solid transparent;
 }

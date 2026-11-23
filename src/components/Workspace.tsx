@@ -2246,6 +2246,7 @@ export function Workspace({
           data-tauri-drag-region
           style={{ left: leftWidth, right: rightWidth }}
         >
+          <div className="titlebar__pill">
           <button
             className="titlebar__btn titlebar__btn--remote"
             data-on={remoteActive || remoteStatus?.enabled ? "true" : "false"}
@@ -2256,7 +2257,7 @@ export function Workspace({
             }}
             title="Remote access"
           >
-            <Icon icon="solar:smartphone-2-linear" width={12} height={12} />
+            <Icon icon="solar:smartphone-2-linear" width={14} height={14} />
             Remote
             {remoteStatus?.devices.some((device) => device.connected) && (
               <span className="titlebar__btn-dot" aria-hidden />
@@ -2274,8 +2275,8 @@ export function Workspace({
                   ? "solar:command-bold-duotone"
                   : "solar:command-linear"
               }
-              width={12}
-              height={12}
+              width={14}
+              height={14}
             />
             Terminal
           </button>
@@ -2285,7 +2286,7 @@ export function Workspace({
             onClick={() => openSettings()}
             title="Settings"
           >
-            <Icon icon="solar:settings-linear" width={12} height={12} />
+            <Icon icon="solar:settings-linear" width={14} height={14} />
             Settings
           </button>
           <button
@@ -2293,7 +2294,7 @@ export function Workspace({
             onClick={() => void openCompanionBubble()}
             title="Ouvrir Claaky sur le bureau"
           >
-            <Icon icon="solar:ghost-smile-linear" width={12} height={12} />
+            <Icon icon="solar:ghost-smile-linear" width={14} height={14} />
             Claaky
           </button>
           <button
@@ -2301,7 +2302,7 @@ export function Workspace({
             onClick={onSwitchWorkspace}
             title="Switch workspace"
           >
-            <Icon icon="solar:folder-with-files-linear" width={12} height={12} />
+            <Icon icon="solar:folder-with-files-linear" width={14} height={14} />
             Switch
           </button>
           <button
@@ -2312,10 +2313,11 @@ export function Workspace({
           >
             <Icon
               icon={theme === "dark" ? "solar:sun-linear" : "solar:moon-linear"}
-              width={12}
-              height={12}
+              width={14}
+              height={14}
             />
           </button>
+          </div>
         </div>
         <div className="titlebar__brand" data-tauri-drag-region>
           <span className="titlebar__brand-mark">
