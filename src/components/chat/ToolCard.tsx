@@ -1304,7 +1304,7 @@ export function ToolCard({
   };
 
   const card = (
-    <div className="tool-card">
+    <div className="tool-card" data-status={status} data-tool={canonicalName}>
       <div
         className="tool-card__head"
         data-cleaned={cleaned ? "true" : "false"}

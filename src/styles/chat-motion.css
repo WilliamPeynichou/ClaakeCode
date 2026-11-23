@@ -1,0 +1,639 @@
+/* ------------------------------------------------------------------
+   Claake Code — chat motion layer (design system "Soft").
+   Loaded after soft-ui.css. Only transform / opacity / filter / clip are
+   animated so everything stays on the compositor, and every animation is
+   switched off under prefers-reduced-motion (bottom of the file).
+
+   Hooks used from the markup:
+     .chat-body[data-status][data-phase]     → ChatPane (stream state)
+     .tool-card[data-status][data-tool]      → ToolCard
+     .chat-surface-tabs { --ind-x, --ind-w } → ChatSurfaceTabs (sliding pill)
+     .composer--selector-locked              → a turn is running
+   ------------------------------------------------------------------ */
+
+@property --ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --shimmer-hi: rgba(255, 255, 255, 0.10);
+  --sweep: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+html[data-theme="light"] {
+  --shimmer-hi: rgba(255, 255, 255, 0.85);
+  --sweep: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+/* ================================================================
+   1. Messages — soft entrance
+   Only the latest messages animate: opening a long conversation
+   settles the bottom of the thread instead of replaying everything.
+   ================================================================ */
+.chat-body__content > .msg:nth-last-child(-n + 6) {
+  animation: msg-in 560ms var(--ease-expo) both;
+}
+.chat-body__content > .msg:nth-last-child(2) { animation-delay: 40ms; }
+.chat-body__content > .msg:nth-last-child(1) { animation-delay: 80ms; }
+
+.chat-body__content > .msg[data-role="user"]:nth-last-child(-n + 6) {
+  animation-name: bubble-in;
+  animation-duration: 520ms;
+  animation-timing-function: var(--ease-spring);
+  transform-origin: 100% 100%;
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+@keyframes bubble-in {
+  0% {
+    opacity: 0;
+    transform: translate(10px, 14px) scale(0.9);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* User bubble: tactile hover (it opens "edit from here"). */
+.user-text {
+  transition:
+    background 180ms ease,
+    transform 220ms var(--ease-spring),
+    box-shadow 220ms ease;
+}
+.user-text[data-rewindable="true"]:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+.user-text[data-rewindable="true"]:active {
+  transform: scale(0.985);
+}
+
+/* ================================================================
+   2. Streaming text — breathing dot at the end of the live answer
+   ================================================================ */
+.chat-body[data-phase="responding"]
+  .chat-body__content
+  > .msg[data-role="assistant"]:last-child
+  .msg__body
+  > .md
+  > :is(p, h1, h2, h3, h4, blockquote):last-child::after,
+.chat-body[data-phase="responding"]
+  .chat-body__content
+  > .msg[data-role="assistant"]:last-child
+  .msg__body
+  > .md
+  > :is(ul, ol):last-child
+  > li:last-child::after,
+.chat-body[data-phase="responding"]
+  .chat-body__content
+  > .msg[data-role="assistant"]:last-child
+  .msg__body
+  > .md:empty::after {
+  content: "";
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--text-0);
+  vertical-align: 0.02em;
+  animation: live-dot 1.1s ease-in-out infinite;
+}
+@keyframes live-dot {
+  0%, 100% { transform: scale(0.7); opacity: 0.45; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* ================================================================
+   3. Thinking — theme-aware shimmer + reveal
+   ================================================================ */
+.thinking-block {
+  padding-left: 2px;
+}
+.thinking-block__head {
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--r-pill);
+  transition: background 160ms ease, color 160ms ease;
+}
+.thinking-block__head:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+.thinking-block__caret {
+  transition: transform 280ms var(--ease-spring);
+}
+.thinking-block__caret[data-open="true"] {
+  transform: rotate(90deg);
+}
+.thinking-block__label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.thinking-block__label[data-streaming="true"] {
+  background-image: linear-gradient(
+    105deg,
+    var(--text-3) 0%,
+    var(--text-3) 38%,
+    var(--text-0) 50%,
+    var(--text-3) 62%,
+    var(--text-3) 100%
+  );
+  background-size: 250% 100%;
+  animation: label-shimmer 2.2s linear infinite;
+}
+@keyframes label-shimmer {
+  from { background-position: 125% 0; }
+  to { background-position: -125% 0; }
+}
+.thinking-block__fade {
+  margin-left: 14px;
+  padding-left: 12px;
+  box-shadow: inset 2px 0 0 var(--line-strong);
+  animation: reveal-down 420ms var(--ease-expo) both;
+}
+.thinking-block__text,
+.thinking-block__text .md {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+@keyframes reveal-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ================================================================
+   4. Tool cards — sweep while running, pop when done
+   ================================================================ */
+.tool-card {
+  position: relative;
+  isolation: isolate;
+  transition: box-shadow 220ms ease, background 220ms ease;
+}
+.tool-card:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.tool-card[data-status="running"] {
+  background: var(--bg-0);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.tool-card[data-status="running"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 25%,
+    var(--sweep) 45%,
+    var(--shimmer-hi) 50%,
+    var(--sweep) 55%,
+    transparent 75%
+  );
+  transform: translateX(-100%);
+  animation: card-sweep 1.8s var(--ease-expo) infinite;
+}
+@keyframes card-sweep {
+  to { transform: translateX(100%); }
+}
+.tool-card[data-status="error"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+  animation: nudge 420ms var(--ease-spring);
+}
+@keyframes nudge {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-3px); }
+  60% { transform: translateX(2px); }
+}
+
+.tool-card__head {
+  gap: 10px;
+  min-height: 38px;
+  padding: 7px 12px;
+}
+.tool-card__glyph {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--bg-3);
+  color: var(--text-1);
+  animation: pop-in 460ms var(--ease-spring) both;
+}
+.tool-card[data-status="done"] .tool-card__glyph {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+@keyframes pop-in {
+  from { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.tool-card__spinner,
+.thinking-block .tool-card__spinner,
+.plan-writing-card .tool-card__spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0 3px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  animation: spin 0.75s linear infinite;
+}
+.tool-card__err-dot {
+  animation: pop-in 460ms var(--ease-spring) both;
+}
+.tool-card__title {
+  font-weight: 500;
+  color: var(--text-0);
+}
+.tool-card[data-tool="bash"] .tool-card__title,
+.tool-card[data-tool="bash_input"] .tool-card__title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.tool-card__caret {
+  transition: opacity 160ms ease, transform 300ms var(--ease-spring);
+}
+.tool-card__caret[data-open="true"] {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+.tool-card__body {
+  padding: 4px 12px 12px;
+  animation: reveal-down 380ms var(--ease-expo) both;
+}
+.tool-card__code,
+.tool-card__pre {
+  border-radius: var(--r-med);
+}
+
+/* Inline "Read …" rows. */
+.tool-read-inline {
+  animation: msg-in 420ms var(--ease-expo) both;
+}
+
+/* Turn footer. */
+.turn-duration {
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-pill);
+  background: var(--bg-1);
+  font-size: 12px;
+  animation: msg-in 520ms var(--ease-expo) both;
+}
+
+/* ================================================================
+   5. Markdown polish
+   ================================================================ */
+.md {
+  font-size: 13.5px;
+  line-height: 1.62;
+}
+.md p { margin-bottom: 8px; }
+.md h1, .md h2, .md h3, .md h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.md h1 { font-size: 17px; }
+.md h2 { font-size: 15.5px; }
+.md h3 { font-size: 14px; }
+.md :not(pre) > code {
+  padding: 1.5px 6px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-0);
+  font-size: 12px;
+}
+.md pre {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--bg-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.md a {
+  color: var(--accent);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 260ms var(--ease-expo);
+}
+.md a:hover {
+  background-size: 100% 1px;
+}
+.md blockquote {
+  margin: 8px 0;
+  padding: 2px 0 2px 12px;
+  border: none;
+  box-shadow: inset 3px 0 0 var(--accent-soft);
+  color: var(--text-2);
+}
+.md li::marker {
+  color: var(--text-3);
+}
+
+/* ================================================================
+   6. Chat header — sliding segmented control + live dot
+   ================================================================ */
+.chat-head {
+  position: relative;
+  z-index: 3;
+}
+/* Content scrolls under a soft fade instead of a hard edge. */
+.chat-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 18px;
+  pointer-events: none;
+  background: linear-gradient(var(--bg-0), transparent);
+}
+
+.chat-surface-tabs {
+  position: relative;
+  isolation: isolate;
+}
+.chat-surface-tabs[data-ready="true"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: var(--ind-w, 0);
+  transform: translateX(var(--ind-x, 0));
+  border-radius: var(--r-pill);
+  background: var(--bg-float);
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform 420ms var(--ease-spring),
+    width 420ms var(--ease-spring);
+}
+.chat-surface-tabs[data-ready="true"] .chat-surface-tab[data-active="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+.chat-surface-tab {
+  transition: color 200ms ease;
+}
+.chat-surface-tab svg {
+  transition: transform 300ms var(--ease-spring);
+}
+.chat-surface-tab[data-active="true"] svg {
+  transform: scale(1.08);
+}
+.chat-surface-tab__live {
+  background: var(--accent);
+  animation: ping-dot 1.6s ease-out infinite;
+}
+
+.chat-head__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  transition: background 220ms ease, transform 300ms var(--ease-spring);
+}
+.chat-head__dot[data-status="streaming"] {
+  background: var(--accent);
+  transform: scale(1.1);
+  animation: ping-dot 1.6s ease-out infinite;
+}
+@keyframes ping-dot {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  80%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+/* ================================================================
+   7. Empty chat
+   ================================================================ */
+.chat-empty {
+  margin: auto 0;
+  padding: 56px 20px;
+  gap: 8px;
+  animation: msg-in 700ms var(--ease-expo) both;
+}
+.chat-empty__mark {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--blob-leaf), var(--blob-blue));
+  box-shadow: 0 14px 30px -8px var(--accent-glow);
+  animation: orb-float 5s ease-in-out infinite;
+}
+.chat-empty__mark svg {
+  width: 30px;
+  height: 30px;
+}
+.chat-empty__mark[data-sub-agent="true"] {
+  background: var(--bg-2);
+  box-shadow: none;
+}
+@keyframes orb-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); border-radius: 22px; }
+  50% { transform: translateY(-5px) rotate(-3deg); border-radius: 26px 20px 24px 22px; }
+}
+.chat-empty__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-0);
+}
+.chat-empty__sub {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* ================================================================
+   8. Composer — lift on focus, living ring while the agent works
+   ================================================================ */
+.composer {
+  position: relative;
+}
+.composer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 20px;
+  pointer-events: none;
+  background: linear-gradient(transparent, var(--bg-0));
+}
+.composer__box {
+  transition:
+    box-shadow 260ms var(--ease-expo),
+    transform 320ms var(--ease-spring);
+}
+.composer__box:focus-within {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 0 5px var(--accent-soft),
+    0 16px 40px -12px rgba(17, 17, 20, 0.18);
+}
+.composer__input {
+  caret-color: var(--accent);
+}
+
+/* Agent running → a soft gradient comet orbits the composer. */
+.composer--selector-locked .composer__box::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  z-index: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--ring-angle),
+    transparent 0deg,
+    transparent 200deg,
+    var(--blob-blue) 260deg,
+    var(--accent) 310deg,
+    var(--blob-sun) 345deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ring-spin 2.6s linear infinite;
+}
+@keyframes ring-spin {
+  to { --ring-angle: 360deg; }
+}
+
+.composer__send {
+  transition:
+    background 220ms ease,
+    color 220ms ease,
+    transform 260ms var(--ease-spring),
+    box-shadow 220ms ease;
+}
+.composer__send:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgba(17, 17, 20, 0.35);
+}
+.composer__send:not(:disabled):active {
+  transform: scale(0.92);
+}
+.composer__send[data-variant="stop"] {
+  animation: ping-stop 1.8s ease-out infinite;
+}
+@keyframes ping-stop {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 35%, transparent); }
+  80%, 100% { box-shadow: 0 0 0 8px transparent; }
+}
+.composer__picker-btn,
+.composer__iconbtn {
+  transition: background 160ms ease, color 160ms ease, transform 220ms var(--ease-spring);
+}
+.composer__picker-btn:active,
+.composer__iconbtn:active {
+  transform: scale(0.94);
+}
+
+/* Popovers & mention list spring open from the composer. */
+.composer__popover,
+.mention-popover {
+  transform-origin: 20% 100%;
+  animation: pop-up 300ms var(--ease-spring) both;
+}
+@keyframes pop-up {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.chip {
+  animation: pop-in 380ms var(--ease-spring) both;
+}
+
+/* Planning / waiting indicator. */
+.planning-next-move {
+  animation: msg-in 480ms var(--ease-expo) both;
+}
+
+/* ================================================================
+   Reduced motion: keep the look, drop the movement.
+   ================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .chat-body__content > .msg,
+  .thinking-block__fade,
+  .tool-card,
+  .tool-card__glyph,
+  .tool-card__err-dot,
+  .tool-card__body,
+  .tool-read-inline,
+  .turn-duration,
+  .chat-empty,
+  .chat-empty__mark,
+  .composer__popover,
+  .mention-popover,
+  .chip,
+  .planning-next-move,
+  .composer__send[data-variant="stop"],
+  .chat-head__dot,
+  .chat-surface-tab__live {
+    animation: none !important;
+  }
+  .tool-card[data-status="running"]::after,
+  .composer--selector-locked .composer__box::before {
+    animation: none;
+  }
+  .thinking-block__label[data-streaming="true"] {
+    animation: none;
+    background-position: 50% 0;
+  }
+  .chat-surface-tabs[data-ready="true"]::before,
+  .composer__box,
+  .user-text {
+    transition: none;
+  }
+}

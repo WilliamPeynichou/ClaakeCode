@@ -3324,11 +3324,16 @@ export function ChatPane({
         <span className="chat-head__dot" data-status={displayView.status} />
       </div>
       {belowHead}
-      <div className="chat-body" ref={bodyRef}>
+      <div
+        className="chat-body"
+        ref={bodyRef}
+        data-status={displayView.status}
+        data-phase={displayView.streamPhase}
+      >
         <div className="chat-body__content" ref={bodyContentRef}>
           {displayView.blocks.length === 0 && !showPlanningNextMove ? (
             <div className="chat-empty">
-              <span className="chat-empty__mark">
+              <span className="chat-empty__mark" data-sub-agent={viewingSubAgent ? "true" : undefined}>
                 {viewingSubAgent ? (
                   <span className="tool-card__spinner" />
                 ) : (

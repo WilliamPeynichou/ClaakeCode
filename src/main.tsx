@@ -4,6 +4,7 @@ import App from "./App";
 import { CompanionDesk } from "./components/companion/CompanionDesk";
 import "./styles.css";
 import "./styles/soft-ui.css";
+import "./styles/chat-motion.css";
 import "./lib/customIcons";
 import { api } from "./lib/ipc";
 import { listen } from "@tauri-apps/api/event";

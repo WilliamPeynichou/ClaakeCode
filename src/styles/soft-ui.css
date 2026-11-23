@@ -13,9 +13,13 @@ body,
   text-rendering: optimizeLegibility;
 }
 
-:focus-visible {
+:is(button, a, [role="button"], [role="tab"]):focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
+}
+/* Text fields carry their own focus treatment (e.g. the composer box). */
+:is(input, textarea, [contenteditable="true"]):focus-visible {
+  outline: none;
 }
 
 ::selection {

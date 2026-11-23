@@ -1,5 +1,5 @@
 import { Icon } from "@iconify/react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../../lib/ipc";
 import type { ChatMessage } from "../../types";
 
@@ -21,6 +21,24 @@ export function ChatSurfaceTabs({
   /** Surfaces with a running turn somewhere (dot on the inactive tab). */
   streaming: Record<ChatSurface, boolean>;
 }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  // Sliding pill: measure the active tab and hand its box to CSS
+  // (--ind-x / --ind-w); the indicator then glides with a spring easing.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const place = () => {
+      const active = list.querySelector<HTMLElement>('[data-active="true"]');
+      if (!active) return;
+      list.style.setProperty("--ind-x", `${active.offsetLeft}px`);
+      list.style.setProperty("--ind-w", `${active.offsetWidth}px`);
+      list.dataset.ready = "true";
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [surface]);
   const tab = (id: ChatSurface, label: string, icon: string, hint: string) => (
     <button
       type="button"
@@ -40,7 +58,12 @@ export function ChatSurfaceTabs({
     </button>
   );
   return (
-    <div className="chat-surface-tabs" role="tablist" aria-label="Chat type">
+    <div
+      ref={listRef}
+      className="chat-surface-tabs"
+      role="tablist"
+      aria-label="Chat type"
+    >
       {tab("chat", "Chat", "solar:chat-square-code-bold-duotone", "Agent chat")}
       {tab("rlm", "RLM", "solar:cpu-bolt-bold-duotone", "RLM chat (experimental, Prime Agent): persistent Python, isolated worktree")}
     </div>
