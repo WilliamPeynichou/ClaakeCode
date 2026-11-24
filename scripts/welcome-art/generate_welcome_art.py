@@ -37,8 +37,8 @@ SCALE = 5                    # hi-res painting scale
 W, H = CELLS_W * SCALE, CELLS_H * SCALE
 
 # Claaky stands on the path, mid-distance (feet position, height in px).
-CLAAKY_FEET = (CELLS_W * SCALE * 0.535, CELLS_H * SCALE * 0.865)
-CLAAKY_H = CELLS_H * SCALE * 0.27
+CLAAKY_FEET = (CELLS_W * SCALE * 0.55, CELLS_H * SCALE * 0.84)
+CLAAKY_H = CELLS_H * SCALE * 0.245
 
 rng = random.Random(7)
 nrng = np.random.default_rng(7)
@@ -528,11 +528,20 @@ def paint_front():
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     fx, fy = CLAAKY_FEET
-    for _ in range(420):  # tufts hiding Claaky's feet in the grass
-        x = fx + rng.gauss(0, X(0.06))
-        y = fy + rng.uniform(-Y(0.004), Y(0.02))
-        h = rng.uniform(7, 18)
-        d.line((x, y, x + rng.uniform(-4, 4), y - h), fill=autumn_color(rng.uniform(0.25, 0.9)) + (255,), width=2)
+    # Tall autumn grass growing in front of Claaky: hides his feet and legs.
+    for _ in range(900):
+        x = fx + rng.gauss(0, X(0.075))
+        y = fy + rng.uniform(-Y(0.002), Y(0.03))
+        near = 1 - min(1, abs(x - fx) / X(0.12))
+        h = rng.uniform(8, 16) + near * rng.uniform(10, 34)
+        lean = rng.uniform(-7, 7)
+        col = autumn_color(rng.uniform(0.25, 0.95))
+        d.line((x, y, x + lean * 0.5, y - h * 0.6, x + lean, y - h), fill=col + (255,), width=2, joint="curve")
+        if rng.random() < 0.07:  # seed heads
+            r = rng.uniform(1.6, 2.6)
+            d.ellipse((x + lean - r, y - h - r, x + lean + r, y - h + r), fill=rng.choice(AUTUMN_SPARK) + (255,))
+    # A low bush overlapping Claaky's side, between him and the viewer.
+    canopy(d, fx - X(0.115), fy + Y(0.012), X(0.075), Y(0.04), 520, 3, 6)
     return img
 
 
@@ -559,9 +568,42 @@ def claaky_sprite() -> Image.Image:
     rgb = rgb + rim[..., None] * np.array([90, 60, 20], float)
     ao = (1 - smoothstep(0.9, 1.0, ny) * 0.35)[..., None]
     rgb = rgb * ao
-    rgb = rgb * 0.96 + np.array(hex_rgb("#c27424"), float) * 0.04  # share the scene's air
+    rgb = rgb * 0.94 + np.array(hex_rgb("#c27424"), float) * 0.06  # share the scene's air
+    # Volume: darker towards the silhouette (a rounded body, not a flat decal).
+    dist = ndimage.distance_transform_edt(alpha > 0.5)
+    roundness = np.clip(dist / (0.16 * w), 0, 1)
+    rgb = rgb * (0.80 + 0.20 * np.sqrt(roundness))[..., None]
+    rgb = rgb * 0.96  # not the brightest thing in the landscape
     arr[..., :3] = np.clip(rgb, 0, 255)
-    return Image.fromarray(arr.astype(np.uint8), "RGBA")
+    return painterize(Image.fromarray(arr.astype(np.uint8), "RGBA"))
+
+
+def painterize(sprite: Image.Image) -> Image.Image:
+    """Repaint the sprite with the same leaf-dab brushwork as the scene, so
+    Claaky shares the landscape's texture. Dabs spill slightly over the
+    silhouette (organic edge); a faint pass of the original keeps the face."""
+    arr = np.array(sprite)
+    a = arr[..., 3]
+    ys, xs = np.nonzero(a > 140)
+    r_ = np.random.default_rng(5)
+    pick = r_.choice(len(xs), size=len(xs) // 3, replace=True)
+    dabs = []
+    for i in pick:
+        x, y = int(xs[i]), int(ys[i])
+        c = arr[y, x, :3].astype(float) * (1 + r_.normal(0, 0.05))
+        c = c + r_.normal(0, 6, 3)
+        dabs.append((float(c.mean()), x + r_.normal(0, 0.8), y + r_.normal(0, 0.8), c))
+    dabs.sort(key=lambda d: d[0])
+    out = Image.new("RGBA", sprite.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(out)
+    for _, x, y, c in dabs:
+        rad = r_.uniform(1.3, 2.3)
+        col = tuple(int(v) for v in np.clip(c, 0, 255))
+        d.ellipse((x - rad, y - rad, x + rad, y + rad), fill=col + (255,))
+    ghost = np.array(sprite).astype(float)
+    ghost[..., 3] *= 0.55
+    out.alpha_composite(Image.fromarray(ghost.astype(np.uint8), "RGBA"))
+    return out
 
 
 def bake_claaky_frames(back_hi: Image.Image, sky: Image.Image):
