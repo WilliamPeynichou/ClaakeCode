@@ -22,6 +22,11 @@ type Props = {
 };
 
 const MAX_VISIBLE_RECENTS = 5;
+
+/// "/Users/william/Scrum/app" → "~/Scrum/app" (also /home/x and C:\Users\x).
+function shortPath(path: string): string {
+  return path.replace(/^(\/Users\/[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/, "~");
+}
 const REPO_URL = "https://github.com/WilliamPeynichou/ClaakeCode";
 const SITE_URL = "https://claakecode-web.vercel.app/whats-new";
 const IS_WINDOWS = isWindowsPlatform();
@@ -168,11 +173,6 @@ export function Welcome({ onPick, error, deriveName }: Props) {
             Workspaces
           </p>
           <h1 className="welcome__title">Open a workspace</h1>
-          <p className="welcome__lead">
-            Pick up a recent project or open any folder.
-            <br />
-            Claaky indexes it and gets your agents ready to work.
-          </p>
 
           {error && <div className="welcome__error">{error}</div>}
 
@@ -198,7 +198,9 @@ export function Welcome({ onPick, error, deriveName }: Props) {
                         />
                       )}
                     </span>
-                    <span className="welcome__field-value">{recent.path}</span>
+                    <span className="welcome__field-value" title={recent.path}>
+                      {shortPath(recent.path)}
+                    </span>
                     <span className="welcome__field-meta">
                       {isActive ? "agent actif" : shortRelativeTime(recent.lastOpenedMs)}
                       <Icon icon="solar:arrow-right-linear" width={14} height={14} />
@@ -229,10 +231,6 @@ export function Welcome({ onPick, error, deriveName }: Props) {
               </button>
             )}
           </div>
-          <p className="welcome__note">
-            <Icon icon="solar:info-circle-linear" width={16} height={16} />
-            Recent workspaces are kept on this device only.
-          </p>
         </main>
       </section>
 

@@ -3,25 +3,28 @@ import skyUrl from "../assets/welcome/sky.png";
 import backUrl from "../assets/welcome/back.png";
 import claakyUrl from "../assets/welcome/claaky.png";
 import frontUrl from "../assets/welcome/front.png";
+import waterUrl from "../assets/welcome/water.png";
 
 /**
- * WelcomeArt — the pixel-mosaic panel of the Welcome screen: Claaky in an
- * autumn forest, drawn like an LED screen (one art pixel = one cell, with a
+ * WelcomeArt — the pixel-mosaic panel of the Welcome screen: Claaky by an
+ * autumn alpine lake (snowy peaks, larch forest, framing trees), drawn like an LED screen (one art pixel = one cell, with a
  * thin light grid between cells).
  *
- * Art layers are 128×160 PNGs baked by scripts/welcome-art/generate_welcome_art.py.
+ * Art layers are 144×180 PNGs baked by scripts/welcome-art/generate_welcome_art.py.
  * Each frame is composed on a tiny offscreen canvas (one pixel per cell), then
  * scaled up with nearest-neighbour and covered by a grid pattern. That's two
  * draw calls per frame, so the motion stays cheap:
  *   - dithered reveal when the screen opens (Bayer order, top → bottom)
  *   - clouds drifting one cell at a time
  *   - Claaky bobbing by one cell
+ *   - sun glints sparkling on the lake (water.png mask)
  *   - autumn leaves falling across the scene (click = gust of leaves)
  * Everything stops on the first full frame under prefers-reduced-motion.
  */
 
-const CW = 128;
-const CH = 160;
+const CW = 144;
+const CH = 180;
+const GLINT_MS = 420;
 const FPS = 24;
 const REVEAL_MS = 1100;
 
@@ -120,7 +123,9 @@ export function WelcomeArt({ className }: { className?: string }) {
     const frame = lowCtx ? lowCtx.createImageData(CW, CH) : null;
     const threshold = bayer8();
 
-    const leaves: Leaf[] = Array.from({ length: 16 }, () => ambientLeaf(Math.random, true));
+    const leaves: Leaf[] = Array.from({ length: 18 }, () => ambientLeaf(Math.random, true));
+    let waterCells: number[] = [];
+    const glints: Array<{ i: number; born: number }> = [];
 
     // Canvas geometry (device pixels).
     let cell = 1;
@@ -214,6 +219,22 @@ export function WelcomeArt({ className }: { className?: string }) {
         }
       }
 
+      // Sun glints on the lake: a few water cells flare and fade.
+      if (reveal >= 1) {
+        for (let k = glints.length - 1; k >= 0; k -= 1) {
+          const age = (now - glints[k].born) / GLINT_MS;
+          if (age >= 1) {
+            glints.splice(k, 1);
+            continue;
+          }
+          const o = glints[k].i * 4;
+          const boost = Math.sin(age * Math.PI) * 150;
+          out[o] = Math.min(255, out[o] + boost);
+          out[o + 1] = Math.min(255, out[o + 1] + boost);
+          out[o + 2] = Math.min(255, out[o + 2] + boost * 0.9);
+        }
+      }
+
       if (reveal >= 0.6) {
         for (const leaf of leaves) {
           const lx = Math.round(leaf.x);
@@ -251,6 +272,9 @@ export function WelcomeArt({ className }: { className?: string }) {
       if (now - last < 1000 / FPS) return;
       const dt = Math.min(0.1, (now - (last || now)) / 1000);
       last = now;
+      if (waterCells.length && glints.length < 14 && Math.random() < 0.6) {
+        glints.push({ i: waterCells[Math.floor(Math.random() * waterCells.length)], born: now });
+      }
       for (let i = leaves.length - 1; i >= 0; i -= 1) {
         const leaf = leaves[i];
         leaf.phase += dt * 2.4;
@@ -292,10 +316,13 @@ export function WelcomeArt({ className }: { className?: string }) {
     const observer = new ResizeObserver(resize);
     canvas.addEventListener("pointerdown", onPointerDown);
 
-    void Promise.all([skyUrl, backUrl, claakyUrl, frontUrl].map(loadPixels))
+    void Promise.all([skyUrl, backUrl, claakyUrl, frontUrl, waterUrl].map(loadPixels))
       .then((loaded) => {
         if (disposed) return;
-        layers = loaded;
+        const water = loaded[4];
+        waterCells = [];
+        for (let i = 0; i < CW * CH; i += 1) if (water.data[i * 4] > 127) waterCells.push(i);
+        layers = loaded.slice(0, 4);
         start = performance.now();
         observer.observe(host);
         resize();
