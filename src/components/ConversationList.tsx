@@ -68,7 +68,7 @@ export function ConversationList({
               onClick={() => !isEditing && onSelect(conv.id)}
             >
               <span className="conv-row__avatar">
-                <BlobAvatar seed={conv.id} size={34} />
+                <BlobAvatar seed={conv.id} size={26} />
                 {isStreaming && (
                   <span className="conv-row__spinner" aria-label="Streaming" />
                 )}

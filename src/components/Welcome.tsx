@@ -10,8 +10,9 @@ import type {
   RecentWorkspace,
 } from "../types";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
-import { BlobAvatar, shortRelativeTime } from "./BlobAvatar";
+import { shortRelativeTime } from "./BlobAvatar";
 import { Claaky } from "./claaky/Claaky";
+import { WelcomeArt } from "./WelcomeArt";
 import { useTheme } from "../lib/theme";
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
 };
 
 const MAX_VISIBLE_RECENTS = 5;
+const REPO_URL = "https://github.com/WilliamPeynichou/ClaakeCode";
+const SITE_URL = "https://claakecode-web.vercel.app/whats-new";
 const IS_WINDOWS = isWindowsPlatform();
 
 /// Collapse a list of `ActiveTurnSummary` items down to the set of workspace
@@ -109,98 +112,133 @@ export function Welcome({ onPick, error, deriveName }: Props) {
           <WindowControls />
         </div>
       )}
-      <div className="welcome__float" data-windows={IS_WINDOWS ? "true" : undefined}>
-        <button
-          type="button"
-          className="welcome__float-btn"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          aria-label="Toggle theme"
-        >
-          <Icon
-            icon={theme === "dark" ? "solar:sun-2-linear" : "solar:moon-linear"}
-            width={20}
-            height={20}
-          />
-        </button>
-        <button
-          type="button"
-          className="welcome__float-btn"
-          onClick={pickFolder}
-          disabled={picking}
-          title="Open a folder"
-          aria-label="Open a folder"
-        >
-          <Icon icon="solar:add-circle-linear" width={22} height={22} />
-        </button>
-      </div>
-
-      <main className="welcome__stage">
-        <header className="welcome__head">
-          <span className="welcome__hero">
-            <Claaky size={104} state="idle" decorative />
+      <section className="welcome__pane">
+        <header className="welcome__top" data-tauri-drag-region>
+          <span className="welcome__logo" aria-label="Claake Code">
+            <Claaky size={34} state="idle" decorative />
+            <span className="welcome__logo-name">Claake Code</span>
           </span>
-          <h1 className="welcome__title">Claake Code</h1>
-          <p className="welcome__tag">Your personal Agentic IDE</p>
-          <button
-            className="welcome__cta"
-            onClick={pickFolder}
-            disabled={picking}
-          >
-            <Icon icon="solar:folder-open-bold" width={16} height={16} />
-            <span>{picking ? "Opening…" : "Open a folder"}</span>
-          </button>
+          <nav className="welcome__nav">
+            <button
+              type="button"
+              className="welcome__icon-btn"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              <Icon
+                icon={theme === "dark" ? "solar:sun-2-linear" : "solar:moon-linear"}
+                width={16}
+                height={16}
+              />
+            </button>
+            <button
+              type="button"
+              className="welcome__icon-btn"
+              onClick={() => void api.openExternalUrl(REPO_URL).catch(() => {})}
+              title="Claake Code on GitHub"
+              aria-label="Claake Code on GitHub"
+            >
+              <Icon icon="local:github" width={16} height={16} />
+            </button>
+            <button
+              type="button"
+              className="welcome__icon-btn"
+              onClick={() => void api.openExternalUrl(SITE_URL).catch(() => {})}
+              title="What's new"
+              aria-label="What's new"
+            >
+              <Icon icon="solar:stars-linear" width={16} height={16} />
+            </button>
+            <button
+              type="button"
+              className="welcome__outline-btn"
+              onClick={pickFolder}
+              disabled={picking}
+            >
+              Open a folder
+            </button>
+          </nav>
         </header>
 
-        {error && (
-          <div className="welcome__error">{error}</div>
-        )}
+        <main className="welcome__content">
+          <p className="welcome__crumb">
+            {String(recents.length).padStart(2, "0")}
+            <span aria-hidden="true">/</span>
+            Workspaces
+          </p>
+          <h1 className="welcome__title">Open a workspace</h1>
+          <p className="welcome__lead">
+            Pick up a recent project or open any folder.
+            <br />
+            Claaky indexes it and gets your agents ready to work.
+          </p>
 
-        {recents.length > 0 ? (
-          <section className="welcome__section">
-            <h2 className="welcome__section-heading">Recent</h2>
-            <div className="welcome__recents">
+          {error && <div className="welcome__error">{error}</div>}
+
+          {recents.length > 0 && (
+            <div className="welcome__fields">
               {recents.slice(0, MAX_VISIBLE_RECENTS).map((recent) => {
                 const isActive = activeWorkspaces.has(recent.path);
                 return (
                   <button
                     key={recent.path}
-                    className="welcome__recent"
+                    type="button"
+                    className="welcome__field"
                     data-active={isActive ? "true" : "false"}
                     onClick={() => onPick(recent.path)}
                   >
-                    <span className="welcome__recent-icon">
-                      <BlobAvatar seed={recent.path} size={46} />
+                    <span className="welcome__field-label">
+                      {recent.name || deriveName(recent.path)}
                       {isActive && (
                         <span
-                          className="welcome__recent-spinner"
+                          className="welcome__field-live"
                           role="status"
                           aria-label="Agent running"
                         />
                       )}
                     </span>
-                    <span className="welcome__recent-body">
-                      <span className="welcome__recent-line">
-                        <span className="welcome__recent-name">
-                          {recent.name || deriveName(recent.path)}
-                        </span>
-                        <span className="welcome__recent-time">
-                          {isActive ? "agent actif" : shortRelativeTime(recent.lastOpenedMs)}
-                        </span>
-                      </span>
-                      <span className="welcome__recent-path">{recent.path}</span>
+                    <span className="welcome__field-value">{recent.path}</span>
+                    <span className="welcome__field-meta">
+                      {isActive ? "agent actif" : shortRelativeTime(recent.lastOpenedMs)}
+                      <Icon icon="solar:arrow-right-linear" width={14} height={14} />
                     </span>
                   </button>
                 );
               })}
             </div>
-          </section>
-        ) : (
-          <div className="welcome__empty">
-            No recent workspaces yet. Pick a folder to get started.
+          )}
+
+          <div className="welcome__actions">
+            {recents.length > 0 ? (
+              <button
+                type="button"
+                className="welcome__cta"
+                onClick={() => onPick(recents[0].path)}
+              >
+                Reopen {recents[0].name || deriveName(recents[0].path)}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="welcome__cta"
+                onClick={pickFolder}
+                disabled={picking}
+              >
+                {picking ? "Opening…" : "Open a folder"}
+              </button>
+            )}
           </div>
-        )}
-      </main>
+          <p className="welcome__note">
+            <Icon icon="solar:info-circle-linear" width={16} height={16} />
+            Recent workspaces are kept on this device only.
+          </p>
+        </main>
+      </section>
+
+      <aside className="welcome__art" aria-hidden="true">
+        <WelcomeArt />
+      </aside>
     </div>
   );
 }
