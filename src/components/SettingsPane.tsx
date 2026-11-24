@@ -2637,7 +2637,7 @@ function AboutSection() {
     <div className="settings-pane__body settings-pane__body--about">
       <div className="settings-pane__about-hero">
         <span className="settings-pane__about-mark" aria-hidden>
-          <ClaakeCodeMark size={26} />
+          <ClaakeCodeMark size={34} decorative />
         </span>
         <div className="settings-pane__about-title">
           <h1>Claake Code</h1>

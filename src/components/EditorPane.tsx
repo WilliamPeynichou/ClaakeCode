@@ -17,6 +17,7 @@ import { Markdown } from "./chat/Markdown";
 import type { EditorRevealTarget, EditorTab } from "../types";
 import { ImageContextMenu } from "./ImageContextMenu";
 import { ClaakyEmpty } from "./claaky/ClaakyEmpty";
+import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { useClaakyEnabled } from "./claaky/useClaakyEnabled";
 
 if (!(globalThis as typeof globalThis & { MonacoEnvironment?: unknown }).MonacoEnvironment) {
@@ -432,8 +433,8 @@ export function EditorPane({
               <ClaakyEmpty />
             ) : (
               <div className="editor-empty">
-                <span className="editor-empty__mark">
-                  <Icon icon="solar:document-text-linear" width={18} height={18} />
+                <span className="brand-tile" aria-hidden="true">
+                  <ClaakeCodeMark size={56} decorative />
                 </span>
                 <span className="editor-empty__title">Nothing open</span>
                 <span className="editor-empty__sub">

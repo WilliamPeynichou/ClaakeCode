@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ClaakeCodeMark } from "./components/ClaakeCodeMark";
 import { NewModelsPopup } from "./components/NewModelsPopup";
 import { Welcome } from "./components/Welcome";
 import { Workspace } from "./components/Workspace";
@@ -152,7 +153,11 @@ export default function App() {
     // Minimal splash while the updater check resolves. Pure canvas — the
     // real updater UI (or Welcome) takes over within a few hundred ms on
     // a healthy network, ~4s worst case before the timeout fires.
-    return <div className="app-boot" aria-hidden="true" />;
+    return (
+      <div className="app-boot" aria-hidden="true">
+        <ClaakeCodeMark size={44} decorative className="app-boot__mark" />
+      </div>
+    );
   }
 
   if (state.kind === "update_required") {

@@ -236,14 +236,14 @@ html[data-theme="light"] {
 }
 
 .tool-card__head {
-  gap: 10px;
-  min-height: 36px;
-  padding: 6px 12px;
+  gap: 9px;
+  min-height: 30px;
+  padding: 5px 10px;
 }
 .tool-card__glyph {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -318,7 +318,7 @@ html[data-theme="light"] {
    5. Markdown polish
    ================================================================ */
 .md {
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.55;
 }
 .md p { margin-bottom: 10px; }
@@ -479,7 +479,7 @@ html[data-theme="light"] {
 }
 .chat-empty__title {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--text-0);

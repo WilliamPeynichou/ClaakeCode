@@ -75,7 +75,7 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .welcome__logo-name {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text-0);
@@ -88,22 +88,22 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .welcome__icon-btn,
 .welcome__outline-btn {
-  height: 32px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1.5px solid var(--text-0);
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-0);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
   transition: background 160ms ease, color 160ms ease, transform 120ms ease;
 }
 .welcome__icon-btn {
-  width: 32px;
+  width: 28px;
 }
 .welcome__outline-btn {
   padding: 0 12px;
@@ -144,7 +144,7 @@ html:not([data-theme="light"]) .blob-avatar {
 .welcome__title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(38px, 4.4vw, 54px);
+  font-size: clamp(34px, 3.8vw, 46px);
   font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.045em;
@@ -173,6 +173,7 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .welcome__field {
   display: grid;
+  min-height: 0;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "label meta"
@@ -181,7 +182,7 @@ html:not([data-theme="light"]) .blob-avatar {
   column-gap: 16px;
   row-gap: 4px;
   width: 100%;
-  padding: 12px 0 10px;
+  padding: 10px 0 8px;
   border-bottom: 1px solid var(--line-strong);
   background: transparent;
   text-align: left;
@@ -196,7 +197,7 @@ html:not([data-theme="light"]) .blob-avatar {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-0);
 }
@@ -206,7 +207,7 @@ html:not([data-theme="light"]) .blob-avatar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-3);
   transition: color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -252,12 +253,12 @@ html:not([data-theme="light"]) .blob-avatar {
   align-items: center;
   width: auto;
   margin: 0;
-  height: 42px;
-  padding: 0 22px;
+  height: 36px;
+  padding: 0 18px;
   border-radius: 8px;
   background: var(--text-0);
   color: var(--bg-1);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
   transition: transform 140ms ease, opacity 140ms ease, box-shadow 180ms ease;
@@ -341,20 +342,20 @@ html:not([data-theme="light"]) .blob-avatar {
   -webkit-app-region: no-drag;
 }
 .titlebar__btn {
-  height: 27px;
-  padding: 0 12px;
-  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  gap: 5px;
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--text-2);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   transition: color 140ms ease, background 140ms ease, transform 100ms ease;
 }
 .titlebar__btn:last-child {
-  width: 27px;
+  width: 24px;
   padding: 0;
   justify-content: center;
 }
@@ -433,17 +434,14 @@ html:not([data-theme="light"]) .blob-avatar {
 .sidebar__head-title {
   gap: 8px;
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text-0);
 }
-.sidebar__head-title svg {
-  color: var(--accent);
-}
 .sidebar__head-btn {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--r-pill);
   color: var(--text-2);
   transition: background 140ms ease, color 140ms ease;
@@ -460,11 +458,11 @@ html:not([data-theme="light"]) .blob-avatar {
 
 /* File tree */
 .tree-row {
-  height: 27px;
+  height: 24px;
   padding: 0 8px;
-  gap: 8px;
-  border-radius: 7px;
-  font-size: 12.5px;
+  gap: 7px;
+  border-radius: 6px;
+  font-size: 12px;
   color: var(--text-1);
 }
 .tree-row:hover {
@@ -498,11 +496,11 @@ html:not([data-theme="light"]) .blob-avatar {
   background: var(--bg-3);
 }
 .sidebar-tab {
-  height: 26px;
-  padding: 0 13px;
+  height: 22px;
+  padding: 0 11px;
   border-radius: var(--r-pill);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-2);
   transition: background 160ms var(--ease-out), color 140ms ease, box-shadow 160ms ease;
@@ -525,10 +523,10 @@ html:not([data-theme="light"]) .blob-avatar {
   position: relative;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  padding: 7px 10px;
-  border-radius: var(--r-card);
+  gap: 10px;
+  min-height: 40px;
+  padding: 5px 8px;
+  border-radius: var(--r-med);
   transition: background 160ms var(--ease-out);
 }
 .conv-row:hover {
@@ -540,8 +538,8 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .conv-row__avatar {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -575,7 +573,7 @@ html:not([data-theme="light"]) .blob-avatar {
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--font-display);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-0);
@@ -591,7 +589,7 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .conv-row__time {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-3);
   transition: opacity 120ms ease;
 }
@@ -603,7 +601,7 @@ html:not([data-theme="light"]) .blob-avatar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-3);
 }
 .conv-row__actions {
@@ -626,8 +624,8 @@ html:not([data-theme="light"]) .blob-avatar {
   opacity: 0;
 }
 .conv-row__btn {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--r-pill);
 }
 .conv-row__btn:hover {
@@ -647,10 +645,10 @@ html:not([data-theme="light"]) .blob-avatar {
   box-shadow: inset 0 -1px 0 var(--divider);
 }
 .tab {
-  height: 30px;
-  padding: 0 10px 0 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border-radius: 7px;
+  font-size: 12px;
   color: var(--text-2);
 }
 .tab:hover {
@@ -669,13 +667,13 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .editor-empty__title {
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--text-0);
 }
 .editor-empty__sub {
-  font-size: 14px;
+  font-size: 12.5px;
   color: var(--text-3);
 }
 .claaky-empty__actions {
@@ -683,13 +681,13 @@ html:not([data-theme="light"]) .blob-avatar {
   margin-top: 6px;
 }
 .claaky-empty__btn {
-  height: 34px;
-  padding: 0 16px;
+  height: 30px;
+  padding: 0 14px;
   border: none;
   border-radius: var(--r-pill);
   background: var(--bg-float);
   color: var(--text-0);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   box-shadow: var(--shadow-float);
   transition: transform 140ms var(--ease-out), box-shadow 160ms ease;
@@ -724,11 +722,11 @@ html:not([data-theme="light"]) .blob-avatar {
   background: var(--bg-2);
 }
 .chat-surface-tab {
-  height: 26px;
-  padding: 0 13px;
+  height: 22px;
+  padding: 0 11px;
   border-radius: var(--r-pill);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-2);
 }
@@ -752,7 +750,7 @@ html:not([data-theme="light"]) .blob-avatar {
   gap: 18px;
 }
 .msg__body {
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.55;
 }
 
@@ -762,10 +760,10 @@ html:not([data-theme="light"]) .blob-avatar {
 }
 .user-text {
   max-width: 86%;
-  padding: 9px 14px;
-  border-radius: 16px 16px 5px 16px;
+  padding: 7px 12px;
+  border-radius: 14px 14px 4px 14px;
   background: var(--bg-2);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 .user-text[data-rewindable="true"]:hover,
@@ -806,7 +804,7 @@ html[data-theme="light"] .rlm-banner {
   padding: 10px 16px 16px;
 }
 .composer__box {
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--bg-float);
   box-shadow: var(--shadow-float);
   transition: box-shadow 180ms var(--ease-out);
@@ -816,8 +814,8 @@ html[data-theme="light"] .rlm-banner {
   box-shadow: var(--shadow-float), 0 0 0 4px var(--accent-soft);
 }
 .composer__input {
-  padding: 12px 14px 4px;
-  font-size: 13px;
+  padding: 10px 12px 2px;
+  font-size: 12.5px;
 }
 .composer__actions {
   padding: 4px 8px 8px 8px;
@@ -828,25 +826,25 @@ html[data-theme="light"] .rlm-banner {
   border-radius: var(--r-pill);
 }
 .composer__picker-btn {
-  height: 26px;
+  height: 24px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .composer__iconbtn {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 .composer__picker-btn:hover,
 .composer__iconbtn:hover {
   background: var(--bg-2);
 }
 .composer__send {
-  height: 26px;
-  padding: 0 12px;
+  height: 24px;
+  padding: 0 11px;
   border-radius: var(--r-pill);
   background: var(--text-0);
   color: var(--bg-0);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 .composer__send:hover {
@@ -878,11 +876,11 @@ html[data-theme="light"] .rlm-banner {
   background: var(--bg-1);
 }
 .settings-pane__nav-item {
-  height: 32px;
-  padding: 0 12px;
-  gap: 10px;
+  height: 28px;
+  padding: 0 10px;
+  gap: 9px;
   border-radius: 7px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-1);
   transition: background 140ms ease, color 140ms ease, box-shadow 160ms ease;
 }
@@ -914,7 +912,7 @@ html[data-theme="light"] .rlm-banner {
   border-radius: var(--r-pill);
 }
 .settings-pane {
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 190px 1fr;
 }
 .settings-pane__nav-item--embedding {
   border: none;
@@ -931,4 +929,54 @@ html[data-theme="light"] .rlm-banner {
 /* Leave room for the floating rename/delete pill on hover. */
 .conv-row:hover .conv-row__line {
   padding-right: 58px;
+}
+
+/* ================================================================
+   Brand mark — the logo represents the product everywhere except
+   the chat (where Claaky lives).
+   ================================================================ */
+:root { --logo: #5fbf86; }
+html[data-theme="light"] { --logo: #216647; }
+/* Doubled class: beats older "container svg { color }" rules. */
+svg.cc-mark.cc-mark {
+  display: block;
+  flex: 0 0 auto;
+  color: var(--logo);
+}
+.brand-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 14px;
+  border-radius: 26px;
+  background: var(--bg-float);
+  box-shadow: var(--shadow-float);
+  animation: brand-breathe 6s ease-in-out infinite;
+}
+@keyframes brand-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.app-boot {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  background: var(--bg-1);
+}
+.app-boot__mark {
+  animation: boot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes boot-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.settings-pane__about-mark {
+  background: transparent;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-tile,
+  .app-boot__mark { animation: none; }
 }

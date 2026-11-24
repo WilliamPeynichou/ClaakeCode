@@ -2321,7 +2321,7 @@ export function Workspace({
         </div>
         <div className="titlebar__brand" data-tauri-drag-region>
           <span className="titlebar__brand-mark">
-            <ClaakeCodeMark size={20} />
+            <ClaakeCodeMark size={16} decorative />
           </span>
           <span className="titlebar__brand-name">Claake Code</span>
         </div>
@@ -2343,7 +2343,7 @@ export function Workspace({
           >
             <div className="sidebar__head">
               <span className="sidebar__head-title">
-                <Icon icon="solar:folder-bold-duotone" width={16} height={16} />
+                <ClaakeCodeMark size={15} decorative />
                 <span>{bootstrap.workspace.name}</span>
               </span>
               <span className="sidebar__head-actions">

@@ -11,7 +11,7 @@ import type {
 } from "../types";
 import { WindowControls, isWindowsPlatform } from "./WindowControls";
 import { shortRelativeTime } from "./BlobAvatar";
-import { Claaky } from "./claaky/Claaky";
+import { ClaakeCodeMark } from "./ClaakeCodeMark";
 import { WelcomeArt } from "./WelcomeArt";
 import { useTheme } from "../lib/theme";
 
@@ -120,7 +120,7 @@ export function Welcome({ onPick, error, deriveName }: Props) {
       <section className="welcome__pane">
         <header className="welcome__top" data-tauri-drag-region>
           <span className="welcome__logo" aria-label="Claake Code">
-            <Claaky size={34} state="idle" decorative />
+            <ClaakeCodeMark size={26} decorative />
             <span className="welcome__logo-name">Claake Code</span>
           </span>
           <nav className="welcome__nav">
