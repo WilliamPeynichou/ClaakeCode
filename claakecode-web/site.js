@@ -166,7 +166,7 @@ addEventListener('load', () => { jumpTo(current); renderScene(); }, { once: true
 if (!reduced.matches) {
   viewport.classList.add('scene-arrival');
   viewport.addEventListener('animationend', event => {
-    if (event.animationName === 'arrival-rule') viewport.classList.remove('scene-arrival');
+    if (event.animationName === 'arrival-ring') viewport.classList.remove('scene-arrival');
   });
 }
 applyHash();
