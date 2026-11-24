@@ -813,7 +813,10 @@ html[data-theme="light"] .rlm-banner {
   background: var(--bg-float);
   box-shadow: var(--shadow-float), 0 0 0 4px var(--accent-soft);
 }
-.composer__input {
+/* The overlay draws the visible text under the transparent textarea:
+   both must share padding and font metrics or the caret drifts. */
+.composer__input,
+.composer__overlay {
   padding: 10px 12px 2px;
   font-size: 12.5px;
 }

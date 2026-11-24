@@ -94,6 +94,7 @@ const APP_ZOOM_STEP = 0.1;
 const TERMINAL_OPEN_EVENT = "terminal-open-requested";
 const CLOSE_ACTIVE_TAB_EVENT = "editor-close-active-tab-requested";
 const SEND_BUSY_RETRY_DELAYS_MS = [160, 320, 640, 1000, 1400];
+const AUTOSAVE_DELAY_MS = 1000;
 const COMPACTION_CONTINUATION_PROMPT =
   "Continue from the compacted context. Do not repeat completed work. Pick up exactly where you left off and proceed with the next useful step.";
 const GOAL_COMPACTION_CONTINUATION_PROMPT =
@@ -745,6 +746,13 @@ export function Workspace({
   const closeTab = useCallback((index: number) => {
     const tabCount = tabsRef.current.length;
     if (index < 0 || index >= tabCount) return;
+    // Closing cancels the pending autosave, so flush unsaved edits now.
+    const closing = tabsRef.current[index];
+    if (closing.dirty && !closing.external) {
+      void api
+        .writeFile(workspacePathRef.current, closing.relativePath, closing.buffer)
+        .catch((err) => console.error(err));
+    }
 
     setTabs((prev) => {
       if (index < 0 || index >= prev.length) return prev;
@@ -860,23 +868,37 @@ export function Workspace({
           tab.relativePath,
           tab.buffer,
         );
-        setTabs((prev) => {
-          const next = prev.slice();
-          if (!next[index]) return prev;
-          next[index] = {
-            ...next[index],
-            doc: updated,
-            buffer: updated.content ?? next[index].buffer,
-            dirty: false,
-          };
-          return next;
-        });
+        // Match by path and keep the live buffer: the user may have typed or
+        // closed tabs while the write was in flight.
+        setTabs((prev) =>
+          prev.map((current) =>
+            current.relativePath === tab.relativePath
+              ? {
+                  ...current,
+                  doc: updated,
+                  dirty: current.buffer !== (updated.content ?? current.buffer),
+                }
+              : current,
+          ),
+        );
       } catch (err) {
         console.error(err);
       }
     },
     [workspacePath, tabs],
   );
+
+  // Autosave: write dirty tabs once typing pauses. Every keystroke changes
+  // `tabs`, which restarts the delay.
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.dirty && !tab.external)) return;
+    const timer = window.setTimeout(() => {
+      tabs.forEach((tab, index) => {
+        if (tab.dirty && !tab.external) void saveTab(index);
+      });
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [tabs, saveTab]);
 
   const applyAppZoom = useCallback((nextZoom: number) => {
     const zoom = Math.max(

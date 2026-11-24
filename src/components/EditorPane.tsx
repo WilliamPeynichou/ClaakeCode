@@ -46,6 +46,28 @@ if (!(globalThis as typeof globalThis & { MonacoEnvironment?: unknown }).MonacoE
 
 loader.config({ monaco: monacoNs });
 
+// Monaco checks each file alone, without node_modules or tsconfig, so its type
+// errors are mostly false ("Cannot find module", JSX flags). Real type errors
+// come from the project's own checker through "claake-diagnostics".
+for (const defaults of [
+  monacoNs.languages.typescript.typescriptDefaults,
+  monacoNs.languages.typescript.javascriptDefaults,
+]) {
+  defaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: false });
+  defaults.setCompilerOptions({
+    target: monacoNs.languages.typescript.ScriptTarget.ESNext,
+    module: monacoNs.languages.typescript.ModuleKind.ESNext,
+    jsx: monacoNs.languages.typescript.JsxEmit.Preserve,
+    allowJs: true,
+    allowNonTsExtensions: true,
+  });
+}
+monacoNs.languages.json.jsonDefaults.setDiagnosticsOptions({
+  validate: true,
+  allowComments: true,
+  trailingCommas: "ignore",
+});
+
 type Props = {
   tabs: EditorTab[];
   activeIndex: number;
