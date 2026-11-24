@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import skyUrl from "../assets/welcome/sky.png";
 import backUrl from "../assets/welcome/back.png";
-import claakyUrl from "../assets/welcome/claaky.png";
+import claaky0Url from "../assets/welcome/claaky0.png";
+import claaky1Url from "../assets/welcome/claaky1.png";
 import frontUrl from "../assets/welcome/front.png";
 import waterUrl from "../assets/welcome/water.png";
 
@@ -16,7 +17,8 @@ import waterUrl from "../assets/welcome/water.png";
  * draw calls per frame, so the motion stays cheap:
  *   - dithered reveal when the screen opens (Bayer order, top → bottom)
  *   - clouds drifting one cell at a time
- *   - Claaky bobbing by one cell
+ *   - Claaky bobbing by one cell (two frames baked into the scene, so his
+ *     edges, lighting and shadow already blend with the meadow)
  *   - sun glints sparkling on the lake (water.png mask)
  *   - autumn leaves falling across the scene (click = gust of leaves)
  * Everything stops on the first full frame under prefers-reduced-motion.
@@ -166,7 +168,7 @@ export function WelcomeArt({ className }: { className?: string }) {
 
     const compose = (now: number) => {
       if (!layers || !frame) return;
-      const [sky, back, claaky, front] = layers;
+      const [sky, back, claakyRest, claakyUp, front] = layers;
       const t = start < 0 ? 0 : now - start;
       const reveal = reduced ? 2 : Math.min(2, t / REVEAL_MS);
       const skyShift = reduced ? 0 : Math.floor(t / 650) % sky.w;
@@ -192,14 +194,11 @@ export function WelcomeArt({ className }: { className?: string }) {
             g = back.data[bo + 1];
             b = back.data[bo + 2];
           }
-          const cy = y + bob; // sample Claaky one cell lower → he rises
-          if (cy < CH) {
-            const co = (cy * CW + x) * 4;
-            if (claaky.data[co + 3] > 0) {
-              r = claaky.data[co];
-              g = claaky.data[co + 1];
-              b = claaky.data[co + 2];
-            }
+          const claaky = bob ? claakyUp : claakyRest;
+          if (claaky.data[bo + 3] > 0) {
+            r = claaky.data[bo];
+            g = claaky.data[bo + 1];
+            b = claaky.data[bo + 2];
           }
           if (front.data[bo + 3] > 0) {
             r = front.data[bo];
@@ -316,13 +315,13 @@ export function WelcomeArt({ className }: { className?: string }) {
     const observer = new ResizeObserver(resize);
     canvas.addEventListener("pointerdown", onPointerDown);
 
-    void Promise.all([skyUrl, backUrl, claakyUrl, frontUrl, waterUrl].map(loadPixels))
+    void Promise.all([skyUrl, backUrl, claaky0Url, claaky1Url, frontUrl, waterUrl].map(loadPixels))
       .then((loaded) => {
         if (disposed) return;
-        const water = loaded[4];
+        const water = loaded[5];
         waterCells = [];
         for (let i = 0; i < CW * CH; i += 1) if (water.data[i * 4] > 127) waterCells.push(i);
-        layers = loaded.slice(0, 4);
+        layers = loaded.slice(0, 5);
         start = performance.now();
         observer.observe(host);
         resize();

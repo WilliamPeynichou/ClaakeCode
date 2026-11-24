@@ -9,7 +9,9 @@ the Welcome canvas (src/components/WelcomeArt.tsx) can animate them:
   sky.png     2× wide, horizontally tileable        → clouds drift
   back.png    mountains, lake, forest, meadow, path → static
   water.png   lake mask (L)                         → sun glints
-  claaky.png  Claaky sprite                         → gentle bob
+  claaky0.png / claaky1.png
+              Claaky relit by the scene and baked into it (edges blended
+              before the mosaic), resting / one cell up  → gentle bob
   front.png   foreground grass                      → static, over Claaky
 
 Usage:  python3 scripts/welcome-art/generate_welcome_art.py
@@ -25,6 +27,7 @@ import random
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy import ndimage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "..", "src", "assets", "welcome"))
@@ -32,6 +35,10 @@ OUT = os.path.normpath(os.path.join(HERE, "..", "..", "src", "assets", "welcome"
 CELLS_W, CELLS_H = 144, 180  # mosaic grid
 SCALE = 5                    # hi-res painting scale
 W, H = CELLS_W * SCALE, CELLS_H * SCALE
+
+# Claaky stands on the path, mid-distance (feet position, height in px).
+CLAAKY_FEET = (CELLS_W * SCALE * 0.535, CELLS_H * SCALE * 0.865)
+CLAAKY_H = CELLS_H * SCALE * 0.27
 
 rng = random.Random(7)
 nrng = np.random.default_rng(7)
@@ -503,36 +510,87 @@ def paint_back(sky_img: Image.Image):
     img = rock(img, X(0.17), Y(0.95), X(0.09), Y(0.045), 9, tone="#8a95a8")
     d = ImageDraw.Draw(img)
 
-    # Contact shadow under Claaky.
+    # Claaky's shadows: soft cast shadow (sun from the upper left) + contact.
+    fx, fy = CLAAKY_FEET
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(sh).ellipse((X(0.47), Y(0.885), X(0.69), Y(0.915)), fill=(40, 14, 4, 160))
-    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(7)))
+    sd = ImageDraw.Draw(sh)
+    sd.polygon([(fx - X(0.05), fy - Y(0.004)), (fx + X(0.05), fy - Y(0.012)),
+                (fx + X(0.20), fy + Y(0.004)), (fx + X(0.16), fy + Y(0.022)),
+                (fx - X(0.04), fy + Y(0.014))], fill=(52, 18, 4, 150))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(9)))
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).ellipse((fx - X(0.075), fy - Y(0.008), fx + X(0.075), fy + Y(0.012)), fill=(36, 12, 2, 170))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4)))
     return img, Image.fromarray(water, "L")
 
 
 def paint_front():
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    for _ in range(500):  # grass blades in front of Claaky's feet
-        x = rng.uniform(X(0.42), X(0.74))
-        y = rng.uniform(Y(0.895), Y(0.93))
-        h = rng.uniform(6, 16)
-        d.line((x, y, x + rng.uniform(-4, 4), y - h), fill=autumn_color(rng.uniform(0.3, 0.95)) + (255,), width=2)
+    fx, fy = CLAAKY_FEET
+    for _ in range(420):  # tufts hiding Claaky's feet in the grass
+        x = fx + rng.gauss(0, X(0.06))
+        y = fy + rng.uniform(-Y(0.004), Y(0.02))
+        h = rng.uniform(7, 18)
+        d.line((x, y, x + rng.uniform(-4, 4), y - h), fill=autumn_color(rng.uniform(0.25, 0.9)) + (255,), width=2)
     return img
 
 
-def claaky_layer():
+def claaky_sprite() -> Image.Image:
+    """Claaky relit for the scene: warm key light from the upper left,
+    shade on the right, orange bounce from the meadow, warm rim, feet AO."""
     sprite = Image.open(os.path.join(HERE, "claaky-idle.png")).convert("RGBA")
     sprite = sprite.crop(sprite.split()[-1].getbbox())
-    target_h = int(Y(0.30))
-    sprite = sprite.resize((round(sprite.width * target_h / sprite.height), target_h), Image.LANCZOS)
-    arr = np.array(sprite, float)  # warm autumn light on Claaky
-    arr[..., 0] = np.clip(arr[..., 0] * 1.04 + 6, 0, 255)
-    arr[..., 2] = np.clip(arr[..., 2] * 0.94, 0, 255)
-    sprite = Image.fromarray(arr.astype(np.uint8), "RGBA")
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    img.alpha_composite(sprite, (int(X(0.58) - sprite.width / 2), int(Y(0.905) - sprite.height)))
-    return img
+    sprite = sprite.resize((round(sprite.width * CLAAKY_H / sprite.height), int(CLAAKY_H)), Image.LANCZOS)
+    arr = np.array(sprite, float)
+    h, w = arr.shape[:2]
+    ys, xs = np.mgrid[0:h, 0:w]
+    nx = (xs / max(w - 1, 1)) * 2 - 1
+    ny = ys / max(h - 1, 1)
+    rgb = arr[..., :3]
+    key = np.clip(1.04 - 0.16 * nx - 0.08 * ny, 0.74, 1.06)[..., None]
+    sun = np.array([255, 243, 224], float) / 255
+    rgb = rgb * key * sun
+    bounce = (smoothstep(0.6, 1.0, ny) * 0.13)[..., None]
+    rgb = rgb * (1 - bounce) + np.array(hex_rgb("#e07a2c"), float) * bounce
+    alpha = arr[..., 3] / 255
+    eroded = ndimage.grey_erosion(alpha, size=(7, 7))
+    rim = np.clip(alpha - eroded, 0, 1) * np.clip(-nx + 0.2, 0, 1) * (1 - ny * 0.6)
+    rgb = rgb + rim[..., None] * np.array([90, 60, 20], float)
+    ao = (1 - smoothstep(0.9, 1.0, ny) * 0.35)[..., None]
+    rgb = rgb * ao
+    rgb = rgb * 0.96 + np.array(hex_rgb("#c27424"), float) * 0.04  # share the scene's air
+    arr[..., :3] = np.clip(rgb, 0, 255)
+    return Image.fromarray(arr.astype(np.uint8), "RGBA")
+
+
+def bake_claaky_frames(back_hi: Image.Image, sky: Image.Image):
+    """Claaky composited into the hi-res scene *before* the mosaic, so his
+    edges blend with the meadow cells. Frame 1 is one cell higher (bob).
+    Each frame keeps only the cells around Claaky (alpha elsewhere = 0)."""
+    sprite = claaky_sprite()
+    fx, fy = CLAAKY_FEET
+    x0 = int(fx - sprite.width / 2)
+    y0 = int(fy - sprite.height)
+    scene = sky.crop((0, 0, W, H)).convert("RGBA")
+    scene.alpha_composite(back_hi)
+    union = np.zeros((H, W), float)
+    frames = []
+    for lift in (0, SCALE):
+        layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        layer.alpha_composite(sprite, (x0, y0 - lift))
+        union = np.maximum(union, np.array(layer.split()[-1], float))
+        comp = scene.copy()
+        comp.alpha_composite(layer)
+        frames.append(comp)
+    mask = Image.fromarray(union.astype(np.uint8), "L").resize((CELLS_W, CELLS_H), Image.BOX)
+    m = ndimage.binary_dilation(np.array(mask) > 8, iterations=1)
+    out = []
+    for comp in frames:
+        cells = np.array(to_cells(comp, CELLS_W, CELLS_H, levels=9).convert("RGBA"))
+        cells[..., 3] = np.where(m, 255, 0)
+        out.append(Image.fromarray(cells, "RGBA"))
+    return out
 
 
 # ---------------------------------------------------------------- mosaic
@@ -567,7 +625,8 @@ def main():
     water.resize((CELLS_W, CELLS_H), Image.BOX).point(lambda v: 255 if v > 140 else 0).save(
         os.path.join(OUT, "water.png"), optimize=True
     )
-    to_cells(claaky_layer(), CELLS_W, CELLS_H, levels=9).save(os.path.join(OUT, "claaky.png"), optimize=True)
+    for i, frame in enumerate(bake_claaky_frames(back, sky)):
+        frame.save(os.path.join(OUT, f"claaky{i}.png"), optimize=True)
     to_cells(paint_front(), CELLS_W, CELLS_H, levels=9).save(os.path.join(OUT, "front.png"), optimize=True)
     print("wrote", OUT)
 
