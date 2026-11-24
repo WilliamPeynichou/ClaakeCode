@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Generate the Welcome screen pixel-mosaic art (autumn alpine lake + Claaky).
+"""Generate the Welcome screen pixel-mosaic art: a scene composed around Claaky.
 
 The scene is painted procedurally at high resolution, downsampled to a coarse
 grid (one pixel = one mosaic cell) and ordered-dithered, which gives the
 "LED screen / 3D render seen through a grid" look. It is split in layers so
 the Welcome canvas (src/components/WelcomeArt.tsx) can animate them:
 
-  sky.png     2× wide, horizontally tileable        → clouds drift
-  back.png    mountains, lake, forest, meadow, path → static
-  water.png   lake mask (L)                         → sun glints
-  claaky0.png / claaky1.png
-              Claaky relit by the scene and baked into it (edges blended
-              before the mosaic), resting / one cell up  → gentle bob
-  front.png   foreground grass                      → static, over Claaky
+  sky.png       2× wide, horizontally tileable → clouds drift
+  back.png      boulder, autumn bushes, golden spikes, leaf floor, shadows
+  sparkle.png   golden flower cells (mask)     → twinkle
+  claaky0/1.png Claaky relit and baked into the scene before the mosaic
+                (edges blended), resting / one cell up → gentle bob
+  front.png     leaves, flowers and bushes in front of Claaky
 
 Usage:  python3 scripts/welcome-art/generate_welcome_art.py
 Needs:  numpy, Pillow. Source sprite: scripts/welcome-art/claaky-idle.png
@@ -36,9 +35,9 @@ CELLS_W, CELLS_H = 144, 180  # mosaic grid
 SCALE = 5                    # hi-res painting scale
 W, H = CELLS_W * SCALE, CELLS_H * SCALE
 
-# Claaky stands on the path, mid-distance (feet position, height in px).
-CLAAKY_FEET = (CELLS_W * SCALE * 0.55, CELLS_H * SCALE * 0.84)
-CLAAKY_H = CELLS_H * SCALE * 0.245
+# Claaky is the subject: big, right of centre, standing in the leaves.
+CLAAKY_FEET = (CELLS_W * SCALE * 0.60, CELLS_H * SCALE * 0.885)
+CLAAKY_H = CELLS_H * SCALE * 0.37
 
 rng = random.Random(7)
 nrng = np.random.default_rng(7)
@@ -96,14 +95,16 @@ def smoothstep(e0, e1, x):
 
 
 # ---------------------------------------------------------------- palettes
-SKY_TOP = np.array(hex_rgb("#1f86dc"), float)
-SKY_MID = np.array(hex_rgb("#48a8ec"), float)
-SKY_LOW = np.array(hex_rgb("#a7dcf7"), float)
+# Vivid, high-contrast palette (same punch as the reference render).
+SKY_TOP = np.array(hex_rgb("#1286e6"), float)
+SKY_MID = np.array(hex_rgb("#2eaef7"), float)
+SKY_LOW = np.array(hex_rgb("#8fd9ff"), float)
 
-AUTUMN_DEEP = [hex_rgb(c) for c in ("#3e0f05", "#561507", "#6a1c08", "#4c1a0a")]
-AUTUMN_MID = [hex_rgb(c) for c in ("#9c2e0c", "#b23c10", "#c64c14", "#d25a16", "#a8240e")]
-AUTUMN_HI = [hex_rgb(c) for c in ("#e2601a", "#ec721c", "#f4861f", "#fb9a26", "#e0521a")]
-AUTUMN_SPARK = [hex_rgb(c) for c in ("#ffb52e", "#ffc93f", "#ffa51f")]
+AUTUMN_DEEP = [hex_rgb(c) for c in ("#3f0b02", "#5a1203", "#6e1904", "#4a1405")]
+AUTUMN_MID = [hex_rgb(c) for c in ("#b8260a", "#d23a0b", "#e2500e", "#c41d0a", "#d94a12")]
+AUTUMN_HI = [hex_rgb(c) for c in ("#ff7410", "#ff8a14", "#ff9e1c", "#ff6614", "#ffad24")]
+AUTUMN_SPARK = [hex_rgb(c) for c in ("#ffc414", "#ffd632", "#ffe45c")]
+GOLD = [hex_rgb(c) for c in ("#ffd21a", "#ffe23c", "#ffc80f", "#fff07a")]
 
 
 def autumn_color(light: float, warm: float = 0.0):
@@ -118,6 +119,7 @@ def autumn_color(light: float, warm: float = 0.0):
     else:
         base = rng.choice(AUTUMN_SPARK if r > 0.4 else AUTUMN_HI)
     return shade(base, 0.9 + rng.random() * 0.2)
+
 
 
 # ---------------------------------------------------------------- painters
@@ -206,158 +208,6 @@ def meadow(draw, y0, y1, n):
             draw.ellipse((x - r, y - h - r, x + r, y - h + r), fill=fc + (255,))
 
 
-# ---------------------------------------------------------------- scene
-def X(f: float) -> float:
-    return f * W
-
-
-def Y(f: float) -> float:
-    return f * H
-
-
-def paint_sky():
-    sw = W * 2
-    y = np.linspace(0, 1, H)[:, None, None]
-    grad = np.where(
-        y < 0.4,
-        SKY_TOP + (SKY_MID - SKY_TOP) * (y / 0.4),
-        SKY_MID + (SKY_LOW - SKY_MID) * np.clip((y - 0.4) / 0.2, 0, 1),
-    )
-    sky = np.repeat(grad, sw, axis=1)
-    dens = fbm(sw, H, 6, 6, 5, 11)
-    detail = fbm(sw, H, 18, 16, 4, 91)
-    yy = np.linspace(0, 1, H)[:, None]
-    band = smoothstep(0.0, 0.08, yy) * (1 - smoothstep(0.22, 0.36, yy))
-    c = dens * band + 0.22 * detail * band - 0.02
-    alpha = smoothstep(0.37, 0.40, c)
-    shifted = np.roll(np.roll(c, -12, axis=0), 9, axis=1)
-    lit = np.clip((c - shifted) * 8 + 0.6, 0, 1)
-    white = np.array([255, 255, 255], float)
-    shadow = np.array(hex_rgb("#a3b8cf"), float)
-    mid = np.array(hex_rgb("#e3ecf5"), float)
-    cloud = np.where(
-        lit[..., None] > 0.55,
-        mid + (white - mid) * ((lit[..., None] - 0.55) / 0.45),
-        shadow + (mid - shadow) * (lit[..., None] / 0.55),
-    )
-    out = sky * (1 - alpha[..., None]) + cloud * alpha[..., None]
-    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGB")
-
-
-def ridge(n: int, y_lo: float, y_hi: float, rough: float, seed: int, peaks=()):
-    """1-D midpoint displacement → ridge heights (pixel y) for every column."""
-    r = random.Random(seed)
-    size = 1
-    while size < n:
-        size *= 2
-    pts = np.zeros(size + 1)
-    pts[0] = r.uniform(0.4, 0.8)
-    pts[-1] = r.uniform(0.4, 0.8)
-    step, amp = size, 0.5
-    while step > 1:
-        half = step // 2
-        for i in range(half, size, step):
-            pts[i] = (pts[i - half] + pts[i + half]) / 2 + r.uniform(-amp, amp)
-        amp *= rough
-        step = half
-    h = pts[:n]
-    for (px, height, width) in peaks:  # sculpt recognisable summits
-        xs = np.arange(n) / n
-        h = h + height * np.exp(-((xs - px) ** 2) / (2 * width**2))
-    h = (h - h.min()) / (h.max() - h.min() + 1e-9)
-    return y_hi + (1 - h) * (y_lo - y_hi)  # high value → small y
-
-
-def paint_range(arr, top, base_y, lit_col, mid_col, dark_col, snow_line=None, seed=1):
-    """Shade a mountain range into arr (H×W×4 float) below the ridge `top`."""
-    ys = np.arange(H)[:, None]
-    mask = (ys >= top[None, :]) & (ys < base_y)
-    slope = np.gradient(top)  # dy/dx: negative → faces left (lit)
-    face = np.clip(-slope * 0.9, -1, 1)[None, :]
-    depth = np.clip((ys - top[None, :]) / 140.0, 0, 1)
-    streaks = periodic_value_noise(W, H, 60, 8, seed) * 0.5 + periodic_value_noise(W, H, 140, 20, seed + 1) * 0.3
-    light = np.clip(0.5 + face * 0.55 * (1 - depth * 0.6) + (streaks - 0.4) * 0.5 - depth * 0.25, 0, 1)
-    lit = np.array(lit_col, float)
-    mid = np.array(mid_col, float)
-    dark = np.array(dark_col, float)
-    col = np.where(
-        light[..., None] > 0.5,
-        mid + (lit - mid) * ((light[..., None] - 0.5) * 2),
-        dark + (mid - dark) * (light[..., None] * 2),
-    )
-    if snow_line is not None:
-        snow_depth = 26 + periodic_value_noise(W, H, 40, 6, seed + 5)[0][None, :] * 46
-        snowy = (ys < np.minimum(top[None, :] + snow_depth, snow_line + streaks * 30)) & mask
-        snow_lit = np.array(hex_rgb("#f7f9fc"), float)
-        snow_sh = np.array(hex_rgb("#b7c6dc"), float)
-        scol = snow_sh + (snow_lit - snow_sh) * np.clip(0.35 + face * 0.8 + (streaks - 0.4) * 0.6, 0, 1)[..., None]
-        col = np.where(snowy[..., None], scol, col)
-    m = mask[..., None]
-    arr[..., :3] = np.where(m, col, arr[..., :3])
-    arr[..., 3] = np.where(mask, 255, arr[..., 3])
-
-
-def larch(d, x, ybase, h, haze=0.0, haze_col=(160, 200, 230)):
-    """Golden autumn larch: a cone of leaf dabs on a thin trunk."""
-    w = h * rng.uniform(0.32, 0.42)
-    d.line((x, ybase, x, ybase - h), fill=(50, 28, 18, 255), width=max(1, int(h / 18)))
-    layers = max(4, int(h / 3.2))
-    dabs = []
-    for i in range(layers):
-        t = i / layers
-        yy = ybase - h * 0.12 - (h * 0.88) * t
-        half = w * (1 - t) * 0.5 + 1
-        for _ in range(int(2 + half / 1.6)):
-            xx = x + rng.uniform(-half, half)
-            light = 0.55 - (xx - x) / (half + 1) * 0.3 + t * 0.25 + rng.uniform(-0.15, 0.15)
-            dabs.append((light, xx, yy + rng.uniform(-1.5, 1.5), rng.uniform(1.6, 2.8)))
-    dabs.sort(key=lambda a: a[0])
-    for light, xx, yy, r in dabs:
-        col = autumn_color(max(0, min(1, light)))
-        if haze:
-            col = mix(col, haze_col, haze)
-        d.ellipse((xx - r, yy - r, xx + r, yy + r), fill=col + (255,))
-
-
-def round_tree(d, x, ybase, h, haze=0.0, haze_col=(160, 200, 230)):
-    d.line((x, ybase, x, ybase - h * 0.5), fill=(50, 28, 18, 255), width=max(1, int(h / 12)))
-    canopy(d, x, ybase - h * 0.62, h * 0.36, h * 0.34, int(30 + h * 3), 1.5, max(2.2, h / 14), haze=haze, haze_col=haze_col)
-
-
-def pine(d, x, ybase, h, haze=0.0, haze_col=(160, 200, 230)):
-    """Dark evergreen spire — a few of them make the forest read as real."""
-    w = h * 0.3
-    tiers = max(3, int(h / 6))
-    for i in range(tiers):
-        t = i / tiers
-        top = ybase - h * (0.15 + 0.85 * (i + 1) / tiers)
-        bot = ybase - h * (0.1 + 0.85 * i / tiers)
-        half = w * (1 - t) * 0.5 + 1
-        col = mix(hex_rgb("#1f3a2c") if rng.random() < 0.7 else hex_rgb("#2c4a33"), haze_col, haze)
-        d.polygon([(x - half, bot), (x + half, bot), (x, top)], fill=col + (255,))
-        lit = mix(hex_rgb("#3d6047"), haze_col, haze)
-        d.polygon([(x - half, bot), (x - half * 0.2, bot), (x, top)], fill=lit + (255,))
-
-
-def forest_band(d, y_of_x, depth, count, scale, haze, seed):
-    """Fill a hillside with individual trees, painted back → front."""
-    r = random.Random(seed)
-    trees = []
-    for _ in range(count):
-        x = r.uniform(-10, W + 10)
-        yb = y_of_x(x) + r.uniform(0, depth)
-        k = r.random()
-        h = scale * (0.7 + (yb - y_of_x(x)) / max(depth, 1) * 0.6) * r.uniform(0.8, 1.25)
-        trees.append((yb, x, h, k))
-    trees.sort()
-    for yb, x, h, k in trees:
-        if k < 0.42:
-            larch(d, x, yb, h, haze=haze)
-        elif k < 0.58:
-            pine(d, x, yb, h * 0.9, haze=haze)
-        else:
-            round_tree(d, x, yb, h * 0.9, haze=haze)
-
 
 def branch(d, x, y, ang, length, width, depth, tips):
     x2 = x + math.cos(ang) * length
@@ -370,184 +220,172 @@ def branch(d, x, y, ang, length, width, depth, tips):
         branch(d, x2, y2, ang + rng.uniform(-0.62, 0.62), length * rng.uniform(0.66, 0.8), width * 0.66, depth - 1, tips)
 
 
-def hero_tree(d, x, ybase, h):
-    """Big framing tree: tapered trunk, visible branches, clumped crown."""
-    tw = h * 0.042
-    d.polygon([(x - tw, ybase), (x + tw, ybase), (x + tw * 0.45, ybase - h * 0.5), (x - tw * 0.4, ybase - h * 0.5)], fill=(52, 28, 16, 255))
-    d.polygon([(x - tw, ybase), (x - tw * 0.2, ybase), (x - tw * 0.1, ybase - h * 0.5), (x - tw * 0.4, ybase - h * 0.5)], fill=(96, 58, 32, 255))
-    tips: list[tuple[float, float]] = []
-    for ang in (-2.05, -1.7, -1.35, -1.0, -0.65):
-        branch(d, x, ybase - h * 0.46, ang + rng.uniform(-0.08, 0.08), h * 0.15, tw * 0.75, 4, tips)
-    # Shaded inner crown first, so the tree reads as one lush mass.
-    xs_ = [t[0] for t in tips]
-    ys_ = [t[1] for t in tips]
-    cx_, cy_ = (min(xs_) + max(xs_)) / 2, (min(ys_) + max(ys_)) / 2 + 20
-    canopy(d, cx_, cy_, (max(xs_) - min(xs_)) / 2 * 0.85, (max(ys_) - min(ys_)) / 2 * 0.8, 1400, 3, 6)
-    clumps = []
-    for tx, ty in tips:
-        light = 0.62 - (ty - (ybase - h)) / h * 0.5 + rng.uniform(-0.1, 0.1)
-        clumps.append((light, tx, ty))
-    clumps.sort()
-    for light, tx, ty in clumps:
-        r = rng.uniform(18, 28)
-        # a clump: dark core then lit dabs, leaving gaps where branches show
-        leaves = []
-        for _ in range(60):
-            a = rng.random() * 2 * math.pi
-            dd = math.sqrt(rng.random())
-            lx = tx + math.cos(a) * r * dd
-            ly = ty + math.sin(a) * r * dd * 0.85
-            local = light - ((ly - ty) / r) * 0.42 - ((lx - tx) / r) * 0.14 + rng.uniform(-0.12, 0.12)
-            leaves.append((max(0, min(1, local)), lx, ly, rng.uniform(3, 5.5)))
-        leaves.sort()
-        for l, lx, ly, lr in leaves:
-            col = autumn_color(l)
-            d.ellipse((lx - lr, ly - lr, lx + lr, ly + lr), fill=col + (255,))
 
 
-def birch(d, x, ybase, h):
-    tw = max(3, h * 0.035)
-    d.polygon([(x - tw, ybase), (x + tw, ybase), (x + tw * 0.5, ybase - h * 0.8), (x - tw * 0.5, ybase - h * 0.8)], fill=(236, 230, 216, 255))
-    for i in range(10):  # birch bark marks
-        yy = ybase - rng.uniform(0.05, 0.75) * h
-        d.line((x - tw * 0.8, yy, x + tw * rng.uniform(-0.2, 0.6), yy + rng.uniform(-1, 1)), fill=(40, 34, 30, 255), width=2)
-    tips: list[tuple[float, float]] = []
-    for ang in (-1.9, -1.45, -1.05):
-        branch(d, x, ybase - h * 0.6, ang, h * 0.16, tw * 0.6, 2, tips)
-    for tx, ty in sorted(tips, key=lambda t: -t[1]):
-        canopy(d, tx, ty, rng.uniform(16, 24), rng.uniform(14, 20), 120, 2.5, 4.2)
+# ---------------------------------------------------------------- scene
+def X(f: float) -> float:
+    return f * W
 
 
-def path(img):
-    """Winding dirt path through the meadow towards Claaky."""
+def Y(f: float) -> float:
+    return f * H
+
+
+def paint_sky():
+    """Vivid sky, horizontally tileable (2× wide) with two big cumulus
+    masses so one always sits behind the upper right of the frame."""
+    sw = W * 2
+    y = np.linspace(0, 1, H)[:, None, None]
+    grad = np.where(
+        y < 0.35,
+        SKY_TOP + (SKY_MID - SKY_TOP) * (y / 0.35),
+        SKY_MID + (SKY_LOW - SKY_MID) * np.clip((y - 0.35) / 0.35, 0, 1),
+    )
+    sky = np.repeat(grad, sw, axis=1)
+    xx = np.linspace(0, 1, sw, endpoint=False)[None, :]
+    yy = np.linspace(0, 1, H)[:, None]
+    # Cumulus masses centred at x≈0.37 and 0.87 of the 2× strip (= upper right of the frame).
+    mass = np.zeros((H, sw))
+    # Cumulus = a few rounded towers on a flat base (offsets in 2×-strip units).
+    lobes = ((0.0, 0.0, 0.085, 0.13), (-0.06, 0.05, 0.06, 0.09), (0.07, 0.03, 0.065, 0.1),
+             (0.02, -0.09, 0.05, 0.08), (-0.035, -0.05, 0.045, 0.07), (0.11, 0.08, 0.05, 0.07),
+             (0.05, -0.04, 0.04, 0.06))
+    for cx in (0.37, 0.87):
+        for ox, oy, sx, sy in lobes:
+            dx = np.minimum(np.abs(xx - cx - ox), 1 - np.abs(xx - cx - ox)) / sx
+            dy = (yy - 0.27 - oy) / sy
+            mass = np.maximum(mass, np.exp(-(dx**2 + dy**2) * 1.2))
+    mass = mass * (1 - smoothstep(0.36, 0.42, yy))  # flat-ish base
+    wisps = np.exp(-(((yy - 0.12) / 0.07) ** 2)) * 0.45
+    dens = fbm(sw, H, 8, 8, 5, 11)
+    bumps = fbm(sw, H, 28, 26, 3, 23)
+    c = mass * (0.45 + 0.6 * dens + 0.35 * bumps) + wisps * dens - 0.22
+    alpha = smoothstep(0.32, 0.35, c)
+    shifted = np.roll(np.roll(c, 10, axis=0), -8, axis=1)  # sun from upper left
+    lit = np.clip((c - shifted) * 9 + 0.6 + (bumps - 0.5) * 0.5, 0, 1)
+    white = np.array([255, 255, 255], float)
+    mid = np.array(hex_rgb("#e6f1fb"), float)
+    shadow = np.array(hex_rgb("#93aed0"), float)
+    cloud = np.where(
+        lit[..., None] > 0.5,
+        mid + (white - mid) * ((lit[..., None] - 0.5) * 2),
+        shadow + (mid - shadow) * (lit[..., None] * 2),
+    )
+    out = sky * (1 - alpha[..., None]) + cloud * alpha[..., None]
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGB")
+
+
+def goldenrod(d, x, ybase, h, lean, sparkle):
+    """Golden flower plume (feathery spray, like the yellow flowers in the reference)."""
+    d.line([(x + lean * (i / 10) ** 2, ybase - h * i / 10) for i in range(11)], fill=(110, 60, 12, 255), width=2)
+    for _ in range(int(h * 1.6)):
+        t = 0.3 + 0.7 * rng.random() ** 0.8
+        spread = 11 * (1 - t) + 4
+        px = x + lean * t * t + rng.gauss(0, spread * 0.5)
+        py = ybase - h * t + rng.uniform(-4, 4)
+        r = rng.uniform(1.8, 3.2)
+        light = 0.5 - (px - x) / 30 + rng.uniform(-0.25, 0.35)
+        col = rng.choice(GOLD) if light > 0.4 else rng.choice(AUTUMN_HI + AUTUMN_SPARK)
+        d.ellipse((px - r, py - r, px + r, py + r), fill=col + (255,))
+        if rng.random() < 0.2:
+            sparkle.append((px, py))
+
+
+def leaf_litter(d, x0, x1, y0, y1, n):
+    for _ in range(n):
+        x = rng.uniform(x0, x1)
+        y = rng.uniform(y0, y1)
+        depth = (y - y0) / max(1, (y1 - y0))
+        r = rng.uniform(2, 4.5) * (0.7 + depth * 0.6)
+        col = autumn_color(rng.uniform(0.15, 1.0))
+        d.ellipse((x - r * 1.3, y - r * 0.7, x + r * 1.3, y + r * 0.7), fill=col + (255,))
+
+
+def paint_back():
+    """Everything behind Claaky, composed around him (he stands at CLAAKY_FEET)."""
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    pts_l, pts_r = [], []
-    for i in range(40):
-        t = i / 39
-        cx = X(0.36) + (X(0.55) - X(0.36)) * (t**1.3) + math.sin(t * 3.4) * X(0.05)
-        y = Y(1.02) - (Y(1.02) - Y(0.80)) * t
-        half = X(0.11) * (1 - t) + X(0.025)
-        pts_l.append((cx - half, y))
-        pts_r.append((cx + half, y))
-    d.polygon(pts_l + pts_r[::-1], fill=hex_rgb("#dcb07a") + (255,))
-    for _ in range(900):  # pebbles & ruts
-        t = rng.random()
-        cx = X(0.36) + (X(0.55) - X(0.36)) * (t**1.3) + math.sin(t * 3.4) * X(0.05)
-        y = Y(1.02) - (Y(1.02) - Y(0.80)) * t
-        half = X(0.11) * (1 - t) + X(0.025)
-        px = cx + rng.uniform(-half, half) * 0.9
-        r = rng.uniform(1.2, 2.6) * (1.2 - t)
-        col = rng.choice([hex_rgb("#f0cd98"), hex_rgb("#b98549"), hex_rgb("#9c6a3a"), hex_rgb("#e6bd84")])
-        d.ellipse((px - r, y - r, px + r, y + r), fill=col + (255,))
+    sparkle: list[tuple[float, float]] = []
 
+    # Far hedge line, low on the horizon, so the sky dominates the top half.
+    for i in range(30):
+        cx = -20 + i * 26 + rng.uniform(-8, 8)
+        canopy(d, cx, Y(0.60) + rng.uniform(-14, 14), rng.uniform(34, 52), rng.uniform(26, 40), 260, 3, 6,
+               haze=0.18, haze_col=(255, 200, 150))
+    # Deep red crown behind Claaky's right shoulder (the dark bush of the reference).
+    canopy(d, X(0.96), Y(0.56), X(0.21), Y(0.13), 2200, 4, 8)
+    # Ground: warm leaf-strewn floor.
+    d.rectangle((0, Y(0.61), W, H), fill=hex_rgb("#8a2a06") + (255,))
+    canopy(d, X(0.72), Y(0.64), X(0.16), Y(0.07), 1200, 3, 7)  # low bushes behind Claaky
+    leaf_litter(d, -10, W + 10, Y(0.66), H, 5200)
 
-def paint_back(sky_img: Image.Image):
-    arr = np.zeros((H, W, 4), float)
-    lake_top = int(Y(0.535))
-
-    # Far range: hazy blue with snowy summits (recognisable silhouette).
-    far = ridge(W, Y(0.40), Y(0.24), 0.55, 21, peaks=((0.30, 1.1, 0.07), (0.62, 1.5, 0.06), (0.86, 0.8, 0.05)))
-    paint_range(arr, far, lake_top, hex_rgb("#c3cfe6"), hex_rgb("#93a5c9"), hex_rgb("#61709a"), snow_line=Y(0.37), seed=4)
-    # Near range: darker, its lower slopes will be covered by forest.
-    near = ridge(W, Y(0.47), Y(0.38), 0.6, 33, peaks=((0.12, 0.6, 0.09), (0.9, 0.7, 0.08)))
-    paint_range(arr, near, lake_top, hex_rgb("#8a8fa6"), hex_rgb("#5e6582"), hex_rgb("#383d55"), seed=8)
-    img = Image.fromarray(arr.astype(np.uint8), "RGBA")
-    d = ImageDraw.Draw(img)
-
-    # Forested hills down to the lake shore: far (hazy) then near.
-    hill_far = lambda x: near[int(min(W - 1, max(0, x)))] + 18
-    forest_band(d, hill_far, lake_top - hill_far(W / 2) - 10, 520, 18, 0.22, 5)
-    hill_near = lambda x: Y(0.47) + math.sin(x / W * math.pi * 2.2 + 1) * 10
-    forest_band(d, hill_near, Y(0.535) - Y(0.47), 420, 26, 0.08, 6)
-
-    # Lake: mirrored scene (incl. sky) with ripples and a cool tint.
-    full = sky_img.crop((0, 0, W, H)).convert("RGBA")
-    full.alpha_composite(img)
-    src = np.array(full, float)
-    out = np.array(img, float)
-    shore = lambda x: Y(0.655) + math.sin(x / W * 5.0) * Y(0.016) + (x / W) * Y(0.02)
-    water = np.zeros((H, W), np.uint8)
-    tint = np.array(hex_rgb("#2a6fa8"), float)
-    for y in range(lake_top, int(Y(0.71))):
-        ry = 2 * lake_top - y - 2
-        if ry < 0:
-            continue
-        depth = (y - lake_top) / (Y(0.16))
-        shift = int(round(math.sin(y * 0.9) * (1 + depth * 3)))
-        row = np.roll(src[ry, :, :3], shift, axis=0)
-        row = row * (0.70 - depth * 0.12) + tint * (0.34 + depth * 0.15)
-        if (y - lake_top) % 7 == 0:  # ripple highlights
-            row = row * 0.85 + 255 * 0.15 * (np.random.default_rng(y).random(W)[:, None] > 0.6)
-        xs = np.arange(W)
-        inside = y < np.array([shore(x) for x in xs])
-        out[y, inside, :3] = row[inside]
-        out[y, inside, 3] = 255
-        water[y, inside] = 255
-    img = Image.fromarray(out.astype(np.uint8), "RGBA")
+    # Big blue boulder behind Claaky (left), lit from the upper left.
+    img = rock(img, X(0.30), Y(0.68), X(0.20), Y(0.15), 3, tone="#7d97c4")
+    img = rock(img, X(0.08), Y(0.80), X(0.12), Y(0.07), 7, tone="#8aa0c8")
     d = ImageDraw.Draw(img)
 
-    # Meadow from the shore down.
-    meadow_poly = [(0, shore(0) - 2)] + [(x, shore(x) - 2) for x in range(0, W + 1, 8)] + [(W, H), (0, H)]
-    d.polygon(meadow_poly, fill=hex_rgb("#c27424") + (255,))
-    # Reeds / bank along the shore.
-    for x in range(0, W, 3):
-        sy = shore(x)
-        hgt = rng.uniform(4, 12)
-        d.line((x, sy + 2, x + rng.uniform(-2, 2), sy - hgt), fill=autumn_color(rng.uniform(0.2, 0.8)) + (255,), width=2)
-    meadow(d, Y(0.67), Y(1.0), 3400)
-    path(img)
-    d = ImageDraw.Draw(img)
+    # Golden flowering bush on the left with spikes rising into the sky.
+    canopy(d, X(0.02), Y(0.66), X(0.20), Y(0.22), 2600, 4, 9)
+    for _ in range(9):
+        goldenrod(d, rng.uniform(X(0.0), X(0.22)), Y(0.56) + rng.uniform(0, 30),
+                  rng.uniform(Y(0.12), Y(0.22)), rng.uniform(-6, 30), sparkle)
+    # A couple of spikes on the right, behind Claaky.
+    for _ in range(4):
+        goldenrod(d, rng.uniform(X(0.86), X(1.0)), Y(0.62), rng.uniform(Y(0.1), Y(0.16)), rng.uniform(-20, 4), sparkle)
 
-    # Shore rocks.
-    img = rock(img, X(0.27), Y(0.69), X(0.085), Y(0.04), 3)
-    img = rock(img, X(0.74), Y(0.685), X(0.05), Y(0.024), 12, tone="#9aa6b8")
-    d = ImageDraw.Draw(img)
-
-    # Framing trees.
-    hero_tree(d, X(0.07), Y(1.02), Y(0.92))
-    birch(d, X(0.92), Y(0.86), Y(0.46))
-    canopy(d, X(0.96), Y(0.86), X(0.14), Y(0.08), 900, 3, 7)  # bush at the birch foot
-    img = rock(img, X(0.17), Y(0.95), X(0.09), Y(0.045), 9, tone="#8a95a8")
-    d = ImageDraw.Draw(img)
-
-    # Claaky's shadows: soft cast shadow (sun from the upper left) + contact.
+    # Claaky's shadows on the ground: contact + soft cast to the right.
     fx, fy = CLAAKY_FEET
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     sd = ImageDraw.Draw(sh)
-    sd.polygon([(fx - X(0.05), fy - Y(0.004)), (fx + X(0.05), fy - Y(0.012)),
-                (fx + X(0.20), fy + Y(0.004)), (fx + X(0.16), fy + Y(0.022)),
-                (fx - X(0.04), fy + Y(0.014))], fill=(52, 18, 4, 150))
-    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(9)))
+    sd.polygon([(fx - X(0.08), fy - Y(0.006)), (fx + X(0.10), fy - Y(0.018)),
+                (fx + X(0.30), fy + Y(0.004)), (fx + X(0.24), fy + Y(0.03)),
+                (fx - X(0.06), fy + Y(0.02))], fill=(40, 8, 0, 150))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(10)))
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(sh).ellipse((fx - X(0.075), fy - Y(0.008), fx + X(0.075), fy + Y(0.012)), fill=(36, 12, 2, 170))
-    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4)))
-    return img, Image.fromarray(water, "L")
+    ImageDraw.Draw(sh).ellipse((fx - X(0.13), fy - Y(0.012), fx + X(0.13), fy + Y(0.016)), fill=(30, 6, 0, 190))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(5)))
+
+    mask = Image.new("L", (W, H), 0)
+    md = ImageDraw.Draw(mask)
+    for px, py in sparkle:
+        md.ellipse((px - 2, py - 2, px + 2, py + 2), fill=255)
+    return img, mask
 
 
 def paint_front():
+    """Foreground in front of Claaky: bushes framing the bottom corners,
+    leaves and flowers hiding his feet, a spike crossing in front."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     fx, fy = CLAAKY_FEET
-    # Tall autumn grass growing in front of Claaky: hides his feet and legs.
-    for _ in range(900):
-        x = fx + rng.gauss(0, X(0.075))
-        y = fy + rng.uniform(-Y(0.002), Y(0.03))
-        near = 1 - min(1, abs(x - fx) / X(0.12))
-        h = rng.uniform(8, 16) + near * rng.uniform(10, 34)
-        lean = rng.uniform(-7, 7)
-        col = autumn_color(rng.uniform(0.25, 0.95))
-        d.line((x, y, x + lean * 0.5, y - h * 0.6, x + lean, y - h), fill=col + (255,), width=2, joint="curve")
-        if rng.random() < 0.07:  # seed heads
-            r = rng.uniform(1.6, 2.6)
-            d.ellipse((x + lean - r, y - h - r, x + lean + r, y - h + r), fill=rng.choice(AUTUMN_SPARK) + (255,))
-    # A low bush overlapping Claaky's side, between him and the viewer.
-    canopy(d, fx - X(0.115), fy + Y(0.012), X(0.075), Y(0.04), 520, 3, 6)
+    # Low bushes at the bottom corners.
+    canopy(d, X(0.05), Y(1.0), X(0.2), Y(0.1), 1400, 4, 9)
+    canopy(d, X(1.0), Y(0.98), X(0.18), Y(0.1), 1200, 4, 9)
+    # Leaf mound around Claaky's feet.
+    for _ in range(1300):
+        x = fx + rng.gauss(0, X(0.11))
+        y = fy + rng.uniform(-Y(0.035), Y(0.05)) * (1 if abs(x - fx) < X(0.1) else 0.6)
+        r = rng.uniform(2.2, 4.6)
+        col = autumn_color(rng.uniform(0.2, 1.0))
+        d.ellipse((x - r * 1.3, y - r * 0.75, x + r * 1.3, y + r * 0.75), fill=col + (255,))
+    # Small rocks at the bottom.
+    img = rock(img, X(0.62), Y(0.975), X(0.09), Y(0.035), 12, tone="#8aa0c8")
+    img = rock(img, X(0.30), Y(0.99), X(0.07), Y(0.03), 14, tone="#7d97c4")
+    d = ImageDraw.Draw(img)
+    # Low golden flower clusters in front of Claaky's feet.
+    for cx, cy in ((fx - X(0.17), fy + Y(0.035)), (fx + X(0.19), fy + Y(0.03)), (fx + X(0.02), fy + Y(0.07))):
+        for _ in range(160):
+            px = cx + rng.gauss(0, X(0.035))
+            py = cy + rng.gauss(0, Y(0.012))
+            r = rng.uniform(1.8, 3.2)
+            d.ellipse((px - r, py - r, px + r, py + r), fill=rng.choice(GOLD + AUTUMN_SPARK) + (255,))
     return img
 
 
 def claaky_sprite() -> Image.Image:
-    """Claaky relit for the scene: warm key light from the upper left,
-    shade on the right, orange bounce from the meadow, warm rim, feet AO."""
+    """Claaky lit by the same sun as the scene, kept vivid: warm key from the
+    upper left, cool sky fill on top, orange bounce from the leaves below,
+    rounded volume, and two fallen leaves resting on him."""
     sprite = Image.open(os.path.join(HERE, "claaky-idle.png")).convert("RGBA")
     sprite = sprite.crop(sprite.split()[-1].getbbox())
     sprite = sprite.resize((round(sprite.width * CLAAKY_H / sprite.height), int(CLAAKY_H)), Image.LANCZOS)
@@ -557,58 +395,44 @@ def claaky_sprite() -> Image.Image:
     nx = (xs / max(w - 1, 1)) * 2 - 1
     ny = ys / max(h - 1, 1)
     rgb = arr[..., :3]
-    key = np.clip(1.04 - 0.16 * nx - 0.08 * ny, 0.74, 1.06)[..., None]
-    sun = np.array([255, 243, 224], float) / 255
-    rgb = rgb * key * sun
-    bounce = (smoothstep(0.6, 1.0, ny) * 0.13)[..., None]
-    rgb = rgb * (1 - bounce) + np.array(hex_rgb("#e07a2c"), float) * bounce
+    # Saturate a touch so he matches the scene's punch.
+    lum = rgb.mean(axis=2, keepdims=True)
+    rgb = lum + (rgb - lum) * 1.25
+    key = np.clip(1.06 - 0.22 * nx - 0.06 * ny, 0.76, 1.1)[..., None]
+    rgb = rgb * key * (np.array([255, 246, 228], float) / 255)
+    sky_fill = (np.clip(0.35 - ny, 0, 0.35) / 0.35 * 0.10)[..., None]
+    rgb = rgb * (1 - sky_fill) + np.array(hex_rgb("#bfe6ff"), float) * sky_fill
+    bounce = (smoothstep(0.55, 1.0, ny) * 0.22)[..., None]
+    rgb = rgb * (1 - bounce) + np.array(hex_rgb("#ff7a1a"), float) * bounce
     alpha = arr[..., 3] / 255
-    eroded = ndimage.grey_erosion(alpha, size=(7, 7))
-    rim = np.clip(alpha - eroded, 0, 1) * np.clip(-nx + 0.2, 0, 1) * (1 - ny * 0.6)
-    rgb = rgb + rim[..., None] * np.array([90, 60, 20], float)
-    ao = (1 - smoothstep(0.9, 1.0, ny) * 0.35)[..., None]
-    rgb = rgb * ao
-    rgb = rgb * 0.94 + np.array(hex_rgb("#c27424"), float) * 0.06  # share the scene's air
-    # Volume: darker towards the silhouette (a rounded body, not a flat decal).
     dist = ndimage.distance_transform_edt(alpha > 0.5)
-    roundness = np.clip(dist / (0.16 * w), 0, 1)
-    rgb = rgb * (0.80 + 0.20 * np.sqrt(roundness))[..., None]
-    rgb = rgb * 0.96  # not the brightest thing in the landscape
+    roundness = np.clip(dist / (0.15 * w), 0, 1)
+    rgb = rgb * (0.82 + 0.18 * np.sqrt(roundness))[..., None]
+    eroded = ndimage.grey_erosion(alpha, size=(7, 7))
+    rim = np.clip(alpha - eroded, 0, 1) * np.clip(-nx + 0.1, 0, 1) * (1 - ny * 0.5)
+    rgb = rgb + rim[..., None] * np.array([70, 50, 10], float)
     arr[..., :3] = np.clip(rgb, 0, 255)
-    return painterize(Image.fromarray(arr.astype(np.uint8), "RGBA"))
-
-
-def painterize(sprite: Image.Image) -> Image.Image:
-    """Repaint the sprite with the same leaf-dab brushwork as the scene, so
-    Claaky shares the landscape's texture. Dabs spill slightly over the
-    silhouette (organic edge); a faint pass of the original keeps the face."""
-    arr = np.array(sprite)
-    a = arr[..., 3]
-    ys, xs = np.nonzero(a > 140)
-    r_ = np.random.default_rng(5)
-    pick = r_.choice(len(xs), size=len(xs) // 3, replace=True)
-    dabs = []
-    for i in pick:
-        x, y = int(xs[i]), int(ys[i])
-        c = arr[y, x, :3].astype(float) * (1 + r_.normal(0, 0.05))
-        c = c + r_.normal(0, 6, 3)
-        dabs.append((float(c.mean()), x + r_.normal(0, 0.8), y + r_.normal(0, 0.8), c))
-    dabs.sort(key=lambda d: d[0])
-    out = Image.new("RGBA", sprite.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(out)
-    for _, x, y, c in dabs:
-        rad = r_.uniform(1.3, 2.3)
-        col = tuple(int(v) for v in np.clip(c, 0, 255))
-        d.ellipse((x - rad, y - rad, x + rad, y + rad), fill=col + (255,))
-    ghost = np.array(sprite).astype(float)
-    ghost[..., 3] *= 0.55
-    out.alpha_composite(Image.fromarray(ghost.astype(np.uint8), "RGBA"))
-    return out
+    sprite = Image.fromarray(arr.astype(np.uint8), "RGBA")
+    # Fallen leaves resting on his left ear and his shoulder.
+    d = ImageDraw.Draw(sprite)
+    for (lx, ly, rot, col) in ((0.2, 0.17, 0.5, "#ff7a10"), (0.78, 0.66, -0.4, "#e2400c")):
+        cx, cy = lx * w, ly * h
+        rr = w * 0.045
+        pts = []
+        for k in range(16):
+            t = k / 16 * 2 * math.pi
+            px = math.cos(t) * rr * 1.5
+            py = math.sin(t) * rr * 0.75
+            pts.append((cx + px * math.cos(rot) - py * math.sin(rot), cy + px * math.sin(rot) + py * math.cos(rot)))
+        d.polygon(pts, fill=hex_rgb(col) + (255,))
+        d.line((cx - rr * 1.4 * math.cos(rot), cy - rr * 1.4 * math.sin(rot),
+                cx + rr * 1.4 * math.cos(rot), cy + rr * 1.4 * math.sin(rot)), fill=(120, 30, 4, 255), width=2)
+    return sprite
 
 
 def bake_claaky_frames(back_hi: Image.Image, sky: Image.Image):
     """Claaky composited into the hi-res scene *before* the mosaic, so his
-    edges blend with the meadow cells. Frame 1 is one cell higher (bob).
+    edges blend with what's behind him. Frame 1 is one cell higher (bob).
     Each frame keeps only the cells around Claaky (alpha elsewhere = 0)."""
     sprite = claaky_sprite()
     fx, fy = CLAAKY_FEET
@@ -630,6 +454,7 @@ def bake_claaky_frames(back_hi: Image.Image, sky: Image.Image):
     out = []
     for comp in frames:
         cells = np.array(to_cells(comp, CELLS_W, CELLS_H, levels=9).convert("RGBA"))
+        cells[..., :3] = np.where(m[..., None], cells[..., :3], 0)
         cells[..., 3] = np.where(m, 255, 0)
         out.append(Image.fromarray(cells, "RGBA"))
     return out
@@ -658,14 +483,15 @@ def to_cells(img: Image.Image, cells_w: int, cells_h: int, levels: int = 7) -> I
     return Image.fromarray(rgb.astype(np.uint8), "RGB")
 
 
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     sky = paint_sky()
-    back, water = paint_back(sky)
+    back, sparkle = paint_back()
     to_cells(sky, CELLS_W * 2, CELLS_H, levels=12).save(os.path.join(OUT, "sky.png"), optimize=True)
     to_cells(back, CELLS_W, CELLS_H, levels=9).save(os.path.join(OUT, "back.png"), optimize=True)
-    water.resize((CELLS_W, CELLS_H), Image.BOX).point(lambda v: 255 if v > 140 else 0).save(
-        os.path.join(OUT, "water.png"), optimize=True
+    sparkle.resize((CELLS_W, CELLS_H), Image.BOX).point(lambda v: 255 if v > 60 else 0).save(
+        os.path.join(OUT, "sparkle.png"), optimize=True
     )
     for i, frame in enumerate(bake_claaky_frames(back, sky)):
         frame.save(os.path.join(OUT, f"claaky{i}.png"), optimize=True)

@@ -4,11 +4,12 @@ import backUrl from "../assets/welcome/back.png";
 import claaky0Url from "../assets/welcome/claaky0.png";
 import claaky1Url from "../assets/welcome/claaky1.png";
 import frontUrl from "../assets/welcome/front.png";
-import waterUrl from "../assets/welcome/water.png";
+import sparkleUrl from "../assets/welcome/sparkle.png";
 
 /**
- * WelcomeArt — the pixel-mosaic panel of the Welcome screen: Claaky by an
- * autumn alpine lake (snowy peaks, larch forest, framing trees), drawn like an LED screen (one art pixel = one cell, with a
+ * WelcomeArt — the pixel-mosaic panel of the Welcome screen: a vivid autumn
+ * scene composed around Claaky (boulder, golden sprays, red bushes, cumulus),
+ * drawn like an LED screen (one art pixel = one cell, with a
  * thin light grid between cells).
  *
  * Art layers are 144×180 PNGs baked by scripts/welcome-art/generate_welcome_art.py.
@@ -19,7 +20,7 @@ import waterUrl from "../assets/welcome/water.png";
  *   - clouds drifting one cell at a time
  *   - Claaky bobbing by one cell (two frames baked into the scene, so his
  *     edges, lighting and shadow already blend with the meadow)
- *   - sun glints sparkling on the lake (water.png mask)
+ *   - golden flowers twinkling (sparkle.png mask)
  *   - autumn leaves falling across the scene (click = gust of leaves)
  * Everything stops on the first full frame under prefers-reduced-motion.
  */
@@ -126,7 +127,7 @@ export function WelcomeArt({ className }: { className?: string }) {
     const threshold = bayer8();
 
     const leaves: Leaf[] = Array.from({ length: 18 }, () => ambientLeaf(Math.random, true));
-    let waterCells: number[] = [];
+    let sparkleCells: number[] = [];
     const glints: Array<{ i: number; born: number }> = [];
 
     // Canvas geometry (device pixels).
@@ -171,7 +172,7 @@ export function WelcomeArt({ className }: { className?: string }) {
       const [sky, back, claakyRest, claakyUp, front] = layers;
       const t = start < 0 ? 0 : now - start;
       const reveal = reduced ? 2 : Math.min(2, t / REVEAL_MS);
-      const skyShift = reduced ? 0 : Math.floor(t / 650) % sky.w;
+      const skyShift = reduced ? 0 : Math.floor(t / 1100) % sky.w;
       const bob = !reduced && Math.sin(t / 520) > 0.35 ? 1 : 0;
       const out = frame.data;
 
@@ -218,7 +219,7 @@ export function WelcomeArt({ className }: { className?: string }) {
         }
       }
 
-      // Sun glints on the lake: a few water cells flare and fade.
+      // Golden flowers twinkle: a few flower cells flare and fade.
       if (reveal >= 1) {
         for (let k = glints.length - 1; k >= 0; k -= 1) {
           const age = (now - glints[k].born) / GLINT_MS;
@@ -271,8 +272,8 @@ export function WelcomeArt({ className }: { className?: string }) {
       if (now - last < 1000 / FPS) return;
       const dt = Math.min(0.1, (now - (last || now)) / 1000);
       last = now;
-      if (waterCells.length && glints.length < 14 && Math.random() < 0.6) {
-        glints.push({ i: waterCells[Math.floor(Math.random() * waterCells.length)], born: now });
+      if (sparkleCells.length && glints.length < 10 && Math.random() < 0.45) {
+        glints.push({ i: sparkleCells[Math.floor(Math.random() * sparkleCells.length)], born: now });
       }
       for (let i = leaves.length - 1; i >= 0; i -= 1) {
         const leaf = leaves[i];
@@ -315,12 +316,12 @@ export function WelcomeArt({ className }: { className?: string }) {
     const observer = new ResizeObserver(resize);
     canvas.addEventListener("pointerdown", onPointerDown);
 
-    void Promise.all([skyUrl, backUrl, claaky0Url, claaky1Url, frontUrl, waterUrl].map(loadPixels))
+    void Promise.all([skyUrl, backUrl, claaky0Url, claaky1Url, frontUrl, sparkleUrl].map(loadPixels))
       .then((loaded) => {
         if (disposed) return;
-        const water = loaded[5];
-        waterCells = [];
-        for (let i = 0; i < CW * CH; i += 1) if (water.data[i * 4] > 127) waterCells.push(i);
+        const sparkle = loaded[5];
+        sparkleCells = [];
+        for (let i = 0; i < CW * CH; i += 1) if (sparkle.data[i * 4] > 127) sparkleCells.push(i);
         layers = loaded.slice(0, 5);
         start = performance.now();
         observer.observe(host);
