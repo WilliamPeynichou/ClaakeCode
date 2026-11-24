@@ -1,15 +1,13 @@
-import { ClaakeCodeMark } from "../ClaakeCodeMark";
+import { ClaakyRoom } from "./ClaakyRoom";
 
-/** Editor empty state: the Claake Code mark (Claaky lives in the chat), with two quick starts. */
+/** Editor empty state: Claaky's 3D room (reacts to the agent), with two quick starts. */
 export function ClaakyEmpty() {
   const act = (action: "new-chat" | "new-rlm-chat") =>
     window.dispatchEvent(new CustomEvent("claakecode:claaky-action", { detail: action }));
 
   return (
     <div className="editor-empty claaky-empty">
-      <span className="brand-tile" aria-hidden="true">
-        <ClaakeCodeMark size={56} decorative />
-      </span>
+      <ClaakyRoom size={400} />
       <span className="editor-empty__title">Que faisons-nous ?</span>
       <span className="editor-empty__sub">
         Dites-le moi dans le chat, ou ouvrez un fichier dans la barre latérale.
