@@ -16,12 +16,10 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
 
 export type VoiceBarState = {
   phase: VoicePhase;
-  muted: boolean;
   level: number;
   error: string | null;
   modelProgress: number | null;
   canSpeak: boolean;
-  toggleMute: () => void;
   needsChoice: boolean;
   chooseEngine: (choice: "settings" | "apple-server" | "whisper") => void;
   stopSpeaking: () => void;
@@ -29,7 +27,7 @@ export type VoiceBarState = {
 };
 
 export function VoiceBar({ voice }: { voice: VoiceBarState }) {
-  const { phase, muted, level, error, modelProgress } = voice;
+  const { phase, level, error, modelProgress } = voice;
   if (phase === "off") {
     return (
       <div className="voice-bar" data-phase="off" role="alert">
@@ -93,21 +91,44 @@ export function VoiceBar({ voice }: { voice: VoiceBarState }) {
         <button
           type="button"
           className="voice-bar__btn"
-          data-active={muted ? "true" : undefined}
-          onClick={voice.toggleMute}
-          title={muted ? "Rallumer le micro (⌘⇧M)" : "Couper le micro (⌘⇧M)"}
-          aria-label={muted ? "Rallumer le micro" : "Couper le micro"}
-          aria-pressed={muted}
+          onClick={voice.exit}
+          title="Quitter le mode vocal"
+          aria-label="Quitter le mode vocal"
         >
-          <Icon
-            icon={muted ? "solar:microphone-3-bold" : "solar:microphone-3-linear"}
-            width={15}
-            height={15}
-          />
-          {muted && <span className="voice-bar__slash" aria-hidden="true" />}
+          <Icon icon="solar:close-circle-linear" width={15} height={15} />
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * The composer's mic: off → turns voice mode on; on → mutes/unmutes the mic (Discord-style),
+ * its halo following the voice level. Leaving voice mode is the ✕ in the voice bar.
+ */
+export function VoiceMicButton({
+  voice,
+}: {
+  voice: { active: boolean; phase: VoicePhase; muted: boolean; level: number; start: () => Promise<void>; toggleMute: () => void };
+}) {
+  const { active, phase, muted } = voice;
+  const label = !active ? "Activer le mode vocal" : muted ? "Rallumer le micro (⌘⇧M)" : "Couper le micro (⌘⇧M)";
+  return (
+    <button
+      type="button"
+      className="composer__iconbtn composer__voice"
+      data-active={active ? "true" : undefined}
+      data-phase={active ? phase : undefined}
+      data-muted={active && muted ? "true" : undefined}
+      style={{ "--voice-level": active && !muted ? Math.min(1, Math.max(0, voice.level)) : 0 } as React.CSSProperties}
+      onClick={() => (active ? voice.toggleMute() : void voice.start())}
+      title={label}
+      aria-label={label}
+      aria-pressed={active ? !muted : false}
+    >
+      <Icon icon={active && !muted ? "solar:microphone-3-bold" : "solar:microphone-3-linear"} width={16} height={16} />
+      {active && muted && <span className="voice-bar__slash" aria-hidden="true" />}
+    </button>
   );
 }
 

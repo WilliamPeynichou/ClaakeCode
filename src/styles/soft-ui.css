@@ -988,9 +988,16 @@ svg.cc-mark.cc-mark {
    Voice mode: voice bar in the composer, "Synthèse" card, entry button
    ================================================================ */
 .composer__voice[data-active="true"] {
+  --voice-level: 0;
+  position: relative;
   color: var(--accent);
   background: var(--accent-soft);
+  /* Halo follows the voice: you see the mic hear you. */
+  box-shadow: 0 0 0 calc(var(--voice-level) * 5px) var(--accent-soft);
+  transition: box-shadow 80ms linear;
 }
+.composer__voice[data-muted="true"] { color: var(--danger); background: transparent; box-shadow: none; }
+.composer__voice[data-phase="starting"] { animation: voice-pulse 1.1s ease-in-out infinite; }
 .composer__deafen { position: relative; }
 .composer__deafen[data-active="true"] { color: var(--danger); }
 

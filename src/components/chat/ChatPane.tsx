@@ -33,7 +33,7 @@ import { fileIcon } from "../../lib/fileIcon";
 import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
 import { takeComposerText } from "./ChatSurface";
 import { useVoiceMode } from "../../lib/useVoiceMode";
-import { AssistantMarkdown, DeafenButton, VoiceBar, VoiceReadContext } from "./VoiceBar";
+import { AssistantMarkdown, DeafenButton, VoiceBar, VoiceMicButton, VoiceReadContext } from "./VoiceBar";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -4117,17 +4117,7 @@ export function ChatPane({
               )}
             </div>
             <div className="composer__actions-right">
-              <button
-                type="button"
-                className="composer__iconbtn composer__voice"
-                data-active={voice.active ? "true" : undefined}
-                onClick={() => (voice.active ? voice.exit() : void voice.start())}
-                title={voice.active ? "Quitter le mode vocal" : "Activer le mode vocal"}
-                aria-label={voice.active ? "Quitter le mode vocal" : "Activer le mode vocal"}
-                aria-pressed={voice.active}
-              >
-                <Icon icon="solar:microphone-3-linear" width={16} height={16} />
-              </button>
+              <VoiceMicButton voice={voice} />
               {voice.active && <DeafenButton deafened={voice.deafened} onToggle={voice.toggleDeafen} />}
               <button
                 type="button"

@@ -530,11 +530,17 @@ export function CompanionBubble({ onClose }: Props) {
           <button
             type="button"
             className="companion-bubble__voice"
-            aria-pressed={voice.active}
-            onClick={() => (voice.active ? voice.exit() : void voice.start())}
-            title={voice.active ? "Quitter le mode vocal" : "Mode vocal : parlez à Claaky"}
+            aria-pressed={voice.active && !voice.muted}
+            onClick={() => (voice.active ? voice.toggleMute() : void voice.start())}
+            title={
+              !voice.active
+                ? "Mode vocal : parlez à Claaky"
+                : voice.muted
+                  ? "Rallumer le micro (⌘⇧M)"
+                  : "Couper le micro (⌘⇧M)"
+            }
           >
-            Voix
+            {!voice.active ? "Voix" : voice.muted ? "Micro coupé" : "Micro"}
           </button>
           {voice.active && (
             <button
