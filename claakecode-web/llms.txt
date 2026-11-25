@@ -5,7 +5,7 @@
 - Plateformes : macOS, Windows et Linux pour le chat classique.
 - RLM Prime est expérimental et disponible sur macOS et Linux uniquement, pas sur Windows. Il utilise un Python persistant et un worktree Git ; un dépôt avec au moins un commit est requis. Un worktree n’est pas un bac à sable de sécurité.
 - Les modèles nécessitent vos accès fournisseur ; les requêtes et le contexte utile sont envoyés aux services configurés.
-- Version 0.3.0 en cours de publication (refonte graphique Soft) : cette page décrit des changements prévus, pas une version déjà publiée. Les téléchargements suivent la dernière version stable publiée sur GitHub, qui peut être antérieure.
+- Version 0.3.2 : mode vocal dans tous les chats. Transcription en direct, envoi après 2 s de silence, synthèse lue à voix haute en fin de tâche. Reconnaissance Apple sur macOS (sur l’appareil si la Dictée est activée, serveurs d’Apple seulement avec accord), Whisper local sur Windows et Linux.
 
 ## Page unique
 
@@ -15,7 +15,7 @@
 - [Outils, skills et MCP](https://claakecode-web.vercel.app/#outils)
 - [RLM Prime et limites](https://claakecode-web.vercel.app/#rlm)
 - [Leçons et mesures](https://claakecode-web.vercel.app/#apprentissage)
-- [Version 0.3.0 en cours de publication](https://claakecode-web.vercel.app/#version)
+- [Version 0.3.2 : mode vocal](https://claakecode-web.vercel.app/#version)
 - [Questions fréquentes](https://claakecode-web.vercel.app/#faq)
 - [Téléchargements](https://claakecode-web.vercel.app/#telecharger)
 
