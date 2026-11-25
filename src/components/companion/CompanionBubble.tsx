@@ -536,6 +536,16 @@ export function CompanionBubble({ onClose }: Props) {
           >
             Voix
           </button>
+          {voice.active && (
+            <button
+              type="button"
+              aria-pressed={voice.deafened}
+              onClick={voice.toggleDeafen}
+              title={voice.deafened ? "Remettre la voix de Claaky (⌘⇧D)" : "Couper la voix de Claaky (⌘⇧D)"}
+            >
+              {voice.deafened ? "Son coupé" : "Son"}
+            </button>
+          )}
           <button type="button" onClick={() => void capture()} title="Capturer une zone de l'écran">
             Zone
           </button>

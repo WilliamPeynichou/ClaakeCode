@@ -32,9 +32,8 @@ import { TodoStrip, type QueuedPromptStripItem } from "./TodoStrip";
 import { fileIcon } from "../../lib/fileIcon";
 import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
 import { takeComposerText } from "./ChatSurface";
-import { useDictation } from "../../lib/useDictation";
 import { useVoiceMode } from "../../lib/useVoiceMode";
-import { AssistantMarkdown, VoiceBar, VoiceReadContext } from "./VoiceBar";
+import { AssistantMarkdown, DeafenButton, VoiceBar, VoiceReadContext } from "./VoiceBar";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -533,18 +532,6 @@ export function ChatPane({
   const modeRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const dictation = useDictation(
-    useCallback((spoken: string) => {
-      const ta = textareaRef.current;
-      const start = ta?.selectionStart ?? text.length;
-      const end = ta?.selectionEnd ?? text.length;
-      const before = text.slice(0, start);
-      const lead = before && !/\s$/.test(before) ? " " : "";
-      const insertion = lead + spoken;
-      pendingCaretRef.current = start + insertion.length;
-      setText(before + insertion + text.slice(end));
-    }, [text]),
-  );
   const voiceActiveRef = useRef(false);
   const sendVoiceRef = useRef<(text: string) => void>(() => {});
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
@@ -3746,11 +3733,6 @@ export function ChatPane({
             />
           )}
           {(voice.active || voice.error) && <VoiceBar voice={voice} />}
-          {dictation.error && !voice.active && !voice.error && (
-            <div className="voice-bar" data-phase="off" role="alert">
-              <span className="voice-bar__label">{dictation.error}</span>
-            </div>
-          )}
           <div className="composer__input-wrap">
             <div
               className="composer__overlay"
@@ -4140,45 +4122,13 @@ export function ChatPane({
                 className="composer__iconbtn composer__voice"
                 data-active={voice.active ? "true" : undefined}
                 onClick={() => (voice.active ? voice.exit() : void voice.start())}
-                disabled={dictation.state !== "idle"}
-                title={voice.active ? "Quitter le mode vocal" : "Mode vocal : parlez à l'agent"}
-                aria-label="Voice mode"
+                title={voice.active ? "Quitter le mode vocal" : "Activer le mode vocal"}
+                aria-label={voice.active ? "Quitter le mode vocal" : "Activer le mode vocal"}
                 aria-pressed={voice.active}
               >
-                <Icon icon="solar:soundwave-linear" width={16} height={16} />
+                <Icon icon="solar:microphone-3-linear" width={16} height={16} />
               </button>
-              <button
-                type="button"
-                className="composer__iconbtn composer__mic"
-                data-state={dictation.state}
-                onClick={() => void dictation.toggle()}
-                disabled={dictation.state === "downloading" || dictation.state === "transcribing"}
-                title={
-                  dictation.error ??
-                  (dictation.state === "downloading"
-                    ? `Downloading speech model… ${Math.round(dictation.progress * 100)}%`
-                    : dictation.state === "recording"
-                      ? "Stop dictation"
-                      : dictation.state === "transcribing"
-                        ? "Transcribing…"
-                        : "Dictate")
-                }
-                aria-label="Voice dictation"
-              >
-                {dictation.state === "downloading" ? (
-                  <span className="composer__mic-pct">{Math.round(dictation.progress * 100)}</span>
-                ) : (
-                  <Icon
-                    icon={
-                      dictation.state === "recording"
-                        ? "solar:stop-circle-bold"
-                        : "solar:microphone-3-linear"
-                    }
-                    width={16}
-                    height={16}
-                  />
-                )}
-              </button>
+              {voice.active && <DeafenButton deafened={voice.deafened} onToggle={voice.toggleDeafen} />}
               <button
                 type="button"
                 className="composer__iconbtn composer__compact"

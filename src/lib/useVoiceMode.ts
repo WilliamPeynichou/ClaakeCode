@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "./ipc";
-import { ensureDictationModel } from "./useDictation";
 import { extractSpoken } from "./spoken";
 import {
   PARTIAL_EVERY_MS,
@@ -27,6 +26,28 @@ export function readVoiceEngine(): VoiceEngine {
 
 export function saveVoiceEngine(engine: VoiceEngine) {
   localStorage.setItem(ENGINE_KEY, engine);
+}
+
+/** Confirms and downloads the local speech model if missing. False when the user declines. */
+export async function ensureDictationModel(onProgress?: (fraction: number) => void): Promise<boolean> {
+  const status = await api.dictationModelStatus();
+  if (status.installed) return true;
+  const mb = Math.round(status.sizeBytes / 1_000_000);
+  const ok = window.confirm(
+    `Voice runs locally and needs a one-time download of the speech model (about ${mb} MB). Download it now?`,
+  );
+  if (!ok) return false;
+  onProgress?.(0);
+  const unlisten = await listen<{ received: number; total: number }>(
+    "dictation-model-progress",
+    (e) => onProgress?.(e.payload.total > 0 ? e.payload.received / e.payload.total : 0),
+  );
+  try {
+    await api.dictationDownloadModel();
+  } finally {
+    unlisten();
+  }
+  return true;
 }
 
 export type VoicePhase = "off" | "starting" | "listening" | "muted" | "hearing" | "transcribing" | "speaking";

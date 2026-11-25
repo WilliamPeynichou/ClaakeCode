@@ -17,13 +17,11 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
 export type VoiceBarState = {
   phase: VoicePhase;
   muted: boolean;
-  deafened: boolean;
   level: number;
   error: string | null;
   modelProgress: number | null;
   canSpeak: boolean;
   toggleMute: () => void;
-  toggleDeafen: () => void;
   needsChoice: boolean;
   chooseEngine: (choice: "settings" | "apple-server" | "whisper") => void;
   stopSpeaking: () => void;
@@ -108,33 +106,30 @@ export function VoiceBar({ voice }: { voice: VoiceBarState }) {
           />
           {muted && <span className="voice-bar__slash" aria-hidden="true" />}
         </button>
-        <button
-          type="button"
-          className="voice-bar__btn"
-          data-active={voice.deafened ? "true" : undefined}
-          onClick={voice.toggleDeafen}
-          title={voice.deafened ? "Rallumer le son (⌘⇧D)" : "Couper le son (⌘⇧D)"}
-          aria-label={voice.deafened ? "Rallumer le son" : "Couper le son"}
-          aria-pressed={voice.deafened}
-        >
-          <Icon
-            icon={voice.deafened ? "solar:headphones-round-bold" : "solar:headphones-round-linear"}
-            width={15}
-            height={15}
-          />
-          {voice.deafened && <span className="voice-bar__slash" aria-hidden="true" />}
-        </button>
-        <button
-          type="button"
-          className="voice-bar__btn"
-          onClick={voice.exit}
-          title="Quitter le mode vocal"
-          aria-label="Quitter le mode vocal"
-        >
-          <Icon icon="solar:close-circle-linear" width={15} height={15} />
-        </button>
       </div>
     </>
+  );
+}
+
+/** Mutes the agent's voice (Discord-style headphones), shown next to the voice-mode button. */
+export function DeafenButton({ deafened, onToggle }: { deafened: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className="composer__iconbtn composer__deafen"
+      data-active={deafened ? "true" : undefined}
+      onClick={onToggle}
+      title={deafened ? "Remettre la voix de l'agent (⌘⇧D)" : "Couper la voix de l'agent (⌘⇧D)"}
+      aria-label={deafened ? "Remettre la voix de l'agent" : "Couper la voix de l'agent"}
+      aria-pressed={deafened}
+    >
+      <Icon
+        icon={deafened ? "solar:headphones-round-bold" : "solar:headphones-round-linear"}
+        width={16}
+        height={16}
+      />
+      {deafened && <span className="voice-bar__slash" aria-hidden="true" />}
+    </button>
   );
 }
 

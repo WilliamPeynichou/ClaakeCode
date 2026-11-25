@@ -984,24 +984,6 @@ svg.cc-mark.cc-mark {
   .app-boot__mark { animation: none; }
 }
 
-.composer__mic[data-state="recording"] {
-  color: #e5484d;
-  animation: composer-mic-pulse 1.2s ease-in-out infinite;
-}
-.composer__mic[data-state="transcribing"] {
-  opacity: 0.5;
-}
-.composer__mic-pct {
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-@keyframes composer-mic-pulse {
-  50% { opacity: 0.45; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .composer__mic[data-state="recording"] { animation: none; }
-}
-
 /* ================================================================
    Voice mode: voice bar in the composer, "Synthèse" card, entry button
    ================================================================ */
@@ -1009,6 +991,8 @@ svg.cc-mark.cc-mark {
   color: var(--accent);
   background: var(--accent-soft);
 }
+.composer__deafen { position: relative; }
+.composer__deafen[data-active="true"] { color: var(--danger); }
 
 .voice-bar {
   display: flex;
