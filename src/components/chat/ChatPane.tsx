@@ -3065,6 +3065,11 @@ export function ChatPane({
     send: (spoken) => sendVoiceRef.current(spoken),
     stop: () => void onStop().catch(() => {}),
     vocabulary: voiceVocabulary,
+    composerText: () => text,
+    onDraft: (draft) => {
+      pendingCaretRef.current = draft.length;
+      setText(draft);
+    },
   });
   voiceActiveRef.current = voice.active;
 

@@ -1,5 +1,7 @@
 export const TARGET_RATE = 16_000;
-export const END_SILENCE_MS = 1200;
+export const END_SILENCE_MS = 2000;
+/** How often the composer shows a fresh partial transcript while the user speaks. */
+export const PARTIAL_EVERY_MS = 2000;
 export const MIN_PHRASE_MS = 400;
 export const MAX_PHRASE_MS = 30_000;
 export const PRE_ROLL_MS = 300;
@@ -47,6 +49,11 @@ export function interpretTranscript(text: string): VoiceInput {
   return normalized.split(" ").filter(Boolean).length >= 2 ? { kind: "message", text: trimmed } : { kind: "ignore" };
 }
 
+/** Text typed before speaking stays at the start of the message. */
+export function joinDraft(...parts: string[]): string {
+  return parts.map((p) => p.trim()).filter(Boolean).join(" ");
+}
+
 export function rms(samples: Float32Array): number {
   if (!samples.length) return 0;
   let sum = 0;
@@ -69,7 +76,8 @@ export function resampleTo16k(samples: Float32Array, fromRate: number): Float32A
   return out;
 }
 
-export type DetectorEvent = "start" | "end" | "discard" | null;
+/** "split": the phrase hit MAX_PHRASE_MS; transcribe that chunk and keep listening. */
+export type DetectorEvent = "start" | "split" | "end" | "discard" | null;
 
 /** Turns a stream of RMS levels into phrase start/end events. */
 export class PhraseDetector {
@@ -114,10 +122,14 @@ export class PhraseDetector {
     } else {
       this.silenceMs += frameMs;
     }
-    if (this.silenceMs >= END_SILENCE_MS || this.totalMs >= MAX_PHRASE_MS) {
+    if (this.silenceMs >= END_SILENCE_MS) {
       const keep = this.voicedMs >= MIN_PHRASE_MS;
       this.reset();
       return keep ? "end" : "discard";
+    }
+    if (this.totalMs >= MAX_PHRASE_MS) {
+      this.totalMs = 0;
+      return "split";
     }
     return null;
   }

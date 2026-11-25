@@ -3,10 +3,12 @@ import { api } from "./ipc";
 import { ensureDictationModel } from "./useDictation";
 import { extractSpoken } from "./spoken";
 import {
+  PARTIAL_EVERY_MS,
   PRE_ROLL_MS,
   PhraseDetector,
   detectLanguage,
   interpretTranscript,
+  joinDraft,
   resampleTo16k,
   rms,
   micErrorMessage,
@@ -21,6 +23,10 @@ type Options = {
   send: (text: string) => void | Promise<void>;
   stop: () => void | Promise<void>;
   vocabulary?: () => string;
+  /** Current composer text, kept at the start of the spoken message. */
+  composerText: () => string;
+  /** Shows the live transcript in the composer ("" once the message is sent). */
+  onDraft: (text: string) => void;
 };
 
 function beep(ctx: AudioContext, freqs: number[]) {
@@ -37,6 +43,16 @@ function beep(ctx: AudioContext, freqs: number[]) {
     osc.start(at);
     osc.stop(at + 0.12);
   });
+}
+
+function concat(frames: Float32Array[]): Float32Array {
+  const merged = new Float32Array(frames.reduce((n, f) => n + f.length, 0));
+  let offset = 0;
+  for (const f of frames) {
+    merged.set(f, offset);
+    offset += f.length;
+  }
+  return merged;
 }
 
 function pickVoice(lang: "fr" | "en"): SpeechSynthesisVoice | undefined {
@@ -69,6 +85,13 @@ export function useVoiceMode(opts: Options) {
   const phraseRef = useRef<Float32Array[]>([]);
   const generationRef = useRef(0);
   const inFlightRef = useRef(0);
+  const messageRef = useRef(0);
+  const draftShownRef = useRef(-1);
+  const baseRef = useRef("");
+  const chunksRef = useRef<Promise<string>[]>([]);
+  const chunkTextsRef = useRef<string[]>([]);
+  const sincePartialMsRef = useRef(0);
+  const partialBusyRef = useRef(false);
 
   const changePhase = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
@@ -180,21 +203,43 @@ export function useVoiceMode(opts: Options) {
     [exit, repeat],
   );
 
-  const transcribe = useCallback(
-    async (samples: Float32Array) => {
+  const transcribeText = useCallback(async (samples: Float32Array) => {
+    const vocabulary = optsRef.current.vocabulary?.();
+    return (await api.transcribeAudio(samples, vocabulary || undefined)).text;
+  }, []);
+
+  /** Puts `voiceText` in the composer after the text typed before speaking. */
+  const showDraft = useCallback((voiceText: string) => {
+    draftShownRef.current = messageRef.current;
+    optsRef.current.onDraft(joinDraft(baseRef.current, voiceText));
+  }, []);
+
+  /** Drops the phrase being heard and gives the composer back its typed text. */
+  const abandonPhrase = useCallback(() => {
+    if (draftShownRef.current === messageRef.current) optsRef.current.onDraft(baseRef.current);
+    messageRef.current += 1;
+  }, []);
+
+  const finalize = useCallback(
+    async (base: string, chunks: Promise<string>[], samples: Float32Array, message: number) => {
       const generation = generationRef.current;
       inFlightRef.current += 1;
       try {
-        const vocabulary = optsRef.current.vocabulary?.();
-        const { text } = await api.transcribeAudio(samples, vocabulary || undefined);
+        const [parts, last] = await Promise.all([Promise.all(chunks), transcribeText(samples)]);
         if (generation !== generationRef.current) return;
-        const input = interpretTranscript(text);
-        if (input.kind === "command") {
-          runCommand(input.command);
-          if (input.command === "exit") return;
-          if (input.command === "repeat" && phaseRef.current === "speaking") return;
-        } else if (input.kind === "message") {
-          void optsRef.current.send(input.text);
+        // A new phrase may already own the composer: only touch it if not.
+        const ownsComposer = messageRef.current === message;
+        const input = interpretTranscript(joinDraft(...parts, last));
+        if (input.kind === "message") {
+          void optsRef.current.send(joinDraft(base, input.text));
+          if (ownsComposer) optsRef.current.onDraft("");
+        } else {
+          if (ownsComposer) optsRef.current.onDraft(base);
+          if (input.kind === "command") {
+            runCommand(input.command);
+            if (input.command === "exit") return;
+            if (input.command === "repeat" && phaseRef.current === "speaking") return;
+          }
         }
       } catch (e) {
         if (generation !== generationRef.current) return;
@@ -206,7 +251,25 @@ export function useVoiceMode(opts: Options) {
         resumeListening(false);
       }
     },
-    [changePhase, resumeListening, runCommand],
+    [resumeListening, runCommand, transcribeText],
+  );
+
+  const partial = useCallback(
+    (samples: Float32Array) => {
+      const generation = generationRef.current;
+      const message = messageRef.current;
+      partialBusyRef.current = true;
+      void transcribeText(samples)
+        .then((text) => {
+          if (generation !== generationRef.current || message !== messageRef.current) return;
+          showDraft(joinDraft(...chunkTextsRef.current, text));
+        })
+        .catch(() => {})
+        .finally(() => {
+          partialBusyRef.current = false;
+        });
+    },
+    [showDraft, transcribeText],
   );
 
   const onFrame = useCallback(
@@ -219,6 +282,12 @@ export function useVoiceMode(opts: Options) {
       setLevel(Math.min(1, levelNow * 8));
       const event = detectorRef.current.push(levelNow, frameMs);
       if (event === "start") {
+        messageRef.current += 1;
+        // While the previous message is still being transcribed, the composer shows its draft.
+        baseRef.current = inFlightRef.current > 0 ? "" : optsRef.current.composerText();
+        chunksRef.current = [];
+        chunkTextsRef.current = [];
+        sincePartialMsRef.current = 0;
         phraseRef.current = [...preRollRef.current, frame];
         changePhase("hearing");
         return;
@@ -230,23 +299,33 @@ export function useVoiceMode(opts: Options) {
         return;
       }
       phraseRef.current.push(frame);
-      if (event === "end") {
-        const length = phraseRef.current.reduce((n, f) => n + f.length, 0);
-        const merged = new Float32Array(length);
-        let offset = 0;
-        for (const f of phraseRef.current) {
-          merged.set(f, offset);
-          offset += f.length;
-        }
+      if (event === "split") {
+        const index = chunksRef.current.length;
+        const chunk = transcribeText(resampleTo16k(concat(phraseRef.current), sampleRate))
+          .then((text) => (chunkTextsRef.current[index] = text))
+          .catch(() => "");
+        chunksRef.current.push(chunk);
+        phraseRef.current = [];
+        sincePartialMsRef.current = 0;
+      } else if (event === "end") {
+        const samples = resampleTo16k(concat(phraseRef.current), sampleRate);
+        const chunks = chunksRef.current;
         resetCapture();
         changePhase("transcribing");
-        void transcribe(resampleTo16k(merged, sampleRate));
+        void finalize(baseRef.current, chunks, samples, messageRef.current);
       } else if (event === "discard") {
+        abandonPhrase();
         resetCapture();
         changePhase(inFlightRef.current > 0 ? "transcribing" : idlePhase());
+      } else {
+        sincePartialMsRef.current += frameMs;
+        if (sincePartialMsRef.current >= PARTIAL_EVERY_MS && !partialBusyRef.current && inFlightRef.current === 0) {
+          sincePartialMsRef.current = 0;
+          partial(resampleTo16k(concat(phraseRef.current), sampleRate));
+        }
       }
     },
-    [changePhase, idlePhase, resetCapture, transcribe],
+    [abandonPhrase, changePhase, finalize, idlePhase, partial, resetCapture, transcribeText],
   );
 
   const start = useCallback(async () => {
@@ -283,10 +362,11 @@ export function useVoiceMode(opts: Options) {
     const next = !mutedRef.current;
     mutedRef.current = next;
     setMuted(next);
+    if (detectorRef.current.inPhrase) abandonPhrase();
     resetCapture();
     const current = phaseRef.current;
     if (current === "listening" || current === "hearing" || current === "muted") changePhase(next ? "muted" : "listening");
-  }, [changePhase, resetCapture]);
+  }, [abandonPhrase, changePhase, resetCapture]);
 
   const wasBusyRef = useRef(opts.isBusy);
   useEffect(() => {

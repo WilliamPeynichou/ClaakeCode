@@ -5,6 +5,7 @@ import {
   PhraseDetector,
   detectLanguage,
   interpretTranscript,
+  joinDraft,
   normalizeSpeech,
   resampleTo16k,
   rms,
@@ -73,33 +74,39 @@ const feed = (d: PhraseDetector, level: number, ms: number, step = 100) => {
   return events;
 };
 
-test("phrase ends after 1200 ms of silence", () => {
+test("phrase ends after 2000 ms of silence", () => {
   const d = new PhraseDetector();
   assert.deepEqual(feed(d, 0.003, 1000), []);
   assert.deepEqual(feed(d, 0.2, 1000), ["start"]);
-  assert.deepEqual(feed(d, 0.003, 1100), []);
+  assert.deepEqual(feed(d, 0.003, 1900), []);
   assert.deepEqual(feed(d, 0.003, 100), ["end"]);
   assert.equal(d.inPhrase, false);
 });
 
-test("a pause shorter than 1200 ms keeps the phrase", () => {
+test("a pause shorter than 2000 ms keeps the phrase", () => {
   const d = new PhraseDetector();
   assert.deepEqual(feed(d, 0.2, 500), ["start"]);
-  assert.deepEqual(feed(d, 0.003, 1000), []);
+  assert.deepEqual(feed(d, 0.003, 1800), []);
   assert.deepEqual(feed(d, 0.2, 500), []);
-  assert.deepEqual(feed(d, 0.003, 1200), ["end"]);
+  assert.deepEqual(feed(d, 0.003, 2000), ["end"]);
 });
 
 test("a short blip is discarded", () => {
   const d = new PhraseDetector();
   assert.deepEqual(feed(d, 0.2, 200), ["start"]);
-  assert.deepEqual(feed(d, 0.003, 1300), ["discard"]);
+  assert.deepEqual(feed(d, 0.003, 2100), ["discard"]);
 });
 
-test("a phrase is cut at 30 s", () => {
+test("a long phrase is split every 30 s and only ends on silence", () => {
   const d = new PhraseDetector();
-  const events = feed(d, 0.2, 31_000);
-  assert.deepEqual(events.slice(0, 2), ["start", "end"]);
+  assert.deepEqual(feed(d, 0.2, 61_000), ["start", "split", "split"]);
+  assert.equal(d.inPhrase, true);
+  assert.deepEqual(feed(d, 0.003, 2000), ["end"]);
+});
+
+test("joinDraft keeps typed text first", () => {
+  assert.equal(joinDraft("  regarde ", "", "le fichier main"), "regarde le fichier main");
+  assert.equal(joinDraft("", "  "), "");
 });
 
 test("threshold adapts to background noise", () => {

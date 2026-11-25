@@ -321,6 +321,8 @@ export function CompanionBubble({ onClose }: Props) {
     lastAssistantText: () => [...messagesRef.current].reverse().find((m) => m.role === "assistant")?.text ?? null,
     send: interruptAndSend,
     stop: cancel,
+    composerText: () => text,
+    onDraft: setText,
   });
   voiceActiveRef.current = voice.active;
 
