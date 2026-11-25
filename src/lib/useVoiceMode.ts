@@ -608,6 +608,8 @@ export function useVoiceMode(opts: Options) {
   return {
     active: phase !== "off",
     phase,
+    /** The composer shows a live transcript that is not yet validated (sent). */
+    drafting: phase === "hearing" || phase === "transcribing",
     muted,
     deafened,
     level,

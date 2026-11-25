@@ -1036,6 +1036,11 @@ svg.cc-mark.cc-mark {
 .voice-bar[data-phase="speaking"] .voice-bar__dot { animation: voice-pulse 0.9s ease-in-out infinite; }
 .voice-bar__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-bar__spacer { flex: 1; }
+/* Live transcript, not yet sent: dimmed italics on both layers so the caret stays aligned. */
+.composer__input-wrap[data-voice-draft="true"] .composer__input,
+.composer__input-wrap[data-voice-draft="true"] .composer__overlay { font-style: italic; }
+.composer__input-wrap[data-voice-draft="true"] .composer__overlay { color: var(--text-muted); }
+textarea[data-voice-draft="true"] { font-style: italic; color: var(--text-muted); }
 /* Live graph: the foreground voice in color, background noise in grey (ignored). */
 .voice-meter { flex: none; display: inline-flex; align-items: center; gap: 1.5px; height: 16px; }
 .voice-meter > span { width: 2px; border-radius: 1px; background: var(--text-faint); opacity: 0.45; transition: height 80ms linear; }

@@ -3733,7 +3733,7 @@ export function ChatPane({
             />
           )}
           {(voice.active || voice.error) && <VoiceBar voice={voice} />}
-          <div className="composer__input-wrap">
+          <div className="composer__input-wrap" data-voice-draft={voice.drafting ? "true" : undefined}>
             <div
               className="composer__overlay"
               ref={overlayRef}

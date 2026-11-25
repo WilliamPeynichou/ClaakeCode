@@ -496,6 +496,7 @@ export function CompanionBubble({ onClose }: Props) {
           placeholder={mode === "ask" ? "Demandez à Claaky…" : "Décrivez la tâche pour Claake Code…"}
           rows={1}
           aria-label="Message"
+          data-voice-draft={voice.drafting ? "true" : undefined}
         />
         <div className="companion-bubble__controls">
           <div className="companion-bubble__mode" role="group" aria-label="Mode">
