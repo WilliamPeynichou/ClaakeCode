@@ -4,6 +4,7 @@ Code map:
 - Motion design du chat : `src/styles/chat-motion.css` (importé après `soft-ui.css` dans `src/main.tsx`) — entrée des 6 derniers messages (fondu + flou, bulle utilisateur à ressort), point « live » en fin de réponse via `.chat-body[data-phase]` (`ChatPane.tsx`), shimmer « Thinking », balayage des outils en cours via `.tool-card[data-status][data-tool]` (`ToolCard.tsx`), halo conique autour du composer pendant un tour (`.composer--selector-locked`), pilule glissante Chat/RLM (`ChatSurface.tsx`, variables `--ind-x/--ind-w`) ; tout est coupé sous `prefers-reduced-motion`.
 - Design system « Soft » (refonte UI, inspirée des listes iOS) : jetons clair/sombre en tête de `src/styles.css` (clair par défaut via `src/lib/theme.ts`), couche composants `src/styles/soft-ui.css` importée après dans `src/main.tsx` (barre de titre en pilule flottante `.titlebar__pill` dans `Workspace.tsx`, contrôles segmentés, composer flottant, bulles utilisateur à droite), avatars générés `src/components/BlobAvatar.tsx` (+ `shortRelativeTime`) utilisés par `ConversationList.tsx` et `Welcome.tsx` (Claaky 2D en héros), thèmes Monaco alignés dans `src/lib/monacoThemes.ts`, feux macOS recentrés (`trafficLightPosition.y = 22`, barre de 48 px).
 - IDE natif sans LLM : revue du diff avant commit (`git.rs` `git_file_diff_command`, `GitDiffDialog.tsx`), diagnostics automatiques `tsc`/`cargo check` après changement de fichier (`diagnostics.rs`, `ProblemsPanel.tsx`, marqueurs Monaco dans `EditorPane.tsx`, activation explicite par workspace) et hooks locaux configurables (`ide_hooks.rs`, `IdeHooksSection.tsx`, réglages dans le dossier de données de l'app, jamais lus depuis le dépôt) ; exécution bornée partagée dans `ide_process.rs`. Plans : `.claakecode/plans/plan-ide-*.md`.
+- Dictée vocale locale et gratuite (Whisper, rien ne quitte la machine) : bouton micro du composer (`ChatPane.tsx`, hook `src/lib/useDictation.ts` : MediaRecorder puis PCM mono 16 kHz envoyé en octets bruts) ; `src-tauri/src/dictation.rs` télécharge `ggml-small-q5_1.bin` au premier usage dans le dossier de données (SHA-256 épinglé) et transcrit via `whisper-rs` (Metal seulement sur Apple Silicon : faux résultats sur Mac Intel) ; Linux active le micro WebKitGTK (`allow_microphone`) ; `src-tauri/Info.plist` (NSMicrophoneUsageDescription), `Entitlements.plist`, macOS 10.15 minimum ; CI : cmake, libclang, `GGML_NATIVE=OFF`.
 - Site vitrine (`claakecode-web/`) : thème Soft aligné sur l'app (tokens clairs de `src/styles.css`, polices système, pilules, cartes arrondies colorées aux teintes des blobs) ; la première carte rejoue la scène d'accueil (`assets/welcome/*.png`, copiées de `src/assets/welcome/`, pixelisées, Claaky qui sautille en CSS). Version 0.3.0 mentionnée dans `index.html`, `llms.txt`.
 - Release `v0.2.15` : notes dans `.github/release-notes/v0.2.15.md` ; versions Rust, npm et Tauri alignées.
 - Chat RLM (`src-tauri/src/rlm.rs`) : nom Prime stable et distinct par conversation, reprise du transcript via `sessionPath` inchangée ; `prime.rs` masque le nom dans le diagnostic de collision.
@@ -225,6 +226,8 @@ Code map:
 │   ├── tauri.prime.conf.json — sidecars macOS/Linux : rg + prime-agent + uv (chat RLM)
 │   ├── tauri.conf.json
 │   ├── tauri.windows.conf.json
+│   ├── Info.plist — NSMicrophoneUsageDescription (dictée)
+│   ├── Entitlements.plist — micro pour un build signé (hardened runtime)
 │   ├── capabilities
 │   │   └── default.json
 │   ├── gen
@@ -302,6 +305,7 @@ Code map:
         ├── context.rs (poids du skill CLAAKE.md inclus)
 
 │       ├── conversations.rs
+│       ├── dictation.rs — dictée locale Whisper : modèle téléchargé au premier usage, transcription, micro Linux
 │       ├── git.rs
 │       ├── lib.rs
 │       ├── main.rs

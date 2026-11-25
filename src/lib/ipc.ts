@@ -1128,6 +1128,16 @@ export const api = {
       input: { deviceId },
     });
   },
+  dictationModelStatus() {
+    return invoke<{ installed: boolean; sizeBytes: number }>("dictation_model_status");
+  },
+  dictationDownloadModel() {
+    return invoke<void>("dictation_download_model");
+  },
+  /** Mono 16 kHz PCM, sent as raw bytes (Tauri passes typed arrays without JSON). */
+  transcribeAudio(samples: Float32Array) {
+    return invoke<{ text: string }>("transcribe_audio", new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength));
+  },
 };
 
 /** Lot C5: verification command typed in the composer for a Goal, per conversation. */

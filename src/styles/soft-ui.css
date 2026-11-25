@@ -983,3 +983,21 @@ svg.cc-mark.cc-mark {
   .brand-tile,
   .app-boot__mark { animation: none; }
 }
+
+.composer__mic[data-state="recording"] {
+  color: #e5484d;
+  animation: composer-mic-pulse 1.2s ease-in-out infinite;
+}
+.composer__mic[data-state="transcribing"] {
+  opacity: 0.5;
+}
+.composer__mic-pct {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes composer-mic-pulse {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer__mic[data-state="recording"] { animation: none; }
+}

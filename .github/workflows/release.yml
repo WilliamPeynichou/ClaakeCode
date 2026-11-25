@@ -153,7 +153,22 @@ jobs:
             build-essential \
             curl \
             wget \
-            file
+            file \
+            cmake \
+            libclang-dev
+
+      # whisper-rs compiles whisper.cpp (cmake) and runs bindgen (libclang).
+      # macOS: Xcode provides libclang. Windows: the runner image ships LLVM.
+      - name: Install whisper.cpp build tools (macOS)
+        if: runner.os == 'macOS'
+        run: command -v cmake || brew install cmake
+
+      - name: Install whisper.cpp build tools (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          command -v cmake || choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+          echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
 
       - name: Install npm dependencies
         run: npm ci
@@ -221,6 +236,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: "true"
+          # whisper.cpp uses std::filesystem (macOS 10.15+); matches bundle.macOS.minimumSystemVersion.
+          MACOSX_DEPLOYMENT_TARGET: "10.15"
+          # Otherwise whisper.cpp builds with -march=native and can crash on user CPUs older than the runner's.
+          GGML_NATIVE: "OFF"
           # Windows stays without the RLM engine until the daemon transport is ported.
           CLAAKECODE_BUNDLE_PRIME: ${{ matrix.platform.bundle_prime || '0' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

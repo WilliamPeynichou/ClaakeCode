@@ -134,6 +134,8 @@ pub(super) fn create_new_window(app: &AppHandle) -> Result<()> {
     }
 
     let window = builder.build().context("unable to create new window")?;
+    #[cfg(target_os = "linux")]
+    super::dictation::allow_microphone(&window);
     let _ = window.set_focus();
     Ok(())
 }

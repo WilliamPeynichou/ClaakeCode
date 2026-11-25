@@ -135,6 +135,7 @@ mod companion_window;
 mod context;
 mod conversations;
 mod diagnostics;
+mod dictation;
 mod event_pump;
 mod git;
 mod ide_hooks;
@@ -276,6 +277,11 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             let _ = app;
 
+            #[cfg(target_os = "linux")]
+            if let Some(main) = app.get_webview_window("main") {
+                dictation::allow_microphone(&main);
+            }
+
             // One-shot purge of legacy Google OAuth tokens so users coming from
             // pre-0.1.14 builds reconnect against the fixed Antigravity flow.
             match purge_legacy_google_oauth() {
@@ -366,6 +372,9 @@ pub fn run() {
         .manage(ide_hooks::HookRuntime::default())
         .manage(updater::UpdaterState::new())
         .invoke_handler(tauri::generate_handler![
+            dictation::dictation_model_status,
+            dictation::dictation_download_model,
+            dictation::transcribe_audio,
             workspace::open_workspace,
             workspace::open_new_window,
             workspace::reset_window_title,

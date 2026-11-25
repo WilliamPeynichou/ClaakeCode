@@ -61,6 +61,10 @@
     "resources": {
       "bundled-skills/": "bundled-skills/"
     },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "Entitlements.plist"
+    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
