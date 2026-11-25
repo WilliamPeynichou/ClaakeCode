@@ -24,6 +24,8 @@ export type VoiceBarState = {
   canSpeak: boolean;
   toggleMute: () => void;
   toggleDeafen: () => void;
+  needsChoice: boolean;
+  chooseEngine: (choice: "settings" | "apple-server" | "whisper") => void;
   stopSpeaking: () => void;
   exit: () => void;
 };
@@ -46,72 +48,93 @@ export function VoiceBar({ voice }: { voice: VoiceBarState }) {
       ? `Téléchargement du modèle vocal… ${Math.round(modelProgress * 100)} %`
       : PHASE_LABEL[phase];
   return (
-    <div className="voice-bar" data-phase={phase} role="status">
-      <span
-        className="voice-bar__dot"
-        style={{ "--voice-level": Math.min(1, Math.max(0, level)) } as React.CSSProperties}
-        aria-hidden="true"
-      />
-      <span className="voice-bar__label">{error ?? label}</span>
-      {modelProgress !== null && (
-        <span className="voice-bar__progress" aria-hidden="true">
-          <span style={{ width: `${Math.round(modelProgress * 100)}%` }} />
-        </span>
+    <>
+      {voice.needsChoice && (
+        <div className="voice-choice" role="alert">
+          <p>
+            La Dictée de macOS est désactivée : la reconnaissance vocale locale ne peut pas démarrer.
+          </p>
+          <div className="voice-choice__actions">
+            <button type="button" className="voice-choice__btn" data-primary="true" onClick={() => voice.chooseEngine("settings")}>
+              Activer la Dictée
+            </button>
+            <button type="button" className="voice-choice__btn" onClick={() => voice.chooseEngine("apple-server")}>
+              Utiliser les serveurs Apple
+            </button>
+            <button type="button" className="voice-choice__btn" onClick={() => voice.chooseEngine("whisper")}>
+              Garder Whisper (plus lent)
+            </button>
+          </div>
+          <small>Avec les serveurs Apple, votre voix est envoyée à Apple pour être transcrite.</small>
+        </div>
       )}
-      <span className="voice-bar__spacer" />
-      {phase === "speaking" && (
+      <div className="voice-bar" data-phase={phase} role="status">
+        <span
+          className="voice-bar__dot"
+          style={{ "--voice-level": Math.min(1, Math.max(0, level)) } as React.CSSProperties}
+          aria-hidden="true"
+        />
+        <span className="voice-bar__label">{error ?? label}</span>
+        {modelProgress !== null && (
+          <span className="voice-bar__progress" aria-hidden="true">
+            <span style={{ width: `${Math.round(modelProgress * 100)}%` }} />
+          </span>
+        )}
+        <span className="voice-bar__spacer" />
+        {phase === "speaking" && (
+          <button
+            type="button"
+            className="voice-bar__btn"
+            onClick={voice.stopSpeaking}
+            title="Arrêter la lecture (Échap)"
+            aria-label="Arrêter la lecture"
+          >
+            <Icon icon="solar:stop-circle-bold" width={15} height={15} />
+          </button>
+        )}
         <button
           type="button"
           className="voice-bar__btn"
-          onClick={voice.stopSpeaking}
-          title="Arrêter la lecture (Échap)"
-          aria-label="Arrêter la lecture"
+          data-active={muted ? "true" : undefined}
+          onClick={voice.toggleMute}
+          title={muted ? "Rallumer le micro (⌘⇧M)" : "Couper le micro (⌘⇧M)"}
+          aria-label={muted ? "Rallumer le micro" : "Couper le micro"}
+          aria-pressed={muted}
         >
-          <Icon icon="solar:stop-circle-bold" width={15} height={15} />
+          <Icon
+            icon={muted ? "solar:microphone-3-bold" : "solar:microphone-3-linear"}
+            width={15}
+            height={15}
+          />
+          {muted && <span className="voice-bar__slash" aria-hidden="true" />}
         </button>
-      )}
-      <button
-        type="button"
-        className="voice-bar__btn"
-        data-active={muted ? "true" : undefined}
-        onClick={voice.toggleMute}
-        title={muted ? "Rallumer le micro (⌘⇧M)" : "Couper le micro (⌘⇧M)"}
-        aria-label={muted ? "Rallumer le micro" : "Couper le micro"}
-        aria-pressed={muted}
-      >
-        <Icon
-          icon={muted ? "solar:microphone-3-bold" : "solar:microphone-3-linear"}
-          width={15}
-          height={15}
-        />
-        {muted && <span className="voice-bar__slash" aria-hidden="true" />}
-      </button>
-      <button
-        type="button"
-        className="voice-bar__btn"
-        data-active={voice.deafened ? "true" : undefined}
-        onClick={voice.toggleDeafen}
-        title={voice.deafened ? "Rallumer le son (⌘⇧D)" : "Couper le son (⌘⇧D)"}
-        aria-label={voice.deafened ? "Rallumer le son" : "Couper le son"}
-        aria-pressed={voice.deafened}
-      >
-        <Icon
-          icon={voice.deafened ? "solar:headphones-round-bold" : "solar:headphones-round-linear"}
-          width={15}
-          height={15}
-        />
-        {voice.deafened && <span className="voice-bar__slash" aria-hidden="true" />}
-      </button>
-      <button
-        type="button"
-        className="voice-bar__btn"
-        onClick={voice.exit}
-        title="Quitter le mode vocal"
-        aria-label="Quitter le mode vocal"
-      >
-        <Icon icon="solar:close-circle-linear" width={15} height={15} />
-      </button>
-    </div>
+        <button
+          type="button"
+          className="voice-bar__btn"
+          data-active={voice.deafened ? "true" : undefined}
+          onClick={voice.toggleDeafen}
+          title={voice.deafened ? "Rallumer le son (⌘⇧D)" : "Couper le son (⌘⇧D)"}
+          aria-label={voice.deafened ? "Rallumer le son" : "Couper le son"}
+          aria-pressed={voice.deafened}
+        >
+          <Icon
+            icon={voice.deafened ? "solar:headphones-round-bold" : "solar:headphones-round-linear"}
+            width={15}
+            height={15}
+          />
+          {voice.deafened && <span className="voice-bar__slash" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          className="voice-bar__btn"
+          onClick={voice.exit}
+          title="Quitter le mode vocal"
+          aria-label="Quitter le mode vocal"
+        >
+          <Icon icon="solar:close-circle-linear" width={15} height={15} />
+        </button>
+      </div>
+    </>
   );
 }
 

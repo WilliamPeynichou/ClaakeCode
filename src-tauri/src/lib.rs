@@ -136,6 +136,7 @@ mod context;
 mod conversations;
 mod diagnostics;
 mod dictation;
+mod speech;
 mod event_pump;
 mod git;
 mod ide_hooks;
@@ -376,6 +377,12 @@ pub fn run() {
             dictation::dictation_model_status,
             dictation::dictation_download_model,
             dictation::transcribe_audio,
+            speech::speech_supported,
+            speech::speech_start,
+            speech::speech_push,
+            speech::speech_finish,
+            speech::speech_cancel,
+            speech::speech_open_settings,
             workspace::open_workspace,
             workspace::open_new_window,
             workspace::reset_window_title,

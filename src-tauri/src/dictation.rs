@@ -22,7 +22,7 @@ const MODEL_SHA256: &str = "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9c
 const MODEL_SIZE: u64 = 59_707_625;
 const PROMPT_HEADER: &str = "x-whisper-prompt";
 const MAX_VOCABULARY_CHARS: usize = 400;
-const DEV_VOCABULARY: &str = "commit, merge, push, pull request, branche, build, tests, composer, Tauri, React, TypeScript, Rust, npm, cargo, refactor, bug, fix";
+pub(crate) const DEV_VOCABULARY: &str = "commit, merge, push, pull request, branche, build, tests, composer, Tauri, React, TypeScript, Rust, npm, cargo, refactor, bug, fix";
 const PROGRESS_EVENT: &str = "dictation-model-progress";
 const SAMPLE_RATE: usize = 16_000;
 const MAX_SAMPLES: usize = 2 * 60 * SAMPLE_RATE;
@@ -149,7 +149,7 @@ fn context(path: &Path) -> Result<Arc<WhisperContext>, String> {
 }
 
 /// Decodes `encodeURIComponent` output; invalid escapes are kept as typed.
-fn percent_decode(input: &str) -> String {
+pub(crate) fn percent_decode(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -234,7 +234,7 @@ fn transcribe(path: &Path, samples: &[f32], vocabulary: &str) -> Result<String, 
 }
 
 /// Raw little-endian f32 PCM (mono, 16 kHz): JSON would turn 2 min of audio into tens of MB.
-fn samples_from_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
+pub(crate) fn samples_from_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
     if bytes.len() % 4 != 0 {
         return Err("Invalid audio payload.".into());
     }

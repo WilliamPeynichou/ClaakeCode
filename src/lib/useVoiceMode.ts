@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "./ipc";
 import { ensureDictationModel } from "./useDictation";
 import { extractSpoken } from "./spoken";
@@ -14,6 +15,19 @@ import {
   micErrorMessage,
   type VoiceCommand,
 } from "./voiceLogic";
+
+/** macOS: "apple" (on-device Speech), "apple-server" (Apple servers allowed); else Whisper. */
+export type VoiceEngine = "apple" | "apple-server" | "whisper";
+const ENGINE_KEY = "claake.voiceEngine";
+
+export function readVoiceEngine(): VoiceEngine {
+  const saved = localStorage.getItem(ENGINE_KEY);
+  return saved === "apple-server" || saved === "whisper" ? saved : "apple";
+}
+
+export function saveVoiceEngine(engine: VoiceEngine) {
+  localStorage.setItem(ENGINE_KEY, engine);
+}
 
 export type VoicePhase = "off" | "starting" | "listening" | "muted" | "hearing" | "transcribing" | "speaking";
 
@@ -92,6 +106,13 @@ export function useVoiceMode(opts: Options) {
   const chunkTextsRef = useRef<string[]>([]);
   const sincePartialMsRef = useRef(0);
   const partialBusyRef = useRef(false);
+  const engineRef = useRef<"apple" | "whisper">("whisper");
+  const allowServerRef = useRef(false);
+  const speechChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const speechIdRef = useRef<number | null>(null);
+  const unlistenRef = useRef<UnlistenFn[]>([]);
+  const needsChoiceRef = useRef(false);
+  const [needsChoice, setNeedsChoice] = useState(false);
 
   const changePhase = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
@@ -180,6 +201,12 @@ export function useVoiceMode(opts: Options) {
       res.stream.getTracks().forEach((t) => t.stop());
       void res.ctx.close();
     }
+    unlistenRef.current.forEach((unlisten) => unlisten());
+    unlistenRef.current = [];
+    if (engineRef.current === "apple") {
+      speechIdRef.current = null;
+      void api.speechCancel().catch(() => {});
+    }
     resetCapture();
   }, [canSpeak, resetCapture]);
 
@@ -190,6 +217,8 @@ export function useVoiceMode(opts: Options) {
     setMuted(false);
     deafenedRef.current = false;
     setDeafened(false);
+    needsChoiceRef.current = false;
+    setNeedsChoice(false);
     setModelProgress(null);
     changePhase("off");
   }, [changePhase, release]);
@@ -220,16 +249,53 @@ export function useVoiceMode(opts: Options) {
     messageRef.current += 1;
   }, []);
 
+  /** Runs Speech-framework calls in order: start, pushes, then finish or cancel. */
+  const queueSpeech = useCallback(<T,>(call: () => Promise<T>) => {
+    const next = speechChainRef.current.then(call);
+    speechChainRef.current = next.catch(() => {});
+    return next;
+  }, []);
+
+  const onSpeechFailure = useCallback(
+    (e: unknown) => {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message === "dictation_disabled") {
+        abandonPhrase();
+        speechIdRef.current = null;
+        void queueSpeech(() => api.speechCancel());
+        needsChoiceRef.current = true;
+        setNeedsChoice(true);
+      } else if (message === "speech_denied") {
+        setError(
+          "Reconnaissance vocale refusée : autorise Claake Code dans Réglages Système › Confidentialité et sécurité › Reconnaissance vocale.",
+        );
+      } else if (message === "speech_unavailable") {
+        setError("La reconnaissance vocale de macOS n'est pas disponible pour le moment.");
+      } else {
+        setError(message);
+      }
+    },
+    [abandonPhrase, queueSpeech],
+  );
+
+  const pushSpeech = useCallback(
+    (frames: Float32Array[], sampleRate: number) => {
+      const samples = resampleTo16k(concat(frames), sampleRate);
+      void queueSpeech(() => api.speechPush(samples));
+    },
+    [queueSpeech],
+  );
+
   const finalize = useCallback(
-    async (base: string, chunks: Promise<string>[], samples: Float32Array, message: number) => {
+    async (base: string, transcript: Promise<string>, message: number) => {
       const generation = generationRef.current;
       inFlightRef.current += 1;
       try {
-        const [parts, last] = await Promise.all([Promise.all(chunks), transcribeText(samples)]);
+        const text = await transcript;
         if (generation !== generationRef.current) return;
         // A new phrase may already own the composer: only touch it if not.
         const ownsComposer = messageRef.current === message;
-        const input = interpretTranscript(joinDraft(...parts, last));
+        const input = interpretTranscript(text);
         if (input.kind === "message") {
           void optsRef.current.send(joinDraft(base, input.text));
           if (ownsComposer) optsRef.current.onDraft("");
@@ -243,7 +309,8 @@ export function useVoiceMode(opts: Options) {
         }
       } catch (e) {
         if (generation !== generationRef.current) return;
-        setError(e instanceof Error ? e.message : String(e));
+        if (messageRef.current === message) optsRef.current.onDraft(base);
+        onSpeechFailure(e);
       } finally {
         inFlightRef.current -= 1;
       }
@@ -251,7 +318,7 @@ export function useVoiceMode(opts: Options) {
         resumeListening(false);
       }
     },
-    [resumeListening, runCommand, transcribeText],
+    [onSpeechFailure, resumeListening, runCommand],
   );
 
   const partial = useCallback(
@@ -275,7 +342,9 @@ export function useVoiceMode(opts: Options) {
   const onFrame = useCallback(
     (input: Float32Array, sampleRate: number) => {
       const current = phaseRef.current;
-      if (mutedRef.current || (current !== "listening" && current !== "hearing" && current !== "transcribing")) return;
+      if (mutedRef.current || needsChoiceRef.current) return;
+      if (current !== "listening" && current !== "hearing" && current !== "transcribing") return;
+      const apple = engineRef.current === "apple";
       const frame = new Float32Array(input);
       const frameMs = (frame.length / sampleRate) * 1000;
       const levelNow = rms(frame);
@@ -290,6 +359,17 @@ export function useVoiceMode(opts: Options) {
         sincePartialMsRef.current = 0;
         phraseRef.current = [...preRollRef.current, frame];
         changePhase("hearing");
+        if (apple) {
+          const message = messageRef.current;
+          speechIdRef.current = null;
+          const vocabulary = optsRef.current.vocabulary?.() || undefined;
+          void queueSpeech(() => api.speechStart(vocabulary, allowServerRef.current))
+            .then((id) => {
+              if (message === messageRef.current) speechIdRef.current = id;
+            })
+            .catch(onSpeechFailure);
+          pushSpeech(phraseRef.current, sampleRate);
+        }
         return;
       }
       if (!detectorRef.current.inPhrase && event === null) {
@@ -299,6 +379,25 @@ export function useVoiceMode(opts: Options) {
         return;
       }
       phraseRef.current.push(frame);
+      if (apple) {
+        if (event === "end") {
+          pushSpeech([frame], sampleRate);
+          speechIdRef.current = null;
+          resetCapture();
+          changePhase("transcribing");
+          void finalize(baseRef.current, queueSpeech(() => api.speechFinish()), messageRef.current);
+        } else if (event === "discard") {
+          speechIdRef.current = null;
+          void queueSpeech(() => api.speechCancel());
+          abandonPhrase();
+          resetCapture();
+          changePhase(inFlightRef.current > 0 ? "transcribing" : idlePhase());
+        } else {
+          // One request covers the whole phrase, so "split" needs nothing here.
+          pushSpeech([frame], sampleRate);
+        }
+        return;
+      }
       if (event === "split") {
         const index = chunksRef.current.length;
         const chunk = transcribeText(resampleTo16k(concat(phraseRef.current), sampleRate))
@@ -309,10 +408,12 @@ export function useVoiceMode(opts: Options) {
         sincePartialMsRef.current = 0;
       } else if (event === "end") {
         const samples = resampleTo16k(concat(phraseRef.current), sampleRate);
-        const chunks = chunksRef.current;
+        const transcript = Promise.all([...chunksRef.current, transcribeText(samples)]).then((parts) =>
+          joinDraft(...parts),
+        );
         resetCapture();
         changePhase("transcribing");
-        void finalize(baseRef.current, chunks, samples, messageRef.current);
+        void finalize(baseRef.current, transcript, messageRef.current);
       } else if (event === "discard") {
         abandonPhrase();
         resetCapture();
@@ -325,7 +426,7 @@ export function useVoiceMode(opts: Options) {
         }
       }
     },
-    [abandonPhrase, changePhase, finalize, idlePhase, partial, resetCapture, transcribeText],
+    [abandonPhrase, changePhase, finalize, idlePhase, onSpeechFailure, partial, pushSpeech, queueSpeech, resetCapture, transcribeText],
   );
 
   const start = useCallback(async () => {
@@ -333,9 +434,24 @@ export function useVoiceMode(opts: Options) {
     setError(null);
     changePhase("starting");
     try {
-      const ready = await ensureDictationModel(setModelProgress);
-      setModelProgress(null);
-      if (!ready) return changePhase("off");
+      const engine = readVoiceEngine();
+      const apple = engine !== "whisper" && (await api.speechSupported());
+      engineRef.current = apple ? "apple" : "whisper";
+      allowServerRef.current = engine === "apple-server";
+      if (apple) {
+        unlistenRef.current = [
+          await listen<{ id: number; text: string }>("speech-partial", (e) => {
+            if (e.payload.id === speechIdRef.current) showDraft(e.payload.text);
+          }),
+          await listen<{ id: number; code: string }>("speech-error", (e) => {
+            if (e.payload.id === speechIdRef.current) onSpeechFailure(new Error(e.payload.code));
+          }),
+        ];
+      } else {
+        const ready = await ensureDictationModel(setModelProgress);
+        setModelProgress(null);
+        if (!ready) return changePhase("off");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
@@ -355,7 +471,26 @@ export function useVoiceMode(opts: Options) {
       setError(micErrorMessage(e));
       changePhase("off");
     }
-  }, [changePhase, onFrame, release, resumeListening]);
+  }, [changePhase, onFrame, onSpeechFailure, release, resumeListening, showDraft]);
+
+  /** Answer to "Dictation is disabled": open Settings, allow Apple servers, or use Whisper. */
+  const chooseEngine = useCallback(
+    (choice: "settings" | "apple-server" | "whisper") => {
+      needsChoiceRef.current = false;
+      setNeedsChoice(false);
+      if (choice === "settings") {
+        void api.speechOpenSettings();
+      } else if (choice === "apple-server") {
+        saveVoiceEngine("apple-server");
+        allowServerRef.current = true;
+      } else {
+        saveVoiceEngine("whisper");
+        exit();
+        void start();
+      }
+    },
+    [exit, start],
+  );
 
   const toggleMute = useCallback(() => {
     if (phaseRef.current === "off" || phaseRef.current === "starting") return;
@@ -423,5 +558,7 @@ export function useVoiceMode(opts: Options) {
     stopSpeaking,
     repeat,
     read,
+    needsChoice,
+    chooseEngine,
   };
 }

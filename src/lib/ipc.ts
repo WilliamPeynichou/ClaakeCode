@@ -1148,6 +1148,25 @@ export const api = {
       hint ? { headers: { "x-whisper-prompt": encodeURIComponent(hint) } } : undefined,
     );
   },
+  /** Live recognition (macOS Speech framework); partials arrive as "speech-partial" events. */
+  speechSupported() {
+    return invoke<boolean>("speech_supported");
+  },
+  speechStart(vocabulary: string | undefined, allowServer: boolean) {
+    return invoke<number>("speech_start", { vocabulary, allowServer });
+  },
+  speechPush(samples: Float32Array) {
+    return invoke<void>("speech_push", new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength));
+  },
+  speechFinish() {
+    return invoke<string>("speech_finish");
+  },
+  speechCancel() {
+    return invoke<void>("speech_cancel");
+  },
+  speechOpenSettings() {
+    return invoke<void>("speech_open_settings");
+  },
 };
 
 /** Lot C5: verification command typed in the composer for a Goal, per conversation. */

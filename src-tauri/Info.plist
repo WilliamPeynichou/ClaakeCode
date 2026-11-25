@@ -3,6 +3,8 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Claake Code utilise le micro pour dicter vos messages. L'audio est transcrit sur votre Mac et n'est jamais envoyé.</string>
+	<string>Claake Code utilise le micro pour dicter vos messages et piloter l'agent à la voix.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Claake Code transcrit votre voix en direct en mode vocal. Avec la Dictée de macOS activée, la reconnaissance reste sur votre Mac.</string>
 </dict>
 </plist>
