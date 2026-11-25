@@ -1036,6 +1036,10 @@ svg.cc-mark.cc-mark {
 .voice-bar[data-phase="speaking"] .voice-bar__dot { animation: voice-pulse 0.9s ease-in-out infinite; }
 .voice-bar__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-bar__spacer { flex: 1; }
+/* Live graph: the foreground voice in color, background noise in grey (ignored). */
+.voice-meter { flex: none; display: inline-flex; align-items: center; gap: 1.5px; height: 16px; }
+.voice-meter > span { width: 2px; border-radius: 1px; background: var(--text-faint); opacity: 0.45; transition: height 80ms linear; }
+.voice-meter > span[data-voice="true"] { background: var(--accent); opacity: 1; }
 .voice-bar__progress { flex: none; width: 64px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .voice-bar__progress > span { display: block; height: 100%; background: var(--accent); }
 .voice-bar .voice-bar__btn {

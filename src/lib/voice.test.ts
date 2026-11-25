@@ -117,6 +117,33 @@ test("threshold adapts to background noise", () => {
   assert.deepEqual(feed(d, 0.2, 100), ["start"]);
 });
 
+test("background chatter after speaking does not keep the phrase open", () => {
+  const d = new PhraseDetector();
+  assert.deepEqual(feed(d, 0.2, 1000), ["start"]);
+  assert.deepEqual(feed(d, 0.04, 1900), []);
+  assert.equal(d.gateOpen, false);
+  assert.deepEqual(feed(d, 0.04, 100), ["end"]);
+});
+
+test("in a noisy room only the near voice starts a phrase", () => {
+  const d = new PhraseDetector();
+  assert.deepEqual(feed(d, 0.04, 6000), []);
+  assert.deepEqual(feed(d, 0.08, 500), []);
+  assert.deepEqual(feed(d, 0.3, 500), ["start"]);
+  assert.equal(d.gateOpen, true);
+  assert.deepEqual(feed(d, 0.05, 2000), ["end"]);
+});
+
+test("the gate holds briefly after the voice drops", () => {
+  const d = new PhraseDetector();
+  feed(d, 0.2, 500);
+  feed(d, 0.003, 300);
+  assert.equal(d.gateOpen, true);
+  feed(d, 0.003, 100);
+  assert.equal(d.gateOpen, false);
+  assert.equal(d.inPhrase, true);
+});
+
 test("detectLanguage", () => {
   assert.equal(detectLanguage("J'ai corrigé le bug."), "fr");
   assert.equal(detectLanguage("Les fichiers sont dans le dossier"), "fr");

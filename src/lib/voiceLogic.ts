@@ -79,20 +79,48 @@ export function resampleTo16k(samples: Float32Array, fromRate: number): Float32A
 /** "split": the phrase hit MAX_PHRASE_MS; transcribe that chunk and keep listening. */
 export type DetectorEvent = "start" | "split" | "end" | "discard" | null;
 
-/** Turns a stream of RMS levels into phrase start/end events. */
+/** The foreground voice must rise this far above the background (~+10 dB). */
+export const VOICE_OVER_NOISE = 3;
+/** Quieter sounds than this share of the phrase's loudest voice (~-12 dB) are someone else. */
+export const VOICE_OF_PEAK = 0.25;
+export const MIN_VOICE_LEVEL = 0.015;
+/** Keeps the gate open briefly after the voice drops, so word endings are not cut. */
+export const GATE_HOLD_MS = 300;
+const PEAK_HALF_LIFE_MS = 6000;
+const MAX_START_NOISE = 0.03;
+
+/** Per-frame smoothing rate, given per 100 ms. */
+const rate = (per100ms: number, frameMs: number) => 1 - (1 - per100ms) ** (frameMs / 100);
+
+/**
+ * Turns a stream of RMS levels into phrase start/end events, following only the foreground
+ * voice: the background level is tracked all the time (even mid-phrase, between words), and
+ * a frame counts as voice only when it rises well above it and near the phrase's loudest
+ * voice. Silence means "no foreground voice", so a phrase ends after 2 s even in a noisy room.
+ */
 export class PhraseDetector {
-  private noise = 0.005;
+  /** Learnt from the first frame (capped, in case it is already speech), so a noisy room does not start a phrase on its own. */
+  private noise: number | null = null;
+  private peak = 0;
   private speaking = false;
   private silenceMs = 0;
   private voicedMs = 0;
   private totalMs = 0;
+  private sinceVoiceMs = Infinity;
+  /** Whether the last frame was foreground voice. */
+  voiced = false;
 
   get threshold(): number {
-    return Math.max(0.015, this.noise * 2.5);
+    return Math.max(MIN_VOICE_LEVEL, (this.noise ?? 0) * VOICE_OVER_NOISE);
   }
 
   get inPhrase(): boolean {
     return this.speaking;
+  }
+
+  /** Audio passes to recognition only while this is true; the rest is replaced by silence. */
+  get gateOpen(): boolean {
+    return this.speaking && this.sinceVoiceMs <= GATE_HOLD_MS;
   }
 
   reset() {
@@ -100,15 +128,28 @@ export class PhraseDetector {
     this.silenceMs = 0;
     this.voicedMs = 0;
     this.totalMs = 0;
+    this.sinceVoiceMs = Infinity;
+    this.voiced = false;
   }
 
   push(level: number, frameMs: number): DetectorEvent {
-    const loud = level > this.threshold;
+    if (this.noise === null) {
+      this.noise = Math.min(level, MAX_START_NOISE);
+      return null;
+    }
+    this.peak *= 0.5 ** (frameMs / PEAK_HALF_LIFE_MS);
+    const voiced = level > this.threshold && (!this.speaking || level > this.peak * VOICE_OF_PEAK);
+    this.voiced = voiced;
+    if (voiced) {
+      this.peak = Math.max(this.peak, level);
+      this.sinceVoiceMs = 0;
+    } else {
+      this.sinceVoiceMs += frameMs;
+      // Falls fast to quiet, rises slowly with the room's noise.
+      this.noise += (level - this.noise) * rate(level < this.noise ? 0.3 : 0.05, frameMs);
+    }
     if (!this.speaking) {
-      if (!loud) {
-        this.noise = this.noise * 0.95 + level * 0.05;
-        return null;
-      }
+      if (!voiced) return null;
       this.speaking = true;
       this.silenceMs = 0;
       this.voicedMs = frameMs;
@@ -116,7 +157,7 @@ export class PhraseDetector {
       return "start";
     }
     this.totalMs += frameMs;
-    if (loud) {
+    if (voiced) {
       this.silenceMs = 0;
       this.voicedMs += frameMs;
     } else {

@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import { Icon } from "@iconify/react";
-import type { VoicePhase } from "../../lib/useVoiceMode";
+import type { MeterBar, VoicePhase } from "../../lib/useVoiceMode";
 import { splitSpoken } from "../../lib/spoken";
 import { Markdown } from "./Markdown";
 
@@ -17,6 +17,7 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
 export type VoiceBarState = {
   phase: VoicePhase;
   level: number;
+  meter: MeterBar[];
   error: string | null;
   modelProgress: number | null;
   canSpeak: boolean;
@@ -70,6 +71,21 @@ export function VoiceBar({ voice }: { voice: VoiceBarState }) {
           style={{ "--voice-level": Math.min(1, Math.max(0, level)) } as React.CSSProperties}
           aria-hidden="true"
         />
+        {(phase === "listening" || phase === "hearing") && !error && (
+          <span
+            className="voice-meter"
+            aria-hidden="true"
+            title="Seule la voix au premier plan (en couleur) est transcrite"
+          >
+            {voice.meter.map((bar, i) => (
+              <span
+                key={i}
+                data-voice={bar.voice ? "true" : undefined}
+                style={{ height: `${Math.max(12, Math.round(bar.level * 100))}%` }}
+              />
+            ))}
+          </span>
+        )}
         <span className="voice-bar__label">{error ?? label}</span>
         {modelProgress !== null && (
           <span className="voice-bar__progress" aria-hidden="true">

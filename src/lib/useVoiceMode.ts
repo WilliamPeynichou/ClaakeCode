@@ -51,6 +51,11 @@ export async function ensureDictationModel(onProgress?: (fraction: number) => vo
   return true;
 }
 
+/** One bar of the voice bar's graph: the mic level, and whether it was the foreground voice. */
+export type MeterBar = { level: number; voice: boolean };
+const METER_BARS = 24;
+const EMPTY_METER: MeterBar[] = Array.from({ length: METER_BARS }, () => ({ level: 0, voice: false }));
+
 export type VoicePhase = "off" | "starting" | "listening" | "muted" | "hearing" | "transcribing" | "speaking";
 
 type Options = {
@@ -100,6 +105,7 @@ export function useVoiceMode(opts: Options) {
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
   const [level, setLevel] = useState(0);
+  const [meter, setMeter] = useState<MeterBar[]>(EMPTY_METER);
   const [error, setError] = useState<string | null>(null);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
   const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
@@ -370,8 +376,13 @@ export function useVoiceMode(opts: Options) {
       const frame = new Float32Array(input);
       const frameMs = (frame.length / sampleRate) * 1000;
       const levelNow = rms(frame);
-      setLevel(Math.min(1, levelNow * 8));
-      const event = detectorRef.current.push(levelNow, frameMs);
+      const detector = detectorRef.current;
+      const event = detector.push(levelNow, frameMs);
+      const shown = Math.min(1, levelNow * 8);
+      setLevel(detector.voiced ? shown : 0);
+      setMeter((bars) => [...bars.slice(1 - METER_BARS), { level: shown, voice: detector.voiced }]);
+      // Outside the foreground voice, recognition gets silence: background chatter never reaches it.
+      const heard = detector.gateOpen ? frame : new Float32Array(frame.length);
       if (event === "start") {
         messageRef.current += 1;
         // While the previous message is still being transcribed, the composer shows its draft.
@@ -400,10 +411,10 @@ export function useVoiceMode(opts: Options) {
         if (preRollRef.current.length > keep) preRollRef.current.splice(0, preRollRef.current.length - keep);
         return;
       }
-      phraseRef.current.push(frame);
+      phraseRef.current.push(heard);
       if (apple) {
         if (event === "end") {
-          pushSpeech([frame], sampleRate);
+          pushSpeech([heard], sampleRate);
           speechIdRef.current = null;
           resetCapture();
           changePhase("transcribing");
@@ -416,7 +427,7 @@ export function useVoiceMode(opts: Options) {
           changePhase(inFlightRef.current > 0 ? "transcribing" : idlePhase());
         } else {
           // One request covers the whole phrase, so "split" needs nothing here.
-          pushSpeech([frame], sampleRate);
+          pushSpeech([heard], sampleRate);
         }
         return;
       }
@@ -481,9 +492,12 @@ export function useVoiceMode(opts: Options) {
       // Created after awaits, so outside the click gesture: WebKit may start it suspended.
       await ctx.resume();
       const source = ctx.createMediaStreamSource(stream);
+      // Keep the voice band: drops hum and rumble (AC, fans, desk knocks) and hiss above speech.
+      const highpass = new BiquadFilterNode(ctx, { type: "highpass", frequency: 100 });
+      const lowpass = new BiquadFilterNode(ctx, { type: "lowpass", frequency: 7000 });
       const node = ctx.createScriptProcessor(4096, 1, 1);
       node.onaudioprocess = (e) => onFrame(e.inputBuffer.getChannelData(0), ctx.sampleRate);
-      source.connect(node);
+      source.connect(highpass).connect(lowpass).connect(node);
       node.connect(ctx.destination);
       resourcesRef.current = { stream, ctx, node, source };
       resumeListening();
@@ -597,6 +611,7 @@ export function useVoiceMode(opts: Options) {
     muted,
     deafened,
     level,
+    meter,
     error,
     modelProgress,
     canSpeak,
