@@ -328,6 +328,8 @@ pub(super) struct SendMessageInput {
     pub(super) rewrite_from_history_index: Option<usize>,
     #[serde(default)]
     pub(super) revert_workspace_changes: bool,
+    #[serde(default)]
+    pub(super) voice: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -857,4 +859,6 @@ pub(super) struct RlmMessageInput {
     pub(super) thinking: Option<ThinkingLevelInput>,    /// Goal is a native Prime objective, not the classic engine's continuation loop.
     #[serde(default)]
     pub(super) mode: Option<AgentModeInput>,
+    #[serde(default)]
+    pub(super) voice: bool,
 }

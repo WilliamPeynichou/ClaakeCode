@@ -10,6 +10,9 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "../../lib/ipc";
+import { useVoiceMode } from "../../lib/useVoiceMode";
+import { splitSpoken } from "../../lib/spoken";
+import { SpokenCard, VoiceBar } from "../chat/VoiceBar";
 import {
   availableModelsForProviders,
   fallbackModelEntry,
@@ -69,6 +72,9 @@ export function CompanionBubble({ onClose }: Props) {
   const turnRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const voiceActiveRef = useRef(false);
+  const messagesRef = useRef<PendingMessage[]>([]);
+  messagesRef.current = messages;
 
   /** Saisie auto-agrandissante (plafonnée : au-delà, le textarea défile). */
   useEffect(() => {
@@ -223,9 +229,10 @@ export function CompanionBubble({ onClose }: Props) {
     }
   };
 
-  const send = async () => {
-    const value = text.trim();
-    if (busy || (!value && attachments.length === 0)) return;
+  const send = async (spoken?: string) => {
+    const value = (spoken ?? text).trim();
+    const files = spoken === undefined ? attachments : [];
+    if ((spoken === undefined && busy) || (!value && files.length === 0)) return;
     if (models.length === 0) {
       setError("Aucun modèle autorisé.");
       return;
@@ -237,15 +244,18 @@ export function CompanionBubble({ onClose }: Props) {
       text: value,
       mode,
       model: model || undefined,
-      attachments,
+      attachments: files,
+      voice: voiceActiveRef.current || undefined,
     };
 
     if (mode === "code") {
       try {
         await invoke<void>(COMPANION_COMMANDS.forwardToClaakeCode, { input });
         setNotice("Transmis à Claake Code.");
-        setText("");
-        setAttachments([]);
+        if (spoken === undefined) {
+          setText("");
+          setAttachments([]);
+        }
       } catch (err) {
         setError(String(err));
       }
@@ -263,7 +273,7 @@ export function CompanionBubble({ onClose }: Props) {
           id: `user-${started.turnId}`,
           role: "user",
           text: value,
-          attachmentNames: attachments.map((a) => a.name),
+          attachmentNames: files.map((a) => a.name),
           createdAtMs: Date.now(),
         },
         {
@@ -275,21 +285,43 @@ export function CompanionBubble({ onClose }: Props) {
           pending: true,
         },
       ]);
-      setText("");
-      setAttachments([]);
+      if (spoken === undefined) {
+        setText("");
+        setAttachments([]);
+      }
     } catch (err) {
       setError(String(err));
     }
   };
 
   const cancel = async () => {
-    if (!turnId) return;
+    const running = turnRef.current;
+    if (!running) return;
     try {
-      await companionChatApi.cancel(turnId);
+      await companionChatApi.cancel(running);
     } catch (err) {
       setError(String(err));
     }
   };
+
+  const interruptAndSend = async (spoken: string) => {
+    const running = turnRef.current;
+    if (running) {
+      turnRef.current = null;
+      setTurnId(null);
+      setMessages((current) => current.map((m) => (m.pending ? { ...m, pending: false } : m)));
+      await companionChatApi.cancel(running).catch((err) => setError(String(err)));
+    }
+    await send(spoken);
+  };
+
+  const voice = useVoiceMode({
+    isBusy: busy,
+    lastAssistantText: () => [...messagesRef.current].reverse().find((m) => m.role === "assistant")?.text ?? null,
+    send: interruptAndSend,
+    stop: cancel,
+  });
+  voiceActiveRef.current = voice.active;
 
   const capture = async () => {
     setError(null);
@@ -355,7 +387,11 @@ export function CompanionBubble({ onClose }: Props) {
   );
 
   return (
-    <section className="companion-bubble" aria-label="Chat Claaky">
+    <section
+      className="companion-bubble"
+      aria-label="Chat Claaky"
+      data-speaking={voice.phase === "speaking" ? "true" : undefined}
+    >
       <header className="companion-bubble__head" data-tauri-drag-region title="Glisser pour déplacer">
         <div className="companion-bubble__title" data-tauri-drag-region>
           <strong data-tauri-drag-region>{conversationTitle || "Claaky"}</strong>
@@ -420,7 +456,7 @@ export function CompanionBubble({ onClose }: Props) {
             {message.attachmentNames.length > 0 && (
               <span className="companion-bubble__muted">Pièces jointes : {message.attachmentNames.join(", ")}</span>
             )}
-            <p>{message.text || (message.pending ? "…" : "")}</p>
+            <MessageText message={message} />
           </div>
         ))}
       </div>
@@ -445,6 +481,7 @@ export function CompanionBubble({ onClose }: Props) {
         </ul>
       )}
 
+      {voice.active && <VoiceBar voice={voice} />}
       <div className="companion-bubble__composer">
         <textarea
           ref={textareaRef}
@@ -486,6 +523,15 @@ export function CompanionBubble({ onClose }: Props) {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="companion-bubble__voice"
+            aria-pressed={voice.active}
+            onClick={() => (voice.active ? voice.exit() : void voice.start())}
+            title={voice.active ? "Quitter le mode vocal" : "Mode vocal : parlez à Claaky"}
+          >
+            Voix
+          </button>
           <button type="button" onClick={() => void capture()} title="Capturer une zone de l'écran">
             Zone
           </button>
@@ -518,5 +564,15 @@ export function CompanionBubble({ onClose }: Props) {
         </div>
       </div>
     </section>
+  );
+}
+
+function MessageText({ message }: { message: PendingMessage }) {
+  const { body, spoken, pending } = splitSpoken(message.text);
+  return (
+    <>
+      {(body || spoken === null) && <p>{body || (message.pending ? "…" : "")}</p>}
+      {spoken !== null && <SpokenCard text={spoken} pending={pending} />}
+    </>
   );
 }

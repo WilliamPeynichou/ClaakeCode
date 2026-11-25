@@ -33,6 +33,8 @@ import { fileIcon } from "../../lib/fileIcon";
 import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStats } from "../../lib/ipc";
 import { takeComposerText } from "./ChatSurface";
 import { useDictation } from "../../lib/useDictation";
+import { useVoiceMode } from "../../lib/useVoiceMode";
+import { AssistantMarkdown, VoiceBar } from "./VoiceBar";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -182,6 +184,7 @@ type Props = {
     planControl?: PlanControl,
     messageVisibility?: MessageVisibility,
     revertWorkspaceChanges?: boolean,
+    voice?: boolean,
   ) => Promise<void>;
   onCompact: (
     model: ModelRef,
@@ -542,6 +545,8 @@ export function ChatPane({
       setText(before + insertion + text.slice(end));
     }, [text]),
   );
+  const voiceActiveRef = useRef(false);
+  const sendVoiceRef = useRef<(text: string) => void>(() => {});
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const composerResizeStateRef = useRef<
     { startY: number; startHeight: number } | null
@@ -1906,6 +1911,7 @@ export function ChatPane({
         undefined,
         undefined,
         revertWorkspaceChanges,
+        voiceActiveRef.current,
       );
     } catch (err) {
       setView((prev) => ({
@@ -1963,6 +1969,11 @@ export function ChatPane({
         nextPrompt.thinking,
         nextPrompt.mode,
         nextPrompt.serviceTier,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        voiceActiveRef.current,
       )
         .catch((err) => {
           blockedQueueItemIdsRef.current.add(nextPrompt.id);
@@ -3028,6 +3039,64 @@ export function ChatPane({
     ],
   );
 
+  const lastAssistantText = useCallback((): string | null => {
+    const blocks = viewRef.current.blocks;
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const block = blocks[i];
+      if (block.kind === "assistant-text") return block.text;
+    }
+    return null;
+  }, []);
+
+  const voiceVocabulary = useCallback(
+    () =>
+      [
+        workspacePath.split(/[\\/]/).filter(Boolean).pop(),
+        ...inlineMentionsRef.current.map((mention) => mention.name),
+      ]
+        .filter(Boolean)
+        .join(", "),
+    [workspacePath],
+  );
+
+  const voice = useVoiceMode({
+    isBusy: view.status === "streaming" || isStreaming,
+    lastAssistantText,
+    send: (spoken) => sendVoiceRef.current(spoken),
+    stop: () => void onStop().catch(() => {}),
+    vocabulary: voiceVocabulary,
+  });
+  voiceActiveRef.current = voice.active;
+
+  sendVoiceRef.current = (spoken: string) => {
+    if (!modelEntry) return;
+    const prompt = buildQueuedPrompt({
+      text: spoken,
+      attachments: [],
+      model: currentModelRef,
+      thinking,
+      mode: effectiveMode,
+      serviceTier,
+    });
+    const busy =
+      view.status === "streaming" ||
+      isStreaming ||
+      activeSubAgentId !== null ||
+      dequeueInFlightRef.current !== null;
+    if (!busy) {
+      sendQueuedPrompt(prompt, 0);
+      return;
+    }
+    setPromptQueuesByConversation((current) =>
+      updatePromptQueue(current, conversationId, (queue) =>
+        insertQueuedPrompt(queue, prompt, 0),
+      ),
+    );
+    void onStop().catch((err) => {
+      setView((prev) => ({ ...prev, lastError: String(err) }));
+    });
+  };
+
   const handleQueuedPromptEdit = useCallback(
     (id: string) => {
       const item = queuedPrompts.find((prompt) => prompt.id === id);
@@ -3670,6 +3739,7 @@ export function ChatPane({
               onChange={(e) => setGoalVerifyCommand(conversationId, e.target.value)}
             />
           )}
+          {voice.active && <VoiceBar voice={voice} />}
           <div className="composer__input-wrap">
             <div
               className="composer__overlay"
@@ -4054,6 +4124,18 @@ export function ChatPane({
               )}
             </div>
             <div className="composer__actions-right">
+              <button
+                type="button"
+                className="composer__iconbtn composer__voice"
+                data-active={voice.active ? "true" : undefined}
+                onClick={() => (voice.active ? voice.exit() : void voice.start())}
+                disabled={dictation.state !== "idle"}
+                title={voice.active ? "Quitter le mode vocal" : "Mode vocal : parlez à l'agent"}
+                aria-label="Voice mode"
+                aria-pressed={voice.active}
+              >
+                <Icon icon="solar:soundwave-linear" width={16} height={16} />
+              </button>
               <button
                 type="button"
                 className="composer__iconbtn composer__mic"
@@ -6317,7 +6399,7 @@ function BlockView({
       return (
         <div className="msg" data-role="assistant">
           <div className="msg__body">
-            <Markdown text={block.text} onOpenFile={onOpenFile} />
+            <AssistantMarkdown text={block.text} onOpenFile={onOpenFile} />
           </div>
         </div>
       );

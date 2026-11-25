@@ -77,6 +77,8 @@ pub struct CompanionAskInput {
     pub model: Option<String>,
     #[serde(default)]
     pub attachments: Vec<CompanionAttachment>,
+    #[serde(default)]
+    pub voice: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

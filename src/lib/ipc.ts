@@ -556,6 +556,7 @@ export const api = {
     model?: { provider: string; name: string },
     thinking?: ThinkingLevel,
     mode?: AgentMode,
+    voice?: boolean,
   ) {
     return invoke<void>("send_rlm_message", {
       input: {
@@ -565,6 +566,7 @@ export const api = {
         model: model ? { provider: model.provider, name: model.name } : null,
         thinking: thinking ?? null,
         mode: mode ?? null,
+        voice,
       },
     });
   },
@@ -904,6 +906,7 @@ export const api = {
     messageVisibility?: MessageVisibility,
     revertWorkspaceChanges?: boolean,
     use1mContext?: boolean,
+    voice?: boolean,
   ) {
     return invoke<void>("send_message", {
       input: {
@@ -920,6 +923,7 @@ export const api = {
         planControl,
         messageVisibility,
         revertWorkspaceChanges,
+        voice,
         // Lot C5: only a new Goal carries its verification command.
         verifyCommand:
           mode === "goal" && messageVisibility !== "systemReminder"
@@ -1135,8 +1139,14 @@ export const api = {
     return invoke<void>("dictation_download_model");
   },
   /** Mono 16 kHz PCM, sent as raw bytes (Tauri passes typed arrays without JSON). */
-  transcribeAudio(samples: Float32Array) {
-    return invoke<{ text: string }>("transcribe_audio", new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength));
+  transcribeAudio(samples: Float32Array, vocabulary?: string) {
+    const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
+    const hint = vocabulary?.trim();
+    return invoke<{ text: string }>(
+      "transcribe_audio",
+      bytes,
+      hint ? { headers: { "x-whisper-prompt": encodeURIComponent(hint) } } : undefined,
+    );
   },
 };
 

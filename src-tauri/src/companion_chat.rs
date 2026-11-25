@@ -113,12 +113,16 @@ pub(crate) async fn start_companion_ask(
         .iter()
         .map(|attachment| attachment.name().to_string())
         .collect();
-    let request = companion_provider_request(
+    let mut request = companion_provider_request(
         model.clone(),
         &conversation.messages,
         &text,
         &input.attachments,
     );
+    if input.voice {
+        let system = request.system_prompt.take().unwrap_or_default();
+        request.system_prompt = Some(format!("{system}\n\n{}", crate::voice::VOICE_TURN_NOTE));
+    }
     let user_message = companion_message("user", text.clone(), attachment_names);
     conversation.messages.push(user_message);
     conversation.model = companion_model_value(&model);

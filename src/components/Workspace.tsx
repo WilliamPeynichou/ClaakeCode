@@ -1518,6 +1518,7 @@ export function Workspace({
       planControl?: PlanControl,
       messageVisibility?: MessageVisibility,
       revertWorkspaceChanges?: boolean,
+      voice?: boolean,
     ) => {
       const conversationId = activeConv.id;
       const workspaceAtRequest = workspacePath;
@@ -1539,7 +1540,7 @@ export function Workspace({
           conversations.find((c) => c.id === conversationId)?.harness === "rlm"
         ) {
           // RLM turns go to the Prime sidecar; the backend refuses other harnesses.
-          await api.sendRlmMessage(workspaceAtRequest, conversationId, text, model, thinking, mode);
+          await api.sendRlmMessage(workspaceAtRequest, conversationId, text, model, thinking, mode, voice);
           return;
         }
         await sendMessageWithBusyRetry(
@@ -1555,6 +1556,8 @@ export function Workspace({
           planControl,
           messageVisibility,
           revertWorkspaceChanges,
+          undefined,
+          voice,
         );
       } catch (err) {
         markConversationStreaming(conversationId, false);

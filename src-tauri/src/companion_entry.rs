@@ -454,6 +454,7 @@ mod tests {
             mode,
             model: Some("anthropic:claude".into()),
             attachments,
+            voice: false,
         }
     }
 

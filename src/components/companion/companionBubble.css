@@ -312,3 +312,27 @@
   .cd__claaky, .cd__hide { transition: none; }
   .cd { transition: none; }
 }
+
+/* ── Mode vocal ──────────────────────────────────────────── */
+.companion-bubble .voice-bar { background: var(--glass-strong); color: var(--ink-2); margin: 0; }
+.companion-bubble .voice-bar .voice-bar__btn { padding: 0; background: transparent; }
+.companion-bubble .voice-bar .voice-bar__btn:hover:not(:disabled) { background: var(--glass-strong); color: var(--ink); }
+.companion-bubble .spoken-card { background: var(--glass-strong); color: var(--ink); margin: 6px 0 0; }
+.companion-bubble .spoken-card__head { color: var(--ink-2); }
+.companion-bubble .spoken-card__replay { padding: 0; background: transparent; }
+.companion-bubble[data-speaking="true"] .companion-bubble__head::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--ink-2);
+  animation: cd-speak 0.9s ease-in-out infinite;
+}
+.cd:has(.companion-bubble[data-speaking="true"]) .cd__claaky { animation: cd-speak-bob 0.6s ease-in-out infinite alternate; }
+@keyframes cd-speak { 50% { transform: scale(1.5); opacity: 0.5; } }
+@keyframes cd-speak-bob { to { transform: translateY(-3px) scale(1.03); } }
+@media (prefers-reduced-motion: reduce) {
+  .companion-bubble[data-speaking="true"] .companion-bubble__head::after,
+  .cd:has(.companion-bubble[data-speaking="true"]) .cd__claaky { animation: none; }
+}

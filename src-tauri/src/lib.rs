@@ -155,6 +155,7 @@ mod tests;
 mod turns;
 mod typesafe;
 mod updater;
+mod voice;
 mod workflow;
 mod workspace;
 

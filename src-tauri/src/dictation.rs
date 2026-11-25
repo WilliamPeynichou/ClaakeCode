@@ -1,6 +1,6 @@
 //! Local voice dictation: whisper.cpp through `whisper-rs`, nothing leaves the machine.
 //!
-//! The multilingual ggml model is downloaded on first use into the app data
+//! The multilingual ggml base model is downloaded on first use into the app data
 //! directory and checked against a pinned SHA-256.
 use crate::*;
 use futures_util::StreamExt;
@@ -15,11 +15,14 @@ use std::{
 use tokio::io::AsyncWriteExt;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
-const MODEL_FILE: &str = "ggml-small-q5_1.bin";
+const MODEL_FILE: &str = "ggml-base-q5_1.bin";
 const MODEL_URL: &str =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin";
-const MODEL_SHA256: &str = "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb";
-const MODEL_SIZE: u64 = 190_085_487;
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin";
+const MODEL_SHA256: &str = "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898";
+const MODEL_SIZE: u64 = 59_707_625;
+const PROMPT_HEADER: &str = "x-whisper-prompt";
+const MAX_VOCABULARY_CHARS: usize = 400;
+const DEV_VOCABULARY: &str = "commit, merge, push, pull request, branche, build, tests, composer, Tauri, React, TypeScript, Rust, npm, cargo, refactor, bug, fix";
 const PROGRESS_EVENT: &str = "dictation-model-progress";
 const SAMPLE_RATE: usize = 16_000;
 const MAX_SAMPLES: usize = 2 * 60 * SAMPLE_RATE;
@@ -143,7 +146,63 @@ fn context(path: &Path) -> Result<Arc<WhisperContext>, String> {
     Ok(CONTEXT.get_or_init(|| Arc::new(ctx)).clone())
 }
 
-fn transcribe(path: &Path, samples: &[f32]) -> Result<String, String> {
+/// Decodes `encodeURIComponent` output; invalid escapes are kept as typed.
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let escaped = (bytes[i] == b'%')
+            .then(|| {
+                input
+                    .get(i + 1..i + 3)
+                    .and_then(|h| u8::from_str_radix(h, 16).ok())
+            })
+            .flatten();
+        match escaped {
+            Some(byte) => {
+                out.push(byte);
+                i += 3;
+            }
+            None => {
+                out.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn initial_prompt(vocabulary: &str) -> String {
+    let extra: String = vocabulary
+        .trim()
+        .chars()
+        .take(MAX_VOCABULARY_CHARS)
+        .collect();
+    if extra.is_empty() {
+        DEV_VOCABULARY.to_string()
+    } else {
+        format!("{DEV_VOCABULARY}, {extra}")
+    }
+}
+
+/// Whisper invents subtitles credits and thanks on silence; those are never real speech.
+fn is_hallucination(text: &str) -> bool {
+    let plain: String = text
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect();
+    let plain = plain.split_whitespace().collect::<Vec<_>>().join(" ");
+    plain.is_empty()
+        || plain == "you"
+        || plain.starts_with("sous titres")
+        || plain.starts_with("merci d avoir regardé")
+        || plain.starts_with("thank you for watching")
+        || plain.starts_with("thanks for watching")
+}
+
+fn transcribe(path: &Path, samples: &[f32], vocabulary: &str) -> Result<String, String> {
     let ctx = context(path)?;
     let mut state = ctx.create_state().map_err(|e| e.to_string())?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
@@ -151,6 +210,10 @@ fn transcribe(path: &Path, samples: &[f32]) -> Result<String, String> {
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get().min(8));
     params.set_n_threads(threads as i32);
     params.set_translate(false);
+    let prompt = initial_prompt(vocabulary);
+    params.set_initial_prompt(&prompt);
+    params.set_no_speech_thold(0.6);
+    params.set_suppress_blank(true);
     params.set_print_progress(false);
     params.set_print_realtime(false);
     params.set_print_special(false);
@@ -160,7 +223,12 @@ fn transcribe(path: &Path, samples: &[f32]) -> Result<String, String> {
         .as_iter()
         .filter_map(|segment| segment.to_str().ok().map(str::to_owned))
         .collect();
-    Ok(text.trim().to_string())
+    let text = text.trim();
+    Ok(if is_hallucination(text) {
+        String::new()
+    } else {
+        text.to_string()
+    })
 }
 
 /// Raw little-endian f32 PCM (mono, 16 kHz): JSON would turn 2 min of audio into tens of MB.
@@ -182,13 +250,19 @@ pub(super) async fn transcribe_audio(
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("Expected raw audio bytes.".into());
     };
+    let vocabulary = request
+        .headers()
+        .get(PROMPT_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(percent_decode)
+        .unwrap_or_default();
     let samples = samples_from_bytes(bytes)?;
     check_length(&samples)?;
     let path = model_path(&app)?;
     if !path.is_file() {
         return Err("Speech model is not installed.".into());
     }
-    let text = tokio::task::spawn_blocking(move || transcribe(&path, &samples))
+    let text = tokio::task::spawn_blocking(move || transcribe(&path, &samples, &vocabulary))
         .await
         .map_err(|e| e.to_string())??;
     Ok(Transcript { text })
@@ -235,6 +309,45 @@ mod tests {
         assert!(check_length(&vec![0.0; MAX_SAMPLES]).is_ok());
         assert!(check_length(&vec![0.0; MAX_SAMPLES + 1]).is_err());
         assert!(check_length(&[]).is_err());
+    }
+
+    #[test]
+    fn percent_decoding_handles_utf8_and_stray_percent() {
+        assert_eq!(percent_decode("caf%C3%A9%20%26%20Cl%C3%A9"), "café & Clé");
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("a%zzb%2"), "a%zzb%2");
+    }
+
+    #[test]
+    fn prompt_appends_vocabulary_after_dev_words() {
+        assert_eq!(initial_prompt("  "), DEV_VOCABULARY);
+        assert_eq!(
+            initial_prompt("composer, App.tsx"),
+            format!("{DEV_VOCABULARY}, composer, App.tsx")
+        );
+        assert!(initial_prompt(&"é".repeat(1000)).chars().count() < DEV_VOCABULARY.len() + 410);
+    }
+
+    #[test]
+    fn known_silence_hallucinations_are_dropped() {
+        for text in [
+            "Merci d'avoir regardé cette vidéo !",
+            "Sous-titres réalisés par la communauté d'Amara.org",
+            "Thank you for watching.",
+            "You",
+            "...",
+            " ",
+            "you.",
+        ] {
+            assert!(is_hallucination(text), "{text}");
+        }
+        for text in [
+            "Lance les tests",
+            "merci, fais le commit",
+            "you should push",
+        ] {
+            assert!(!is_hallucination(text), "{text}");
+        }
     }
 
     #[test]

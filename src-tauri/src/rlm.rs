@@ -478,7 +478,10 @@ pub(super) async fn send_rlm_message(
     }
     ensure_observer(&app, state.inner(), &workspace_id, &input.conversation_id, &socket, &session_id).await?;
     let lessons = state.store.lessons_prompt_for(&input.conversation_id, &text);
-    let text_for_mode = mode_prompt(&text, input.mode);
+    let mut text_for_mode = mode_prompt(&text, input.mode);
+    if input.voice {
+        text_for_mode = format!("{}\n\n{text_for_mode}", crate::voice::VOICE_TURN_NOTE);
+    }
     let prompt = turn_prompt(&text_for_mode, state.store.learning_enabled_for(&input.conversation_id), lessons.as_deref());
     prime::call(&socket, serde_json::json!({"type":"prompt","activeSessionId":session_id,"message":prompt,"streamingBehavior":"followUp"}),
         Duration::from_secs(30), |_| {}).await.map_err(error_to_string)?;

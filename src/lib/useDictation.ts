@@ -7,7 +7,7 @@ export type DictationState = "idle" | "downloading" | "recording" | "transcribin
 const SAMPLE_RATE = 16_000;
 const MAX_SECONDS = 120;
 
-async function toMono16k(blob: Blob): Promise<Float32Array> {
+export async function toMono16k(blob: Blob): Promise<Float32Array> {
   const ctx = new AudioContext();
   try {
     const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
@@ -22,6 +22,28 @@ async function toMono16k(blob: Blob): Promise<Float32Array> {
   } finally {
     void ctx.close();
   }
+}
+
+/** Confirms and downloads the local speech model if missing. False when the user declines. */
+export async function ensureDictationModel(onProgress?: (fraction: number) => void): Promise<boolean> {
+  const status = await api.dictationModelStatus();
+  if (status.installed) return true;
+  const mb = Math.round(status.sizeBytes / 1_000_000);
+  const ok = window.confirm(
+    `Voice runs locally and needs a one-time download of the speech model (about ${mb} MB). Download it now?`,
+  );
+  if (!ok) return false;
+  onProgress?.(0);
+  const unlisten = await listen<{ received: number; total: number }>(
+    "dictation-model-progress",
+    (e) => onProgress?.(e.payload.total > 0 ? e.payload.received / e.payload.total : 0),
+  );
+  try {
+    await api.dictationDownloadModel();
+  } finally {
+    unlisten();
+  }
+  return true;
 }
 
 export function useDictation(onText: (text: string) => void) {
@@ -51,30 +73,12 @@ export function useDictation(onText: (text: string) => void) {
     release();
   }, [release]);
 
-  const download = useCallback(async () => {
-    setState("downloading");
-    setProgress(0);
-    const unlisten = await listen<{ received: number; total: number }>(
-      "dictation-model-progress",
-      (e) => setProgress(e.payload.total > 0 ? e.payload.received / e.payload.total : 0),
-    );
-    try {
-      await api.dictationDownloadModel();
-    } finally {
-      unlisten();
-    }
-  }, []);
-
   const start = useCallback(async () => {
-    const status = await api.dictationModelStatus();
-    if (!status.installed) {
-      const mb = Math.round(status.sizeBytes / 1_000_000);
-      const ok = window.confirm(
-        `Voice dictation runs locally and needs a one-time download of the speech model (about ${mb} MB). Download it now?`,
-      );
-      if (!ok) return;
-      await download();
-    }
+    const ready = await ensureDictationModel((p) => {
+      setState("downloading");
+      setProgress(p);
+    });
+    if (!ready) return;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
     const recorder = new MediaRecorder(stream);
@@ -97,7 +101,7 @@ export function useDictation(onText: (text: string) => void) {
     recorder.start();
     timerRef.current = window.setTimeout(() => recorder.stop(), MAX_SECONDS * 1000);
     setState("recording");
-  }, [download, release]);
+  }, [release]);
 
   const toggle = useCallback(async () => {
     setError(null);

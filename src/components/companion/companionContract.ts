@@ -76,6 +76,8 @@ export type CompanionAskInput = {
   /** « provider:id » ; absent = defaultModel des réglages. */
   model?: string;
   attachments: CompanionAttachment[];
+  /** Mode vocal actif : le tour ajoute la consigne du compte rendu parlé. */
+  voice?: boolean;
 };
 
 export type CompanionAskStarted = { turnId: string; conversationId: string };

@@ -132,6 +132,9 @@ pub(super) async fn send_message(
             turn_system_prompt = format!("{turn_system_prompt}\n\n{block}");
         }
     }
+    if input.voice {
+        turn_system_prompt = format!("{turn_system_prompt}\n\n{}", crate::voice::VOICE_TURN_NOTE);
+    }
     let mut mode_model_settings = conversation.mode_model_settings.clone();
     let selected_model = model_with_optional_selection(
         mode_model_settings.get(policy.mode),

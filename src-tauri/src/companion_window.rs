@@ -296,6 +296,8 @@ pub(crate) fn ensure_companion_window(app: &AppHandle) -> Result<tauri::WebviewW
     .focused(false)
     .build()
     .context("unable to create companion window")?;
+    #[cfg(target_os = "linux")]
+    crate::dictation::allow_microphone(&window);
     Ok(window)
 }
 
