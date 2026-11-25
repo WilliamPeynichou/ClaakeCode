@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./ipc";
+import { micErrorMessage } from "./voiceLogic";
 
 export type DictationState = "idle" | "downloading" | "recording" | "transcribing";
 
@@ -114,7 +115,7 @@ export function useDictation(onText: (text: string) => void) {
       await start();
     } catch (e) {
       release();
-      setError(e instanceof Error ? e.message : String(e));
+      setError(micErrorMessage(e));
       setState("idle");
     }
   }, [state, start, release]);

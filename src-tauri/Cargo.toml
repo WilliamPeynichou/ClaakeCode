@@ -43,11 +43,11 @@ url = { workspace = true }
 ring = { workspace = true }
 portable-pty = "0.9.0"
 reqwest = { workspace = true }
-whisper-rs = "0.16"
+whisper-rs = { version = "0.16", features = ["tracing_backend"] }
 
 # Metal gives empty, slower transcripts on Intel Macs (measured on Iris Plus): Apple Silicon only.
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
-whisper-rs = { version = "0.16", features = ["metal"] }
+whisper-rs = { version = "0.16", features = ["metal", "tracing_backend"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0.2", features = ["v2_4"] }

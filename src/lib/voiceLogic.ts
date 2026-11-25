@@ -6,6 +6,18 @@ export const PRE_ROLL_MS = 300;
 
 export type VoiceCommand = "stop" | "repeat" | "exit";
 
+/** getUserMedia failures in words the user can act on. */
+export function micErrorMessage(e: unknown): string {
+  const name = e instanceof DOMException ? e.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Micro refusé : autorise l'accès dans Réglages Système › Confidentialité et sécurité › Micro, puis réessaie.";
+  }
+  if (name === "NotFoundError") return "Aucun micro détecté.";
+  if (name === "NotReadableError") return "Le micro est déjà utilisé par une autre app.";
+  if (!navigator.mediaDevices?.getUserMedia) return "Le micro n'est pas disponible dans cette fenêtre.";
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function normalizeSpeech(text: string): string {
   return text
     .toLowerCase()

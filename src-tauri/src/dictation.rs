@@ -141,6 +141,8 @@ fn context(path: &Path) -> Result<Arc<WhisperContext>, String> {
         return Ok(ctx.clone());
     }
     let path = path.to_str().ok_or("invalid model path")?;
+    // Routes whisper.cpp's per-token stderr output through tracing (debug level, hidden by default).
+    whisper_rs::install_logging_hooks();
     let ctx = WhisperContext::new_with_params(path, WhisperContextParameters::default())
         .map_err(|e| format!("Could not load the speech model: {e}"))?;
     Ok(CONTEXT.get_or_init(|| Arc::new(ctx)).clone())

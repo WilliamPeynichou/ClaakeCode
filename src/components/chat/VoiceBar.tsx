@@ -30,6 +30,17 @@ export type VoiceBarState = {
 
 export function VoiceBar({ voice }: { voice: VoiceBarState }) {
   const { phase, muted, level, error, modelProgress } = voice;
+  if (phase === "off") {
+    return (
+      <div className="voice-bar" data-phase="off" role="alert">
+        <span className="voice-bar__label">{error}</span>
+        <span className="voice-bar__spacer" />
+        <button type="button" className="voice-bar__btn" onClick={voice.exit} title="Fermer" aria-label="Fermer">
+          <Icon icon="solar:close-circle-linear" width={15} height={15} />
+        </button>
+      </div>
+    );
+  }
   const label =
     modelProgress !== null
       ? `Téléchargement du modèle vocal… ${Math.round(modelProgress * 100)} %`

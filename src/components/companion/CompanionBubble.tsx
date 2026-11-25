@@ -483,7 +483,7 @@ export function CompanionBubble({ onClose }: Props) {
         </ul>
       )}
 
-      {voice.active && <VoiceBar voice={voice} />}
+      {(voice.active || voice.error) && <VoiceBar voice={voice} />}
       <div className="companion-bubble__composer">
         <textarea
           ref={textareaRef}

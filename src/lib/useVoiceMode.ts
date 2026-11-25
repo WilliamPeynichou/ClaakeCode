@@ -9,6 +9,7 @@ import {
   interpretTranscript,
   resampleTo16k,
   rms,
+  micErrorMessage,
   type VoiceCommand,
 } from "./voiceLogic";
 
@@ -161,6 +162,7 @@ export function useVoiceMode(opts: Options) {
 
   const exit = useCallback(() => {
     release();
+    setError(null);
     mutedRef.current = false;
     setMuted(false);
     deafenedRef.current = false;
@@ -271,7 +273,7 @@ export function useVoiceMode(opts: Options) {
     } catch (e) {
       release();
       setModelProgress(null);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(micErrorMessage(e));
       changePhase("off");
     }
   }, [changePhase, onFrame, release, resumeListening]);

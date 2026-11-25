@@ -3740,7 +3740,12 @@ export function ChatPane({
               onChange={(e) => setGoalVerifyCommand(conversationId, e.target.value)}
             />
           )}
-          {voice.active && <VoiceBar voice={voice} />}
+          {(voice.active || voice.error) && <VoiceBar voice={voice} />}
+          {dictation.error && !voice.active && !voice.error && (
+            <div className="voice-bar" data-phase="off" role="alert">
+              <span className="voice-bar__label">{dictation.error}</span>
+            </div>
+          )}
           <div className="composer__input-wrap">
             <div
               className="composer__overlay"
