@@ -45,6 +45,7 @@ function pickVoice(lang: "fr" | "en"): SpeechSynthesisVoice | undefined {
 export function useVoiceMode(opts: Options) {
   const [phase, setPhase] = useState<VoicePhase>("off");
   const [muted, setMuted] = useState(false);
+  const [deafened, setDeafened] = useState(false);
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
@@ -54,6 +55,7 @@ export function useVoiceMode(opts: Options) {
   optsRef.current = opts;
   const phaseRef = useRef<VoicePhase>("off");
   const mutedRef = useRef(false);
+  const deafenedRef = useRef(false);
   const lastSpokenRef = useRef<string | null>(null);
   const resourcesRef = useRef<{
     stream: MediaStream;
@@ -86,7 +88,7 @@ export function useVoiceMode(opts: Options) {
       resetCapture();
       changePhase(idlePhase());
       const res = resourcesRef.current;
-      if (sound && res && !mutedRef.current) beep(res.ctx, [660]);
+      if (sound && res && !mutedRef.current && !deafenedRef.current) beep(res.ctx, [660]);
     },
     [changePhase, idlePhase, resetCapture],
   );
@@ -121,8 +123,26 @@ export function useVoiceMode(opts: Options) {
   }, [resumeListening]);
 
   const repeat = useCallback(() => {
-    if (lastSpokenRef.current) speak(lastSpokenRef.current);
+    if (lastSpokenRef.current && !deafenedRef.current) speak(lastSpokenRef.current);
   }, [speak]);
+
+  /** Explicit request (▶ on a report card): plays even when sound is off. */
+  const read = useCallback(
+    (text: string) => {
+      if (phaseRef.current !== "off" && phaseRef.current !== "starting") speak(text);
+    },
+    [speak],
+  );
+
+  const toggleDeafen = useCallback(() => {
+    const next = !deafenedRef.current;
+    deafenedRef.current = next;
+    setDeafened(next);
+    if (next && phaseRef.current === "speaking") {
+      window.speechSynthesis.cancel();
+      resumeListening(false);
+    }
+  }, [resumeListening]);
 
   const release = useCallback(() => {
     generationRef.current += 1;
@@ -143,6 +163,8 @@ export function useVoiceMode(opts: Options) {
     release();
     mutedRef.current = false;
     setMuted(false);
+    deafenedRef.current = false;
+    setDeafened(false);
     setModelProgress(null);
     changePhase("off");
   }, [changePhase, release]);
@@ -271,11 +293,16 @@ export function useVoiceMode(opts: Options) {
     if (!was || opts.isBusy) return;
     const res = resourcesRef.current;
     if (!res || phaseRef.current === "off" || phaseRef.current === "starting") return;
-    beep(res.ctx, [660, 880]);
     const text = optsRef.current.lastAssistantText();
     const spoken = text ? extractSpoken(text) : null;
     // An interrupted turn may end without a new report: never re-read the previous one.
-    if (spoken && spoken !== lastSpokenRef.current) speak(spoken);
+    const fresh = spoken && spoken !== lastSpokenRef.current ? spoken : null;
+    if (deafenedRef.current) {
+      if (fresh) lastSpokenRef.current = fresh;
+      return;
+    }
+    beep(res.ctx, [660, 880]);
+    if (fresh) speak(fresh);
   }, [opts.isBusy, speak]);
 
   useEffect(() => {
@@ -284,6 +311,9 @@ export function useVoiceMode(opts: Options) {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "m") {
         e.preventDefault();
         toggleMute();
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        toggleDeafen();
       } else if (e.key === "Escape" && phaseRef.current === "speaking") {
         e.preventDefault();
         stopSpeaking();
@@ -291,7 +321,7 @@ export function useVoiceMode(opts: Options) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, stopSpeaking, toggleMute]);
+  }, [phase, stopSpeaking, toggleDeafen, toggleMute]);
 
   useEffect(() => release, [release]);
 
@@ -299,6 +329,7 @@ export function useVoiceMode(opts: Options) {
     active: phase !== "off",
     phase,
     muted,
+    deafened,
     level,
     error,
     modelProgress,
@@ -306,7 +337,9 @@ export function useVoiceMode(opts: Options) {
     start,
     exit,
     toggleMute,
+    toggleDeafen,
     stopSpeaking,
     repeat,
+    read,
   };
 }

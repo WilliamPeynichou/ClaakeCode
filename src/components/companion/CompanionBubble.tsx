@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,7 +13,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "../../lib/ipc";
 import { useVoiceMode } from "../../lib/useVoiceMode";
 import { splitSpoken } from "../../lib/spoken";
-import { SpokenCard, VoiceBar } from "../chat/VoiceBar";
+import { SpokenCard, VoiceBar, VoiceReadContext } from "../chat/VoiceBar";
 import {
   availableModelsForProviders,
   fallbackModelEntry,
@@ -387,6 +388,7 @@ export function CompanionBubble({ onClose }: Props) {
   );
 
   return (
+    <VoiceReadContext.Provider value={voice.active ? voice.read : null}>
     <section
       className="companion-bubble"
       aria-label="Chat Claaky"
@@ -564,15 +566,19 @@ export function CompanionBubble({ onClose }: Props) {
         </div>
       </div>
     </section>
+    </VoiceReadContext.Provider>
   );
 }
 
 function MessageText({ message }: { message: PendingMessage }) {
   const { body, spoken, pending } = splitSpoken(message.text);
+  const read = useContext(VoiceReadContext);
   return (
     <>
       {(body || spoken === null) && <p>{body || (message.pending ? "…" : "")}</p>}
-      {spoken !== null && <SpokenCard text={spoken} pending={pending} />}
+      {spoken !== null && (
+        <SpokenCard text={spoken} pending={pending} onReplay={read ? () => read(spoken) : undefined} />
+      )}
     </>
   );
 }

@@ -34,7 +34,7 @@ import { api, getGoalVerifyCommand, setGoalVerifyCommand, type MeasuredModelStat
 import { takeComposerText } from "./ChatSurface";
 import { useDictation } from "../../lib/useDictation";
 import { useVoiceMode } from "../../lib/useVoiceMode";
-import { AssistantMarkdown, VoiceBar } from "./VoiceBar";
+import { AssistantMarkdown, VoiceBar, VoiceReadContext } from "./VoiceBar";
 import { canonicalToolName, isToolName } from "../../lib/tools";
 import {
   MODELS,
@@ -3333,6 +3333,7 @@ export function ChatPane({
   }, [activeSubAgent, autoCloseSubAgentId]);
 
   return (
+    <VoiceReadContext.Provider value={voice.active ? voice.read : null}>
     <div
       className="chat-col"
       ref={dropZoneRef}
@@ -4211,6 +4212,7 @@ export function ChatPane({
         </>
       )}
     </div>
+    </VoiceReadContext.Provider>
   );
 }
 

@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import { Icon } from "@iconify/react";
 import type { VoicePhase } from "../../lib/useVoiceMode";
 import { splitSpoken } from "../../lib/spoken";
@@ -16,11 +17,13 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
 export type VoiceBarState = {
   phase: VoicePhase;
   muted: boolean;
+  deafened: boolean;
   level: number;
   error: string | null;
   modelProgress: number | null;
   canSpeak: boolean;
   toggleMute: () => void;
+  toggleDeafen: () => void;
   stopSpeaking: () => void;
   exit: () => void;
 };
@@ -75,6 +78,22 @@ export function VoiceBar({ voice }: { voice: VoiceBarState }) {
       <button
         type="button"
         className="voice-bar__btn"
+        data-active={voice.deafened ? "true" : undefined}
+        onClick={voice.toggleDeafen}
+        title={voice.deafened ? "Rallumer le son (⌘⇧D)" : "Couper le son (⌘⇧D)"}
+        aria-label={voice.deafened ? "Rallumer le son" : "Couper le son"}
+        aria-pressed={voice.deafened}
+      >
+        <Icon
+          icon={voice.deafened ? "solar:headphones-round-bold" : "solar:headphones-round-linear"}
+          width={15}
+          height={15}
+        />
+        {voice.deafened && <span className="voice-bar__slash" aria-hidden="true" />}
+      </button>
+      <button
+        type="button"
+        className="voice-bar__btn"
         onClick={voice.exit}
         title="Quitter le mode vocal"
         aria-label="Quitter le mode vocal"
@@ -116,21 +135,19 @@ export function SpokenCard({
   );
 }
 
+/** Set while voice mode is active: report cards get a ▶ button that reads them aloud. */
+export const VoiceReadContext = createContext<((text: string) => void) | null>(null);
+
 /** Réponse assistant en Markdown ; le bloc <spoken> devient une carte « Synthèse ». */
-export function AssistantMarkdown({
-  text,
-  onOpenFile,
-  onReplay,
-}: {
-  text: string;
-  onOpenFile: (path: string) => void;
-  onReplay?: () => void;
-}) {
+export function AssistantMarkdown({ text, onOpenFile }: { text: string; onOpenFile: (path: string) => void }) {
   const { body, spoken, pending } = splitSpoken(text);
+  const read = useContext(VoiceReadContext);
   return (
     <>
       {body.trim() && <Markdown text={body} onOpenFile={onOpenFile} />}
-      {spoken !== null && <SpokenCard text={spoken} pending={pending} onReplay={onReplay} />}
+      {spoken !== null && (
+        <SpokenCard text={spoken} pending={pending} onReplay={read ? () => read(spoken) : undefined} />
+      )}
     </>
   );
 }
