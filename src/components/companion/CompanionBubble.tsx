@@ -536,11 +536,11 @@ export function CompanionBubble({ onClose }: Props) {
               !voice.active
                 ? "Mode vocal : parlez à Claaky"
                 : voice.muted
-                  ? "Rallumer le micro (⌘⇧M)"
-                  : "Couper le micro (⌘⇧M)"
+                  ? "Reprendre (⌘⇧M)"
+                  : "Pause (⌘⇧M)"
             }
           >
-            {!voice.active ? "Voix" : voice.muted ? "Micro coupé" : "Micro"}
+            {!voice.active ? "Voix" : voice.muted ? "Reprendre" : "Pause"}
           </button>
           {voice.active && (
             <button

@@ -6,6 +6,7 @@ import {
   PARTIAL_EVERY_MS,
   PRE_ROLL_MS,
   PhraseDetector,
+  TARGET_RATE,
   detectLanguage,
   interpretTranscript,
   joinDraft,
@@ -513,16 +514,43 @@ export function useVoiceMode(opts: Options) {
     [exit, start],
   );
 
+  /**
+   * Muting mid-phrase is a pause: what was said stays in the composer, unsent, and the next
+   * phrase continues it (its base is the composer text), so silence after resuming sends it all.
+   */
+  const pausePhrase = useCallback(() => {
+    const base = baseRef.current;
+    const message = messageRef.current;
+    const generation = generationRef.current;
+    let transcript: Promise<string>;
+    if (engineRef.current === "apple") {
+      speechIdRef.current = null;
+      transcript = queueSpeech(() => api.speechFinish());
+    } else {
+      const rate = resourcesRef.current?.ctx.sampleRate ?? TARGET_RATE;
+      const samples = resampleTo16k(concat(phraseRef.current), rate);
+      transcript = Promise.all([...chunksRef.current, transcribeText(samples)]).then((parts) =>
+        joinDraft(...parts),
+      );
+    }
+    void transcript
+      .then((text) => {
+        if (generation !== generationRef.current || message !== messageRef.current) return;
+        optsRef.current.onDraft(joinDraft(base, text));
+      })
+      .catch(() => {});
+  }, [queueSpeech, transcribeText]);
+
   const toggleMute = useCallback(() => {
     if (phaseRef.current === "off" || phaseRef.current === "starting") return;
     const next = !mutedRef.current;
     mutedRef.current = next;
     setMuted(next);
-    if (detectorRef.current.inPhrase) abandonPhrase();
+    if (detectorRef.current.inPhrase) pausePhrase();
     resetCapture();
     const current = phaseRef.current;
     if (current === "listening" || current === "hearing" || current === "muted") changePhase(next ? "muted" : "listening");
-  }, [abandonPhrase, changePhase, resetCapture]);
+  }, [changePhase, pausePhrase, resetCapture]);
 
   const wasBusyRef = useRef(opts.isBusy);
   useEffect(() => {

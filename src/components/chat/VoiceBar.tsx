@@ -8,7 +8,7 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
   off: "",
   starting: "Préparation du micro…",
   listening: "À l'écoute",
-  muted: "Micro coupé",
+  muted: "En pause · texte gardé, reclique sur le micro pour reprendre",
   hearing: "Je vous entends…",
   transcribing: "Transcription…",
   speaking: "Lecture de la synthèse",
@@ -112,7 +112,7 @@ export function VoiceMicButton({
   voice: { active: boolean; phase: VoicePhase; muted: boolean; level: number; start: () => Promise<void>; toggleMute: () => void };
 }) {
   const { active, phase, muted } = voice;
-  const label = !active ? "Activer le mode vocal" : muted ? "Rallumer le micro (⌘⇧M)" : "Couper le micro (⌘⇧M)";
+  const label = !active ? "Activer le mode vocal" : muted ? "Reprendre (⌘⇧M)" : "Pause (⌘⇧M)";
   return (
     <button
       type="button"
