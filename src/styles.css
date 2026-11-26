@@ -10479,8 +10479,11 @@ button.settings-pane__about-link:disabled {
   gap: 6px;
   min-width: 0;
 }
-.remote-panel__pairing-copy > span {
+.remote-panel__steps {
+  margin: 0;
+  padding-left: 18px;
   font-size: var(--fs-sm);
+  line-height: 1.5;
   color: var(--text-2);
 }
 .remote-panel__pairing-copy > a {

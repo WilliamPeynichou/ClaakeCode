@@ -1,0 +1,21 @@
+name = "claake-remote"
+main = "worker/index.ts"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/ws", "/healthz", "/vapid-public-key"]
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "Relay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Relay"]
+
+# VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are secrets (`wrangler secret put`), or .dev.vars locally.
+[vars]
+VAPID_SUBJECT = "https://claake-remote.claakecode.workers.dev"

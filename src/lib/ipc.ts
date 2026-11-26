@@ -1116,9 +1116,9 @@ export const api = {
   remoteGetStatus() {
     return invoke<RemoteStatus>("remote_get_status");
   },
-  remoteSetEnabled(enabled: boolean, relayUrl?: string | null) {
+  remoteSetEnabled(enabled: boolean) {
     return invoke<RemoteStatus>("remote_set_enabled", {
-      input: { enabled, relayUrl },
+      input: { enabled },
     });
   },
   remoteStartPairing() {

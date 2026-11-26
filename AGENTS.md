@@ -17,7 +17,7 @@ Code map:
 - Correctif Mistral streaming : `crates/claakecode-mistral/src/wire.rs` accepte texte ou fragments structurés ; `stream.rs` sépare thinking/texte et teste les formats, outils et usages.
 - Settings Skills : `src/components/SettingsPane.tsx` garde la bibliothèque et l’éditeur prioritaires, avec gestion Git repliable en pied de page ; `src/styles.css` borne son défilement indépendamment.
 - Dépôts de skills Git : `crates/claakecode-app/src/skill.rs` lit l’en-tête des SKILL.md avec `serde_yaml` (`>`/`|`, repli tolérant si YAML invalide) ; `skill_repository.rs` ignore les dossiers cachés (sauf dépôt qui n’a que ça), dédoublonne les copies internes (« doublon ignoré »), et met à jour par clone neuf validé (`auto_update` par dépôt, `update_all_in`) ; tests dans `skill_repository_{tests,security_tests,update_tests}.rs` (+ recette réseau ponytail `--ignored`) et fixtures `crates/claakecode-app/tests/fixtures/ponytail/` ; tâche de fond démarrage + 6 h et commandes dans `src-tauri/src/conversations.rs` / `lib.rs` (événement `skill-repositories-updated`) ; UI (interrupteur mise à jour auto, badge, « Tout mettre à jour », notification) dans `SettingsPane.tsx`. Mise à jour auto = génération en attente (`Record.pending`, fichiers changés), appliquée seulement via accept/discard (A4).
-- Catalogue de modèles distant : `models.json` (racine, aussi embarqué dans le binaire) ; `crates/claakecode-core/src/catalog.rs` valide (niveaux de thinking limités à ceux transmis fidèlement par chaque adaptateur), fusionne (distant gagne, `hidden` masque, ordre du fichier) et sert les limites aux crates providers (secours prudent par provider) ; `crates/claakecode-app/src/model_catalog.rs` télécharge une fois par lancement (3 s, tâche de fond dans `src-tauri/src/lib.rs`) puis émet `model-catalog-updated` ; cache SQLite `model_catalog` ; UI : `src/lib/models.ts` (`applyModelCatalog`, `startModelCatalogSync`, `useModelCatalogVersion`, `fallbackModelEntry` ; thinking piloté par le catalogue) vérifié par `scripts/check-models.mjs`, bulle compagnon qui garde mode/modèle choisis, `remote/public/app.js` ; CI `.github/workflows/models-catalog.yml`.
+- Catalogue de modèles distant : `models.json` (racine, aussi embarqué dans le binaire) ; `crates/claakecode-core/src/catalog.rs` valide (niveaux de thinking limités à ceux transmis fidèlement par chaque adaptateur), fusionne (distant gagne, `hidden` masque, ordre du fichier) et sert les limites aux crates providers (secours prudent par provider) ; `crates/claakecode-app/src/model_catalog.rs` télécharge une fois par lancement (3 s, tâche de fond dans `src-tauri/src/lib.rs`) puis émet `model-catalog-updated` ; cache SQLite `model_catalog` ; UI : `src/lib/models.ts` (`applyModelCatalog`, `startModelCatalogSync`, `useModelCatalogVersion`, `fallbackModelEntry` ; thinking piloté par le catalogue) vérifié par `scripts/check-models.mjs`, bulle compagnon qui garde mode/modèle choisis, `remote/app/src/state.ts` ; CI `.github/workflows/models-catalog.yml`.
 - Popup « nouveaux modèles » : `src/lib/modelAnnouncements.ts` (état localStorage `claakecode:model-announcements:v1` : ids déjà vus + en attente, base silencieuse au 1er lancement) alimenté par `applyModelCatalog` dans `src/lib/models.ts` ; `src/components/NewModelsPopup.tsx/.css` (dialog natif, monté dans `src/App.tsx`) ; tests dans `scripts/check-models.mjs`. Le skill `add-models` est privé (`~/.claakecode/skills/add-models`), jamais dans `src-tauri/bundled-skills` (test `shipped_bundle_is_valid…`).
 - L'agent doit garder à jour cette carte simple des fichiers à chaque création, suppression, renommage, déplacement ou modification.
 
@@ -45,18 +45,17 @@ Code map:
 ├── package-lock.json
 ├── package.json
 ├── README.md
-├── remote
+├── remote — Claake Remote : app iPhone (PWA) et relais Cloudflare (Worker + Durable Object), voir remote/README.md
 │   ├── README.md
-│   ├── server.mjs
-│   ├── package.json
-│   └── public
-│       ├── app.js
-│       ├── index.html
-│       ├── manifest.webmanifest
-│       ├── styles.css
-│       ├── sw.js
-│       └── icons
-│           └── icon.svg
+│   ├── package.json — dev (vite), build, relay (wrangler dev), test, check (tsc), deploy
+│   ├── wrangler.toml — Worker : assets dist/, Durable Object Relay (SQLite), VAPID_SUBJECT ; clés VAPID en secrets
+│   ├── vite.config.ts — build de l'app vers dist/ (cible safari16)
+│   ├── app — app iPhone React, style iOS, en français
+│   │   ├── index.html
+│   │   ├── public — sw.js (cache réseau d'abord, notifications), manifest.webmanifest, icons/
+│   │   └── src — App.tsx (pile d'écrans), state.ts (useRemote), protocol/ (crypto, client WebSocket, types), screens/, chat/, ui/
+│   ├── worker — index.ts (relais : trames chiffrées, une socket par iPhone, pong sans réveil), push.ts (Web Push VAPID)
+│   └── test — push, relay et fake-pc .test.mjs ; fake-pc.mjs (faux Mac) ; wrangler.mjs (lance wrangler dev)
 ├── refero-heroes
 │   ├── errors.json
 │   ├── metadata.json

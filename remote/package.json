@@ -1,17 +1,33 @@
 {
-  "name": "sinew-remote-relay",
+  "name": "claake-remote",
   "private": true,
   "version": "1.0.0",
-  "description": "Sinew Remote relay: routes opaque E2E frames between a paired phone and its PC, and serves the mobile PWA.",
+  "description": "Claake Code Remote: the iPhone web app and the Cloudflare relay that routes end-to-end encrypted frames between the phone and the Mac.",
   "type": "module",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
-    "start": "node server.mjs"
+    "dev": "vite",
+    "build": "vite build",
+    "relay": "wrangler dev",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "check": "tsc -p app",
+    "deploy": "vite build && wrangler deploy"
   },
   "dependencies": {
+    "dompurify": "^3.2.3",
+    "marked": "^15.0.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261123.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "http_ece": "^1.2.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3",
     "web-push": "3.6.7",
+    "wrangler": "^4.168.0",
     "ws": "8.21.0"
   }
 }

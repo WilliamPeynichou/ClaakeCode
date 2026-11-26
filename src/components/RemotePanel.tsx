@@ -113,8 +113,8 @@ export function RemotePanel({ initialStatus = null, onStatusChange }: Props) {
           <div className="remote-panel__head-text">
             <h1>Remote</h1>
             <p>
-              Drive Sinew chat from a paired phone over remote.sinew-ide.com.
-              Messages stay end-to-end encrypted between this PC and your devices.
+              Drive your Claake Code chats from your iPhone. Messages are end-to-end
+              encrypted between this computer and your phone; the relay only forwards them.
             </p>
           </div>
           <button
@@ -182,7 +182,11 @@ export function RemotePanel({ initialStatus = null, onStatusChange }: Props) {
               </div>
               <QrCode value={pairing.qrUrl} />
               <div className="remote-panel__pairing-copy">
-                <span>Scan the code, or open this link on the phone:</span>
+                <ol className="remote-panel__steps">
+                  <li>Scan the QR code with the iPhone camera.</li>
+                  <li>In Safari, tap Share, then Add to Home Screen.</li>
+                  <li>Open Claake from the Home Screen and enter this code.</li>
+                </ol>
                 <a href={pairing.qrUrl}>{pairing.qrUrl}</a>
                 <small>
                   {pairing.attemptsRemaining} attempt
@@ -193,7 +197,7 @@ export function RemotePanel({ initialStatus = null, onStatusChange }: Props) {
           ) : (
             <p className="remote-panel__hint">
               {enabled
-                ? "Open pairing to reveal a fresh code and QR for a new phone."
+                ? "Open pairing to show a code and a QR code for your iPhone."
                 : "Enable Remote first, then open pairing to add a device."}
             </p>
           )}

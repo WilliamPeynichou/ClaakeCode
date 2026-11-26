@@ -8,12 +8,21 @@ use ring::{
     rand::{SecureRandom, SystemRandom},
 };
 use serde::de::DeserializeOwned;
+use std::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 const REMOTE_SETTINGS_KEY: &str = "remote_settings_v1";
 pub(super) const REMOTE_STATUS_EVENT_NAME: &str = "remote-status-changed";
 pub(super) const CONVERSATIONS_CHANGED_EVENT_NAME: &str = "conversations-changed";
-const DEFAULT_RELAY_WS_URL: &str = "wss://remote.sinew-ide.com/ws";
+const DEFAULT_RELAY_WS_URL: &str = "wss://claake-remote.claakecode.workers.dev/ws";
+/// Points the Mac at a self-hosted or local relay, e.g. `ws://localhost:8787/ws`.
+const RELAY_URL_ENV: &str = "CLAAKE_REMOTE_RELAY_URL";
+/// The relay answers each ping; a relay silent past the limit is treated as gone.
+const RELAY_PING_INTERVAL: Duration = Duration::from_secs(25);
+const RELAY_SILENCE_LIMIT: Duration = Duration::from_secs(70);
+/// Phones show summaries: long tool output and big diffs stay on the Mac.
+const PHONE_TEXT_LIMIT: usize = 4_000;
+const PHONE_DIFF_LINES: usize = 300;
 const PAIRING_CODE_TTL_MS: i64 = 5 * 60 * 1000;
 const PAIRING_MAX_ATTEMPTS: u32 = 5;
 const PAIRING_LOCK_MS: i64 = 60 * 1000;
@@ -32,7 +41,6 @@ pub(super) struct RemoteRuntime {
 struct RemoteSettings {
     enabled: bool,
     pc_id: String,
-    relay_url: String,
     devices: Vec<RemoteDeviceRecord>,
 }
 
@@ -41,7 +49,6 @@ impl Default for RemoteSettings {
         Self {
             enabled: false,
             pc_id: random_id("pc", 18),
-            relay_url: DEFAULT_RELAY_WS_URL.to_string(),
             devices: Vec::new(),
         }
     }
@@ -88,6 +95,8 @@ struct RemoteRuntimeInner {
     settings: RemoteSettings,
     relay_connected: bool,
     connected_devices: HashSet<String>,
+    /// Phones showing the app; the others get push notifications.
+    visible_devices: HashSet<String>,
     seen_request_ids: HashSet<String>,
     pairing: Option<PairingWindow>,
     current_workspace: Option<String>,
@@ -108,6 +117,7 @@ impl RemoteRuntime {
                 settings,
                 relay_connected: false,
                 connected_devices: HashSet::new(),
+                visible_devices: HashSet::new(),
                 seen_request_ids: HashSet::new(),
                 pairing: None,
                 current_workspace: None,
@@ -128,20 +138,14 @@ impl RemoteRuntime {
         app: &AppHandle,
         store: &AppStore,
         enabled: bool,
-        relay_url: Option<String>,
     ) -> Result<RemoteStatus> {
         let should_start = {
             let mut inner = self.inner.lock().await;
             inner.settings.enabled = enabled;
-            if let Some(relay_url) = relay_url
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty())
-            {
-                inner.settings.relay_url = normalize_relay_url(&relay_url);
-            }
             if !enabled {
                 inner.relay_connected = false;
                 inner.connected_devices.clear();
+                inner.visible_devices.clear();
                 inner.seen_request_ids.clear();
                 inner.pairing = None;
                 inner.connect_generation = inner.connect_generation.saturating_add(1);
@@ -249,11 +253,11 @@ impl RemoteRuntime {
         };
 
         loop {
-            let (enabled, relay_url, pc_id, current_generation) = {
+            let relay_url = relay_ws_url();
+            let (enabled, pc_id, current_generation) = {
                 let inner = self.inner.lock().await;
                 (
                     inner.settings.enabled,
-                    inner.settings.relay_url.clone(),
                     inner.settings.pc_id.clone(),
                     inner.connect_generation,
                 )
@@ -274,6 +278,7 @@ impl RemoteRuntime {
                         let mut inner = self.inner.lock().await;
                         inner.relay_connected = true;
                         inner.connected_devices.clear();
+                        inner.visible_devices.clear();
                     }
                     self.emit_status(&app).await;
 
@@ -290,7 +295,15 @@ impl RemoteRuntime {
                     }
 
                     let writer = tauri::async_runtime::spawn(async move {
-                        while let Some(frame) = rx.recv().await {
+                        let mut keepalive = tokio::time::interval(RELAY_PING_INTERVAL);
+                        loop {
+                            let frame = tokio::select! {
+                                frame = rx.recv() => match frame {
+                                    Some(frame) => frame,
+                                    None => break,
+                                },
+                                _ = keepalive.tick() => RelayClientFrame::Ping,
+                            };
                             let Ok(text) = serde_json::to_string(&frame) else {
                                 continue;
                             };
@@ -300,9 +313,10 @@ impl RemoteRuntime {
                         }
                     });
 
+                    let mut last_heard = Instant::now();
                     loop {
                         let still_current = self.connection_is_current(generation).await;
-                        if !still_current {
+                        if !still_current || last_heard.elapsed() > RELAY_SILENCE_LIMIT {
                             break;
                         }
                         let next_message = tokio::select! {
@@ -312,6 +326,7 @@ impl RemoteRuntime {
                         if !self.connection_is_current(generation).await {
                             break;
                         }
+                        last_heard = Instant::now();
                         match next_message {
                             Some(Ok(Message::Text(text))) => {
                                 match serde_json::from_str::<RelayServerFrame>(&text) {
@@ -348,6 +363,7 @@ impl RemoteRuntime {
                 } else {
                     inner.relay_connected = false;
                     inner.connected_devices.clear();
+                    inner.visible_devices.clear();
                     (true, inner.settings.enabled)
                 }
             };
@@ -413,12 +429,14 @@ impl RemoteRuntime {
             RelayServerFrame::PhoneDisconnected { device_id } => {
                 let mut inner = self.inner.lock().await;
                 inner.connected_devices.remove(&device_id);
+                inner.visible_devices.remove(&device_id);
                 drop(inner);
                 self.emit_status(app).await;
             }
             RelayServerFrame::Error { message } => {
                 tracing::warn!(message = %message, "remote relay error");
             }
+            RelayServerFrame::Pong => {}
         }
     }
 
@@ -493,7 +511,7 @@ impl RemoteRuntime {
         let name = sanitize_device_name(&device_name);
         let grant = RemotePairingGrant {
             pc_id: pc_id.clone(),
-            relay_url: public_relay_url_for_ws(&self.relay_url().await),
+            relay_url: public_relay_url_for_ws(&relay_ws_url()),
             device_id: device_id.clone(),
             device_name: name.clone(),
             device_token: device_token.clone(),
@@ -546,11 +564,6 @@ impl RemoteRuntime {
         .await
     }
 
-    async fn relay_url(&self) -> String {
-        let inner = self.inner.lock().await;
-        inner.settings.relay_url.clone()
-    }
-
     async fn handle_phone_cipher(
         &self,
         app: &AppHandle,
@@ -569,7 +582,8 @@ impl RemoteRuntime {
             .execute_phone_command(app, device_id, command_envelope)
             .await;
         match result {
-            Ok(data) => {
+            Ok(mut data) => {
+                trim_for_phone(&mut data);
                 self.send_response_to_device(device_id, request_id, true, Some(data), None)
                     .await?;
             }
@@ -689,6 +703,7 @@ impl RemoteRuntime {
                     "workspaces": workspaces,
                     "bootstrap": bootstrap,
                     "activeTurns": active_turns,
+                    "rlmAvailable": cfg!(not(target_os = "windows")),
                 }))
             }
             RemotePhoneCommand::ListConversations => {
@@ -702,14 +717,15 @@ impl RemoteRuntime {
                 .map_err(|err| anyhow::anyhow!(err))?;
                 Ok(serde_json::to_value(conversations)?)
             }
-            RemotePhoneCommand::CreateConversation => {
-                let bootstrap = conversations::create_conversation(
-                    state,
-                    WorkspaceInput {
-                        workspace_path: workspace_path.clone(),
-                    },
-                )
-                .await
+            RemotePhoneCommand::CreateConversation { harness } => {
+                let input = WorkspaceInput {
+                    workspace_path: workspace_path.clone(),
+                };
+                let bootstrap = if harness.as_deref() == Some("rlm") {
+                    rlm::create_rlm_conversation(state, input).await
+                } else {
+                    conversations::create_conversation(state, input).await
+                }
                 .map_err(|err| anyhow::anyhow!(err))?;
                 emit_conversations_changed(app, &workspace_path);
                 Ok(serde_json::to_value(bootstrap)?)
@@ -801,7 +817,34 @@ impl RemoteRuntime {
                 service_tier,
                 plan_control,
                 message_visibility,
+                voice,
             } => {
+                if state
+                    .store
+                    .conversation_harness(&conversation_id)?
+                    .as_deref()
+                    == Some("rlm")
+                {
+                    if !attachments.is_empty() {
+                        return Err(anyhow::anyhow!("RLM chats do not take attachments yet."));
+                    }
+                    rlm::send_rlm_message(
+                        app.clone(),
+                        state,
+                        RlmMessageInput {
+                            workspace_path: workspace_path.clone(),
+                            conversation_id,
+                            text,
+                            model,
+                            thinking,
+                            mode,
+                            voice,
+                        },
+                    )
+                    .await
+                    .map_err(|err| anyhow::anyhow!(err))?;
+                    return Ok(json!({ "accepted": true }));
+                }
                 let attachments = materialize_remote_attachments(&attachments).await?;
                 turns::send_message(
                     app.clone(),
@@ -821,12 +864,30 @@ impl RemoteRuntime {
                         rewrite_from_history_index: None,
                         revert_workspace_changes: false,
                         use_1m_context: None,
-                        voice: false,
+                        voice,
                     },
                 )
                 .await
                 .map_err(|err| anyhow::anyhow!(err))?;
                 Ok(json!({ "accepted": true }))
+            }
+            RemotePhoneCommand::CancelTurn { conversation_id } => {
+                let rlm_chat = state
+                    .store
+                    .conversation_harness(&conversation_id)?
+                    .as_deref()
+                    == Some("rlm");
+                let input = ConversationInput {
+                    workspace_path: workspace_path.clone(),
+                    conversation_id,
+                };
+                let cancelled = if rlm_chat {
+                    rlm::stop_rlm_turn(state, input).await.map(|()| true)
+                } else {
+                    turns::cancel_turn(state, input).await
+                }
+                .map_err(|err| anyhow::anyhow!(err))?;
+                Ok(json!({ "cancelled": cancelled }))
             }
             RemotePhoneCommand::CompactConversation {
                 conversation_id,
@@ -913,6 +974,15 @@ impl RemoteRuntime {
                 self.remove_push_subscription(app, device_id, &endpoint)
                     .await?;
                 Ok(json!({ "subscribed": false }))
+            }
+            RemotePhoneCommand::Presence { visible } => {
+                let mut inner = self.inner.lock().await;
+                if visible {
+                    inner.visible_devices.insert(device_id.to_string());
+                } else {
+                    inner.visible_devices.remove(device_id);
+                }
+                Ok(json!({ "visible": visible }))
             }
             RemotePhoneCommand::Ping => Ok(json!({ "pong": true, "nowMs": now_ms() })),
         }
@@ -1057,14 +1127,26 @@ impl RemoteRuntime {
         Ok(())
     }
 
-    async fn notify_turn_finished(&self, conversation_id: &str) {
+    /// Notifies the phones that are not looking at the app (closed, hidden or locked).
+    async fn notify_away_devices(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        title: String,
+        body: &str,
+    ) {
         let subscriptions = {
             let inner = self.inner.lock().await;
+            if !inner.settings.enabled {
+                return;
+            }
             inner
                 .settings
                 .devices
                 .iter()
-                .filter(|device| device.revoked_at_ms.is_none())
+                .filter(|device| {
+                    device.revoked_at_ms.is_none() && !inner.visible_devices.contains(&device.id)
+                })
                 .flat_map(|device| device.push_subscriptions.iter().cloned())
                 .collect::<Vec<_>>()
         };
@@ -1073,8 +1155,9 @@ impl RemoteRuntime {
                 .send_relay(RelayClientFrame::PcPush {
                     subscription,
                     payload: RemotePushPayload {
-                        title: "Sinew".to_string(),
-                        body: "Response ready".to_string(),
+                        title: title.clone(),
+                        body: body.to_string(),
+                        workspace_id: workspace_id.to_string(),
                         conversation_id: conversation_id.to_string(),
                     },
                 })
@@ -1137,7 +1220,6 @@ impl RemoteSettings {
         if self.pc_id.trim().is_empty() {
             self.pc_id = random_id("pc", 18);
         }
-        self.relay_url = normalize_relay_url(&self.relay_url);
         self.devices.retain(|device| {
             !device.id.trim().is_empty()
                 && !device.secret_b64.trim().is_empty()
@@ -1185,7 +1267,6 @@ pub(super) struct RemoteDeviceView {
 #[serde(rename_all = "camelCase")]
 pub(super) struct RemoteSetEnabledInput {
     enabled: bool,
-    relay_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1209,7 +1290,7 @@ pub(super) async fn remote_set_enabled(
 ) -> std::result::Result<RemoteStatus, String> {
     state
         .remote
-        .set_enabled(&app, &state.store, input.enabled, input.relay_url)
+        .set_enabled(&app, &state.store, input.enabled)
         .await
         .map_err(error_to_string)
 }
@@ -1323,29 +1404,103 @@ pub(super) fn forward_agent_events(
         return;
     }
     let runtime = state.remote.clone();
+    // The notification title names the conversation, so the user knows which task it is about.
+    let push = events.iter().find_map(|(_, event)| push_body(event)).map(|body| {
+        let title = state
+            .store
+            .list_conversations(workspace_id)
+            .ok()
+            .and_then(|list| list.into_iter().find(|c| c.id == conversation_id))
+            .map(|c| c.title)
+            .filter(|title| !title.trim().is_empty())
+            .unwrap_or_else(|| "Claake Code".to_string());
+        (title, body)
+    });
     let workspace_id = workspace_id.to_string();
     let conversation_id = conversation_id.to_string();
-    // Une seule tâche par lot. Sans appareil connecté, la tâche sort immédiatement.
+    // One task per batch; it ends at once when no phone is connected and nothing needs a notification.
     tauri::async_runtime::spawn(async move {
-        if !runtime.has_connected_devices().await {
-            return;
+        if runtime.has_connected_devices().await {
+            for (sequence, event) in events {
+                let Ok(mut event) = serde_json::to_value(event) else {
+                    continue;
+                };
+                trim_for_phone(&mut event);
+                let payload = RemotePcPayload::AgentEvent {
+                    workspace_id: workspace_id.clone(),
+                    conversation_id: conversation_id.clone(),
+                    sequence,
+                    event,
+                };
+                let _ = runtime.broadcast_payload(&payload).await;
+            }
         }
-        let notify_finished = events
-            .iter()
-            .any(|(_, event)| matches!(event, AgentEvent::TurnFinished { .. }));
-        for (sequence, event) in events {
-            let payload = RemotePcPayload::AgentEvent {
-                workspace_id: workspace_id.clone(),
-                conversation_id: conversation_id.clone(),
-                sequence,
-                event,
-            };
-            let _ = runtime.broadcast_payload(&payload).await;
-        }
-        if notify_finished {
-            runtime.notify_turn_finished(&conversation_id).await;
+        if let Some((title, body)) = push {
+            runtime
+                .notify_away_devices(&workspace_id, &conversation_id, title, body)
+                .await;
         }
     });
+}
+
+/// Moments worth a notification on a phone that is not looking.
+fn push_body(event: &AgentEvent) -> Option<&'static str> {
+    match event {
+        AgentEvent::TurnFinished { .. } => Some("L'agent a terminé."),
+        AgentEvent::ToolStarted { name, .. } if name == "question" => {
+            Some("L'agent te pose une question.")
+        }
+        AgentEvent::ApprovalRequested { .. } => Some("L'agent attend ton accord."),
+        _ => None,
+    }
+}
+
+/// Phones show summaries: long tool output, images and big diffs stay on the Mac.
+fn trim_for_phone(value: &mut Value) {
+    match value {
+        Value::Array(items) => items.iter_mut().for_each(trim_for_phone),
+        Value::Object(map) => {
+            match map.get("type").and_then(Value::as_str) {
+                Some("tool_result" | "tool_finished") => {
+                    for key in ["content", "output"] {
+                        if let Some(Value::String(text)) = map.get_mut(key) {
+                            truncate_text(text, PHONE_TEXT_LIMIT);
+                        }
+                    }
+                    if let Some(Value::Array(images)) = map.get_mut("images") {
+                        images.clear();
+                    }
+                }
+                Some("image") => {
+                    if let Some(Value::String(data)) = map.get_mut("data") {
+                        data.clear();
+                    }
+                }
+                _ => {}
+            }
+            let long_diff = matches!(map.get("lines"), Some(Value::Array(lines)) if lines.len() > PHONE_DIFF_LINES);
+            if long_diff {
+                if let Some(Value::Array(lines)) = map.get_mut("lines") {
+                    lines.truncate(PHONE_DIFF_LINES);
+                }
+                map.insert("truncated".into(), Value::Bool(true));
+            }
+            map.values_mut().for_each(trim_for_phone);
+        }
+        _ => {}
+    }
+}
+
+fn truncate_text(text: &mut String, limit: usize) {
+    if text.len() <= limit {
+        return;
+    }
+    let mut cut = limit;
+    while !text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    text.truncate(cut);
+    text.push_str("\n…");
 }
 
 pub(super) fn forward_agent_event(
@@ -1383,7 +1538,7 @@ fn status_from_inner(inner: &RemoteRuntimeInner) -> RemoteStatus {
             expires_at_ms: pairing.expires_at_ms,
             qr_url: format!(
                 "{}?code={}",
-                public_relay_url_for_ws(&inner.settings.relay_url),
+                public_relay_url_for_ws(&relay_ws_url()),
                 pairing.code
             ),
             attempts_remaining: PAIRING_MAX_ATTEMPTS.saturating_sub(pairing.attempts),
@@ -1392,7 +1547,7 @@ fn status_from_inner(inner: &RemoteRuntimeInner) -> RemoteStatus {
     });
     RemoteStatus {
         enabled: inner.settings.enabled,
-        relay_url: inner.settings.relay_url.clone(),
+        relay_url: relay_ws_url(),
         pc_id: inner.settings.pc_id.clone(),
         relay_connected: inner.relay_connected,
         reachable: inner.settings.enabled && inner.relay_connected,
@@ -1455,6 +1610,7 @@ enum RelayClientFrame {
     PcRevokeDevice {
         device_id: String,
     },
+    Ping,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1482,6 +1638,7 @@ enum RelayServerFrame {
     Error {
         message: String,
     },
+    Pong,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1507,6 +1664,7 @@ struct RemotePairingGrant {
 struct RemotePushPayload {
     title: String,
     body: String,
+    workspace_id: String,
     conversation_id: String,
 }
 
@@ -1525,7 +1683,11 @@ struct RemotePhoneEnvelope {
 enum RemotePhoneCommand {
     Bootstrap,
     ListConversations,
-    CreateConversation,
+    CreateConversation {
+        /// "rlm" creates an RLM chat; anything else a classic one.
+        #[serde(default)]
+        harness: Option<String>,
+    },
     LoadConversation {
         conversation_id: String,
     },
@@ -1554,6 +1716,16 @@ enum RemotePhoneCommand {
         service_tier: Option<ServiceTierInput>,
         plan_control: Option<PlanControlInput>,
         message_visibility: Option<MessageVisibilityInput>,
+        /// Asks for a short <spoken> report at the end, like the desktop voice mode.
+        #[serde(default)]
+        voice: bool,
+    },
+    CancelTurn {
+        conversation_id: String,
+    },
+    /// The phone shows or hides the app, so it only gets notifications when away.
+    Presence {
+        visible: bool,
     },
     CompactConversation {
         conversation_id: String,
@@ -1609,7 +1781,7 @@ enum RemotePcPayload {
         workspace_id: String,
         conversation_id: String,
         sequence: Option<u64>,
-        event: AgentEvent,
+        event: Value,
     },
     ActiveTurnsChanged {
         active_turns: Vec<ActiveTurnSummary>,
@@ -1825,6 +1997,12 @@ fn sanitize_device_name(value: &str) -> String {
     }
 }
 
+fn relay_ws_url() -> String {
+    std::env::var(RELAY_URL_ENV)
+        .map(|value| normalize_relay_url(&value))
+        .unwrap_or_else(|_| DEFAULT_RELAY_WS_URL.to_string())
+}
+
 fn normalize_relay_url(value: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -1853,5 +2031,69 @@ fn public_relay_url_for_ws(ws_url: &str) -> String {
         stripped.to_string()
     } else {
         url.trim_end_matches('/').to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phone_commands_parse() {
+        let parse = |raw: &str| serde_json::from_str::<RemotePhoneCommand>(raw).unwrap();
+        assert!(matches!(
+            parse(r#"{"type":"create_conversation"}"#),
+            RemotePhoneCommand::CreateConversation { harness: None }
+        ));
+        assert!(matches!(
+            parse(r#"{"type":"create_conversation","harness":"rlm"}"#),
+            RemotePhoneCommand::CreateConversation { harness: Some(h) } if h == "rlm"
+        ));
+        assert!(matches!(
+            parse(r#"{"type":"cancel_turn","conversation_id":"c1"}"#),
+            RemotePhoneCommand::CancelTurn { conversation_id } if conversation_id == "c1"
+        ));
+        assert!(matches!(
+            parse(r#"{"type":"presence","visible":false}"#),
+            RemotePhoneCommand::Presence { visible: false }
+        ));
+        assert!(matches!(
+            parse(r#"{"type":"send_message","conversation_id":"c1","text":"hi"}"#),
+            RemotePhoneCommand::SendMessage { voice: false, .. }
+        ));
+    }
+
+    #[test]
+    fn keepalive_matches_the_relay_auto_response() {
+        // The relay answers this exact text without waking up.
+        assert_eq!(
+            serde_json::to_string(&RelayClientFrame::Ping).unwrap(),
+            r#"{"kind":"ping"}"#
+        );
+        assert!(matches!(
+            serde_json::from_str::<RelayServerFrame>(r#"{"kind":"pong"}"#).unwrap(),
+            RelayServerFrame::Pong
+        ));
+    }
+
+    #[test]
+    fn trim_for_phone_keeps_summaries_only() {
+        let mut value = json!({
+            "history": [{"role": "assistant", "parts": [
+                {"type": "image", "media_type": "image/png", "data": "AAAA"},
+                {"type": "tool_result", "tool_call_id": "t1", "content": "x".repeat(PHONE_TEXT_LIMIT + 10),
+                 "images": [{"media_type": "image/png", "data": "AAAA"}],
+                 "meta": {"file_changes": [{"relativePath": "a.rs", "truncated": false,
+                   "lines": vec![json!({"kind": "added", "text": "l"}); PHONE_DIFF_LINES + 1]}]}}
+            ]}]
+        });
+        trim_for_phone(&mut value);
+        let parts = &value["history"][0]["parts"];
+        assert_eq!(parts[0]["data"], "");
+        assert!(parts[1]["content"].as_str().unwrap().len() < PHONE_TEXT_LIMIT + 10);
+        assert_eq!(parts[1]["images"], json!([]));
+        let change = &parts[1]["meta"]["file_changes"][0];
+        assert_eq!(change["lines"].as_array().unwrap().len(), PHONE_DIFF_LINES);
+        assert_eq!(change["truncated"], true);
     }
 }
