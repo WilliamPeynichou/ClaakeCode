@@ -65,11 +65,10 @@ function ConversationRow({ conversation, running, onOpen }: { conversation: Conv
   );
 }
 
-export function HomeScreen({ remote, onOpen, onSettings, onDictation }: {
+export function HomeScreen({ remote, onOpen, onSettings }: {
   remote: Remote;
   onOpen(id: string): void;
   onSettings(): void;
-  onDictation(): void;
 }) {
   const [query, setQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
@@ -109,12 +108,7 @@ export function HomeScreen({ remote, onOpen, onSettings, onDictation }: {
       <NavBar
         title="Conversations"
         showTitle={scrolled}
-        left={(
-          <>
-            <NavButton icon="gear" label="Réglages" onClick={onSettings} />
-            <NavButton icon="mic" label="Dictée" onClick={onDictation} />
-          </>
-        )}
+        left={<NavButton icon="gear" label="Réglages" onClick={onSettings} />}
         right={
           creating ? (
             <Spinner />

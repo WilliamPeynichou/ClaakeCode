@@ -5,6 +5,7 @@ import { AgentRow, AgentText, Notice, QuestionCard, Thinking, ToolRow, UserBubbl
 import type { AgentMode, Attachment, PhoneThinking } from "../protocol/types";
 import { toBase64 } from "../protocol/crypto";
 import { speak } from "../speech";
+import { VoicePanel } from "./Voice";
 import { findEntry, modelEntries, thinkingOf, type ModelEntry, type Remote } from "../state";
 import { BackButton, ConnectionBanner, NavBar, NavButton, Spinner, conversationTitle, duration } from "../ui/common";
 import { Icon, type IconName } from "../ui/Icon";
@@ -141,8 +142,14 @@ function ModelSheet({ remote, open, onClose }: { remote: Remote; open: boolean; 
   );
 }
 
-function Composer({ remote, onOpenModel, onOpenMode }: { remote: Remote; onOpenModel(): void; onOpenMode(): void }) {
-  const [text, setText] = useState(remote.initialDraft);
+function Composer({ remote, voice, onVoice, onOpenModel, onOpenMode }: {
+  remote: Remote;
+  voice: boolean;
+  onVoice(on: boolean): void;
+  onOpenModel(): void;
+  onOpenMode(): void;
+}) {
+  const [text, setText] = useState("");
   const [photos, setPhotos] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -184,17 +191,43 @@ function Composer({ remote, onOpenModel, onOpenMode }: { remote: Remote; onOpenM
     }
   }
 
+  const queued = remote.queued && (
+    <div className="composer__queued">
+      <Icon name="flag" size={14} />
+      <span>Envoyé dès que l'agent a fini : « {remote.queued.text} »</span>
+      <button type="button" aria-label="Annuler l'envoi" onClick={remote.actions.unqueue}>
+        <Icon name="close" size={14} />
+      </button>
+    </div>
+  );
+
+  if (voice) {
+    return (
+      <div className="composer composer--voice">
+        {queued}
+        <VoicePanel
+          initialText={text}
+          ready={ready}
+          onKeyboard={(spoken) => {
+            setText(spoken);
+            onVoice(false);
+          }}
+          onSend={async (spoken) => {
+            const sent = await remote.actions.send({ text: spoken, attachments: photos });
+            if (sent) {
+              setText("");
+              setPhotos([]);
+            }
+            return sent;
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="composer">
-      {remote.queued && (
-        <div className="composer__queued">
-          <Icon name="flag" size={14} />
-          <span>Envoyé dès que l'agent a fini : « {remote.queued.text} »</span>
-          <button type="button" aria-label="Annuler l'envoi" onClick={remote.actions.unqueue}>
-            <Icon name="close" size={14} />
-          </button>
-        </div>
-      )}
+      {queued}
       {photos.length > 0 && (
         <div className="composer__photos">
           {photos.map((photo, i) => (
@@ -231,6 +264,9 @@ function Composer({ remote, onOpenModel, onOpenMode }: { remote: Remote; onOpenM
           <span className="chip__sub">{THINKING_LABELS[thinkingOf(model)]}</span>
         </button>
         <span className="composer__spacer" />
+        <button type="button" className="composer__icon" aria-label="Mode vocal" onClick={() => onVoice(true)} disabled={!ready}>
+          <Icon name="mic" size={21} />
+        </button>
         {showStop ? (
           <button type="button" className="send send--stop" aria-label="Arrêter l'agent" onClick={() => void remote.actions.stop()}>
             <Icon name="stop" size={14} />
@@ -260,6 +296,7 @@ export function ChatScreen({ remote, onBack }: { remote: Remote; onBack(): void 
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const readNext = useRef(false);
+  const [voice, setVoice] = useState(false);
 
   const blocks = useMemo(
     () => (conversation ? [...blocksFromHistory(conversation.history), ...blocksFromEvents(remote.events)] : []),
@@ -278,6 +315,7 @@ export function ChatScreen({ remote, onBack }: { remote: Remote; onBack(): void 
 
   useEffect(() => {
     stick.current = true;
+    setVoice(false);
   }, [remote.currentId]);
 
   // Read the report of a turn that ends while the app is open.
@@ -287,16 +325,16 @@ export function ChatScreen({ remote, onBack }: { remote: Remote; onBack(): void 
   useEffect(() => {
     if (!readNext.current || turn || !conversation) return;
     readNext.current = false;
-    if (!remote.settings.readAloud) return;
+    if (!remote.settings.readAloud && !voice) return;
     const lastText = [...conversation.history].reverse().find((m) => m.role === "assistant")?.parts.find((p) => p.type === "text");
     const spoken = lastText?.type === "text" ? extractSpoken(lastText.text) : null;
     if (spoken) speak(spoken);
-  }, [conversation, turn, remote.settings.readAloud]);
+  }, [conversation, turn, remote.settings.readAloud, voice]);
 
-  const status = turn ? `L'agent travaille · ${duration(now - turn.startedAtMs)}` : rlm ? "RLM" : undefined;
+  const status = turn ? `L'agent travaille · ${duration(now - turn.startedAtMs)}` : voice ? "Mode vocal" : rlm ? "RLM" : undefined;
 
   return (
-    <div className="screen chat">
+    <div className="screen chat" data-voice={voice || undefined}>
       <NavBar
         title={title}
         subtitle={status}
@@ -393,7 +431,7 @@ export function ChatScreen({ remote, onBack }: { remote: Remote; onBack(): void 
             <Icon name="down" size={18} stroke={2.4} />
           </button>
         )}
-        <Composer key={remote.currentId} remote={remote} onOpenModel={() => setModelOpen(true)} onOpenMode={() => setModeOpen(true)} />
+        <Composer key={remote.currentId} remote={remote} voice={voice} onVoice={setVoice} onOpenModel={() => setModelOpen(true)} onOpenMode={() => setModeOpen(true)} />
       </div>
 
       <ModelSheet remote={remote} open={modelOpen} onClose={() => setModelOpen(false)} />

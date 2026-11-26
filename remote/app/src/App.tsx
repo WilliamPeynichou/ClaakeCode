@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatScreen } from "./screens/Chat";
-import { DictationScreen } from "./screens/Dictation";
 import { HomeScreen } from "./screens/Home";
 import { InstallScreen } from "./screens/Install";
 import { PairScreen } from "./screens/Pair";
@@ -56,7 +55,7 @@ const SLIDE_MS = 320;
 
 export function App() {
   const remote = useRemote();
-  const [page, setPage] = useState<"settings" | "dictation" | null>(null);
+  const [page, setPage] = useState<"settings" | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [skipInstall, setSkipInstall] = useState(false);
   const code = new URLSearchParams(location.search).get("code")?.replace(/\D/g, "").slice(0, 6) ?? "";
@@ -90,7 +89,6 @@ export function App() {
           remote={remote}
           onOpen={(id) => void remote.actions.openConversation(id)}
           onSettings={() => setPage("settings")}
-          onDictation={() => setPage("dictation")}
         />
       </div>
       <div
@@ -100,14 +98,6 @@ export function App() {
       >
         {pushed === "chat" && <ChatScreen remote={remote} onBack={back} />}
         {pushed === "settings" && <SettingsScreen remote={remote} onBack={back} />}
-        {pushed === "dictation" && (
-          <DictationScreen
-            active={front}
-            canOpenChat={remote.synced && remote.connection.mac}
-            onBack={back}
-            onUse={async (text) => { await remote.actions.createConversation("classic", text); }}
-          />
-        )}
       </div>
       {remote.error && (
         <button type="button" className="toast" onClick={remote.actions.clearError}>

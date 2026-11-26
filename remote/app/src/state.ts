@@ -137,7 +137,6 @@ export function useRemote() {
   const client = useRef<RemoteClient | null>(null);
   /** The conversation the user is looking at (set before it finishes loading). */
   const wanted = useRef<string | null>(null);
-  const [initialDraft, setInitialDraft] = useState<{ id: string; text: string } | null>(null);
   /** Events of the running turn of `wanted`, by sequence: live events and replays merge without duplicates. */
   const liveEvents = useRef(new Map<number, AgentEvent>());
   /** The error or stop of the last finished turn: the saved history keeps no trace of them. */
@@ -160,7 +159,6 @@ export function useRemote() {
   const want = useCallback((id: string | null) => {
     wanted.current = id;
     setCurrentId(id);
-    setInitialDraft((draft) => draft?.id === id ? draft : null);
   }, []);
 
   const resetEvents = useCallback(() => {
@@ -392,12 +390,11 @@ export function useRemote() {
       if (workspace) await actions.selectWorkspace(workspace);
       await actions.openConversation(id);
     },
-    async createConversation(harness: "classic" | "rlm", draftText?: string) {
+    async createConversation(harness: "classic" | "rlm") {
       try {
         const bootstrap = await command<WorkspaceBootstrap>({ type: "create_conversation", harness });
         setConversations(bootstrap.conversations);
         want(bootstrap.activeConversation.id);
-        if (draftText) setInitialDraft({ id: bootstrap.activeConversation.id, text: draftText });
         resetEvents();
         setOpen(bootstrap.activeConversation);
         setModeState(modeOf(bootstrap.activeConversation));
@@ -571,7 +568,6 @@ export function useRemote() {
     synced,
     open,
     currentId,
-    initialDraft: initialDraft?.id === currentId ? initialDraft.text : "",
     events,
     mode,
     models,

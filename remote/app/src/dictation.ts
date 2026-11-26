@@ -38,13 +38,14 @@ function recognitionError(code: string) {
   }
 }
 
-export function useDictation(active: boolean) {
+export function useDictation(active: boolean, initialText = "") {
   const { SpeechRecognition, webkitSpeechRecognition } = window as RecognitionWindow;
   const Engine = SpeechRecognition ?? webkitSpeechRecognition;
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [interim, setInterim] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
+  const [heard, setHeard] = useState(0);
   const run = useRef<{ engine: Recognition; finish(): void; stop(): void; dispose(): void } | null>(null);
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export function useDictation(active: boolean) {
       partial = chunks.filter((chunk) => !chunk.isFinal).map((chunk) => chunk[0].transcript.trim()).join(" ");
       setText(joinSpeech(base, finalized) || base);
       setInterim(partial);
+      setHeard(Date.now());
     };
     engine.onerror = ({ error: code }) => {
       setError(recognitionError(code));
@@ -139,5 +141,12 @@ export function useDictation(active: boolean) {
     if (phase === "listening") run.current?.stop();
   }
 
-  return { supported: Boolean(Engine), text, setText, interim, phase, error, start, stop };
+  /** Ends recognition now and returns everything heard so far, including the unfinished phrase. */
+  function flush() {
+    const all = interim ? joinSpeech(text, interim) : text;
+    run.current?.finish();
+    return all;
+  }
+
+  return { supported: Boolean(Engine), text, setText, interim, phase, error, heard, start, stop, flush };
 }
