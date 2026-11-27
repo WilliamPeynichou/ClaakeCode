@@ -72,26 +72,28 @@ jobs:
               repo: context.repo.repo,
               per_page: 100,
             });
-            const release = existing.find((candidate) => candidate.tag_name === tag);
+            const matching = existing.filter((candidate) => candidate.tag_name === tag);
+            const published = matching.find((candidate) => !candidate.draft);
+            if (published) {
+              core.info(`Reusing published release ${published.id} for ${tag}`);
+              return published.id;
+            }
+            // Drafts left by a failed run: `gh release upload <tag>` reports "release not found"
+            // on them once they have been edited or re-tagged, so start again from a fresh draft.
+            for (const draft of matching) {
+              core.info(`Deleting stale draft ${draft.id} for ${tag}`);
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: draft.id,
+              });
+            }
             // Shown in the in-app update dialog: `.github/release-notes/<tag>.md` when it exists.
             const fs = require("fs");
             const notesFile = `.github/release-notes/${tag}.md`;
             const notes = fs.existsSync(notesFile)
               ? fs.readFileSync(notesFile, "utf8").trim()
               : "Downloads below. The desktop app will auto-update existing installs.";
-            if (release) {
-              core.info(`Reusing existing release ${release.id} for ${tag}`);
-              if (release.draft) {
-                // A re-run after a failed build: keep the draft's notes in sync with the tagged file.
-                await github.rest.repos.updateRelease({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  release_id: release.id,
-                  body: `${notes}\n\nDownloads below. The desktop app will auto-update existing installs.`,
-                });
-              }
-              return release.id;
-            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
