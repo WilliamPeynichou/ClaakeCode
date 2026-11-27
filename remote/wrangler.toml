@@ -24,8 +24,9 @@ database_id = "ede41470-aab7-4ede-9cc0-a0f1e9b607ab"
 migrations_dir = "migrations"
 
 # Secrets (`wrangler secret put`, or .dev.vars locally): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
-# GITHUB_CLIENT_SECRET and ALLOWED_GITHUB_LOGINS (comma-separated GitHub logins of the beta testers).
+# GITHUB_CLIENT_SECRET, ALLOWED_GITHUB_LOGINS (comma-separated GitHub logins of the beta testers)
+# and PROVIDER_ENCRYPTION_KEY (base64 of 32 random bytes; it encrypts the subscription credentials).
 [vars]
 VAPID_SUBJECT = "https://claake-remote.claakecode.workers.dev"
-# Public id of the GitHub OAuth App (empty until it is created).
+# Public id of the GitHub OAuth App.
 GITHUB_CLIENT_ID = "Ov23liwBVsIXBfwTTigG"

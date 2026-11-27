@@ -1,6 +1,8 @@
 // Builds the model request: system prompt, project instructions and documents, then the conversation.
 import { askApi, base64ToText, type AskMessage, type DocumentRef, type Project } from "./api";
-import type { ChatMessage, ContentPart, OrModel } from "./openrouter";
+import type { ChatMessage, ContentPart } from "./openrouter";
+
+type ModelTraits = { images: boolean };
 
 const SYSTEM =
   "Tu es Claake, l'assistant de Claake Code, utilisé depuis un iPhone. Réponds dans la langue de l'utilisateur, " +
@@ -18,7 +20,7 @@ export const isPdf = (d: DocumentRef) => d.mediaType === "application/pdf" || /\
 export const isText = (d: DocumentRef) =>
   d.mediaType.startsWith("text/") || /^application\/(json|xml|javascript|x-yaml|yaml|toml|x-sh|sql)/.test(d.mediaType) || TEXT_EXT.test(d.name);
 
-async function parts(docs: DocumentRef[], model: OrModel, budget: { left: number }, skipped: string[]): Promise<ContentPart[]> {
+async function parts(docs: DocumentRef[], model: ModelTraits, budget: { left: number }, skipped: string[]): Promise<ContentPart[]> {
   const out: ContentPart[] = [];
   for (const doc of docs) {
     if (isImage(doc) && !model.images) {
@@ -49,7 +51,7 @@ export async function buildMessages({ project, documents, history, model, voice 
   project: Project | null;
   documents: DocumentRef[];
   history: Pick<AskMessage, "role" | "text" | "attachments">[];
-  model: OrModel;
+  model: ModelTraits;
   voice: boolean;
 }): Promise<ChatMessage[]> {
   const budget = { left: TEXT_BUDGET };

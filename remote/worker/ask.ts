@@ -1,8 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 // Claake Ask API (/v1): GitHub sign-in, projects, conversations, messages and documents, stored in D1.
-// The phone calls the models itself (OpenRouter, with the user's own key): this API only stores data.
+// The phone calls OpenRouter itself, with the user's own key. Subscriptions (Claude, ChatGPT…) go through
+// /v1/providers, which keeps their credentials encrypted and relays the model calls.
+import { handleProviders, type ProvidersEnv } from "./providers";
 
-export interface AskEnv {
+export interface AskEnv extends ProvidersEnv {
   DB: D1Database;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
@@ -21,15 +23,15 @@ const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 const CHUNK_BYTES = 1_500_000;
 const LIST_LIMIT = 200;
 
-type User = { id: string; login: string; name: string | null; avatarUrl: string | null };
+export type User = { id: string; login: string; name: string | null; avatarUrl: string | null };
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
   }
 }
 
-const ok = (data: unknown, status = 200) =>
+export const ok = (data: unknown, status = 200) =>
   new Response(JSON.stringify({ data }), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const fail = (status: number, code: string, message: string) =>
   new Response(JSON.stringify({ error: { code, message } }), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -66,7 +68,7 @@ function redirect(location: string, setCookies: string[] = []): Response {
   return new Response(null, { status: 302, headers });
 }
 
-async function body<T>(request: Request): Promise<T> {
+export async function body<T>(request: Request): Promise<T> {
   try {
     return (await request.json()) as T;
   } catch {
@@ -375,6 +377,7 @@ export async function handleAsk(request: Request, env: AskEnv, url: URL): Promis
     const [resource, id, sub] = parts;
 
     if (resource === "me" && method === "GET") return ok({ user });
+    if (resource === "providers") return await handleProviders(request, env, user, parts.slice(1));
 
     if (resource === "projects") {
       if (!id && method === "GET") return ok({ projects: await listProjects(env, user) });

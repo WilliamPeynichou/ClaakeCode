@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { askApi, type AskConversation, type AskDocument, type AskMessage, type Project } from "../../ask/api";
 import { buildMessages, titleFrom } from "../../ask/context";
-import { defaultModel, getKey, listModels, saveDefaultModel, streamChat, type OrModel } from "../../ask/openrouter";
+import { accountsChanged, allModels, streamModel, subscriptionLabel, type Model } from "../../ask/models";
+import { defaultModel, saveDefaultModel } from "../../ask/openrouter";
 import { UserBubble } from "../../chat/parts";
 import { speak, speechSupported, stopSpeaking } from "../../speech";
 import { BackButton, NavBar, NavButton, Spinner } from "../../ui/common";
@@ -19,52 +20,80 @@ const SUGGESTIONS = [
   { label: "Prépare un plan", text: "Aide-moi à préparer un plan pour " },
 ];
 
-function ModelSheet({ open, models, current, onClose, onChoose }: {
+function ModelSheet({ open, models, loaded, current, onClose, onChoose, onSettings }: {
   open: boolean;
-  models: OrModel[];
-  current: OrModel | undefined;
+  models: Model[];
+  loaded: boolean;
+  current: Model | undefined;
   onClose(): void;
-  onChoose(model: OrModel): void;
+  onChoose(model: Model): void;
+  onSettings(): void;
 }) {
   const [query, setQuery] = useState("");
   const [paid, setPaid] = useState(false);
   const needle = query.trim().toLowerCase();
-  const shown = useMemo(
-    () => models.filter((m) => (paid || m.free) && (!needle || m.name.toLowerCase().includes(needle) || m.id.includes(needle))).slice(0, 80),
+  const match = (m: Model) => !needle || m.name.toLowerCase().includes(needle) || m.id.includes(needle);
+  const groups = useMemo(() => {
+    const out: { source: string; title: string; models: Model[] }[] = [];
+    for (const m of models.filter((m) => m.source !== "openrouter" && match(m))) {
+      const group = out.find((g) => g.source === m.source);
+      if (group) group.models.push(m);
+      else out.push({ source: m.source, title: subscriptionLabel(m.source), models: [m] });
+    }
+    return out;
+  }, [models, needle]);
+  const openrouter = useMemo(
+    () => models.filter((m) => m.source === "openrouter" && (paid || m.free) && match(m)).slice(0, 80),
     [models, paid, needle],
   );
+  const hasOpenrouter = models.some((m) => m.source === "openrouter");
+  const row = (m: Model, detail: string) => (
+    <button key={m.id} type="button" className="row row--compact" onClick={() => onChoose(m)}>
+      <span className="row__text">
+        <strong>{m.name}</strong>
+        <span>{detail}</span>
+      </span>
+      {m.id === current?.id && <span className="row__check"><Icon name="check" size={18} stroke={2.4} /></span>}
+    </button>
+  );
+  const traits = (m: Model) => `${m.images ? " · Images" : ""}${m.context ? ` · ${Math.round(m.context / 1000)}k` : ""}`;
   return (
     <Sheet open={open} title="Modèle" onClose={onClose}>
       <label className="search">
         <Icon name="search" size={17} />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher un modèle" type="search" />
       </label>
-      <div className="segmented" role="tablist">
-        <button type="button" role="tab" aria-selected={!paid} data-on={!paid} onClick={() => setPaid(false)}>Gratuits</button>
-        <button type="button" role="tab" aria-selected={paid} data-on={paid} onClick={() => setPaid(true)}>Tous</button>
-      </div>
-      {models.length === 0 && (
+      {!loaded && (
         <div className="empty">
           <Spinner />
         </div>
       )}
+      {groups.map((g) => (
+        <section key={g.source} className="group">
+          <h2 className="group__title">{g.title}</h2>
+          <div className="group__body">{g.models.map((m) => row(m, `Ton abonnement${traits(m)}`))}</div>
+        </section>
+      ))}
+      {hasOpenrouter && (
+        <section className="group">
+          <div className="group__head">
+            <h2 className="group__title">OpenRouter</h2>
+          </div>
+          <div className="segmented" role="tablist">
+            <button type="button" role="tab" aria-selected={!paid} data-on={!paid} onClick={() => setPaid(false)}>Gratuits</button>
+            <button type="button" role="tab" aria-selected={paid} data-on={paid} onClick={() => setPaid(true)}>Tous</button>
+          </div>
+          <div className="group__body">{openrouter.map((m) => row(m, `${m.free ? "Gratuit" : "Payant"}${traits(m)}`))}</div>
+          {!paid && <p className="group__footer">Les modèles gratuits d'OpenRouter ont une limite de messages par jour.</p>}
+        </section>
+      )}
       <section className="group">
         <div className="group__body">
-          {shown.map((m) => (
-            <button key={m.id} type="button" className="row row--compact" onClick={() => onChoose(m)}>
-              <span className="row__text">
-                <strong>{m.name}</strong>
-                <span>
-                  {m.free ? "Gratuit" : "Payant"}
-                  {m.images ? " · Images" : ""}
-                  {m.context ? ` · ${Math.round(m.context / 1000)}k` : ""}
-                </span>
-              </span>
-              {m.id === current?.id && <span className="row__check"><Icon name="check" size={18} stroke={2.4} /></span>}
-            </button>
-          ))}
+          <button type="button" className="row row--compact ask-add" onClick={onSettings}>
+            <Icon name="plus" size={18} />
+            <span className="row__text"><strong>Connecter un abonnement</strong></span>
+          </button>
         </div>
-        {!paid && <p className="group__footer">Les modèles gratuits d'OpenRouter ont une limite de messages par jour.</p>}
       </section>
     </Sheet>
   );
@@ -115,7 +144,7 @@ function AssistantMessage({ text, streaming }: { text: string; streaming: boolea
 function AskComposer({ voice, busy, model, onVoice, onModel, onSend, onStop, onError, draft }: {
   voice: boolean;
   busy: boolean;
-  model: OrModel | undefined;
+  model: Model | undefined;
   onVoice(on: boolean): void;
   onModel(): void;
   onSend(text: string, photos: Photo[]): Promise<boolean>;
@@ -245,7 +274,9 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
   const [loading, setLoading] = useState(Boolean(conversationId));
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<AskDocument[]>([]);
-  const [models, setModels] = useState<OrModel[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [modelsVersion, setModelsVersion] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
   const [streaming, setStreaming] = useState<string | null>(null);
   const [voice, setVoice] = useState(voiceOnly);
@@ -255,7 +286,7 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const busy = streaming !== null;
-  const model = models.find((m) => m.id === (chosen ?? conversation?.model)) ?? defaultModel(models);
+  const model = models.find((m) => m.id === (chosen ?? conversation?.model)) ?? (defaultModel(models) as Model | undefined);
   const projectIdNow = conversation?.projectId ?? projectId;
 
   useEffect(() => {
@@ -283,8 +314,16 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
   }, [projectIdNow]);
 
   useEffect(() => {
-    listModels().then(setModels).catch(onError);
+    const reload = () => setModelsVersion((v) => v + 1);
+    accountsChanged.addEventListener("change", reload);
+    return () => accountsChanged.removeEventListener("change", reload);
   }, []);
+  useEffect(() => {
+    allModels()
+      .then(setModels)
+      .catch(onError)
+      .finally(() => setModelsLoaded(true));
+  }, [modelsVersion]);
 
   useEffect(() => {
     if (!active) stopSpeaking();
@@ -297,13 +336,9 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
   }, [messages, streaming]);
 
   async function send(text: string, photos: Photo[]): Promise<boolean> {
-    const key = getKey();
-    if (!key) {
-      onSettings();
-      return false;
-    }
     if (!model) {
-      onError(new Error("La liste des modèles n'est pas encore chargée."));
+      if (modelsLoaded) onSettings();
+      else onError(new Error("La liste des modèles n'est pas encore chargée."));
       return false;
     }
     stopSpeaking();
@@ -326,9 +361,8 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
       const request = await buildMessages({ project, documents, history: [...before, pending], model, voice });
       let reply: string;
       try {
-        reply = await streamChat({
-          key,
-          model: model.id,
+        reply = await streamModel({
+          model,
           messages: request,
           signal: controller.signal,
           onDelta: (t) => {
@@ -358,7 +392,7 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
     }
   }
 
-  function choose(m: OrModel) {
+  function choose(m: Model) {
     setChosen(m.id);
     saveDefaultModel(m.id);
     setModelOpen(false);
@@ -454,7 +488,18 @@ export function AskChat({ conversationId, projectId, voiceOnly = false, active, 
           onError={onError}
         />
       </div>
-      <ModelSheet open={modelOpen} models={models} current={model} onClose={() => setModelOpen(false)} onChoose={choose} />
+      <ModelSheet
+        open={modelOpen}
+        models={models}
+        loaded={modelsLoaded}
+        current={model}
+        onClose={() => setModelOpen(false)}
+        onChoose={choose}
+        onSettings={() => {
+          setModelOpen(false);
+          onSettings();
+        }}
+      />
     </div>
   );
 }

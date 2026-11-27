@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { askApi, type AskConversation, type AskUser, type Project } from "../../ask/api";
+import { accountsChanged, connectedAccounts } from "../../ask/models";
 import { getKey } from "../../ask/openrouter";
 import { NavBar, NavButton, Spinner, relativeTime } from "../../ui/common";
 import { Icon } from "../../ui/Icon";
@@ -71,7 +72,15 @@ export function AskHome({ user, active, onOpenProject, onOpenChat, onSettings, o
   const [query, setQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [creating, setCreating] = useState(false);
-  const hasKey = Boolean(getKey());
+  const [subscribed, setSubscribed] = useState(false);
+  const hasModels = Boolean(getKey()) || subscribed;
+
+  useEffect(() => {
+    const check = () => void connectedAccounts().then((a) => setSubscribed(a.length > 0));
+    check();
+    accountsChanged.addEventListener("change", check);
+    return () => accountsChanged.removeEventListener("change", check);
+  }, []);
 
   useEffect(() => {
     if (!active) return;
@@ -108,12 +117,12 @@ export function AskHome({ user, active, onOpenProject, onOpenChat, onSettings, o
       />
       <div className="scroll" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 40)}>
         <h1 className="large-title">Conversations</h1>
-        {!hasKey && (
+        {!hasModels && (
           <button type="button" className="ask-connect" onClick={onSettings}>
             <span className="ask-connect__icon"><Icon name="sparkle" size={20} /></span>
             <span className="ask-connect__text">
-              <strong>Connecte OpenRouter</strong>
-              <span>Une étape pour parler aux modèles, gratuits par défaut.</span>
+              <strong>Connecte un modèle</strong>
+              <span>Ton abonnement Claude, ChatGPT, Gemini… ou OpenRouter, gratuit.</span>
             </span>
             <Icon name="chevron" size={16} />
           </button>

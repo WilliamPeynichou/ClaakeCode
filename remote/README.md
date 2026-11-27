@@ -24,6 +24,8 @@ npx wrangler d1 migrations apply claake-ask --local
 
 Sign-in needs a GitHub OAuth App: put `GITHUB_CLIENT_SECRET` and `ALLOWED_GITHUB_LOGINS` (comma-separated logins) in `.dev.vars`, and `GITHUB_CLIENT_ID` in `wrangler.toml` or with `--var`. `GITHUB_OAUTH_URL` and `GITHUB_API_URL` point the Worker at a fake GitHub, as `test/ask.test.mjs` does.
 
+Subscriptions (`worker/providers.ts`): the phone signs in to Claude, ChatGPT, Gemini or Kimi once, with the same OAuth clients as the desktop app, or saves a Mistral API key. The Worker keeps the credentials AES-GCM encrypted in D1 with `PROVIDER_ENCRYPTION_KEY`, refreshes them, and relays `POST /v1/providers/<provider>/chat`: the phone builds the provider's request body (`app/src/ask/models.ts`), the Worker adds the account's headers and envelope and streams the answer back. `PROVIDER_TEST_URL` sends every upstream call to `test/fake-providers.mjs`.
+
 ### Phone app without the Mac
 
 `test/fake-pc.mjs` is a fake Mac. It speaks the same protocol as `src-tauri/src/remote.rs` and serves French demo conversations.
@@ -51,7 +53,7 @@ npm run check  # type-checks the phone app
 - `push.test.mjs`: Web Push encryption and VAPID signatures.
 - `relay.test.mjs`: relay routing, pairing and keepalive.
 - `fake-pc.test.mjs`: drives the fake Mac like the phone does.
-- `ask.test.mjs`: the Ask API, signed in through a fake GitHub (port 8792).
+- `ask.test.mjs`: the Ask API and the subscriptions, signed in through a fake GitHub (port 8792), with fake providers (port 8793).
 
 The last three start `wrangler dev` (ports 8788, 8789 and 8791), each with a fresh local D1. Set `RELAY_URL=http://host:port` to test a running relay instead.
 
@@ -74,7 +76,10 @@ npx wrangler secret put VAPID_PRIVATE_KEY
 npx wrangler d1 migrations apply claake-ask --remote
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put ALLOWED_GITHUB_LOGINS   # e.g. alice,bob
+openssl rand -base64 32 | npx wrangler secret put PROVIDER_ENCRYPTION_KEY
 ```
+
+Changing `PROVIDER_ENCRYPTION_KEY` disconnects every subscription.
 
 The GitHub OAuth App's callback URL is `https://<worker host>/v1/auth/github/callback`; its Client ID goes in `GITHUB_CLIENT_ID` in `wrangler.toml`.
 

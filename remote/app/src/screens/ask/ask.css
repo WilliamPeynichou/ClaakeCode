@@ -113,3 +113,29 @@
 @media (prefers-reduced-motion: reduce) {
   .ask-orb i, .ask-project, .ask-connect, .ask-suggestions .chip { animation: none; }
 }
+
+/* Subscriptions in the settings: one row per provider, the sign-in steps open under it. */
+.ask-sub + .ask-sub { border-top: 0.5px solid var(--separator); }
+.ask-sub__logo {
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 9px;
+  color: #fff; font-weight: 700; font-size: 15px; background: #6b7c5c;
+}
+.ask-sub__logo[data-provider="anthropic"] { background: #c96442; }
+.ask-sub__logo[data-provider="openai"] { background: #1f1f1f; }
+.ask-sub__logo[data-provider="google"] { background: #3b78e7; }
+.ask-sub__logo[data-provider="kimi"] { background: #111827; }
+.ask-sub__logo[data-provider="mistral"] { background: #fa520f; }
+@media (prefers-color-scheme: dark) { .ask-sub__logo[data-provider="openai"], .ask-sub__logo[data-provider="kimi"] { background: #3a3a3c; } }
+.ask-sub__action {
+  flex: none; height: 30px; padding: 0 14px; border-radius: 15px;
+  background: var(--accent); color: var(--on-accent); font-size: 14px; font-weight: 600;
+}
+.ask-sub__action--quiet { background: var(--fill); color: var(--danger); }
+.ask-sub__panel { display: flex; flex-direction: column; gap: 10px; padding: 2px 14px 14px; animation: fade-up 280ms var(--ease) both; }
+.ask-sub__panel p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--label-2); }
+.ask-sub__panel a:not(.button) { color: var(--accent); }
+.ask-sub__panel .button { text-decoration: none; }
+.ask-sub__code {
+  align-self: center; padding: 8px 16px; border-radius: 12px; background: var(--fill);
+  font: 600 24px/1.2 var(--mono); letter-spacing: 0.12em;
+}

@@ -15,6 +15,8 @@ export type DocumentRef = { id: string; name: string; mediaType: string; size: n
 export type AskDocument = DocumentRef & { projectId: string | null; conversationId: string | null; createdAtMs: number };
 export type AskMessage = { id: string; role: "user" | "assistant"; text: string; attachments: DocumentRef[]; model: string | null; createdAtMs: number };
 
+export type ProviderAccount = { provider: string; label: string | null; updatedAtMs: number };
+
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
@@ -52,6 +54,16 @@ export const askApi = {
   updateProject: (id: string, patch: { name?: string; instructions?: string }) =>
     call<{ project: Project }>("PATCH", `/projects/${id}`, patch).then((d) => d.project),
   deleteProject: (id: string) => call("DELETE", `/projects/${id}`),
+
+  providers: () => call<{ accounts: ProviderAccount[] }>("GET", "/providers").then((d) => d.accounts),
+  startProviderLogin: (provider: string) =>
+    call<{ loginId: string; url: string; userCode?: string }>("POST", `/providers/${provider}/login`),
+  finishProviderLogin: (provider: string, loginId: string, input = "") =>
+    call<{ connected?: boolean; pending?: boolean; label?: string | null }>("POST", `/providers/${provider}/login/${loginId}`, { input }),
+  saveProviderKey: (provider: string, key: string) => call<{ connected: boolean }>("PUT", `/providers/${provider}/key`, { key }),
+  disconnectProvider: (provider: string) => call("DELETE", `/providers/${provider}`),
+  mistralModels: () =>
+    call<{ models: { id: string; context: number; images: boolean }[] }>("GET", "/providers/mistral/models").then((d) => d.models),
 
   conversations: () => call<{ conversations: AskConversation[] }>("GET", "/conversations").then((d) => d.conversations),
   conversation: (id: string) => call<{ conversation: AskConversation; messages: AskMessage[] }>("GET", `/conversations/${id}`),

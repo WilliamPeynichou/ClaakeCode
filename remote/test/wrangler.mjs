@@ -31,7 +31,7 @@ export async function startRelay(port, inspectorPort, vars = {}) {
   };
   for (let i = 0; i < 120; i++) {
     try {
-      if ((await fetch(`${base}/healthz`)).ok) return { base, stop };
+      if ((await fetch(`${base}/healthz`)).ok) return { base, stop, state };
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
