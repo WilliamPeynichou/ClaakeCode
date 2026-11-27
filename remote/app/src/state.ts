@@ -113,6 +113,7 @@ const launchLink = (() => {
   history.replaceState(null, "", "/");
   return { workspace: params.get("workspace"), conversation };
 })();
+export const launchedFromNotification = launchLink !== null;
 
 export function useRemote() {
   const [session, setSession] = useState<Session | null>(null);

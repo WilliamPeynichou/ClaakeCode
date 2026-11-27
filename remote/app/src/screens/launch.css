@@ -1,0 +1,276 @@
+/* Opening screen: Claaky's pixel meadow and the project picker ("Vert Noisette" palette). */
+@font-face {
+  font-family: "DM Serif Display";
+  src: url("../fonts/dm-serif-display.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../fonts/dm-sans.woff2") format("woff2");
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+.launch {
+  --paper: #faf9f5;
+  --cream: #f3f0e8;
+  --ink: #1e1c18;
+  --muted: #6b6558;
+  --line: #e8e4d8;
+  --hazel: #6b7c5c;
+  --hazel-dark: #4e5c42;
+  --night: #1a1916;
+  --expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--night);
+  color: var(--ink);
+  font-family: "DM Sans", var(--font);
+  letter-spacing: 0;
+  transition: opacity 260ms ease 420ms;
+}
+.launch[data-leaving="true"] { opacity: 0; pointer-events: none; }
+
+@media (prefers-color-scheme: dark) {
+  .launch {
+    --paper: #1a1916;
+    --cream: #24221d;
+    --ink: #e8e4d8;
+    --muted: #8a8578;
+    --line: #2e2b25;
+    --hazel: #8a9b78;
+    --hazel-dark: #d0dac4;
+    --night: #0f0e0c;
+  }
+}
+
+/* Scene */
+.scene { position: relative; flex: 1 1 auto; min-height: 260px; overflow: hidden; background: var(--night); }
+.scene__canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: manipulation; }
+.scene::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 70px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--night) 55%, transparent));
+  pointer-events: none;
+}
+
+.launch__status {
+  position: absolute;
+  top: calc(var(--top) + 12px);
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: rgba(20, 19, 16, 0.42);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  color: #faf9f5;
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
+  animation: launch-fade 600ms var(--expo) 500ms both;
+}
+.launch__status i { width: 7px; height: 7px; border-radius: 50%; background: #ffb52e; box-shadow: 0 0 0 3px rgba(255, 181, 46, 0.22); }
+.launch__status[data-online="true"] i { background: #4fd17f; box-shadow: 0 0 0 3px rgba(79, 209, 127, 0.25); animation: launch-pulse 2.2s ease-in-out infinite; }
+
+/* Claaky's speech bubble, drawn with square pixel steps. */
+.launch__bubble {
+  --px: 3px;
+  --left: clamp(12px, calc(var(--x) - 150px), calc(100% - 232px));
+  position: absolute;
+  left: var(--left);
+  bottom: calc(100% - var(--y) + 14px);
+  width: 220px;
+  margin: 0;
+  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.2));
+  pointer-events: none;
+  transform-origin: 70% 100%;
+  animation: launch-pop 520ms var(--expo) 900ms both;
+}
+.launch__bubble-body {
+  display: block;
+  min-height: 42px;
+  padding: 10px 13px;
+  background: #faf9f5;
+  color: #1e1c18;
+  font: 600 13.5px/1.35 var(--mono);
+  letter-spacing: -0.01em;
+  clip-path: polygon(
+    0 var(--px), var(--px) var(--px), var(--px) 0,
+    calc(100% - var(--px)) 0, calc(100% - var(--px)) var(--px), 100% var(--px),
+    100% calc(100% - var(--px)), calc(100% - var(--px)) calc(100% - var(--px)), calc(100% - var(--px)) 100%,
+    var(--px) 100%, var(--px) calc(100% - var(--px)), 0 calc(100% - var(--px))
+  );
+}
+/* The tail: three pixels stepping down towards Claaky. */
+.launch__bubble::after {
+  content: "";
+  position: absolute;
+  left: clamp(14px, calc(var(--x) - var(--left) - 12px), 200px);
+  top: 100%;
+  width: calc(var(--px) * 3);
+  height: var(--px);
+  background: #faf9f5;
+  box-shadow: var(--px) var(--px) 0 #faf9f5, calc(var(--px) * 2) calc(var(--px) * 2) 0 #faf9f5;
+  clip-path: inset(0 0 calc(var(--px) * -3) 0);
+}
+.launch__caret { display: inline-block; width: 7px; height: 13px; margin-left: 2px; vertical-align: -2px; background: #6b7c5c; animation: blink 0.8s step-end infinite; }
+
+/* Project sheet */
+.launch__sheet {
+  position: relative;
+  flex: none;
+  max-height: 62%;
+  display: flex;
+  flex-direction: column;
+  margin-top: -26px;
+  padding: 26px 20px calc(max(var(--bottom), 12px) + 8px);
+  border-radius: 28px 28px 0 0;
+  background: var(--paper);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.22);
+  animation: launch-rise 820ms var(--expo) 250ms both;
+  transition: transform 560ms var(--expo), opacity 400ms ease;
+}
+.launch__sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--grain);
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.launch[data-leaving="true"] .launch__sheet { transform: translateY(40%); opacity: 0; }
+
+.launch__eyebrow {
+  margin: 0 0 6px;
+  color: var(--hazel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: launch-fade 700ms var(--expo) 450ms both;
+}
+.launch__title {
+  margin: 0;
+  font: 400 36px/1.05 "DM Serif Display", Georgia, serif;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.launch__title span, .launch__title em { display: inline-block; animation: launch-line 900ms var(--expo) both; }
+.launch__title span { animation-delay: 500ms; }
+.launch__title em { font-style: italic; color: var(--hazel-dark); animation-delay: 580ms; }
+.launch__lead { margin: 8px 0 16px; color: var(--muted); font-size: 15px; line-height: 1.45; animation: launch-fade 700ms var(--expo) 640ms both; }
+
+.launch__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 -4px;
+  padding: 2px 4px 6px;
+}
+.launch__project {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--cream);
+  color: var(--ink);
+  animation: launch-row 700ms var(--expo) calc(700ms + var(--i) * 70ms) both;
+  transition: transform 220ms var(--expo), border-color 220ms ease, background 220ms ease;
+}
+.launch__project:active { transform: scale(0.98); }
+.launch__project[data-chosen="true"] { border-color: var(--hazel); background: color-mix(in srgb, var(--hazel) 14%, var(--cream)); }
+.launch__tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #faf9f5;
+  font: 400 22px/1 "DM Serif Display", Georgia, serif;
+  background: #6b7c5c;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+}
+.launch__tile[data-tone="1"] { background: #c0622a; }
+.launch__tile[data-tone="2"] { background: #4e5c42; }
+.launch__tile[data-tone="3"] { background: #b08a3e; }
+.launch__project-text { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; text-align: left; }
+.launch__project-text strong { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch__project-text span { font: 12px/1.3 var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.launch__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.launch__badge[data-tone="live"] { background: color-mix(in srgb, #2f9e5e 16%, transparent); color: #2f9e5e; }
+.launch__badge i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: launch-pulse 1.6s ease-in-out infinite; }
+.launch__go { flex: none; color: var(--muted); transition: transform 300ms var(--expo), color 200ms ease; }
+.launch__project[data-chosen="true"] .launch__go { color: var(--hazel-dark); transform: scale(1.2); }
+
+.launch__skeleton {
+  height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, var(--cream) 30%, var(--line) 50%, var(--cream) 70%) 0 0 / 200% 100%;
+  animation: launch-row 700ms var(--expo) calc(700ms + var(--i) * 70ms) both, shimmer 1.4s linear infinite;
+}
+.launch__skip {
+  align-self: center;
+  margin-top: 8px;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  animation: launch-fade 700ms var(--expo) 900ms both;
+}
+
+@keyframes launch-fade { from { opacity: 0; transform: translateY(6px); } }
+@keyframes launch-line { from { opacity: 0; transform: translateY(70%); clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 -20% 0); } }
+@keyframes launch-rise { from { transform: translateY(100%); } }
+@keyframes launch-row { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+@keyframes launch-pop { 0% { opacity: 0; transform: scale(0.6) translateY(10px); } 60% { opacity: 1; transform: scale(1.04); } }
+@keyframes launch-pulse { 50% { opacity: 0.45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .launch *, .launch *::before, .launch *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+
+/* Short screens (iPhone SE, 8): a tighter sheet leaves room for Claaky. */
+@media (max-height: 700px) {
+  .launch__eyebrow { display: none; }
+  .launch__title { font-size: 31px; }
+  .launch__lead { margin: 6px 0 12px; font-size: 14px; }
+  .launch__sheet { padding-top: 22px; }
+}
+
+/* Very short screens (iPhone SE 1st gen): Claaky's bubble already tells the connection state. */
+@media (max-height: 600px) {
+  .launch__status { display: none; }
+}

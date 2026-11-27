@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ChatScreen } from "./screens/Chat";
 import { HomeScreen } from "./screens/Home";
 import { InstallScreen } from "./screens/Install";
+import { LaunchScreen } from "./screens/Launch";
 import { PairScreen } from "./screens/Pair";
 import { SettingsScreen } from "./screens/Settings";
-import { useRemote } from "./state";
+import { launchedFromNotification, useRemote } from "./state";
 import { Icon } from "./ui/Icon";
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -58,10 +59,15 @@ export function App() {
   const [page, setPage] = useState<"settings" | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [skipInstall, setSkipInstall] = useState(false);
+  // The project picker opens each time the app launches, unless a notification opened a chat.
+  const [launching, setLaunching] = useState(!launchedFromNotification);
   const code = new URLSearchParams(location.search).get("code")?.replace(/\D/g, "").slice(0, 6) ?? "";
   const pushed = remote.currentId !== null ? "chat" : page;
   useEffect(() => {
-    if (remote.currentId !== null) setPage(null);
+    if (remote.currentId !== null) {
+      setPage(null);
+      setLaunching(false);
+    }
   }, [remote.currentId]);
   // The pushed screen keeps its content while it slides away.
   const back = () => {
@@ -99,6 +105,7 @@ export function App() {
         {pushed === "chat" && <ChatScreen remote={remote} onBack={back} />}
         {pushed === "settings" && <SettingsScreen remote={remote} onBack={back} />}
       </div>
+      {launching && <LaunchScreen remote={remote} onDone={() => setLaunching(false)} />}
       {remote.error && (
         <button type="button" className="toast" onClick={remote.actions.clearError}>
           <Icon name="warning" size={17} />
