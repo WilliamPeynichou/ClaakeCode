@@ -109,11 +109,12 @@ jobs:
             # tauri.prime.conf.json = ripgrep + prime-agent + uv (RLM chat engine).
             tauri_args: "--target universal-apple-darwin --config src-tauri/tauri.prime.conf.json --ignore-version-mismatches"
             bundle_prime: "1"
-          # Windows x64 installer bundles — MSI + NSIS.
+          # Windows x64 installer bundles — MSI + NSIS, with the RLM engine.
           - name: windows-x64
             os: windows-2022
             rust_targets: "x86_64-pc-windows-msvc"
-            tauri_args: "--target x86_64-pc-windows-msvc --config src-tauri/tauri.sidecars.conf.json --ignore-version-mismatches"
+            tauri_args: "--target x86_64-pc-windows-msvc --config src-tauri/tauri.prime.conf.json --ignore-version-mismatches"
+            bundle_prime: "1"
           # Linux x64 bundles — .deb + AppImage.
           - name: linux-x64
             os: ubuntu-22.04
@@ -240,7 +241,6 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: "10.15"
           # Otherwise whisper.cpp builds with -march=native and can crash on user CPUs older than the runner's.
           GGML_NATIVE: "OFF"
-          # Windows stays without the RLM engine until the daemon transport is ported.
           CLAAKECODE_BUNDLE_PRIME: ${{ matrix.platform.bundle_prime || '0' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

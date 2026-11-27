@@ -4,8 +4,7 @@
 // Without `prime-agent-runtime` the kernel cannot be installed: it is not on any package registry.
 //
 // Opt-in because compiling Prime takes minutes: runs only when CLAAKECODE_BUNDLE_PRIME=1
-// (release CI) or when invoked directly with --force. Windows is skipped: the daemon transport
-// is a Unix socket and is not supported there yet.
+// (release CI) or when invoked directly with --force.
 import { execFile as execFileCallback, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -24,6 +23,7 @@ const UV_SHA256 = {
   "x86_64-apple-darwin": "1b8a5b316883df2daf20fb9a446e5b230e01d947d57aba2694977c5ac5a7e98c",
   "x86_64-unknown-linux-gnu": "b9980552309f09c15172b8be828555e375097f16deb459795ce7bfd200380f0b",
   "aarch64-unknown-linux-gnu": "6f66a14e8239871fb477f9746c941fedfa77e8fe28a8bc7c07e1dc7f53a66712",
+  "x86_64-pc-windows-msvc": "ea1397797a0ca15f63516dd0f49c2dde9776db9be5861cab152ebe8ad199894d",
 };
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -41,10 +41,6 @@ if (isMain) {
 }
 
 export async function preparePrime() {
-  if (process.platform === "win32") {
-    console.log("prime sidecar skipped on Windows (transport not supported yet)");
-    return;
-  }
   await fs.mkdir(binariesDir, { recursive: true });
   const triples = targetTriples();
   for (const triple of triples) {
@@ -65,17 +61,22 @@ export function targetTriples() {
     if (process.arch === "x64") return ["x86_64-unknown-linux-gnu"];
     if (process.arch === "arm64") return ["aarch64-unknown-linux-gnu"];
   }
+  if (process.platform === "win32" && process.arch === "x64") return ["x86_64-pc-windows-msvc"];
   throw new Error(`No prime sidecar target for ${process.platform}/${process.arch}`);
 }
 
+const exe = (triple) => (triple.includes("windows") ? ".exe" : "");
+
+/** Tauri's externalBin naming: `<name>-<target triple>[.exe]`. */
 function outputPath(name, triple) {
-  return path.join(binariesDir, `${name}-${triple}`);
+  return path.join(binariesDir, `${name}-${triple}${exe(triple)}`);
 }
 
 async function ensureUv(triple) {
   const out = outputPath("uv", triple);
   if (await isFile(out)) return console.log(`uv already present: ${triple}`);
-  const archive = `uv-${triple}.tar.gz`;
+  // Windows releases are zips with uv.exe at the root; the others are tarballs with a directory.
+  const archive = `uv-${triple}.${triple.includes("windows") ? "zip" : "tar.gz"}`;
   const url = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${archive}`;
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) throw new Error(`failed to download ${url}: ${response.status}`);
@@ -86,8 +87,11 @@ async function ensureUv(triple) {
   }
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "claakecode-uv-"));
   await fs.writeFile(path.join(tmp, archive), bytes);
-  await execFile("tar", ["-xzf", path.join(tmp, archive), "-C", tmp]);
-  await fs.copyFile(path.join(tmp, `uv-${triple}`, "uv"), out);
+  // bsdtar reads zips too; on Windows call the system one, Git's GNU tar may come first on PATH.
+  const tar = process.platform === "win32" ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
+  await execFile(tar, ["-xf", path.join(tmp, archive), "-C", tmp]);
+  const extracted = triple.includes("windows") ? path.join(tmp, "uv.exe") : path.join(tmp, `uv-${triple}`, "uv");
+  await fs.copyFile(extracted, out);
   await fs.chmod(out, 0o755);
   await fs.rm(tmp, { recursive: true, force: true });
   console.log(`prepared ${path.relative(projectRoot, out)}`);
@@ -102,7 +106,7 @@ async function ensurePrime(triple) {
     CARGO_PROFILE_RELEASE_DEBUG: "0",
     CARGO_PROFILE_RELEASE_STRIP: "symbols",
   });
-  await fs.copyFile(path.join(src, "target", triple, "release", "prime-agent"), out);
+  await fs.copyFile(path.join(src, "target", triple, "release", `prime-agent${exe(triple)}`), out);
   await fs.chmod(out, 0o755);
   console.log(`prepared ${path.relative(projectRoot, out)}`);
 }

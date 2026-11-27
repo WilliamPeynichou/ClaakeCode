@@ -1921,7 +1921,7 @@ export function Workspace({
       if (action === "new-chat") {
         setSurface("chat");
         void createConversation();
-      } else if (action === "new-rlm-chat" && !IS_WINDOWS) {
+      } else if (action === "new-rlm-chat") {
         keepSurfaceRef.current = true;
         setSurface("rlm");
         void createRlmConversation();
@@ -1935,7 +1935,7 @@ export function Workspace({
   // same model, and starts the turn. The agent chat itself is left untouched.
   const [autoComputing, setAutoComputing] = useState(false);
   const autoCompute = useCallback(async () => {
-    if (IS_WINDOWS || autoComputing) return;
+    if (autoComputing) return;
     const source = activeConv;
     const transcript = autoComputeTranscript(source.history);
     if (!transcript) return;
@@ -2015,7 +2015,7 @@ export function Workspace({
     <ChatSurfaceTabs surface={surface} onChange={switchSurface} streaming={streamingBySurface} />
   );
   const autoComputeAction =
-    surface === "chat" && !IS_WINDOWS ? (
+    surface === "chat" ? (
       <div className="chat-head__actions">
         <button
           type="button"
@@ -2482,7 +2482,7 @@ export function Workspace({
                     type="button"
                     className="sidebar__head-btn"
                     onClick={createInSurface}
-                    disabled={surface === "rlm" && (IS_WINDOWS || rlmCreating)}
+                    disabled={surface === "rlm" && rlmCreating}
                     title={surface === "rlm" ? "New RLM chat" : "New conversation"}
                   >
                     <Icon
@@ -2654,7 +2654,6 @@ export function Workspace({
             <div className="chat-col">
               <div className="chat-head">{surfaceTabs}</div>
               <RlmEmptyState
-                available={!IS_WINDOWS}
                 creating={rlmCreating}
                 error={rlmError}
                 onCreate={() => void createRlmConversation()}

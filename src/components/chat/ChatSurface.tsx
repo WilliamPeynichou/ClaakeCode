@@ -72,12 +72,10 @@ export function ChatSurfaceTabs({
 
 /** Shown on the RLM tab while the workspace has no RLM conversation yet. */
 export function RlmEmptyState({
-  available,
   creating,
   error,
   onCreate,
 }: {
-  available: boolean;
   creating: boolean;
   error: string | null;
   onCreate: () => void;
@@ -93,19 +91,15 @@ export function RlmEmptyState({
         l'autre. Chaque conversation travaille dans son propre worktree git et a son propre
         historique, séparé du chat agent.
       </p>
-      {available ? (
-        <button
-          type="button"
-          className="rlm-empty__cta"
-          onClick={onCreate}
-          disabled={creating}
-        >
-          <Icon icon="solar:add-square-linear" width={14} height={14} />
-          <span>{creating ? "Création du worktree…" : "Nouveau chat RLM"}</span>
-        </button>
-      ) : (
-        <p className="rlm-empty__muted">Le chat RLM n'est pas encore disponible sur Windows.</p>
-      )}
+      <button
+        type="button"
+        className="rlm-empty__cta"
+        onClick={onCreate}
+        disabled={creating}
+      >
+        <Icon icon="solar:add-square-linear" width={14} height={14} />
+        <span>{creating ? "Création du worktree…" : "Nouveau chat RLM"}</span>
+      </button>
       <p className="rlm-empty__muted">
         Astuce : depuis le chat agent, le bouton <b>Auto Compute</b> ouvre un chat RLM qui
         reprend la conversation.

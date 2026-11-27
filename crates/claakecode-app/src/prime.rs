@@ -51,17 +51,40 @@ pub fn command_frame(id: &str, command: Value) -> Result<Value> {
 }
 
 #[cfg(unix)]
-pub struct Connection {
-    reader: BufReader<tokio::net::unix::OwnedReadHalf>,
-    writer: tokio::net::unix::OwnedWriteHalf,
+type Stream = tokio::net::UnixStream;
+#[cfg(windows)]
+type Stream = tokio::net::windows::named_pipe::NamedPipeClient;
+
+/// Opens the daemon endpoint: a socket file on Unix, a named pipe (`\\.\pipe\...`) on Windows.
+#[cfg(unix)]
+async fn open_stream(endpoint: &std::path::Path) -> std::io::Result<Stream> {
+    tokio::net::UnixStream::connect(endpoint).await
 }
 
-#[cfg(unix)]
+#[cfg(windows)]
+async fn open_stream(endpoint: &std::path::Path) -> std::io::Result<Stream> {
+    // Every pipe instance may be serving another client for a moment: wait for a free one.
+    const ERROR_PIPE_BUSY: i32 = 231;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        match tokio::net::windows::named_pipe::ClientOptions::new().open(endpoint) {
+            Err(error) if error.raw_os_error() == Some(ERROR_PIPE_BUSY) && tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            result => return result,
+        }
+    }
+}
+
+pub struct Connection {
+    reader: BufReader<tokio::io::ReadHalf<Stream>>,
+    writer: tokio::io::WriteHalf<Stream>,
+}
+
 impl Connection {
     pub async fn connect(socket: &std::path::Path) -> Result<Self> {
-        let stream = tokio::net::UnixStream::connect(socket)
-            .await.context("connect Prime daemon")?;
-        let (reader, writer) = stream.into_split();
+        let stream = open_stream(socket).await.context("connect Prime daemon")?;
+        let (reader, writer) = tokio::io::split(stream);
         Ok(Self { reader: BufReader::new(reader), writer })
     }
 
@@ -99,7 +122,6 @@ impl Connection {
 /// A dedicated connection per command keeps abort independent of a running prompt.
 /// Notifications received while awaiting a response are delivered to the caller.
 /// Timeout/cancellation closes the connection: uncertain mutations must NOT be retried.
-#[cfg(unix)]
 pub async fn call(
     socket: &std::path::Path,
     command: Value,
@@ -292,14 +314,12 @@ impl RlmStream {
 }
 
 /// Creates a persisted Prime session (persistence is required for RLM children). `cwd` is canonicalised.
-#[cfg(unix)]
 pub async fn create_session(socket: &std::path::Path, cwd: &std::path::Path, name: &str, script: Option<&std::path::Path>) -> Result<String> {
     Ok(create_session_with(socket, cwd, name, script, None).await?.0)
 }
 
 /// Creates a session, or reopens the persisted one at `session_path` (Prime refuses
 /// `continueRecent` by design). Returns the live id and the session file to store for reopening.
-#[cfg(unix)]
 pub async fn create_session_with(
     socket: &std::path::Path, cwd: &std::path::Path, name: &str, script: Option<&std::path::Path>,
     session_path: Option<&str>,
@@ -309,7 +329,6 @@ pub async fn create_session_with(
 
 /// Native Prime session: keep the base RLM prompt and append only host policy.
 /// `harness` is not a create-config selector in the pinned daemon; do not invent one.
-#[cfg(unix)]
 pub async fn create_rlm_session_with(
     socket: &std::path::Path, cwd: &std::path::Path, name: &str,
     session_path: Option<&str>, append_system_prompt: &str,
@@ -321,15 +340,14 @@ pub async fn create_rlm_session_with(
     Ok(created)
 }
 
-#[cfg(unix)]
 async fn create_session_config(
     socket: &std::path::Path, cwd: &std::path::Path, name: &str,
     script: Option<&std::path::Path>, session_path: Option<&str>, append_system_prompt: Option<&str>,
 ) -> Result<(String, Option<String>)> {
-    let cwd = std::fs::canonicalize(cwd).context("canonicalise session cwd")?;
+    let cwd = plain_path(std::fs::canonicalize(cwd).context("canonicalise session cwd")?);
     let mut config = json!({"cwd": cwd});
     if let Some(policy) = append_system_prompt { config["appendSystemPrompt"] = json!([policy]); }
-    if let Some(script) = script { config["script"] = json!(std::fs::canonicalize(script)?); }
+    if let Some(script) = script { config["script"] = json!(plain_path(std::fs::canonicalize(script)?)); }
     let mut command = json!({"type":"create","name":name,"config":config});
     if let Some(path) = session_path { command["sessionPath"] = json!(path); }
     let data = call(socket, command, Duration::from_secs(60), |_| {}).await?;
@@ -338,14 +356,12 @@ async fn create_session_config(
 }
 
 /// Aborts through its own connection so it never waits behind the streaming one.
-#[cfg(unix)]
 pub async fn abort_session(socket: &std::path::Path, session_id: &str) -> Result<()> {
     call(socket, json!({"type":"abort","activeSessionId":session_id}), Duration::from_secs(10), |_| {}).await.map(|_| ())
 }
 
 /// Selects the session model. Prime refuses unknown or signed-out providers; that refusal is
 /// surfaced (never a silent fallback to another model).
-#[cfg(unix)]
 pub async fn set_model(socket: &std::path::Path, session_id: &str, provider: &str, model_id: &str) -> Result<()> {
     call(
         socket,
@@ -365,7 +381,6 @@ pub fn is_model_unavailable(error: &anyhow::Error) -> bool {
 
 /// Applies a thinking level (Prime wire names: off, minimal, low, medium, high, xhigh, max).
 /// Prime clamps it to what the session model supports.
-#[cfg(unix)]
 pub async fn set_thinking_level(socket: &std::path::Path, session_id: &str, level: &str) -> Result<()> {
     call(
         socket,
@@ -439,7 +454,6 @@ pub fn declare_model(agent_dir: &std::path::Path, model: &ModelDeclaration) -> R
 
 /// Returns the response `data`. Session events arriving before the response are dropped:
 /// the attach snapshot already covers them.
-#[cfg(unix)]
 async fn wait_response(connection: &mut Connection, id: &str) -> Result<Value> {
     loop {
         let frame = tokio::time::timeout(Duration::from_secs(30), connection.receive())
@@ -491,7 +505,6 @@ const MAX_RECONNECTS: u32 = 3;
 
 /// Sends one prompt and streams `AgentEvent`s until the run ends. Replayed (historic) events are dropped.
 /// Send a prompt and wait for the daemon's settled queue, not an intermediate agent_end.
-#[cfg(unix)]
 pub async fn run_prompt(
     socket: &std::path::Path, session_id: &str, text: &str, max_idle: Duration,
     on_event: impl FnMut(crate::AgentEvent),
@@ -500,7 +513,6 @@ pub async fn run_prompt(
 }
 
 /// Retain the attach while idle so background completions and continuations stay visible.
-#[cfg(unix)]
 pub async fn observe_session(
     socket: &std::path::Path, session_id: &str,
     ready: tokio::sync::oneshot::Sender<()>,
@@ -509,7 +521,6 @@ pub async fn observe_session(
     drive_session(socket, session_id, None, Duration::from_secs(30 * 60), Some(ready), on_event).await
 }
 
-#[cfg(unix)]
 async fn drive_session(
     socket: &std::path::Path, session_id: &str, text: Option<&str>, max_idle: Duration,
     mut ready: Option<tokio::sync::oneshot::Sender<()>>,
@@ -726,12 +737,13 @@ pub struct SidecarConfig {
     pub credentials: Vec<(String, String)>,
 }
 
-#[cfg(unix)]
 pub struct Sidecar {
     child: tokio::process::Child,
     pub socket: std::path::PathBuf,
-    /// Group created for the supervisor; workers may detach, so snapshot children on stop.
+    /// Unix: group created for the supervisor. Windows: the supervisor's pid, root of its tree.
     pgid: Option<u32>,
+    /// Workers may detach (Unix), so their identities are snapshotted on stop.
+    #[cfg(unix)]
     children: Vec<PrimeProcess>,
 }
 
@@ -749,6 +761,30 @@ impl Drop for Sidecar {
         }
         if let Some(dir) = self.socket.parent() { let _ = std::fs::remove_dir_all(dir); }
     }
+}
+
+#[cfg(windows)]
+impl Drop for Sidecar {
+    fn drop(&mut self) {
+        // Workers are children of the supervisor: take the whole tree down while it is alive.
+        if let (Some(pid), Ok(None)) = (self.pgid, self.child.try_wait()) { kill_tree(pid); }
+    }
+}
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// `taskkill /T /F`: the supervisor and every process it started (no Win32 dependency).
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let system = std::env::var_os("SystemRoot").map_or_else(|| "C:\\Windows".into(), std::path::PathBuf::from);
+    let _ = std::process::Command::new(system.join("System32").join("taskkill.exe"))
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
 }
 
 /// Signals every process of group `pgid` (no libc dependency). Errors (group gone) are ignored.
@@ -880,14 +916,11 @@ fn cleanup_orphans(root: &std::path::Path) {
 
 /// Minimal environment: telemetry off, private HOME-independent state, no ambient secrets.
 pub fn sidecar_env(config: &SidecarConfig, root: &std::path::Path) -> Vec<(String, String)> {
-    let mut path = String::new();
-    if let Some(uv) = &config.uv_dir {
-        path.push_str(&uv.display().to_string());
-        path.push(':');
-    }
-    path.push_str("/usr/bin:/bin:/usr/local/bin");
+    let mut path: Vec<String> = config.uv_dir.iter().map(|uv| uv.display().to_string()).collect();
+    path.extend(system_path());
+    let separator = if cfg!(windows) { ";" } else { ":" };
     let mut env = vec![
-        ("PATH".into(), path),
+        ("PATH".into(), path.join(separator)),
         ("HOME".into(), root.display().to_string()),
         ("PRIME_AGENT_CODING_AGENT_DIR".into(), root.join("agent").display().to_string()),
         ("PRIME_AGENT_KERNEL_VENV".into(), root.join("kernel-venv").display().to_string()),
@@ -895,6 +928,8 @@ pub fn sidecar_env(config: &SidecarConfig, root: &std::path::Path) -> Vec<(Strin
         ("DO_NOT_TRACK".into(), "1".into()),
         ("PI_OFFLINE".into(), "1".into()),
     ];
+    #[cfg(windows)]
+    env.extend(windows_env(root));
     if let Some(dir) = package_dir(&config.binary) {
         env.push(("PI_PACKAGE_DIR".into(), dir.display().to_string()));
     }
@@ -902,39 +937,119 @@ pub fn sidecar_env(config: &SidecarConfig, root: &std::path::Path) -> Vec<(Strin
     env
 }
 
+#[cfg(unix)]
+fn system_path() -> Vec<String> {
+    ["/usr/bin", "/bin", "/usr/local/bin"].map(String::from).to_vec()
+}
+
+#[cfg(windows)]
+fn system_path() -> Vec<String> {
+    let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    vec![format!(r"{system}\System32"), system.clone(), format!(r"{system}\System32\Wbem")]
+}
+
+/// Windows needs a few system variables (Python's Winsock init reads SystemRoot; Prime finds
+/// Git Bash under ProgramFiles). Profile and temp folders point into the private root, like HOME:
+/// Python's `Path.home()` reads USERPROFILE, uv keeps its cache and Pythons under LOCALAPPDATA.
+#[cfg(windows)]
+fn windows_env(root: &std::path::Path) -> Vec<(String, String)> {
+    const PASSTHROUGH: [&str; 12] = [
+        "SystemRoot", "windir", "SystemDrive", "ComSpec", "PATHEXT", "ProgramFiles",
+        "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "NUMBER_OF_PROCESSORS",
+        "PROCESSOR_ARCHITECTURE", "USERNAME",
+    ];
+    let mut env: Vec<(String, String)> = PASSTHROUGH
+        .iter()
+        .filter_map(|name| std::env::var(name).ok().map(|value| (name.to_string(), value)))
+        .collect();
+    let temp = root.join("tmp");
+    let _ = std::fs::create_dir_all(&temp);
+    for (name, dir) in [
+        ("USERPROFILE", root.to_path_buf()),
+        ("LOCALAPPDATA", root.join("AppData").join("Local")),
+        ("APPDATA", root.join("AppData").join("Roaming")),
+        ("TEMP", temp.clone()),
+        ("TMP", temp),
+    ] {
+        env.push((name.into(), dir.display().to_string()));
+    }
+    env
+}
+
 /// Where Prime finds `prime-agent-runtime` (the Python sources of its kernel) when it is not
 /// next to the binary: the bundle ships it as a resource. `None` keeps Prime's own lookup
-/// (next to its executable). macOS bundle layout only for now.
+/// (next to its executable).
 fn package_dir(binary: &std::path::Path) -> Option<std::path::PathBuf> {
     let has_runtime = |dir: &std::path::Path| dir.join("prime-agent-runtime").join("pyproject.toml").is_file();
     let exe_dir = binary.parent()?;
     if has_runtime(exe_dir) {
         return None;
     }
-    let resources = exe_dir.parent()?.join("Resources").join("prime");
-    has_runtime(&resources).then_some(resources)
+    // macOS: Contents/Resources/prime. Windows installs the resources next to the executable.
+    let mut candidates = vec![exe_dir.join("prime")];
+    if let Some(contents) = exe_dir.parent() { candidates.insert(0, contents.join("Resources").join("prime")); }
+    candidates.into_iter().find(|dir| has_runtime(dir))
 }
 
+/// Private data root as Prime sees it. Prime canonicalises paths: /tmp -> /private/tmp on macOS
+/// breaks lease ownership otherwise.
+fn data_root(dir: &std::path::Path) -> Result<std::path::PathBuf> {
+    std::fs::create_dir_all(dir)?;
+    Ok(plain_path(std::fs::canonicalize(dir)?))
+}
+
+/// Windows canonical paths are verbatim (`\\?\C:\...`), which Python and uv handle badly:
+/// keep the ordinary drive form. Other paths are returned unchanged.
+pub fn plain_path(path: std::path::PathBuf) -> std::path::PathBuf {
+    #[cfg(windows)]
+    if let Some(rest) = path.to_str().and_then(|p| p.strip_prefix(r"\\?\")) {
+        if rest.as_bytes().get(1) == Some(&b':') { return rest.into(); }
+    }
+    path
+}
+
+/// A fresh daemon endpoint for this run.
+/// Unix: AF_UNIX paths are capped (~104 bytes) and app data dirs exceed it on macOS, so a short
+/// per-run directory owned by the user (0700). Windows: a named pipe with a random name.
 #[cfg(unix)]
+fn new_endpoint() -> Result<std::path::PathBuf> {
+    use std::os::unix::fs::DirBuilderExt;
+    let socket_dir = std::path::PathBuf::from("/tmp").join(format!("ccp-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
+    std::fs::DirBuilder::new().mode(0o700).create(&socket_dir)?;
+    let socket = std::fs::canonicalize(socket_dir)?.join("d.sock");
+    if socket.as_os_str().len() > 100 { bail!("Prime socket path too long"); }
+    Ok(socket)
+}
+
+#[cfg(windows)]
+fn new_endpoint() -> Result<std::path::PathBuf> {
+    Ok(format!(r"\\.\pipe\claake-prime-{}", uuid::Uuid::new_v4().simple()).into())
+}
+
+/// Kills the supervisor's family after a failed start.
+fn kill_family(id: u32) {
+    #[cfg(unix)]
+    kill_group(id, "KILL");
+    #[cfg(windows)]
+    kill_tree(id);
+}
+
 impl Sidecar {
     pub async fn start(config: &SidecarConfig) -> Result<Self> {
-        // Prime canonicalises paths: /tmp -> /private/tmp on macOS breaks lease ownership otherwise.
-        std::fs::create_dir_all(&config.data_dir)?;
-        let root = std::fs::canonicalize(&config.data_dir)?;
-        // AF_UNIX paths are capped (~104 bytes) and app data dirs exceed it on macOS:
-        // use a short per-run directory owned by the user (0700).
-        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-        let socket_dir = std::path::PathBuf::from("/tmp").join(format!("ccp-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
-        std::fs::DirBuilder::new().mode(0o700).create(&socket_dir)?;
-        let socket_dir = std::fs::canonicalize(socket_dir)?;
-        let socket = socket_dir.join("d.sock");
-        if socket.as_os_str().len() > 100 { bail!("Prime socket path too long"); }
+        let root = data_root(&config.data_dir)?;
+        let socket = new_endpoint()?;
         // Never contact the shared legacy marker: it may name another live app's daemon.
         let _ = std::fs::remove_file(root.join("daemon.socket"));
+        #[cfg(unix)]
         cleanup_orphans(&root);
         // Supervisor output may echo prompts: keep it private to the data dir (0600 on unix).
-        let log = std::fs::OpenOptions::new().create(true).append(true).open(root.join("supervisor.log"))?;
-        std::fs::set_permissions(root.join("supervisor.log"), std::fs::Permissions::from_mode(0o600))?;
+        let log_path = root.join("supervisor.log");
+        let log = std::fs::OpenOptions::new().create(true).append(true).open(&log_path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&log_path, std::fs::Permissions::from_mode(0o600))?;
+        }
         let mut command = tokio::process::Command::new(&config.binary);
         command
             .args(["--mode", "daemon", "--daemon-socket"])
@@ -947,17 +1062,24 @@ impl Sidecar {
             .stderr(std::process::Stdio::from(log))
             .kill_on_drop(true);
         // Own process group so a hard stop can target the whole family.
+        #[cfg(unix)]
         command.process_group(0);
+        // A hidden console, inherited by the workers, Python and uv: no window flashes.
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
         let mut child = command.spawn().context("spawn Prime sidecar")?;
         let pgid = child.id();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
-            if tokio::net::UnixStream::connect(&socket).await.is_ok() {
+            if open_stream(&socket).await.is_ok() {
+                #[cfg(unix)]
                 return Ok(Self { child, socket, pgid, children: Vec::new() });
+                #[cfg(windows)]
+                return Ok(Self { child, socket, pgid });
             }
             if child.try_wait()?.is_some() { bail!("Prime sidecar exited during startup"); }
             if tokio::time::Instant::now() > deadline {
-                if let Some(g) = pgid { kill_group(g, "KILL"); }
+                if let Some(id) = pgid { kill_family(id); }
                 let _ = child.kill().await;
                 bail!("Prime sidecar socket unavailable");
             }
@@ -967,6 +1089,7 @@ impl Sidecar {
 
     /// One total grace period for both the shutdown request and supervisor exit.
     pub async fn stop(mut self) -> Result<()> {
+        #[cfg(unix)]
         if let Some(pid) = self.pgid { self.children = direct_children(pid); }
         let graceful = async {
             let _ = call(&self.socket, json!({"type":"shutdown"}), Duration::from_secs(3), |_| {}).await;
@@ -974,49 +1097,18 @@ impl Sidecar {
         };
         let _ = tokio::time::timeout(Duration::from_secs(3), graceful).await;
         // Do not await another unbounded drain. Drop guards the group and detached children.
+        #[cfg(windows)]
+        if let (Some(pid), Ok(None)) = (self.pgid, self.child.try_wait()) { kill_tree(pid); }
         let _ = self.child.start_kill();
         Ok(())
     }
 }
 
 /// True when a daemon answers on `socket` (liveness probe, no command sent).
-#[cfg(unix)]
 pub async fn daemon_alive(socket: &std::path::Path) -> bool {
-    tokio::net::UnixStream::connect(socket).await.is_ok()
+    open_stream(socket).await.is_ok()
 }
 
-/// Non-Unix builds: the daemon transport is a Unix socket, so the RLM engine is unavailable.
-/// These keep the app compiling and fail every entry point with a clear message.
-#[cfg(not(unix))]
-mod unsupported {
-    use super::*;
-    const UNSUPPORTED: &str = "RLM chat is not available on this platform yet (Prime daemon needs Unix sockets)";
-
-    pub struct Sidecar { pub socket: std::path::PathBuf }
-    impl Sidecar {
-        pub async fn start(_: &SidecarConfig) -> Result<Self> { bail!(UNSUPPORTED) }
-        pub async fn stop(self) -> Result<()> { Ok(()) }
-    }
-    pub async fn daemon_alive(_: &std::path::Path) -> bool { false }
-    pub async fn call(_: &std::path::Path, _: Value, _: Duration, _: impl FnMut(Value)) -> Result<Value> { bail!(UNSUPPORTED) }
-    pub async fn create_session_with(
-        _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&std::path::Path>, _: Option<&str>,
-    ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
-    pub async fn create_rlm_session_with(
-        _: &std::path::Path, _: &std::path::Path, _: &str, _: Option<&str>, _: &str,
-    ) -> Result<(String, Option<String>)> { bail!(UNSUPPORTED) }
-    pub async fn abort_session(_: &std::path::Path, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
-    pub async fn set_model(_: &std::path::Path, _: &str, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
-    pub async fn set_thinking_level(_: &std::path::Path, _: &str, _: &str) -> Result<()> { bail!(UNSUPPORTED) }
-    pub async fn run_prompt(
-        _: &std::path::Path, _: &str, _: &str, _: Duration, _: impl FnMut(crate::AgentEvent),
-    ) -> Result<()> { bail!(UNSUPPORTED) }
-    pub async fn observe_session(
-        _: &std::path::Path, _: &str, _: tokio::sync::oneshot::Sender<()>, _: impl FnMut(crate::AgentEvent),
-    ) -> Result<()> { bail!(UNSUPPORTED) }
-}
-#[cfg(not(unix))]
-pub use unsupported::*;
 
 #[cfg(all(test, unix))]
 #[path = "prime_lifecycle_tests.rs"]
