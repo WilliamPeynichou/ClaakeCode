@@ -1636,7 +1636,9 @@ fn is_not_git_repository_error(message: &str) -> bool {
 }
 
 fn canonical_or_original(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    fs::canonicalize(path)
+        .map(claakecode_app::prime::plain_path)
+        .unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {

@@ -998,8 +998,9 @@ fn data_root(dir: &std::path::Path) -> Result<std::path::PathBuf> {
     Ok(plain_path(std::fs::canonicalize(dir)?))
 }
 
-/// Windows canonical paths are verbatim (`\\?\C:\...`), which Python and uv handle badly:
-/// keep the ordinary drive form. Other paths are returned unchanged.
+/// Windows canonical paths are verbatim (`\\?\C:\...`), which Python, uv and git handle badly
+/// (`git worktree add` fails with "Invalid argument"): keep the ordinary drive form.
+/// Other paths are returned unchanged.
 pub fn plain_path(path: std::path::PathBuf) -> std::path::PathBuf {
     #[cfg(windows)]
     if let Some(rest) = path.to_str().and_then(|p| p.strip_prefix(r"\\?\")) {
