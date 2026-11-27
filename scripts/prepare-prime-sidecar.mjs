@@ -65,7 +65,9 @@ export function targetTriples() {
   throw new Error(`No prime sidecar target for ${process.platform}/${process.arch}`);
 }
 
-const exe = (triple) => (triple.includes("windows") ? ".exe" : "");
+function exe(triple) {
+  return triple.includes("windows") ? ".exe" : "";
+}
 
 /** Tauri's externalBin naming: `<name>-<target triple>[.exe]`. */
 function outputPath(name, triple) {
