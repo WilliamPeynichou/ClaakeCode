@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 const execFile = promisify(execFileCallback);
 
 export const PRIME_REPO = "https://github.com/WilliamPeynichou/prime-agent.git";
-export const PRIME_SHA = "f24bcccebcfc4da5845cfbe84dd3cd8f0b205f77";
+export const PRIME_SHA = "2baefd68a45bd268e7e9a0333e640a6be5cee7d9";
 export const UV_VERSION = "0.12.22";
 const UV_SHA256 = {
   "aarch64-apple-darwin": "5d714de09501a59393ceca78f4bc232a50478729640d251907160299b2a93ddd",
