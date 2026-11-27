@@ -7,7 +7,7 @@ import { Sheet } from "../ui/Sheet";
 
 const DELETE_WIDTH = 92;
 
-function SwipeRow({ children, onDelete }: { children: React.ReactNode; onDelete(): void }) {
+export function SwipeRow({ children, onDelete }: { children: React.ReactNode; onDelete(): void }) {
   const [offset, setOffset] = useState(0);
   const start = useRef<{ x: number; y: number; base: number; horizontal: boolean | null } | null>(null);
 

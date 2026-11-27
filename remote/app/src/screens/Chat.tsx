@@ -40,7 +40,7 @@ const PROVIDERS: Record<string, string> = {
 // Photos are resized on the phone: smaller uploads, and relay frames stay well under the size limit.
 const PHOTO_MAX_SIDE = 1600;
 
-async function photoAttachment(file: File): Promise<Attachment> {
+export async function photoAttachment(file: File): Promise<Attachment> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");

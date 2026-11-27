@@ -6,7 +6,7 @@ compatibility_date = "2025-09-01"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/ws", "/healthz", "/vapid-public-key"]
+run_worker_first = ["/ws", "/healthz", "/vapid-public-key", "/v1/*"]
 
 [[durable_objects.bindings]]
 name = "RELAY"
@@ -16,6 +16,16 @@ class_name = "Relay"
 tag = "v1"
 new_sqlite_classes = ["Relay"]
 
-# VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are secrets (`wrangler secret put`), or .dev.vars locally.
+# Claake Ask data (schema in migrations/, applied with `wrangler d1 migrations apply claake-ask`).
+[[d1_databases]]
+binding = "DB"
+database_name = "claake-ask"
+database_id = "ede41470-aab7-4ede-9cc0-a0f1e9b607ab"
+migrations_dir = "migrations"
+
+# Secrets (`wrangler secret put`, or .dev.vars locally): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
+# GITHUB_CLIENT_SECRET and ALLOWED_GITHUB_LOGINS (comma-separated GitHub logins of the beta testers).
 [vars]
 VAPID_SUBJECT = "https://claake-remote.claakecode.workers.dev"
+# Public id of the GitHub OAuth App (empty until it is created).
+GITHUB_CLIENT_ID = "Ov23liwBVsIXBfwTTigG"

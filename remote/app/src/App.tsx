@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatScreen } from "./screens/Chat";
 import { HomeScreen } from "./screens/Home";
 import { InstallScreen } from "./screens/Install";
 import { LaunchScreen } from "./screens/Launch";
 import { PairScreen } from "./screens/Pair";
 import { SettingsScreen } from "./screens/Settings";
-import { launchedFromNotification, useRemote } from "./state";
-import { Icon } from "./ui/Icon";
+import { launchParams } from "./ask/launch";
+import { AskGate, AskTab, AskToast, VoiceTab, useAskUser } from "./screens/ask/AskTab";
+import { launchedFromNotification, useRemote, type Remote } from "./state";
+import { Icon, type IconName } from "./ui/Icon";
+import { SLIDE_MS, useEdgeSwipe } from "./ui/stack";
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isStandalone = () =>
@@ -32,34 +35,26 @@ function useKeyboardInset() {
   }, []);
 }
 
-/** Swipe from the left edge to go back, like a native navigation stack. */
-function useEdgeSwipe(enabled: boolean, onBack: () => void) {
-  const [offset, setOffset] = useState(0);
-  const start = useRef<number | null>(null);
-  const handlers = {
-    onTouchStart: (e: React.TouchEvent) => {
-      if (enabled && e.touches[0].clientX < 24) start.current = e.touches[0].clientX;
-    },
-    onTouchMove: (e: React.TouchEvent) => {
-      if (start.current !== null) setOffset(Math.max(0, e.touches[0].clientX - start.current));
-    },
-    onTouchEnd: () => {
-      if (start.current !== null && offset > 90) onBack();
-      start.current = null;
-      setOffset(0);
-    },
-  };
-  return { offset, handlers };
+type Tab = "ask" | "voice" | "remote";
+const TAB_KEY = "claake.tab";
+const TABS: { id: Tab; label: string; icon: IconName }[] = [
+  { id: "ask", label: "Conversations", icon: "bubble" },
+  { id: "voice", label: "Vocal", icon: "mic" },
+  { id: "remote", label: "Remote", icon: "laptop" },
+];
+
+function initialTab(): Tab {
+  if (launchedFromNotification) return "remote";
+  if (launchParams.tab === "ask" || launchParams.openrouterCode || launchParams.authError) return "ask";
+  const saved = localStorage.getItem(TAB_KEY);
+  return saved === "voice" || saved === "remote" ? saved : "ask";
 }
 
-const SLIDE_MS = 320;
-
-export function App() {
-  const remote = useRemote();
+/** The Mac remote: pairing, then the conversations of the Mac's projects. */
+function RemoteTab({ remote, onBar }: { remote: Remote; onBar(hidden: boolean): void }) {
   const [page, setPage] = useState<"settings" | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [skipInstall, setSkipInstall] = useState(false);
-  // The project picker opens each time the app launches, unless a notification opened a chat.
+  // The Mac project picker opens the first time the tab shows, unless a notification opened a chat.
   const [launching, setLaunching] = useState(!launchedFromNotification);
   const code = new URLSearchParams(location.search).get("code")?.replace(/\D/g, "").slice(0, 6) ?? "";
   const pushed = remote.currentId !== null ? "chat" : page;
@@ -69,6 +64,8 @@ export function App() {
       setLaunching(false);
     }
   }, [remote.currentId]);
+  const showLaunch = launching && Boolean(remote.session);
+  useEffect(() => onBar(pushed !== null || showLaunch), [pushed, showLaunch]);
   // The pushed screen keeps its content while it slides away.
   const back = () => {
     if (!pushed || leaving) return;
@@ -80,12 +77,8 @@ export function App() {
     }, SLIDE_MS);
   };
   const swipe = useEdgeSwipe(Boolean(pushed) && !leaving, back);
-  useKeyboardInset();
 
-  if (!remote.session) {
-    if (isIos() && !isStandalone() && !skipInstall) return <InstallScreen code={code || null} onSkip={() => setSkipInstall(true)} />;
-    return <PairScreen remote={remote} initialCode={code} />;
-  }
+  if (!remote.session) return <PairScreen remote={remote} initialCode={code} />;
 
   const front = pushed !== null && !leaving;
   return (
@@ -105,12 +98,83 @@ export function App() {
         {pushed === "chat" && <ChatScreen remote={remote} onBack={back} />}
         {pushed === "settings" && <SettingsScreen remote={remote} onBack={back} />}
       </div>
-      {launching && <LaunchScreen remote={remote} onDone={() => setLaunching(false)} />}
-      {remote.error && (
+      {showLaunch && <LaunchScreen remote={remote} onDone={() => setLaunching(false)} />}
+    </div>
+  );
+}
+
+function TabBar({ tab, onTab }: { tab: Tab; onTab(tab: Tab): void }) {
+  return (
+    <nav className="tabbar" aria-label="Sections">
+      {TABS.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className="tabbar__item"
+          data-active={tab === t.id}
+          aria-current={tab === t.id ? "page" : undefined}
+          onClick={() => onTab(t.id)}
+        >
+          <Icon name={t.icon} size={22} stroke={tab === t.id ? 2.2 : 1.8} />
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+export function App() {
+  const remote = useRemote();
+  const ask = useAskUser();
+  const [skipInstall, setSkipInstall] = useState(false);
+  const [tab, setTab] = useState<Tab>(initialTab);
+  // Tabs mount on first visit, then stay mounted so they keep their place.
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set([initialTab()]));
+  const [hidden, setHidden] = useState<Record<Tab, boolean>>({ ask: false, voice: false, remote: false });
+  useKeyboardInset();
+
+  function open(next: Tab) {
+    setTab(next);
+    setVisited((v) => (v.has(next) ? v : new Set(v).add(next)));
+    localStorage.setItem(TAB_KEY, next);
+  }
+  // A tapped notification opens its Mac conversation.
+  useEffect(() => {
+    if (remote.currentId !== null) open("remote");
+  }, [remote.currentId]);
+
+  if (!remote.session && isIos() && !isStandalone() && !skipInstall) {
+    const code = new URLSearchParams(location.search).get("code")?.replace(/\D/g, "").slice(0, 6) ?? "";
+    return <InstallScreen code={code || null} onSkip={() => setSkipInstall(true)} />;
+  }
+
+  const barHidden = hidden[tab];
+  const bar = (id: Tab) => (value: boolean) => setHidden((h) => (h[id] === value ? h : { ...h, [id]: value }));
+  return (
+    <div className="tabs" data-bar={!barHidden}>
+      {visited.has("ask") && (
+        <div className="tab-panel" hidden={tab !== "ask"}>
+          <AskGate ask={ask}>{(user) => <AskTab ask={ask} user={user} active={tab === "ask"} onBar={bar("ask")} />}</AskGate>
+        </div>
+      )}
+      {visited.has("voice") && (
+        <div className="tab-panel" hidden={tab !== "voice"}>
+          <VoiceTab ask={ask} active={tab === "voice"} />
+        </div>
+      )}
+      {visited.has("remote") && (
+        <div className="tab-panel" hidden={tab !== "remote"}>
+          <RemoteTab remote={remote} onBar={bar("remote")} />
+        </div>
+      )}
+      {!barHidden && <TabBar tab={tab} onTab={open} />}
+      {tab === "remote" && remote.error ? (
         <button type="button" className="toast" onClick={remote.actions.clearError}>
           <Icon name="warning" size={17} />
           <span>{remote.error}</span>
         </button>
+      ) : (
+        tab !== "remote" && <AskToast ask={ask} />
       )}
     </div>
   );

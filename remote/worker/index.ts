@@ -1,8 +1,9 @@
 /// <reference types="@cloudflare/workers-types" />
 import { DurableObject } from "cloudflare:workers";
+import { handleAsk, type AskEnv } from "./ask";
 import { sendPush, type PushSubscription, type VapidConfig } from "./push";
 
-interface Env {
+interface Env extends AskEnv {
   ASSETS: Fetcher;
   RELAY: DurableObjectNamespace;
   VAPID_PUBLIC_KEY: string;
@@ -28,6 +29,7 @@ export default {
     if (url.pathname === "/vapid-public-key") {
       return json({ publicKey: env.VAPID_PUBLIC_KEY || null }, { headers: { "cache-control": "no-store" } });
     }
+    if (url.pathname.startsWith("/v1/")) return handleAsk(request, env, url);
     if (url.pathname === "/ws") {
       if (request.headers.get("upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
       return env.RELAY.get(env.RELAY.idFromName("relay")).fetch(request);
